@@ -870,3 +870,24 @@ var ButtonLoading = (function() {
   }
   return { start: start, run: run };
 })();
+
+// =====================================================================
+// Mobile: collapse Source disclosure at load. The input-section should
+// fit on one screen on phones — scrolling kicks in only when a result
+// renders below. The Source details is `open` in HTML so desktop users
+// see the URL template immediately; on narrow viewports we close it so
+// the panel stays compact. Users can still expand it with one tap.
+// =====================================================================
+(function closeSourceOnMobile() {
+  if (window.innerWidth > 1199) return;
+  function apply() {
+    document.querySelectorAll('details.lookup-source[open]').forEach(function(d) {
+      d.removeAttribute('open');
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+})();
