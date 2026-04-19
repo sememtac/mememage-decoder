@@ -208,6 +208,30 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 .ev-mv { font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; color: #c0c0c8; }
 .ev-mv.pass { color: #4ade80; }
 .ev-mv.fail { color: #f87171; }
+
+/* Mobile: tighten Observatory evidence cards + orbit inspector + audit
+   rows so nested forensic content doesn't squish on narrow viewports.
+   Collapse 2-col grids to single columns, shrink card margins/padding,
+   and make the fixed-width orbit-ages window scale to viewport width. */
+@media (max-width: 600px) {
+  .ev { margin: 0.6rem 0.4rem; }
+  .ev-body { padding: 0.6rem 0.7rem; }
+  .ev-g { grid-template-columns: 1fr; gap: 0.25rem; }
+  .ev-h { padding: 0.5rem 0.7rem; }
+  .ev-t { font-size: 0.75rem; }
+  .orbit-ages-window { width: 100%; max-width: 100%; }
+  .orbit-age { width: 33.333%; }
+  .orbit-age.near-1, .orbit-age.near-2 { width: 20%; }
+  .orbit-grid { margin: 0; overflow-x: auto; }
+  .orbit-controls { gap: 0.4rem; }
+  .orbit-vbtn { font-size: 0.64rem; padding: 0.2rem 0.55rem; }
+
+  /* Audit report — reduce section margins and let rows stack when
+     the value would otherwise wrap weirdly next to a label. */
+  .audit-section { margin: 0.6rem 0.6rem; }
+  .audit-row { flex-wrap: wrap; row-gap: 0.1rem; }
+  .audit-val { text-align: left; flex: 1 1 100%; min-width: 0; }
+}
 .bar-img { width: 100%; image-rendering: pixelated; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
 
 /* NCM grid */
