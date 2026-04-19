@@ -94,17 +94,12 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Mobile scroll order: input → result/cert → footer. Dissolve
-   .panel-left as a layout container via display:contents so its
-   children become flex items of .panel-layout, then flex `order`
-   places the cert between the input group and the footer. Desktop
-   (layout-active) keeps its fixed two-panel layout — the media
-   query below this block only reapplies on small viewports. */
-@media (max-width: 1199px) {
-  .panel-left { display: contents; }
-  .panel-layout .panel-right { order: 5; }
-  .panel-layout .panel-footer { order: 10; width: 100%; max-width: 680px; }
-}
+/* .panel-footer now sits as a direct child of .panel-layout after
+   .panel-right. On mobile that DOM order gives the scroll flow we
+   want naturally (input → cert → footer) without needing
+   display:contents on .panel-left (which had an iOS Safari bug
+   where it swallowed click events on descendants). */
+.panel-footer { width: 100%; max-width: 680px; }
 
 @media (min-width: 1200px) {
   .panel-layout.layout-active {
@@ -156,6 +151,13 @@
   .panel-layout.layout-active .panel-right.panel-right-has-player {
     overflow: hidden;
   }
+
+  /* Desktop compact mode: panel-left and panel-right are both
+     position:fixed, so the panel-footer (a normal flow sibling)
+     would float at the top of the page behind the fixed layers.
+     Hide it — the cert is the focus, and the footer belongs to
+     the cold-start scroll state. */
+  .panel-layout.layout-active .panel-footer { display: none; }
 
   body:has(.panel-layout.layout-active) {
     overflow: hidden;
