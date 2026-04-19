@@ -1128,7 +1128,10 @@ Portal.init({
     if (!cw || !cw.classList.contains('visible')) { done(); return; }
     if (typeof CosmicPlayer !== 'undefined') CosmicPlayer.dismiss();
     cw.classList.add('dismissing');
-    cw.addEventListener('animationend', function() {
+    var finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
       cw.classList.remove('visible', 'dismissing');
       cw.innerHTML = '';
       var dm = document.querySelector('.panel-layout');
@@ -1141,7 +1144,12 @@ Portal.init({
       } else {
         done();
       }
-    }, { once: true });
+    }
+    cw.addEventListener('animationend', finish, { once: true });
+    // Safety fallback — if animationend never fires (CSS cascade bug,
+    // reduced-motion, etc.) the portal flow must still proceed. 600ms
+    // is well past panelFadeOut's 0.4s duration.
+    setTimeout(finish, 600);
   },
 });
 

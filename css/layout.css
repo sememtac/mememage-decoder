@@ -49,10 +49,6 @@
   display: block;
 }
 
-.panel-right.dismissing {
-  animation: panelFadeOut 0.4s ease-in forwards;
-}
-
 /* Mobile reveal animation. On desktop, PanelSwap drives all intros via
    .panel-swap-in (cold start + hot swap alike) and .visible must NOT
    carry an animation — when .panel-swap-in is removed at animation end
@@ -64,6 +60,15 @@
   .panel-right.visible {
     animation: panelFadeIn 0.6s ease-out;
   }
+}
+
+/* Dismissing rule comes AFTER the mobile .visible animation rule so
+   it wins on the cascade — earlier ordering meant mobile Safari kept
+   running the already-ended panelFadeIn and the dismiss animationend
+   never fired, hanging the portal transition from decoder→validator
+   whenever a cert was loaded. */
+.panel-right.dismissing {
+  animation: panelFadeOut 0.4s ease-in forwards;
 }
 
 @keyframes panelFadeIn {
