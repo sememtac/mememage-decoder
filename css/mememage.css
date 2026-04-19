@@ -16,18 +16,6 @@
     .lookup-input, .audit-input { font-size: 16px; }
   }
 
-  /* Mobile: release the 365px panel lock. The desktop-oriented
-     height:365px + overflow-y:auto makes the system box its own
-     scroll container, which reads as a pannable pane on touch
-     screens (awkward — thumb scrolls the box, not the page).
-     Let content flow naturally so the page scrolls as one unit. */
-  @media (max-width: 1199px) {
-    .input-panel {
-      height: auto;
-      min-height: 0;
-      overflow: visible;
-    }
-  }
 
   :root {
     --bg-deep: #000000;
@@ -205,6 +193,19 @@
     transition: height var(--compact-duration) var(--compact-ease);
   }
   .input-panel::-webkit-scrollbar { display: none; }
+  /* Mobile: release the 365px lock. On touch screens the desktop
+     height:365px + overflow-y:auto makes the system box its own
+     scroll container — thumb drags pan the box's content instead
+     of the page. Let content flow naturally so the page scrolls
+     as one unit. Declared AFTER the base rule so the cascade
+     honors the override on small viewports. */
+  @media (max-width: 1199px) {
+    .input-panel {
+      height: auto;
+      min-height: 0;
+      overflow: visible;
+    }
+  }
   /* Flex column lets the panel's error slot (drop-error, lookup-error,
      verify-status, .how, img-console.error-only, .tab-error) sit at the
      bottom of the 323px tab via margin-top: auto — errors never push
