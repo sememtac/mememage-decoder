@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cosmic Audio — Production Test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d0d14; color: #c8c8d4; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+h1 { font-size: 1rem; font-weight: 300; letter-spacing: 0.15em; margin-bottom: 1.5rem; }
+.controls { display: flex; flex-direction: column; gap: 0.8rem; max-width: 400px; width: 100%; }
+.row { display: flex; gap: 0.5rem; align-items: center; }
+label { font-size: 0.7rem; color: #6a6a80; min-width: 100px; }
+select, button { background: #1a1a2e; color: #c8c8d4; border: 1px solid #2a2a40; border-radius: 4px; padding: 0.4rem 0.8rem; font-family: inherit; font-size: 0.75rem; cursor: pointer; }
+button { background: #2a2a40; }
+button:hover { background: #3a3a50; }
+.status { margin-top: 1.5rem; font-size: 0.7rem; color: #4a4a60; text-align: center; line-height: 1.8; }
+.song-name { font-size: 0.9rem; color: #8a7aaa; margin-top: 0.5rem; }
+canvas { width: 400px; height: 60px; background: #12121e; border-radius: 6px; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<h1>PRODUCTION AUDIO TEST</h1>
+<div class="controls">
+  <div class="row">
+    <label>Sign</label>
+    <select id="sign">
+      <option value="Aries">Aries</option><option value="Taurus">Taurus</option>
+      <option value="Gemini">Gemini</option><option value="Cancer">Cancer</option>
+      <option value="Leo">Leo</option><option value="Virgo">Virgo</option>
+      <option value="Libra">Libra</option><option value="Scorpio" selected>Scorpio</option>
+      <option value="Sagittarius">Sagittarius</option><option value="Capricorn">Capricorn</option>
+      <option value="Aquarius">Aquarius</option><option value="Pisces">Pisces</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>Moon</label>
+    <select id="moon">
+      <option value="New Moon">New Moon</option><option value="Waxing Crescent">Waxing Crescent</option>
+      <option value="First Quarter">First Quarter</option><option value="Waxing Gibbous">Waxing Gibbous</option>
+      <option value="Full Moon" selected>Full Moon</option><option value="Waning Gibbous">Waning Gibbous</option>
+      <option value="Last Quarter">Last Quarter</option><option value="Waning Crescent">Waning Crescent</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>Temperament</label>
+    <select id="temp">
+      <option value="serene" selected>Serene</option><option value="clean">Clean</option>
+      <option value="turbulent">Turbulent</option><option value="electric">Electric</option>
+      <option value="shifting">Shifting</option><option value="fever">Fever</option>
+      <option value="knotted">Knotted</option><option value="perfect">Perfect</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>Rarity</label>
+    <select id="rarity">
+      <option value="20">Common</option><option value="40">Uncommon</option>
+      <option value="55" selected>Rare</option><option value="65">Very Rare</option>
+      <option value="75">Epic</option><option value="85">Legendary</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>Hash</label>
+    <select id="hash">
+      <option value="">— no hash (same params = same sound) —</option>
+      <option value="a7f39c2d8b04e51a" selected>Star #1 (a7f3...)</option>
+      <option value="3b8e1f6a92c0d745">Star #2 (3b8e...)</option>
+      <option value="c4d2e8f1a6b39057">Star #3 (c4d2...)</option>
+      <option value="918f2b7c3d0ea456">Star #4 (918f...)</option>
+      <option value="f5a1c83e2d7b4609">Star #5 (f5a1...)</option>
+      <option value="6e0d49b8a2f17c35">Star #6 (6e0d...)</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>Mode</label>
+    <select id="mode">
+      <option value="speaker" selected>Speaker (phone-friendly, root ↑2 octaves)</option>
+      <option value="cosmic">Cosmic (headphones, deep sub mix)</option>
+    </select>
+  </div>
+  <div class="row" style="justify-content:center; gap:1rem; margin-top:0.5rem;">
+    <button onclick="play()">Play</button>
+    <button onclick="stop()">Stop</button>
+  </div>
+</div>
+<div class="status" id="status">Two layers: ambient + drift</div>
+<div class="song-name" id="songName"></div>
+<canvas id="viz" width="400" height="60"></canvas>
+
+<script src="js/cosmic-audio.js"></script>
+<script>
+var audioCtx = null;
+var masterGain = null;
+var analyser = null;
+var cosmicAudio = null;
+var animId = null;
+
+function play() {
+  stop();
+
+  var params = {
+    sign: document.getElementById('sign').value,
+    moonPhase: document.getElementById('moon').value,
+    temperament: document.getElementById('temp').value,
+    rarity: parseInt(document.getElementById('rarity').value),
+    hash: document.getElementById('hash').value,
+    // speaker:true is the CosmicAudio default — pass false for the
+    // deep headphone mix (sub-octave + wide stereo, no phone lift).
+    speaker: document.getElementById('mode').value === 'speaker'
+  };
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume().then(function() {
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0;
+    masterGain.connect(audioCtx.destination);
+
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    masterGain.connect(analyser);
+
+    cosmicAudio = CosmicAudio.create(params);
+    cosmicAudio.start(audioCtx, masterGain);
+
+    // Fade in
+    var now = audioCtx.currentTime;
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(0.5, now + 12);
+
+    document.getElementById('status').textContent =
+      params.sign + ' . ' + params.moonPhase + ' . ' + params.temperament +
+      ' . rarity ' + params.rarity + ' — ' + cosmicAudio.element +
+      ' — ' + (params.speaker ? 'speaker mode' : 'cosmic mode');
+
+    // Song name
+    document.getElementById('songName').textContent = CosmicAudio.songName('test' + cosmicAudio.seed);
+
+    drawViz();
+  });
+}
+
+function stop() {
+  if (cosmicAudio) { cosmicAudio.stop(); cosmicAudio = null; }
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  if (audioCtx && audioCtx.state !== 'closed') {
+    try { audioCtx.close(); } catch(e) {}
+  }
+  audioCtx = null; masterGain = null; analyser = null;
+}
+
+function drawViz() {
+  if (!analyser) return;
+  var canvas = document.getElementById('viz');
+  var ctx = canvas.getContext('2d');
+  var bufLen = analyser.frequencyBinCount;
+  var dataArr = new Uint8Array(bufLen);
+  function draw() {
+    animId = requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(dataArr);
+    ctx.fillStyle = 'rgba(18,18,30,0.3)';
+    ctx.fillRect(0, 0, 400, 60);
+    var barW = 400 / bufLen * 2;
+    for (var i = 0; i < bufLen; i++) {
+      var v = dataArr[i] / 255;
+      var h = v * 50;
+      ctx.fillStyle = 'hsla(220, 40%, ' + (25 + v * 35) + '%, ' + (0.3 + v * 0.5) + ')';
+      ctx.fillRect(i * barW, 60 - h, barW - 1, h);
+    }
+  }
+  draw();
+}
+</script>
+</body>
+</html>
