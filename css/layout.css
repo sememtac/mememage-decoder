@@ -245,6 +245,22 @@
   letter-spacing: 0.05em;
 }
 
+/* Mobile: tighten the footer stack so the whole block sits above iOS
+   Chrome's bottom toolbar. Matches the system-box compact philosophy
+   — no scrolling to reach the footer on an idle page. */
+@media (max-width: 1199px) {
+  .panel-footer { margin-top: 0.5rem; }
+  .panel-footer .note {
+    font-size: 0.66rem;
+    margin: 0.6rem 0 0;
+    line-height: 1.4;
+  }
+  .panel-footer .page-footer {
+    margin-top: 0.4rem;
+    font-size: 0.62rem;
+  }
+}
+
 /* ================================================================
    Drag-to-scroll — wired by DragScroll.attach in portal.js. Scroll
    containers in content-heavy panels (cert plate, validator results

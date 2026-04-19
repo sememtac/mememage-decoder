@@ -75,6 +75,27 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 
 /* Attack mode — #tab-attack takes the tab slot, same dimensions */
 #tab-attack { display: none; min-height: 365px; }
+#tab-attack > div { padding: 0.8rem 1.2rem 1rem; }
+
+/* Mobile: compact the attack lab so it fits in one page alongside
+   the header and DECODER portal. Shorter textareas, tighter labels,
+   smaller dhash cells — same UX, a third less vertical space. */
+@media (max-width: 1199px) {
+  #tab-attack { min-height: 0; }
+  #tab-attack > div { padding: 0.5rem 0.8rem 0.6rem; }
+  #tab-attack > div > p:first-child { font-size: 0.6rem; margin: 0 0 0.25rem; }
+  .atk-sec { margin: 0.3rem 0 0.15rem; font-size: 0.56rem; }
+  .atk-field { padding: 0.3rem; font-size: 0.6rem; }
+  .atk-field#atk-record { height: 70px !important; }
+  .atk-field#atk-sig { height: 44px; }
+  .atk-field#atk-pub { height: 28px; }
+  .atk-status { font-size: 0.58rem; margin-top: 0.25rem; }
+  .atk-dhash { margin-top: 0.2rem; gap: 0.7rem; }
+  .atk-dhash-pair td { width: 2.5px; height: 2.5px; }
+  .atk-dhash-label { font-size: 0.48rem; }
+  #atk-drop { padding: 0.3rem 0.5rem !important; font-size: 0.6rem !important; }
+  #atk-reset { padding: 0.3rem 0.6rem !important; font-size: 0.56rem !important; }
+}
 .input-section.attack-active .input-tabs,
 .input-section.attack-active .input-panel.active { display: none; }
 .input-section.attack-active #tab-attack { display: block; }
@@ -608,7 +629,7 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 
 <div class="console-example" id="attackToggle"><a href="#" id="attackToggleLink">test an attack</a></div>
 <div id="tab-attack">
-<div style="padding:0.8rem 1.2rem 1rem;">
+<div>
 <p style="color:#6a6a74;font-size:0.62rem;margin:0 0 0.4rem;"><span style="color:#a0a0b0;">You are the attacker.</span> Edit, forge, swap. Watch the cert.</p>
 
 <div class="atk-sec">Tamper Record</div>
