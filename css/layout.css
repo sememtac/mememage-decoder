@@ -211,6 +211,15 @@
   letter-spacing: 0.08em;
 }
 
+/* Mobile: trim the header so the system box + portal fit under iOS
+   Chrome's chrome (top URL bar + bottom toolbar). Every reclaimed
+   pixel goes into the panel below. */
+@media (max-width: 1199px) {
+  .page-header { margin-bottom: 0.5rem; }
+  .page-header h1 { font-size: 1.35rem; margin-bottom: 0.15rem; letter-spacing: 0.15em; }
+  .page-header .subtitle { font-size: 0.66rem; }
+}
+
 /* ================================================================
    Footer pattern — a single footer block that lives inside the
    left column. On desktop it's already in the scroll region; on

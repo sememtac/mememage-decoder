@@ -124,6 +124,21 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 .drop-zone .drop-icon { color: #a0a0a8; }
 .drop-zone .drop-hint { color: #5a5a64; }
 
+/* Audit tab wrapper — replaces the former inline style="padding:1.2rem".
+   Class form lets the mobile shrink rule in mememage.css reduce padding
+   without fighting inline-style specificity. */
+.audit-wrap { padding: 1.2rem; }
+@media (max-width: 1199px) { .audit-wrap { padding: 0.7rem 0.8rem; } }
+
+/* Attack toggle — class form so the mobile .console-example rule in
+   mememage.css can trim its padding without fighting inline styles. */
+#attackToggle { border-top: 1px solid rgba(255,255,255,0.04); }
+#attackToggleLink {
+  color: #606068; font-size: 0.72rem; font-weight: 300;
+  text-decoration: none; letter-spacing: 0.04em; transition: color 0.3s;
+}
+#attackToggleLink:hover { color: #909098; }
+
 /* Compact state — uniformly triggered by .panel-layout.layout-active
    so all three tabs collapse their 323px reserve when a cert/result is
    rendered on the right. Matches the decoder's compact rules and uses
@@ -543,7 +558,7 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 </div>
 
 <div class="input-panel" id="tab-cert">
-<div style="padding:1.2rem;">
+<div class="audit-wrap">
   <div class="audit-lookup">
     <input class="audit-input" id="auditInput" type="text" placeholder="mememage-identifier">
     <button class="audit-btn" id="auditBtn" onclick="runAudit()">Audit</button>
@@ -591,7 +606,7 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 </div>
 </div>
 
-<div class="console-example" id="attackToggle" style="text-align:center;padding:0.6rem 1.2rem 0.8rem;border-top:1px solid rgba(255,255,255,0.04);"><a href="#" id="attackToggleLink" style="color:#606068;font-size:0.72rem;font-weight:300;text-decoration:none;letter-spacing:0.04em;transition:color 0.3s;" onmouseover="this.style.color='#909098'" onmouseout="this.style.color='#606068'">test an attack</a></div>
+<div class="console-example" id="attackToggle"><a href="#" id="attackToggleLink">test an attack</a></div>
 <div id="tab-attack">
 <div style="padding:0.8rem 1.2rem 1rem;">
 <p style="color:#6a6a74;font-size:0.62rem;margin:0 0 0.4rem;"><span style="color:#a0a0b0;">You are the attacker.</span> Edit, forge, swap. Watch the cert.</p>

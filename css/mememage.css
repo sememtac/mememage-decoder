@@ -882,13 +882,31 @@
      these rules earlier causes later rules to silently override them.
      ================================================================ */
   @media (max-width: 1199px) {
-    .input-panel.active { height: 360px; }
+    .input-panel.active { height: 300px; }
+    /* #imagePanel .drop-error has margin-top:auto + 1.6rem min-height on
+       desktop to pin the error slot to the panel bottom — on mobile that
+       reserve becomes 47px of dead space above "see an example" when the
+       error is empty. Collapse it and let drop-zone's flex-grow claim
+       the space instead. */
+    #imagePanel .drop-error { margin-top: 0; min-height: 0; }
+    #imagePanel .drop-error:empty { display: none; }
     /* Drop-zone tightening — smaller padding, icon, and hint so the
-       upload boxes don't eat the entire panel. */
-    .drop-zone { padding: 1rem 1rem; }
-    .drop-zone .drop-icon { font-size: 1.2rem; margin-bottom: 0.3rem; }
-    .drop-zone p { font-size: 0.76rem; }
-    .drop-zone .drop-hint { font-size: 0.6rem; max-height: 28px; margin-top: 0.25rem; }
+       upload boxes don't eat the entire panel. flex: 1 lets drop-only
+       tabs (By Sight solo, Observatory, Image) stretch the box to fill
+       empty space instead of leaving dead gaps below. The id-scoped
+       rules below (By Sight + By Soul) match the desktop spec's
+       specificity so they actually apply on mobile. */
+    .drop-zone { padding: 0.7rem 1rem; flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #imagePanel .drop-zone { flex: 1 1 auto; }
+    .drop-zone .drop-icon { font-size: 1.1rem; margin-bottom: 0.2rem; }
+    .drop-zone p { font-size: 0.72rem; }
+    .drop-zone .drop-hint { font-size: 0.58rem; max-height: 24px; margin-top: 0.2rem; }
+    /* By Soul pair of drop-zones stacked on mobile — shrink the 100px
+       min-height and let the pair flex-grow so it fills the 300px panel. */
+    .verify-pair { gap: 0.4rem; flex: 1 1 auto; }
+    .verify-slot { display: flex; }
+    .verify-slot .drop-zone { min-height: 0 !important; padding: 0.5rem 0.8rem; }
+    .verify-link { padding: 0.1rem 0 !important; font-size: 0.6rem; }
     /* Source disclosure rows — tighter so the open state fits under the
        drop-zone/input without overflowing the 360px panel. */
     .lookup-source summary { font-size: 0.6rem; padding: 0.25rem 0; }
@@ -902,22 +920,32 @@
     .lookup-btn, .audit-btn { padding: 0.55rem 0.8rem; }
     .lookup-btn, .audit-btn { min-width: 5.5rem; font-size: 0.76rem; }
     /* Hints — drop the 2rem top margin + generous padding that desktop
-       layout relies on. On mobile every pixel counts. */
+       layout relies on. On mobile every pixel counts. Keep display: block
+       so inline text (e.g., <em>By Sight</em>) flows naturally. */
     .lookup-hint, .how {
       font-size: 0.62rem;
       margin-top: 0.5rem;
       padding: 0.4rem 0.7rem;
       line-height: 1.4;
     }
-    /* Error slots — empty reserves collapse. The desktop y-lock (80px
-       reserve) isn't worth the space on a phone; errors flow naturally
-       when they appear. */
+    /* On By Word / Audit the content naturally stacks form → Source →
+       hint. Push the hint to the panel bottom with margin-top: auto
+       so dead space collects between Source and hint instead of below
+       the hint — reads better when the link ("see an example" / "test
+       an attack") sits right under the hint box. */
+    #lookupPanel .lookup-hint,
+    #tab-cert .how { margin-top: auto; }
+    /* Error slots — empty reserves collapse AND drop the margin-top:
+       auto y-lock the desktop uses. On mobile the error can appear
+       where it naturally sits; forcing it to the panel bottom leaves
+       dead space above it when empty. */
     .panel-error-head {
       font-size: 0.68rem;
       min-height: 0;
+      margin-top: 0;
       padding: 0.2rem 0.8rem;
     }
-    .panel-error-head:empty { padding: 0; }
+    .panel-error-head:empty { padding: 0; display: none; }
     .panel-error-body {
       font-size: 0.6rem;
       min-height: 0;
@@ -925,7 +953,15 @@
     }
     .panel-error-body:not(:empty) { padding: 0.3rem 0.8rem 0; }
     /* Panel wrap padding trimmed so content sits closer to the edges. */
-    .input-panel-wrap { padding: 0.8rem; }
+    .input-panel-wrap { padding: 0.6rem 0.8rem; }
+    /* Tabs row shorter — saves ~12px per row. */
+    .input-tab { padding: 0.55rem 0.4rem; font-size: 0.7rem; }
+    /* Try Example and portal link — tighter vertical reserve so the
+       system box's last line sits above iOS Chrome's bottom toolbar. */
+    .console-example { padding: 0.25rem 1rem 0.35rem; }
+    .console-example a { font-size: 0.66rem; }
+    .evidence-wrap { padding: 0.25rem 0 0.35rem; }
+    .portal-link { font-size: 0.58rem; padding: 0.15rem 0.8rem; }
   }
 
   /* ================================================================
