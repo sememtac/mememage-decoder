@@ -1129,19 +1129,27 @@ Portal.init({
     if (typeof CosmicPlayer !== 'undefined') CosmicPlayer.dismiss();
     cw.classList.add('dismissing');
     var finished = false;
+    var isDesktop = window.innerWidth >= 1200;
     function finish() {
       if (finished) return;
       finished = true;
       cw.classList.remove('visible', 'dismissing');
       cw.innerHTML = '';
       var dm = document.querySelector('.panel-layout');
-      if (dm && dm.classList.contains('layout-active')) {
+      // Desktop-only: animate the two-panel layout collapsing back
+      // to single-column before departing. On mobile the
+      // layout-collapsing class is a no-op (mobile CSS overrides
+      // already released the fixed-panel lock), so waiting on it is
+      // pure dead time — skip straight to done() so the portal
+      // flip feels responsive.
+      if (dm && dm.classList.contains('layout-active') && isDesktop) {
         dm.classList.add('layout-collapsing');
         setTimeout(function() {
           dm.classList.remove('layout-active', 'layout-collapsing');
           setTimeout(done, 100);
         }, 500);
       } else {
+        if (dm) dm.classList.remove('layout-active');
         done();
       }
     }
