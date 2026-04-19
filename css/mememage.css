@@ -692,6 +692,7 @@
   .lookup-form, .audit-lookup { display: flex; gap: 0.6rem; }
   .lookup-input, .audit-input {
     flex: 1;
+    min-width: 0;  /* let flex-shrink claim below the input's intrinsic size (default 20ch) so the row fits narrow viewports */
     padding: 0.85rem 1rem;
     border-radius: var(--radius-sm);
     font-family: inherit;
