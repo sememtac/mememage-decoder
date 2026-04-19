@@ -94,6 +94,18 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Mobile scroll order: input → result/cert → footer. Dissolve
+   .panel-left as a layout container via display:contents so its
+   children become flex items of .panel-layout, then flex `order`
+   places the cert between the input group and the footer. Desktop
+   (layout-active) keeps its fixed two-panel layout — the media
+   query below this block only reapplies on small viewports. */
+@media (max-width: 1199px) {
+  .panel-left { display: contents; }
+  .panel-layout .panel-right { order: 5; }
+  .panel-layout .panel-footer { order: 10; width: 100%; max-width: 680px; }
+}
+
 @media (min-width: 1200px) {
   .panel-layout.layout-active {
     max-width: 1200px;
