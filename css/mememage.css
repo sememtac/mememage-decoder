@@ -193,29 +193,21 @@
     transition: height var(--compact-duration) var(--compact-ease);
   }
   .input-panel::-webkit-scrollbar { display: none; }
-  /* Mobile: the system box fits on one screen, only results below
-     scroll into view. Release the desktop 365px lock so each tab's
-     natural height drives layout, but cap the ACTIVE panel to the
-     small viewport height so expanding Source (or any content growth)
-     scrolls internally instead of pushing the portal link off-screen.
-     svh accounts for iOS Safari's visible chrome (top bar + bottom
-     toolbar); the 200px reserve covers the page header, tabs row,
-     portal link, and safe-area insets. vh fallback for iOS <15.4. */
+  /* Mobile: the system box fits on one screen. No scrolling inside
+     the box, no height expansion when Source opens. Every tab reserves
+     the same height (360px) — big enough to accommodate the tallest
+     state any tab can reach (Source expanded + drop-zone + errors) so
+     switching tabs or toggling Source never changes box height. Content
+     that's shorter than 360px just leaves empty space, which is fine:
+     the consistency buys predictable layout. The compact element rules
+     below (drop-zone, Source, inputs, hints) keep every max state under
+     360px so overflow never happens. */
   @media (max-width: 1199px) {
     .input-panel {
       height: auto;
       min-height: 0;
       overflow: visible;
     }
-    .input-panel.active {
-      max-height: calc(100vh - 240px);
-      max-height: calc(100svh - 240px);
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-    .input-panel.active::-webkit-scrollbar { display: none; }
   }
   /* Flex column lets the panel's error slot (drop-error, lookup-error,
      verify-status, .how, img-console.error-only, .tab-error) sit at the
@@ -878,6 +870,62 @@
     padding: 0.6rem 1.2rem;
     color: var(--text-secondary);
     word-break: break-word;
+  }
+
+  /* ================================================================
+     MOBILE COMPACT — system box fits on one screen, every tab reserves
+     the same height (360px) so switching tabs or toggling Source never
+     changes the outer box. Every element above is shrunk enough that
+     the tallest state any tab reaches (Source expanded + form + errors)
+     still fits in 360px. Positioned near the end of the file so the
+     cascade wins over the top-level defaults above — moving any of
+     these rules earlier causes later rules to silently override them.
+     ================================================================ */
+  @media (max-width: 1199px) {
+    .input-panel.active { height: 360px; }
+    /* Drop-zone tightening — smaller padding, icon, and hint so the
+       upload boxes don't eat the entire panel. */
+    .drop-zone { padding: 1rem 1rem; }
+    .drop-zone .drop-icon { font-size: 1.2rem; margin-bottom: 0.3rem; }
+    .drop-zone p { font-size: 0.76rem; }
+    .drop-zone .drop-hint { font-size: 0.6rem; max-height: 28px; margin-top: 0.25rem; }
+    /* Source disclosure rows — tighter so the open state fits under the
+       drop-zone/input without overflowing the 360px panel. */
+    .lookup-source summary { font-size: 0.6rem; padding: 0.25rem 0; }
+    .lookup-source-row,
+    .lookup-source-mode-row,
+    .offline-row { margin-top: 0.35rem; }
+    .lookup-source-hint { font-size: 0.55rem; margin: 0.3rem 0 0; line-height: 1.45; }
+    /* Inputs/buttons — vertical padding down from 0.85rem to 0.55rem.
+       Font-size pinned at 16px (see top of file) to kill iOS auto-zoom. */
+    .lookup-input, .audit-input,
+    .lookup-btn, .audit-btn { padding: 0.55rem 0.8rem; }
+    .lookup-btn, .audit-btn { min-width: 5.5rem; font-size: 0.76rem; }
+    /* Hints — drop the 2rem top margin + generous padding that desktop
+       layout relies on. On mobile every pixel counts. */
+    .lookup-hint, .how {
+      font-size: 0.62rem;
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.7rem;
+      line-height: 1.4;
+    }
+    /* Error slots — empty reserves collapse. The desktop y-lock (80px
+       reserve) isn't worth the space on a phone; errors flow naturally
+       when they appear. */
+    .panel-error-head {
+      font-size: 0.68rem;
+      min-height: 0;
+      padding: 0.2rem 0.8rem;
+    }
+    .panel-error-head:empty { padding: 0; }
+    .panel-error-body {
+      font-size: 0.6rem;
+      min-height: 0;
+      padding: 0;
+    }
+    .panel-error-body:not(:empty) { padding: 0.3rem 0.8rem 0; }
+    /* Panel wrap padding trimmed so content sits closer to the edges. */
+    .input-panel-wrap { padding: 0.8rem; }
   }
 
   /* ================================================================
