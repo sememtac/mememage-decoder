@@ -16,6 +16,19 @@
     .lookup-input, .audit-input { font-size: 16px; }
   }
 
+  /* Mobile: release the 365px panel lock. The desktop-oriented
+     height:365px + overflow-y:auto makes the system box its own
+     scroll container, which reads as a pannable pane on touch
+     screens (awkward — thumb scrolls the box, not the page).
+     Let content flow naturally so the page scrolls as one unit. */
+  @media (max-width: 1199px) {
+    .input-panel {
+      height: auto;
+      min-height: 0;
+      overflow: visible;
+    }
+  }
+
   :root {
     --bg-deep: #000000;
     --bg-card: rgba(180, 180, 185, 0.08);

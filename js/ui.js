@@ -650,7 +650,20 @@ function processImage(file){
     var hintOriginal = hintEl ? hintEl.innerHTML : '';
     if (hintEl) hintEl.innerHTML = '<em style="color:var(--text-muted);">Fetching\u2026</em>';
     try {
-      await fetchAndRender(decoded.identifier, decoded.content_hash || null, null, imgSourceBase);
+      // 20s hard timeout so a silent network hang (iOS Safari can
+      // leave fetches pending without firing error events in some
+      // CORS/mixed-content paths) doesn't leave the user staring at
+      // "Fetching…" indefinitely. Race the real work against a
+      // rejection that surfaces the failure to the catch handler.
+      await Promise.race([
+        fetchAndRender(decoded.identifier, decoded.content_hash || null, null, imgSourceBase),
+        new Promise(function(_, reject) {
+          setTimeout(function() { reject(new Error('Fetch timed out after 20s')); }, 20000);
+        })
+      ]);
+    } catch (err) {
+      console.error('[processImage] fetch failed:', err);
+      setImgError('Fetch failed: ' + (err && err.message ? err.message : 'unknown error') + '. Check the Source URL and CORS.');
     } finally {
       if (hintEl) hintEl.innerHTML = hintOriginal;
     }
