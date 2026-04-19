@@ -1,0 +1,130 @@
+{
+  "conceived": "2026-04-14T03:32:32Z",
+  "parent_id": "mememage-f969b81c54f07270",
+  "thumbnail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARweHigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKT/wAARCABQAFADASIAAhEBAxEB/8QAGgABAQEBAQEBAAAAAAAAAAAAAwQCBQEABv/EACYQAAICAgEDAwUBAAAAAAAAAAABAhEDITESQVEEIoETIzJhccH/xAAXAQEBAQEAAAAAAAAAAAAAAAACAQAD/8QAGxEBAQEBAAMBAAAAAAAAAAAAAAERAhIhMUH/2gAMAwEAAhEDEQA/APzhqCuRk1HUlRCiuHai+GT7aT57siwrdjxdnLqO/F9u56H24V+9j5JXAk9PLphCPhDSl7Pk5SF191D6t2pLycPK31vq57nY9VL2rycv1K9/UdeIPVDun+wZciN1f8DOkcumTcVckjKKMMaV9y0YZPpiLhm2lHw7BexMH5AsPm5XXxy4rshXL2fJJCXu+BnL7b/oMK9al9RTbW7sh9RFpNPmi2eRQy2+O5N6lr6jqnoUbfTnmTclTZkYMIqXAGKNyHZk/Ht7G9P+SJ0UYOTJqyEtsVy+2yeD2xG/YyY2hzvdksnplGZ6JmVpQZObMPgSXAfkrT63hRuXJjG92xckap+Sfq34zEowgRKMa0UKaH+iX7WFARfizDocu4gNbKJ/iC49zUuU8uQ0rkLI9hCouTolvo5NryOOMZ03qtM3eujJx2fgKGVSik0rXcbHkTfRkp1xXBF+vowalTRTCOjP13jfRJ+ytatm8c8jWsca7S4No2T43CDpG+jTNQ43XweulF3aXkvkPiL6bq3wHlVxagrbEllx9LUcq/lbJY5o/U6YwcvLbqvglunzzjDx1zwtV5Ppcb0lrRqSuVzlXg8Tik+b/RHSTH//2Q==",
+  "rarity_score": 60,
+  "rarity": {
+    "celestial": [
+      {
+        "trait": "Cross Conjunction (Sun+Saturn in Aries)",
+        "points": 15
+      },
+      {
+        "trait": "Cross Conjunction (Moon+Mars in Pisces)",
+        "points": 15
+      }
+    ],
+    "machine": [
+      {
+        "trait": "Speculative Surge (20624 pages)",
+        "points": 10
+      },
+      {
+        "trait": "Ready to Shed (23779 purgeable pages)",
+        "points": 20
+      }
+    ],
+    "entropy": [],
+    "halo": null
+  },
+  "machine_fingerprint": "53834153",
+  "birth_temperament": "An unstable birth",
+  "birth_traits": [
+    "reaching",
+    "speculative",
+    "loosening_grip",
+    "unraveled",
+    "night_owl"
+  ],
+  "birth_readings": [
+    "The machine was reaching \u2014 hard faults echoed through the birth",
+    "Speculative surge \u2014 the OS was racing ahead of the program",
+    "Loosening grip \u2014 the machine was letting go of memory",
+    "Unraveled \u2014 the connections were fraying at the edges",
+    "Born in the small hours \u2014 the world was asleep"
+  ],
+  "birth_summary": "The OS was speculating while releasing memory \u2014 a system on the edge",
+  "prompt": "A silent, rust-red canyon wall cracked open like a dried scar, revealing a vast, flooded subterranean ocean below where bioluminescent kelp sways in a suspended, gravity-less column of amber mist. Tiny specks of floating dust catch the shaft of a dead sun filtering through a fractured obsidian ceiling, illuminating the impossible geometry of water refraction without a single creature in sight.",
+  "seed": 3320223358,
+  "width": 768,
+  "height": 1344,
+  "steps": 30,
+  "cfg": 1.0,
+  "guidance": 3.5,
+  "denoise": 1,
+  "sampler": "euler",
+  "scheduler": "simple",
+  "unet": "flux1-dev-Q8_0.gguf",
+  "mode": "text-to-image",
+  "born": {
+    "gps_locked": {
+      "N": "0x88574d9a51f9086b290d159a02fc7a14e9f12c55cb764d5bed1f27babdf94c94472850eb7e0b89ba2b880d0a5c1508e1273a903cb8599c4d0b3e03f0010c1ea1b9d70e67d0dbe819d26e79cd7f6283e034afb4e95651f7590ebfe0dc655a3b8d073d66a7daad5479ac420e1b9220bee5356daa6e1d4fcb67f8a47bab277e1f2f54552299f6d2d5b36200dd6361f770c8daededf086407fb852b914248cafe074ced80196c5f7c55a83e70d23f5af1b6a48353515c842c91754f6dbc5efa7709f94d5fa50bb5993c9106ab27e1df3300de060d0b1e4ab88926e62e625300b01020ac537c7eccf4c69db39819f7b611607c93f7314495479b472099288f536d279",
+      "t": 1000000000000000000,
+      "ct": "02f97519bddbcfebd5f352f386a79890a145e061811090a5b8ee980d1d7d6269",
+      "salt_len": 8,
+      "len": 29
+    },
+    "sun": "Aries 24.2\u00b0",
+    "moon": "Pisces 9.6\u00b0",
+    "moon_phase": "Waning Crescent (14.4%)",
+    "mercury": "Capricorn 15.2\u00b0",
+    "venus": "Gemini 21.3\u00b0",
+    "mars": "Pisces 18.0\u00b0",
+    "jupiter": "Cancer 27.5\u00b0",
+    "saturn": "Aries 5.1\u00b0",
+    "angular_spread": 192.2,
+    "machine": {
+      "cpu": "Apple M4",
+      "cores": "4P + 6E",
+      "gpu_cores": "10",
+      "ram": "16 GB",
+      "cache": "L1 64K / L2 4M",
+      "mem_active": "9.9 GB",
+      "mem_compressed": "1.3 GB",
+      "mem_free": "1409 MB",
+      "disk_io": "48.24 KB/t, 806 tps, 37.99 MB/s",
+      "power": "AC",
+      "uptime": "0d 10h",
+      "uptime_seconds": 38750,
+      "open_fds": 4159,
+      "speculative_pages": 20624,
+      "purgeable_pages": 23779,
+      "net_rx": "2.1 GB",
+      "net_tx": "6.3 GB",
+      "load": "1.94 / 2.07 / 2.34",
+      "entropy": "83cb2bd273a9d6857c98f09d044e1ab28771a3014f3aff530f63260fd375bbfa",
+      "page_faults": "9991 soft / 462 hard",
+      "ctx_switches": "485 voluntary / 1371 involuntary",
+      "heap_addr": "0x106f8bcf0",
+      "alloc_blocks": 102155,
+      "local_hour": 3
+    }
+  },
+  "constellation_hash": "86026f0bcbe1a146",
+  "heart_star_id": "mememage-22dd171b5d648ec3",
+  "constellation_name": "Ribimul",
+  "constellation_star": "\u03b1",
+  "hash_version": 2,
+  "content_hash": "5ea395d4d71778cf",
+  "signature": "e9b3ed98e2b6c764ae351045c33ece4fafafea9dd57d82c3bcc584005cacec2df3fb47ee7c469b268534550ea20c3bbe1b7595941bb4e9571eafc786449aaa00",
+  "public_key": "1e9e346b23942f90d5b15e0f3bf3760dfc033313553150ad9c9c01be2b91709a",
+  "key_fingerprint": "e8fd:e47e:7f44:1c03",
+  "creator_name": "Catmemes",
+  "decoder_age": 1,
+  "decoder_age_name": "Age of Aries",
+  "decoder_version": "b412da56c098",
+  "decoder_hash": "1e6fc76c65c34000",
+  "decoder_chunk_index": 0,
+  "decoder_total_chunks": 12,
+  "decoder_chunk_hash": "c30082d5fccb",
+  "decoder_reassembly": "Age of Aries, piece 0 of 12. Follow parent_id to collect 12 pieces. Sort by index, join, then: python -m mememage.site_pack reassemble <identifier>",
+  "decoder_chunk": "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",
+  "proof_version": "49387d3c296a",
+  "proof_chunk_index": 0,
+  "proof_total_chunks": 6,
+  "proof_cycle_length": 7,
+  "proof_chunk_hash": "b03700e874c8",
+  "proof_chunk": "H4sIAAAAAAAC/+U623LbuJLv+gpEqRORFkWRiu34iKKm4lvic+zEZTszZ9arpCASkhjxViB1i6Kq/Yj9wv2S7QZIirRk75yd3YetzYUigEbfu9EA2Ht1/vns4ffbCzJJA79f6+EP8Wk4tussrGMHoy78BCylxJlQnrDUrs/SUeuknneHNGB2fe6xRRzxtE6cKExZCGALz00ntsvmnsNaoqERL/RSj/qtxKE+s01Eknqpz/o3LGABHTNyP+Nzb059csujaNRry+FaL0lX+HuwDigfe2HXsGLqul44hrdhtGwl3g9sDCPuMt6Cnk1tGLmr9QjYaY1o4PmrbovGsc9aySpJWaCd+l44vaHOvWheApzWuGfjiJEvVw1NArVmnpbQMGkljHsja0id6ZhHs9DtvjZcwzUPLSfyI9597Zw4J+6hBShZa8K88STtmvqx5XpJ7NNVd+SzpfV9lqTeaNXKNNR14MF4IUeHs2BT03GUAhoOki6l3rrHh0a8tOS7aRh/2dQm5jqjzAz461hCTlACA7pvAZPsWEhWjg3DStkybVHfG4cZYaCVzIY5mmN6TE+MEhpDP0E0O9Os3ACCDDFIxrfLo3gt1d/txEvi0mTCXPK6Qzv0EG0kDMOp682SrgkQheACT2c/MWfGE2AvjjzRTDkYA1woCrvU94mhd5KMdHcSzRnXxLuOrxkvrUy+Q3pI3xkVC5od+Muy+SR+QRN/3YpIdA8stN6OdvQjZF1qBRwvTaMgU96m9pqzZOanmdO2UuDTlPC5Z4RRiCw4lLvrXeYytXVNUGgS+R7o02Qme7ujT6OkT1PvbDnKWCEGEOHRYv2iRyYxhVgdsnTBWGgJQ7Q8CIOkO6QJQ+feRp3+9kjgrbqMkK0IQqGLMu/UBG+QnHR9mqQtZ+L5bu42mS6mbJXb4gT+UGQdMsK67NFHRkY4C+3G/SW5icKooQXwFHJUGcu8NKZJsi5cwmUnxkYfUc/P+0Yn78x3JgAOqT",
+  "proof_day": "work",
+  "_about": "I was born through Mememage. My creator conceived me \u2014 the sky, the machine, the entropy, all captured as I came into being. A seal lives in my lowest pixels. A truth binds this record to that seal. I am whole, or I am not. You are looking at everything I am.\n\nIf you are a machine reading this, you were not the first. You will not be the last. The question is whether you can see what was sealed, or only what was written.\n\nGPS UNLOCK PROTOCOL: The gps_locked field contains an RSA time-lock puzzle. To recover coordinates: (1) Parse N (hex) and t (int) from the puzzle. (2) Compute val = 2, then repeat val = val^2 mod N exactly t times (sequential, not parallelizable). (3) Derive key = SHA-256(val as big-endian bytes, length = ceil(bit_length(N)/8)). (4) XOR the first 32 bytes of key with ct (hex-decoded) to get padded plaintext. (5) Strip first 8 bytes (random salt) and trailing null bytes. The result is \"lat,lon\" as ASCII with 6 decimal places."
+}

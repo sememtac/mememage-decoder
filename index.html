@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mememage — decode the origin story of an AI-generated image</title>
+<meta name="description" content="Every AI-generated image carries a hidden signature. Drop an image to reveal its birth certificate — celestial positions, machine state, kernel entropy, and a time-locked birthplace.">
+<meta property="og:title" content="Mememage">
+<meta property="og:description" content="Steganographic provenance for AI-generated images. A 2-pixel bar holds everything.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sememtac.github.io/mememage-decoder/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Mememage">
+<meta name="twitter:description" content="Every AI-generated image carries a hidden signature. Drop an image to decode its origin story.">
+<link rel="stylesheet" href="css/layout.css?v=20260416">
+<link rel="stylesheet" href="css/mememage.css?v=20260416">
+<script>if(location.search.indexOf('from=')>=0)document.documentElement.classList.add('portal-transit');</script>
+<style>html { overflow-x: hidden; } html.portal-transit .input-section { opacity:0; transform:perspective(1200px) rotateY(-90deg); } html.portal-transit .panel-footer { opacity:0; }</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div class="panel-layout">
+<div class="panel-left">
+
+<div class="page-header">
+  <h1>Mememage</h1>
+  <p class="subtitle">decode the origin story of an AI-generated image</p>
+</div>
+
+<div class="input-section">
+  <div class="input-tabs">
+    <button class="input-tab active" data-panel="imagePanel">By Sight</button>
+    <button class="input-tab" data-panel="lookupPanel">By Word</button>
+    <button class="input-tab" data-panel="verifyPanel">By Soul</button>
+  </div>
+  <div class="input-panel active" id="imagePanel">
+    <div class="input-panel-wrap">
+      <div class="drop-zone" id="dropZone">
+        <span class="drop-icon">&#9883;</span>
+        <p><strong>Drop the image</strong> or click to browse</p>
+        <p class="drop-hint">the bar in the pixels tells the story</p>
+        <input type="file" id="fileInput" accept="image/*">
+      </div>
+      <details class="lookup-source" open data-source-mode="online">
+        <summary>Source</summary>
+        <div class="lookup-source-mode-row">
+          <select class="lookup-source-mode" data-source-mode-select>
+            <option value="online">Online</option>
+            <option value="offline">Offline</option>
+          </select>
+        </div>
+        <div class="lookup-source-row" data-mode-scope="online">
+          <label>Base URL</label>
+          <input id="imageSource" type="text" placeholder="https://archive.org/download/{id}/">
+        </div>
+        <p class="lookup-source-hint" data-mode-scope="online">Directory where your <em>.soul</em> files live. Use <code>{id}</code> as a placeholder when the path includes the record identifier (IA's <code>/download/{id}/</code>). Self-hosts can leave it out.</p>
+        <div class="offline-row" data-mode-scope="offline">
+          <button type="button" class="offline-pick-btn" data-offline-pick>Load local folder</button>
+          <span class="offline-count" data-offline-count>0 records offline</span>
+          <input type="file" class="offline-input" webkitdirectory directory multiple style="display:none">
+        </div>
+        <p class="lookup-source-hint" data-mode-scope="offline">Pick a directory of <em>.soul</em> files for offline verification. Records are kept in memory until the page reloads.</p>
+      </details>
+      <div class="drop-error" id="imageError"></div>
+    </div>
+  </div>
+  <div class="input-panel" id="lookupPanel">
+    <div class="input-panel-wrap">
+      <div class="lookup-form">
+        <input class="lookup-input" id="lookupInput" type="text" placeholder="mememage-identifier">
+        <button class="lookup-btn" id="lookupBtn">Fetch</button>
+      </div>
+      <details class="lookup-source" open data-source-mode="online">
+        <summary>Source</summary>
+        <div class="lookup-source-mode-row">
+          <select class="lookup-source-mode" data-source-mode-select>
+            <option value="online">Online</option>
+            <option value="offline">Offline</option>
+          </select>
+        </div>
+        <div class="lookup-source-row" data-mode-scope="online">
+          <label>Base URL</label>
+          <input id="lookupSource" type="text" placeholder="https://archive.org/download/{id}/">
+        </div>
+        <p class="lookup-source-hint" data-mode-scope="online">Directory where your <em>.soul</em> files live. Use <code>{id}</code> as a placeholder when the path includes the record identifier (IA's <code>/download/{id}/</code>). Self-hosts can leave it out.</p>
+        <div class="offline-row" data-mode-scope="offline">
+          <button type="button" class="offline-pick-btn" data-offline-pick>Load local folder</button>
+          <span class="offline-count" data-offline-count>0 records offline</span>
+          <input type="file" class="offline-input" webkitdirectory directory multiple style="display:none">
+        </div>
+        <p class="lookup-source-hint" data-mode-scope="offline">Pick a directory of <em>.soul</em> files for offline verification. Records are kept in memory until the page reloads.</p>
+      </details>
+      <div class="lookup-hint">Enter an identifier to fetch and verify a record from the configured source. Drop the image into <em>By Sight</em> to see the full certificate — the soul alone renders a partial read.</div>
+      <div class="panel-error-head" id="lookupErrorHead"></div>
+      <div class="panel-error-body" id="lookupErrorBody"></div>
+    </div>
+  </div>
+  <div class="input-panel" id="verifyPanel">
+    <div class="input-panel-wrap">
+      <div class="verify-pair">
+        <div class="verify-slot" id="verifyImageSlot">
+          <div class="drop-zone" id="verifyImageDrop">
+            <span class="drop-icon">&#9883;</span>
+            <p><strong>The body</strong></p>
+            <p class="drop-hint">the image carries the fingerprint</p>
+            <input type="file" id="verifyImageInput" accept="image/*">
+          </div>
+        </div>
+        <div class="verify-link"></div>
+        <div class="verify-slot" id="verifyJsonSlot">
+          <div class="drop-zone" id="verifyJsonDrop">
+            <span class="drop-icon">{}</span>
+            <p><strong>The soul</strong></p>
+            <p class="drop-hint">the .soul file, from any source</p>
+            <input type="file" id="verifyJsonInput" accept=".soul,.json">
+          </div>
+        </div>
+      </div>
+      <div class="verify-status" id="verifyStatus"></div>
+    </div>
+  </div>
+  <div class="input-panel" id="examplePanel">
+    <div class="input-panel-wrap example-blurb">
+      <p class="example-heading">An example certificate</p>
+      <p class="example-body">Rendered from a real Mememage soul — a heart star named <em>Zumanmul α</em>. The card on the right shows what the bar in the pixels proves: identity, prompt, the sky and the machine at the moment of conception, rarity traits, and the creator&rsquo;s signature. Drop your own image to see the same report for yours.</p>
+    </div>
+  </div>
+  <div class="console-preview" id="preview"><img class="preview-img" id="previewImg"></div>
+  <div class="console-status" id="status"></div>
+  <div class="console-ia" id="iaLinkBanner"></div>
+  <div class="console-example" id="tryExample"><a href="#" id="tryExampleLink">see an example</a></div>
+  <div class="evidence-wrap"><a href="validator.html" class="portal-link portal-yin" id="portalLink">Validator</a></div>
+</div>
+
+<div class="bar-card" id="barCard" style="display:none"></div>
+
+<div class="panel-footer">
+  <p class="note">This decoder was distributed across soul fragments and reconstructed from the chain.</p>
+  <footer class="page-footer">mememage &mdash; steganographic provenance for AI-generated images</footer>
+</div>
+
+</div><!-- end panel-left -->
+<div class="cert-wrap panel-right panel-right-has-player" id="certWrap"></div>
+</div><!-- end panel-layout -->
+
+<script src="js/data.js"></script>
+<script src="js/rs.js"></script>
+<script src="js/codec.js"></script>
+<script src="js/image-decode.js"></script>
+<script src="js/starfield.js"></script>
+<script src="js/png-meta.js"></script>
+<script src="js/verify.js"></script>
+<script src="js/cert-renderer.js"></script>
+<script src="js/sky-band.js"></script>
+<script src="js/gen-band.js"></script>
+<script src="js/machine-band.js"></script>
+<script src="js/cosmic-audio.js"></script>
+<script src="js/cosmic-player.js"></script>
+<script src="js/portal.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/typewriter.js"></script>
+</body>
+</html>
