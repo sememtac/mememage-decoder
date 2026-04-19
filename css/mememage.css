@@ -454,6 +454,7 @@
      equally — so head lands in the middle, body at the bottom. Each
      slot is :empty-hidden so a panel without an error looks untouched. */
   .panel-error-head {
+    flex-shrink: 0;
     margin-top: auto;  /* pushes error block to panel bottom */
     padding: 0.4rem 0.8rem;
     text-align: center;
@@ -463,6 +464,7 @@
     min-height: 1.6rem;  /* reserved space locks error y-position */
   }
   .panel-error-body {
+    flex-shrink: 0;
     margin-top: 0;  /* sits directly under head, no second auto */
     padding: 0.4rem 0.8rem 0;
     text-align: center;
@@ -606,8 +608,12 @@
   /* Shared prose hint box — decoder's .lookup-hint and validator's
      .how have identical structure; only palette differs. Yang colors
      (dark text on cream-ish bg) live here; validator's inline CSS
-     overrides color/background/border to yin. */
+     overrides color/background/border to yin. flex-shrink: 0 keeps
+     the hint at its natural size — without it the locked 365px panel
+     would squeeze multi-line prose and overflow:hidden would clip
+     characters mid-line. */
   .lookup-hint, .how {
+    flex-shrink: 0;
     margin-top: 2rem;
     padding: 0.8rem 1rem;
     background: rgba(0,0,0,0.06);
