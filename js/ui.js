@@ -689,7 +689,7 @@ function lookupById(input, pushHistory){
       setTabOwner('lookupPanel');
       showPanelError(
         'Invalid identifier.',
-        'Expected <strong>mememage-&lt;hex&gt;</strong>, a <em>.soul</em> filename, or a URL containing one.'
+        'Expected <strong>mememage-&lt;hex&gt;</strong>, or a URL containing one.'
       );
       return;
     }

@@ -140,11 +140,15 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 .panel-layout.layout-active #tab-meta #jsonDrop .drop-hint {
   max-height: 0; opacity: 0; margin-top: 0;
 }
-.panel-layout.layout-active #tab-cert .how {
-  max-height: 0; opacity: 0;
+.panel-layout.layout-active #tab-cert .how,
+.panel-layout.layout-active #tab-cert .panel-error-body {
+  max-height: 0; min-height: 0; opacity: 0;
   margin-top: 0; margin-bottom: 0;
   padding-top: 0; padding-bottom: 0;
   border-width: 0;
+}
+.panel-layout.layout-active #tab-cert .panel-error-head {
+  min-height: 0; margin: 0.4rem 0 0;
 }
 
 /* Compact-mode collapse transitions + drop-hint max-height inherit from
