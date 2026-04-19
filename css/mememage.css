@@ -193,18 +193,29 @@
     transition: height var(--compact-duration) var(--compact-ease);
   }
   .input-panel::-webkit-scrollbar { display: none; }
-  /* Mobile: release the 365px lock. On touch screens the desktop
-     height:365px + overflow-y:auto makes the system box its own
-     scroll container — thumb drags pan the box's content instead
-     of the page. Let content flow naturally so the page scrolls
-     as one unit. Declared AFTER the base rule so the cascade
-     honors the override on small viewports. */
+  /* Mobile: the system box fits on one screen, only results below
+     scroll into view. Release the desktop 365px lock so each tab's
+     natural height drives layout, but cap the ACTIVE panel to the
+     small viewport height so expanding Source (or any content growth)
+     scrolls internally instead of pushing the portal link off-screen.
+     svh accounts for iOS Safari's visible chrome (top bar + bottom
+     toolbar); the 200px reserve covers the page header, tabs row,
+     portal link, and safe-area insets. vh fallback for iOS <15.4. */
   @media (max-width: 1199px) {
     .input-panel {
       height: auto;
       min-height: 0;
       overflow: visible;
     }
+    .input-panel.active {
+      max-height: calc(100vh - 240px);
+      max-height: calc(100svh - 240px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .input-panel.active::-webkit-scrollbar { display: none; }
   }
   /* Flex column lets the panel's error slot (drop-error, lookup-error,
      verify-status, .how, img-console.error-only, .tab-error) sit at the
