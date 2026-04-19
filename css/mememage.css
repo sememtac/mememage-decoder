@@ -233,7 +233,11 @@
     width: 100%;
     border: 2px dashed rgba(0,0,0,0.15);
     border-radius: var(--radius-sm);
-    padding: 3.5rem 2rem;
+    /* 2rem padding (down from 3.5rem) — keeps the drop zone targetable
+       while leaving room for Source + error slots inside the 365px
+       locked input-panel. Prior height pushed .drop-error below the
+       scrollable viewport, making error messages invisible. */
+    padding: 2rem 2rem;
     text-align: center;
     cursor: pointer;
     transition: all 0.4s ease;
