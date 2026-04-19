@@ -1803,16 +1803,21 @@
     padding: 0.4rem 0;
     border-top: 1px dashed rgba(0,0,0,0.1);
   }
-  /* Portal link base + animations live in layout.css; only theme color here. */
+  /* Portal link base + animations live in layout.css; only theme color here.
+     :hover rules are gated on (hover: hover) so touch devices don't trigger
+     hover styles on the first tap — without the gate, iOS Safari shows the
+     hover state and swallows the click, requiring a second tap to navigate. */
   .portal-yin { color: #6a6a72; }
-  .portal-yin:hover {
-    color: #000;
-    text-shadow: 0 0 8px rgba(0,0,0,0.15);
-  }
   .portal-yang { color: #606068; }
-  .portal-yang:hover {
-    color: #fff;
-    text-shadow: 0 0 8px rgba(255,255,255,0.2);
+  @media (hover: hover) {
+    .portal-yin:hover {
+      color: #000;
+      text-shadow: 0 0 8px rgba(0,0,0,0.15);
+    }
+    .portal-yang:hover {
+      color: #fff;
+      text-shadow: 0 0 8px rgba(255,255,255,0.2);
+    }
   }
 
   /* Download Soul button — dark system silver */
