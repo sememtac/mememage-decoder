@@ -361,16 +361,6 @@ function showIALink(identifier, contentHash) {
   // No longer shown — "Recovered from Internet Archive" in the status is sufficient
 }
 
-function triggerSoulDownload(url, filename) {
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  showStatus('Soul downloading \u2014 drag it into By Soul to reunite.', 'info');
-}
-
 async function fetchFromSource(baseUrl, identifier, contentHash) {
   // {id} templating — base URLs may include {id} as a placeholder for
   // the record identifier, which lets a single input express both

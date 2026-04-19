@@ -140,28 +140,8 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 .panel-layout.layout-active #tab-meta #jsonDrop .drop-hint {
   max-height: 0; opacity: 0; margin-top: 0;
 }
-.panel-layout.layout-active #tab-cert .how,
-.panel-layout.layout-active #tab-cert .panel-error-body {
-  max-height: 0; min-height: 0; opacity: 0;
-  margin-top: 0; margin-bottom: 0;
-  padding-top: 0; padding-bottom: 0;
-  border-width: 0;
-}
-.panel-layout.layout-active #tab-cert .panel-error-head {
-  min-height: 0; margin: 0.4rem 0 0;
-}
-
-/* Compact-mode collapse transitions + drop-hint max-height inherit from
-   mememage.css. Redundant overrides removed — one source of truth. */
-.how {
-  overflow: hidden;
-  transition: max-height var(--compact-duration) var(--compact-ease),
-              opacity calc(var(--compact-duration) * 0.8) var(--compact-ease),
-              margin var(--compact-duration) var(--compact-ease),
-              padding var(--compact-duration) var(--compact-ease),
-              font-size var(--compact-duration) var(--compact-ease),
-              border-width var(--compact-duration) var(--compact-ease);
-}
+/* Compact-mode collapse + transitions for .how inherit from the
+   shared .lookup-hint,.how rules in mememage.css. */
 
 /* Image console — compact preview + id + status under the drop zone,
    shown after an image is analyzed. Mirrors the decoder's console-* flow
@@ -196,23 +176,13 @@ body > *:not(#starfield) { position: relative; z-index: 1; }
 .img-console-status.ok { color: #4ade80; }
 .img-console-status.fail { color: #f87171; }
 
-/* Help / note — structural parity with decoder's .lookup-hint so the
-   "Fetching…" box reads the same on both pages. Only colors differ
-   (yin palette here; yang in mememage.css). */
+/* .how — yin palette overrides for the shared .lookup-hint,.how
+   structural rules in mememage.css. Only ink shifts. */
 .how {
-  margin: 2rem 0 0;
-  padding: 0.8rem 1rem;
   background: rgba(0,0,0,0.15);
-  border: 1px solid rgba(255,255,255,0.04);
-  border-radius: 8px;
-  font-size: 0.72rem;
-  line-height: 1.55;
+  border-color: rgba(255,255,255,0.04);
   color: #8a8a94;
-  text-align: center;
 }
-/* Hide .how when error head has content — the error slots take over
-   (head in the middle, body at the bottom). */
-#tab-cert:has(.panel-error-head:not(:empty)) .how { display: none; }
 .how b { color: #c0c0c8; }
 
 /* Evidence cards — yin palette (warm dark grays) */

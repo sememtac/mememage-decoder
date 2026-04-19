@@ -324,8 +324,13 @@
      after a cert is on screen (e.g., try a different host for a record
      that didn't resolve against IA). Only the prose hint and error
      body collapse. */
+  /* Cert-rendered compact mode: collapse the prose hint + error body
+     for both pages. Decoder's #lookupPanel and validator's #tab-cert
+     share the exact same collapse shape. */
   .panel-layout.layout-active #lookupPanel .lookup-hint,
-  .panel-layout.layout-active #lookupPanel .panel-error-body {
+  .panel-layout.layout-active #lookupPanel .panel-error-body,
+  .panel-layout.layout-active #tab-cert .how,
+  .panel-layout.layout-active #tab-cert .panel-error-body {
     max-height: 0;
     min-height: 0;  /* override the non-compact reserved 3rem */
     opacity: 0;
@@ -335,7 +340,8 @@
     padding-bottom: 0;
     border-width: 0;
   }
-  .panel-layout.layout-active #lookupPanel .panel-error-head { margin: 0.4rem 0 0; min-height: 0; }
+  .panel-layout.layout-active #lookupPanel .panel-error-head,
+  .panel-layout.layout-active #tab-cert .panel-error-head { margin: 0.4rem 0 0; min-height: 0; }
 
   /* Tab scoping — each query stamps its origin tab on the evidence
      elements (preview, bar-card, status, iaLinkBanner, certWrap) via
@@ -597,7 +603,11 @@
      group (input + source) with a 2-line gap. Uses max-height + opacity
      collapse (not display:none) so compact-mode transitions ease out
      smoothly instead of popping. */
-  .lookup-hint {
+  /* Shared prose hint box — decoder's .lookup-hint and validator's
+     .how have identical structure; only palette differs. Yang colors
+     (dark text on cream-ish bg) live here; validator's inline CSS
+     overrides color/background/border to yin. */
+  .lookup-hint, .how {
     margin-top: 2rem;
     padding: 0.8rem 1rem;
     background: rgba(0,0,0,0.06);
@@ -616,7 +626,10 @@
                 padding var(--compact-duration) var(--compact-ease),
                 border-width var(--compact-duration) var(--compact-ease);
   }
-  #lookupPanel:has(.panel-error-head:not(:empty)) .lookup-hint {
+  /* Error-present collapse — smooth max-height transition on both
+     pages (decoder By Word + validator Audit). */
+  #lookupPanel:has(.panel-error-head:not(:empty)) .lookup-hint,
+  #tab-cert:has(.panel-error-head:not(:empty)) .how {
     max-height: 0; opacity: 0; margin-top: 0;
     padding-top: 0; padding-bottom: 0; border-width: 0;
   }
