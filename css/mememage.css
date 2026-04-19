@@ -421,23 +421,23 @@
     text-align: center;
     line-height: 1.55;
   }
-  /* By Sight keeps the drop-zone flex-filled so Source open/closed
-     only changes the drop zone's height — the error slot keeps a
-     fixed position and reserved vertical space. Prior `margin-top:
-     auto` combined with varying sibling heights meant the error's y
-     position drifted ~15px between Source states. */
+  /* By Sight pins the drop zone to its natural size (no flex-fill),
+     so Source open/closed, example flow, and error states never
+     resize it. Variance elsewhere (Source collapse, long errors)
+     is absorbed by the panel's overflow or by the margin-top:auto
+     on .panel-error-head. */
   #imagePanel .drop-zone {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
   }
   #imagePanel .drop-error {
-    margin-top: 0.5rem;
+    margin-top: auto;  /* pushed to panel bottom, stable y-position */
     min-height: 1.6rem;
   }
-  #imagePanel .drop-error:empty { display: block; }
+  #imagePanel .drop-error:empty { display: block; color: transparent; }
   .drop-error:empty { display: none; }
   .drop-error strong { font-weight: 600; }
   .drop-error em { font-style: italic; color: inherit; }
