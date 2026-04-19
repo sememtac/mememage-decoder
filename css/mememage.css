@@ -2,6 +2,20 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html {
+    /* Prevent iOS Safari's auto text-size adjust on orientation
+       change — keeps rem-based sizing predictable. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Mobile typography bump: +6% root size so rem-based sizing reads
+     comfortably on high-DPI phone screens. Inputs pinned at ≥16px
+     to kill iOS Safari's "zoom into focused input" snap behavior. */
+  @media (max-width: 480px) {
+    html { font-size: 17px; }
+    .lookup-input, .audit-input { font-size: 16px; }
+  }
+
   :root {
     --bg-deep: #000000;
     --bg-card: rgba(180, 180, 185, 0.08);
