@@ -912,6 +912,19 @@ var ButtonLoading = (function() {
   // install the handler — on desktop, clicking a badge is a
   // reasonable alternative to hovering (you get the same info).
   var tooltipEl = null;
+
+  // ===== DEBUG BANNER (temporary) =====
+  // Visible on-screen readout so the user can see whether the script
+  // is loaded and whether events are firing. Remove once tooltip is
+  // confirmed working on their device.
+  var dbg = document.createElement('div');
+  dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#0a0a12;color:#4ade80;font-family:monospace;font-size:11px;padding:6px 10px;z-index:99999;border-bottom:1px solid #2a7030;';
+  dbg.textContent = 'tooltip:init hover:' + (window.matchMedia && window.matchMedia('(hover: hover)').matches);
+  function appendDbg() { if (document.body) document.body.appendChild(dbg); else setTimeout(appendDbg, 50); }
+  appendDbg();
+  function dbgLog(msg) {
+    dbg.textContent = msg.slice(0, 80);
+  }
   var activeTarget = null;
 
   function ensureEl() {
@@ -974,6 +987,7 @@ var ButtonLoading = (function() {
     var t = e.target;
     if (t && t.nodeType === 3) t = t.parentElement;  // text node → element
     var el = t && t.closest ? t.closest('[title], [data-title]') : null;
+    dbgLog(e.type + ' target:' + ((t && t.tagName) || '?') + '.' + ((t && t.className) || '').toString().slice(0,20) + ' matched:' + (el ? (el.tagName + '.' + (el.className || '').toString().slice(0,20)) : 'NO'));
     if (el && (el.getAttribute('title') || el.getAttribute('data-title'))) {
       if (activeTarget === el) {
         hide();
