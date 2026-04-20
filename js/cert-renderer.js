@@ -877,11 +877,14 @@ function renderCert(meta, options) {
 
     var celestialTraits = (rarity.celestial || []).map(function(t) { return t.trait; });
     var birthTemp = meta.birth_temperament || '';
-    // Sky-band needs its canvas sized before init (draws immediately).
-    // Defer setup/init until after the plate is mounted so clientWidth
-    // reflects the real CSS size.
+    // Sky-band height stays fixed at 390 regardless of canvas width.
+    // Its graphical elements (zodiac wheel, orbit ring, meteor trails)
+    // are positioned in absolute logical coordinates from the top —
+    // scaling H proportionally with W pushes them off-canvas on mobile.
+    // Keeping 390 means mobile gets a portrait-aspect sky (narrower
+    // but same tall) with every graphical element intact.
     setTimeout(function() {
-      var dims = _setupHiDpi(skyCanvas, SKY_W, function(w) { return Math.round(390 * (w / 604)); });
+      var dims = _setupHiDpi(skyCanvas, SKY_W, 390);
       initSkyBand(skyCanvas, dims.w, dims.h, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, m, ageTier, rarityScore, celestialTraits, birthTemp);
     }, 0);
 
