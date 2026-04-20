@@ -938,7 +938,6 @@ var ButtonLoading = (function() {
 
   function position(target) {
     var t = tooltipEl;
-    // Two rAFs so the tooltip has a layout size before we measure.
     requestAnimationFrame(function() {
       var rect = target.getBoundingClientRect();
       var ttRect = t.getBoundingClientRect();
@@ -948,22 +947,26 @@ var ButtonLoading = (function() {
       if (top < 8) top = rect.bottom + 10;
       t.style.left = left + 'px';
       t.style.top = top + 'px';
+      dbgLog('pos: L' + left.toFixed(0) + ' T' + top.toFixed(0) + ' ttW' + ttRect.width.toFixed(0) + ' ttH' + ttRect.height.toFixed(0));
     });
   }
 
   function show(target) {
     var text = target.getAttribute('title') || target.getAttribute('data-title');
-    if (!text) return;
-    // Stash the title so iOS's native title behavior doesn't interfere.
-    if (target.hasAttribute('title')) {
-      target.setAttribute('data-title', text);
-      target.removeAttribute('title');
-    }
+    if (!text) { dbgLog('show: no text'); return; }
     var t = ensureEl();
     t.textContent = text;
     t.classList.add('visible');
+    // Inline styles as backup in case a CSS rule is missing
+    t.style.opacity = '1';
+    t.style.background = 'red';  // TEMPORARY: red = script ran but CSS missing?
+    t.style.color = 'white';
+    t.style.padding = '8px 12px';
+    t.style.zIndex = '99998';
+    t.style.position = 'fixed';
     position(target);
     activeTarget = target;
+    dbgLog('show: ' + text.slice(0, 40) + ' bodyHas:' + (document.body.contains(t) ? 'Y' : 'N'));
   }
 
   function hide() {
