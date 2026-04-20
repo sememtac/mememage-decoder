@@ -908,23 +908,9 @@ var ButtonLoading = (function() {
 (function() {
   // No hover-capability gate. matchMedia('(hover: hover)') can mis-
   // report on iOS when an accessory is paired or in various browser
-  // modes, and the user reported the tooltip not showing. Always
-  // install the handler — on desktop, clicking a badge is a
-  // reasonable alternative to hovering (you get the same info).
+  // modes. Always install — on desktop, clicking a badge is a
+  // reasonable alternative to hovering (same info, different surface).
   var tooltipEl = null;
-
-  // ===== DEBUG BANNER (temporary) =====
-  // Visible on-screen readout so the user can see whether the script
-  // is loaded and whether events are firing. Remove once tooltip is
-  // confirmed working on their device.
-  var dbg = document.createElement('div');
-  dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#0a0a12;color:#4ade80;font-family:monospace;font-size:11px;padding:6px 10px;z-index:99999;border-bottom:1px solid #2a7030;';
-  dbg.textContent = 'tooltip:init hover:' + (window.matchMedia && window.matchMedia('(hover: hover)').matches);
-  function appendDbg() { if (document.body) document.body.appendChild(dbg); else setTimeout(appendDbg, 50); }
-  appendDbg();
-  function dbgLog(msg) {
-    dbg.textContent = msg.slice(0, 80);
-  }
   var activeTarget = null;
 
   function ensureEl() {
@@ -947,26 +933,17 @@ var ButtonLoading = (function() {
       if (top < 8) top = rect.bottom + 10;
       t.style.left = left + 'px';
       t.style.top = top + 'px';
-      dbgLog('pos: L' + left.toFixed(0) + ' T' + top.toFixed(0) + ' ttW' + ttRect.width.toFixed(0) + ' ttH' + ttRect.height.toFixed(0));
     });
   }
 
   function show(target) {
     var text = target.getAttribute('title') || target.getAttribute('data-title');
-    if (!text) { dbgLog('show: no text'); return; }
+    if (!text) return;
     var t = ensureEl();
     t.textContent = text;
     t.classList.add('visible');
-    // Inline styles as backup in case a CSS rule is missing
-    t.style.opacity = '1';
-    t.style.background = 'red';  // TEMPORARY: red = script ran but CSS missing?
-    t.style.color = 'white';
-    t.style.padding = '8px 12px';
-    t.style.zIndex = '99998';
-    t.style.position = 'fixed';
     position(target);
     activeTarget = target;
-    dbgLog('show: ' + text.slice(0, 40) + ' bodyHas:' + (document.body.contains(t) ? 'Y' : 'N'));
   }
 
   function hide() {
@@ -990,7 +967,6 @@ var ButtonLoading = (function() {
     var t = e.target;
     if (t && t.nodeType === 3) t = t.parentElement;  // text node → element
     var el = t && t.closest ? t.closest('[title], [data-title]') : null;
-    dbgLog(e.type + ' target:' + ((t && t.tagName) || '?') + '.' + ((t && t.className) || '').toString().slice(0,20) + ' matched:' + (el ? (el.tagName + '.' + (el.className || '').toString().slice(0,20)) : 'NO'));
     if (el && (el.getAttribute('title') || el.getAttribute('data-title'))) {
       if (activeTarget === el) {
         hide();
@@ -1014,7 +990,8 @@ var ButtonLoading = (function() {
   document.addEventListener('touchstart', handle, true);
   document.addEventListener('touchend', handle, true);
 
-  // Hide on scroll so a sticky tooltip doesn't hang mid-air while the
-  // element it's anchored to moves off-screen.
-  window.addEventListener('scroll', function() { if (activeTarget) hide(); }, { passive: true });
+  // Hide on any scroll (document-level capture catches window scroll
+  // AND any inner scrollable container — the cert plate, the drag
+  // scroll rails, etc.).
+  document.addEventListener('scroll', function() { if (activeTarget) hide(); }, { capture: true, passive: true });
 })();
