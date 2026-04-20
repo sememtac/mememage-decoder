@@ -1958,9 +1958,19 @@
   /* ================================================================
      COSMIC AUDIO PLAYER
      ================================================================ */
+  /* Mobile/default: pin to the viewport bottom (position: fixed) so
+     the player stays visible while the user scrolls through the cert,
+     and naturally overlaps the cert's bottom when the page reaches its
+     end. Sticky wouldn't engage here — the player is the last child
+     in its container, leaving zero range for sticky to stick within.
+     Desktop overrides further below make it position: absolute inside
+     the right panel so it anchors to the panel bottom with internal
+     scroll on the plate. */
   .cosmic-player {
-    position: sticky;
+    position: fixed;
     bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 10;
     background: rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(20px) saturate(1.2);
@@ -1968,9 +1978,17 @@
     border-top: none;
     box-shadow: none;
     border-radius: 0;
-    margin: 24px -30px -30px;
+    margin: 0;
     overflow: hidden;
     display: none;
+  }
+  @media (max-width: 1199px) {
+    /* Reserve space at the bottom of the plate so content doesn't
+       render behind the fixed player. 104px matches the player's
+       measured height (eq canvas 40 + controls 64); extra 20px of
+       breathing room keeps the last line from hugging the top edge
+       of the player. */
+    .plate { padding-bottom: 124px; }
   }
   .cosmic-player.visible {
     display: block;

@@ -45,11 +45,17 @@
   overflow: hidden;
 }
 
-/* Mobile: swap overflow: hidden for clip-path so the cosmic player
-   inside the plate can engage position: sticky against the window
-   scroll. overflow: hidden on an ancestor traps sticky (makes it
-   behave like position: relative); clip-path rounds the corners
-   without creating a new flow root. Same trick .plate already uses. */
+/* Mobile: swap overflow: hidden for clip-path and make the panel
+   position: relative so it becomes the sticky containing block for
+   the cosmic player. overflow: hidden on an ancestor traps sticky;
+   clip-path rounds the corners without creating a flow root. And the
+   player lives as a direct child of .panel-right on mobile — its
+   natural position sits just below the plate, so the containing
+   block has to include that. panel-layout (the default positioned
+   ancestor) stops short because it's only as tall as panel-left +
+   cert-wrap's content area, not the player's margins; position:
+   relative on panel-right pulls the containing block down to cover
+   the player and lets sticky engage. */
 @media (max-width: 1199px) {
   .panel-right {
     overflow: visible;
