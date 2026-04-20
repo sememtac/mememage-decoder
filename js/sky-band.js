@@ -339,10 +339,18 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
       pctx.fillStyle = 'rgba(255,255,255,0.35)';
       pctx.fillText(p.label.toUpperCase(), cX + 26, cY + 14);
 
-      pctx.font = font('300', 8.5);
-      pctx.fillStyle = 'rgba(255,255,255,0.75)';
       var valText = p.sign + ' ' + p.deg.toFixed(1) + '\u00b0';
       if (p.phase) valText += ' \u2014 ' + p.phase;
+      // Shrink to fit cell — on narrow canvases "Capricorn 15.2°"
+      // overflows the default 8.5px into the neighbor cell.
+      var _valW = cW - 30;  // left offset 26 + right padding 4
+      var _vs = 8.5;
+      pctx.font = font('300', _vs);
+      while (pctx.measureText(valText).width > _valW && _vs > 5.5) {
+        _vs -= 0.5;
+        pctx.font = font('300', _vs);
+      }
+      pctx.fillStyle = 'rgba(255,255,255,0.75)';
       pctx.fillText(valText, cX + 26, cY + 28);
     }
 
@@ -796,7 +804,15 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
     // Celestial rarity traits at the bottom of the band
     if (celestialTraits && celestialTraits.length) {
       var traitText = celestialTraits.join(' \u00b7 ');
-      ctx.font = '400 8px "JetBrains Mono", monospace';
+      // Shrink to fit — conjunction strings can be long and the
+      // centered render overflows both edges on narrow canvases.
+      var _ttW = SKY_W - 20;
+      var _tts = 8;
+      ctx.font = '400 ' + _tts + 'px "JetBrains Mono", monospace';
+      while (ctx.measureText(traitText).width > _ttW && _tts > 5.5) {
+        _tts -= 0.5;
+        ctx.font = '400 ' + _tts + 'px "JetBrains Mono", monospace';
+      }
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(136, 152, 184, 0.7)';
       ctx.fillText(traitText, SKY_W / 2, SKY_H - 12);

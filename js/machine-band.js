@@ -19,25 +19,48 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
   if (entropyHex) for (var i = 0; i < 16 && i < entropyHex.length; i++) seed = (seed * 37 + entropyHex.charCodeAt(i)) & 0x7FFFFFFF;
   function rng() { seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF; return seed / 0x7FFFFFFF; }
 
-  // Cell positions (with wide cells)
-  var dataItems = [];
+  // Cell positions — span-based packing, supports fractional spans.
+  // Each row must sum to COL (3). A span of 1 = 1/3 row width,
+  // 1.5 = half, 2 = two-thirds, 3 = full width.
+  //
+  // First pass: group cells into rows.
+  var rowList = [];
+  var curRow = [];
+  var curSum = 0;
+  var EPS = 0.001;
   for (var mi = 0; mi < machineData.length; mi++) {
-    var isWide = machineData[mi].l === 'Load' || machineData[mi].l === 'Disk I/O' || machineData[mi].l === 'CPU';
-    dataItems.push({ l: machineData[mi].l, v: machineData[mi].v, wide: isWide });
+    var s = Math.min(COL, Math.max(0.5, machineData[mi].span || 1));
+    if (curSum + s > COL + EPS) {
+      if (curRow.length) rowList.push(curRow);
+      curRow = [];
+      curSum = 0;
+    }
+    curRow.push({ l: machineData[mi].l, v: machineData[mi].v, span: s });
+    curSum += s;
+    if (Math.abs(curSum - COL) < EPS) {
+      rowList.push(curRow);
+      curRow = [];
+      curSum = 0;
+    }
   }
+  if (curRow.length) rowList.push(curRow);
 
+  // Second pass: compute per-cell x/y/w. Row width minus per-gap
+  // between cells; each cell gets (span/COL) fraction of the content.
   var cells = [];
-  var col = 0, row = 0;
-  for (var ci = 0; ci < dataItems.length; ci++) {
-    var span = dataItems[ci].wide ? 2 : 1;
-    if (col + span > COL) { col = 0; row++; }
-    var cw = span * cellW + (span - 1) * GAP;
-    cells.push({
-      x: PAD + col * (cellW + GAP), y: PAD + row * (CELL_H + GAP),
-      w: cw, h: CELL_H, l: dataItems[ci].l, v: dataItems[ci].v, hover: 0
-    });
-    col += span;
-    if (col >= COL) { col = 0; row++; }
+  for (var ri = 0; ri < rowList.length; ri++) {
+    var r = rowList[ri];
+    var availW = W - PAD * 2 - (r.length - 1) * GAP;
+    var x = PAD;
+    var y = PAD + ri * (CELL_H + GAP);
+    for (var rci = 0; rci < r.length; rci++) {
+      var cw = availW * (r[rci].span / COL);
+      cells.push({
+        x: x, y: y, w: cw, h: CELL_H,
+        l: r[rci].l, v: r[rci].v, hover: 0
+      });
+      x += cw + GAP;
+    }
   }
   // gridBottom = bottom edge of last cell + gap
   var lastCellBottom = cells.length > 0 ? cells[cells.length - 1].y + CELL_H : PAD;
@@ -307,22 +330,37 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
       var totalTextH = lineCount * lineH;
       var btY = bottomCell.y + (bottomCell.h - totalTextH) / 2 + lineH - 2;
 
+      // Auto-shrink helper: drop font-size until text fits the cell's
+      // inner width. Used by the bottom-cell lines (FP, trait list,
+      // halo caption) so they don't bleed past the canvas edge when
+      // the canvas is narrow (mobile).
+      var _maxW = bottomCell.w - 16;
+      function _fit(text, weight, maxPx, minPx) {
+        var size = maxPx;
+        ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
+        while (ctx.measureText(text).width > _maxW && size > minPx) {
+          size -= 0.5;
+          ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
+        }
+      }
       if (fingerprint) {
-        ctx.font = '300 7px "JetBrains Mono", monospace';
+        _fit('FP: ' + fingerprint, '300', 7, 5);
         ctx.fillStyle = 'rgba(255,255,255,' + (0.25 + bh * 0.3) + ')';
         ctx.fillText('FP: ' + fingerprint, W / 2, btY);
         btY += lineH;
       }
       if (allTraitsList.length) {
-        ctx.font = '400 8px "JetBrains Mono", monospace';
+        var traitLine = allTraitsList.join(' \u00b7 ');
+        _fit(traitLine, '400', 8, 5);
         ctx.fillStyle = 'rgba(255,255,255,' + (0.45 + bh * 0.35) + ')';
-        ctx.fillText(allTraitsList.join(' \u00b7 '), W / 2, btY);
+        ctx.fillText(traitLine, W / 2, btY);
         btY += lineH;
       }
       if (haloData) {
-        ctx.font = 'italic 400 8px "JetBrains Mono", monospace';
+        var haloText = '\u2728 Halo \u2014 0xAD4E found in entropy';
+        _fit(haloText, 'italic 400', 8, 5);
         ctx.fillStyle = 'rgba(160, 140, 240,' + (0.6 + bh * 0.15) + ')';
-        ctx.fillText('\u2728 Halo \u2014 0xAD4E found in entropy', W / 2, btY);
+        ctx.fillText(haloText, W / 2, btY);
       }
     }
 

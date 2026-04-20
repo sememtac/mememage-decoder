@@ -11,25 +11,34 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
   // Layout
   var COL = 3, PAD = 20, GAP = 6, CELL_H = 44;
   var cellW = Math.floor((W - PAD * 2 - GAP * (COL - 1)) / COL);
-  var rows = Math.ceil(genParams.length / COL);
-  var gridH = rows * CELL_H + (rows - 1) * GAP;
-  var gridY = Math.floor((H - gridH) / 2);
 
   // Entropy-seeded PRNG
   var seed = 0;
   if (entropyHex) for (var i = 0; i < 16 && i < entropyHex.length; i++) seed = (seed * 31 + entropyHex.charCodeAt(i)) & 0x7FFFFFFF;
   function rng() { seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF; return seed / 0x7FFFFFFF; }
 
-  // Cell positions
+  // Cell positions — pack cells with `span` of 1, 2, or 3 columns.
+  // Matches the ordering from cert-renderer: full-width headers
+  // (Seed/Size/Mode/Model), then 3-col rows for shorter params.
   var cells = [];
+  var col = 0, row = 0;
   for (var ci = 0; ci < genParams.length; ci++) {
+    var span = Math.min(COL, Math.max(1, genParams[ci].span || 1));
+    if (col + span > COL) { col = 0; row++; }
+    var cw = span * cellW + (span - 1) * GAP;
     cells.push({
-      x: PAD + (ci % COL) * (cellW + GAP),
-      y: gridY + Math.floor(ci / COL) * (CELL_H + GAP),
-      w: cellW, h: CELL_H,
+      x: PAD + col * (cellW + GAP),
+      y: row * (CELL_H + GAP),  // gridY added after total row count known
+      w: cw, h: CELL_H,
       hover: 0
     });
+    col += span;
+    if (col >= COL) { col = 0; row++; }
   }
+  var rows = row + (col > 0 ? 1 : 0);
+  var gridH = rows * CELL_H + Math.max(0, rows - 1) * GAP;
+  var gridY = Math.floor((H - gridH) / 2);
+  for (var ck = 0; ck < cells.length; ck++) cells[ck].y += gridY;
 
   // Mouse
   var mx = -1, my = -1;

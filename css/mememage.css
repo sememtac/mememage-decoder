@@ -1696,6 +1696,76 @@
     line-height: 1.6;
   }
 
+  /* --- GPS Password Unlock --- */
+  .gps-unlock {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(100,120,180,0.12);
+  }
+  .gps-unlock .gps-mod-label { margin-top: 0; margin-bottom: 6px; }
+  .gps-unlock-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .gps-pw {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 16px;  /* prevents iOS auto-zoom on focus */
+    padding: 6px 10px;
+    background: rgba(100,120,180,0.06);
+    color: #b8c4d8;
+    border: 1px solid rgba(100,120,180,0.18);
+    border-radius: 5px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+  .gps-pw:focus { border-color: rgba(140,160,210,0.5); }
+  .gps-pw::placeholder { color: rgba(100,120,160,0.4); }
+  .gps-unlock-btn {
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8898b8;
+    background: rgba(100,120,180,0.1);
+    border: 1px solid rgba(100,120,180,0.25);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .gps-unlock-btn:hover:not(:disabled) {
+    background: rgba(100,120,180,0.18);
+    border-color: rgba(140,160,210,0.45);
+    color: #c8d4e8;
+  }
+  .gps-unlock-btn:disabled { opacity: 0.5; cursor: default; }
+  .gps-unlock-result { margin-top: 8px; text-align: center; min-height: 1em; }
+  .gps-unlock-err { color: #e66b6b; font-size: 8px; letter-spacing: 0.04em; }
+  .gps-unlock-pending { color: #8898b8; font-size: 8px; font-style: italic; }
+  .gps-unlock-coords {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 9px;
+    color: #c8d4e8;
+    padding: 6px 10px;
+    background: rgba(100,160,120,0.08);
+    border: 1px solid rgba(100,160,120,0.2);
+    border-radius: 5px;
+  }
+  .gps-unlock-k {
+    font-size: 7px;
+    color: #7a8898;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-right: 4px;
+  }
+  .gps-unlock-v { font-weight: 500; }
+
   /* --- Birth Temperament --- */
   .temperament-cell {
     background: rgba(0,0,0,0.04);

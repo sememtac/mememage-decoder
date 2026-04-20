@@ -38,6 +38,21 @@ var BAR_SPEC = {
 function _hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]; }
 function _div(cls) { var d = document.createElement('div'); if (cls) d.className = cls; return d; }
 function _divider() { return _div('plate-divider'); }
+
+// Set up a canvas for hi-DPI rendering. Buffer size = logical × dpr
+// so fills/strokes/text render at physical device resolution while
+// draw coordinates stay in logical space. Band init functions take
+// (canvas, logicalW, logicalH) and draw at logical coords — this
+// wrapper pre-scales the context so they don't need to know about
+// DPR. Called before the band's init runs.
+function _setupHiDpi(canvas, logicalW, logicalH) {
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(logicalW * dpr);
+  canvas.height = Math.round(logicalH * dpr);
+  canvas.style.width = logicalW + 'px';
+  canvas.style.height = logicalH + 'px';
+  canvas.getContext('2d').scale(dpr, dpr);
+}
 function _sectionLabel(text) { var d = _div('plate-section-label'); d.textContent = text; return d; }
 function _copyable(el, text) {
   el.title = 'Click to copy';
@@ -99,17 +114,28 @@ function renderCert(meta, options) {
   var TIMESTAMP = meta.conceived || meta.timestamp || '';
 
   var GEN_PARAMS = [];
-  if (meta.seed !== undefined) GEN_PARAMS.push({l: 'Seed', v: '' + meta.seed});
-  if (meta.width && meta.height) GEN_PARAMS.push({l: 'Size', v: meta.width + ' \u00d7 ' + meta.height});
-  if (meta.mode) GEN_PARAMS.push({l: 'Mode', v: meta.mode});
+  // span: 3 = full width, 2 = two-thirds, 1 = one-third of the grid.
+  // Order below builds the desired layout:
+  //   [ SEED            full ]
+  //   [ SIZE            full ]
+  //   [ MODE            full ]
+  //   [ STEPS | CFG | GUIDANCE ]      numeric row
+  //   [ DENOISE | SAMPLER | SCHEDULER ] numeric/label row
+  //   [ MODEL           full ]
+  //   [ LoRA            full ]
+  if (meta.seed !== undefined) GEN_PARAMS.push({l: 'Seed', v: '' + meta.seed, span: 3});
+  if (meta.width && meta.height) GEN_PARAMS.push({l: 'Size', v: meta.width + ' \u00d7 ' + meta.height, span: 3});
+  if (meta.mode) GEN_PARAMS.push({l: 'Mode', v: meta.mode, span: 3});
+  // Numeric row (keep Steps / CFG / Guidance together visually)
   if (meta.steps !== undefined) GEN_PARAMS.push({l: 'Steps', v: '' + meta.steps});
   if (meta.cfg !== undefined) GEN_PARAMS.push({l: 'CFG', v: '' + meta.cfg});
   if (meta.guidance !== undefined) GEN_PARAMS.push({l: 'Guidance', v: '' + meta.guidance});
+  // Second short row
   if (meta.denoise !== undefined) GEN_PARAMS.push({l: 'Denoise', v: '' + meta.denoise});
   if (meta.sampler) GEN_PARAMS.push({l: 'Sampler', v: meta.sampler});
   if (meta.scheduler) GEN_PARAMS.push({l: 'Scheduler', v: meta.scheduler});
-  if (meta.unet) GEN_PARAMS.push({l: 'Model', v: meta.unet});
-  if (meta.lora) GEN_PARAMS.push({l: 'LoRA', v: meta.lora});
+  if (meta.unet) GEN_PARAMS.push({l: 'Model', v: meta.unet, span: 3});
+  if (meta.lora) GEN_PARAMS.push({l: 'LoRA', v: meta.lora, span: 3});
   if (meta.lora_strength !== undefined) GEN_PARAMS.push({l: 'LoRA Str', v: '' + meta.lora_strength});
 
   // Build PLANET_DATA from born
@@ -131,21 +157,38 @@ function renderCert(meta, options) {
   }
   var hasSky = PLANET_DATA.length > 0;
 
-  // Build MACHINE from born.machine
+  // Build MACHINE from born.machine. `span` controls the grid layout
+  // downstream in machine-band — 3 = full width, 1.5 = half row,
+  // 1 = one of three. Row totals must sum to 3.
+  //   [ CPU                           ] span 3
+  //   [ Cores | Active | GPU          ] 1|1|1
+  //   [ RAM | Compressed | Free       ] 1|1|1
+  //   [ Load                          ] span 3
+  //   [ Power | Speculative | Purgeable ] 1|1|1
+  //   [ Disk I/O                      ] span 3
+  //   [ Net ↑ | Net ↓                 ] 1.5|1.5
   var MACHINE = [];
   var machineFields = [
-    {k:'cpu', l:'CPU'}, {k:'cores', l:'Cores'}, {k:'gpu_cores', l:'GPU', fmt: function(v){return v + ' cores';}},
-    {k:'ram', l:'RAM'}, {k:'mem_active', l:'Active'}, {k:'mem_compressed', l:'Compressed'},
-    {k:'mem_free', l:'Free'}, {k:'load', l:'Load'}, {k:'power', l:'Power'},
-    {k:'speculative_pages', l:'Speculative'}, {k:'purgeable_pages', l:'Purgeable'},
-    {k:'disk_io', l:'Disk I/O'},
-    {k:'net_rx', l:'Net \u2193'}, {k:'net_tx', l:'Net \u2191'}
+    {k:'cpu', l:'CPU', span: 3},
+    {k:'cores', l:'Cores'},
+    {k:'mem_active', l:'Active'},
+    {k:'gpu_cores', l:'GPU', fmt: function(v){return v + ' cores';}},
+    {k:'ram', l:'RAM'},
+    {k:'mem_compressed', l:'Compressed'},
+    {k:'mem_free', l:'Free'},
+    {k:'load', l:'Load', span: 3},
+    {k:'power', l:'Power'},
+    {k:'speculative_pages', l:'Speculative'},
+    {k:'purgeable_pages', l:'Purgeable'},
+    {k:'disk_io', l:'Disk I/O', span: 3},
+    {k:'net_tx', l:'Net \u2191', span: 1.5},
+    {k:'net_rx', l:'Net \u2193', span: 1.5}
   ];
   for (var fi = 0; fi < machineFields.length; fi++) {
     var f = machineFields[fi];
     var v = m[f.k];
     if (v === undefined || v === null) continue;
-    MACHINE.push({l: f.l, v: f.fmt ? f.fmt(v) : '' + v});
+    MACHINE.push({l: f.l, v: f.fmt ? f.fmt(v) : '' + v, span: f.span || 1});
   }
 
   var KERNEL_ENTROPY = m.entropy || '';
@@ -732,14 +775,24 @@ function renderCert(meta, options) {
 
     var genWrap = _div('sky-band-wrap');
     var genContainer = _div('sky-band-container');
-    var GEN_W = 604;
-    var genRows = Math.ceil(GEN_PARAMS.length / 3);
+    // On mobile the canvas renders at the plate's actual content
+    // width (~295px on iPhone 12) instead of 604 scaled down, so 7-11px
+    // fonts render at their intended size instead of being downsampled
+    // to ~4-6 physical px. Desktop stays at 604.
+    var GEN_W = Math.min(604, Math.max(280, window.innerWidth - 96));
+    // Count rows accounting for span 1/2/3 cells in a 3-col grid.
+    // Mirrors the packing in gen-band.js so canvas height matches.
+    var _gpCol = 0, _gpRow = 0;
+    for (var _gpi = 0; _gpi < GEN_PARAMS.length; _gpi++) {
+      var _sp = Math.min(3, Math.max(1, GEN_PARAMS[_gpi].span || 1));
+      if (_gpCol + _sp > 3) { _gpCol = 0; _gpRow++; }
+      _gpCol += _sp;
+      if (_gpCol >= 3) { _gpCol = 0; _gpRow++; }
+    }
+    var genRows = _gpRow + (_gpCol > 0 ? 1 : 0);
     var GEN_H = Math.max(80, genRows * 50 + 30);
     var genCanvas = document.createElement('canvas');
-    genCanvas.width = GEN_W;
-    genCanvas.height = GEN_H;
-    genCanvas.style.width = '100%';
-    genCanvas.style.height = 'auto';
+    _setupHiDpi(genCanvas, GEN_W, GEN_H);
     genContainer.appendChild(genCanvas);
     genWrap.appendChild(genContainer);
     plate.appendChild(genWrap);
@@ -759,16 +812,21 @@ function renderCert(meta, options) {
 
     var machWrap = _div('sky-band-wrap');
     var machContainer = _div('sky-band-container');
-    var MACH_W = 604;
-    // Compute height from cell count (accounting for wide cells)
-    var machCol = 0, machRows = 1;
+    var MACH_W = Math.min(604, Math.max(280, window.innerWidth - 96));
+    // Compute row count using same span-based packing as machine-band.
+    // Each row's spans sum to 3 (full width).
+    var machRowSum = 0, machRows = 0;
+    var MACH_EPS = 0.001;
     for (var mi = 0; mi < MACHINE.length; mi++) {
-      var isWide = MACHINE[mi].l === 'Load' || MACHINE[mi].l === 'Disk I/O' || MACHINE[mi].l === 'CPU';
-      var span = isWide ? 2 : 1;
-      if (machCol + span > 3) { machCol = 0; machRows++; }
-      machCol += span;
-      if (machCol >= 3) { machCol = 0; machRows++; }
+      var ms = Math.min(3, Math.max(0.5, MACHINE[mi].span || 1));
+      if (machRowSum + ms > 3 + MACH_EPS) {
+        if (machRowSum > 0) machRows++;
+        machRowSum = 0;
+      }
+      machRowSum += ms;
+      if (Math.abs(machRowSum - 3) < MACH_EPS) { machRows++; machRowSum = 0; }
     }
+    if (machRowSum > 0) machRows++;
     // Extra height: entropy cell + identity/traits cell
     var extraH = 0;
     if (KERNEL_ENTROPY) extraH += 54; // entropy cell + gap
@@ -781,10 +839,7 @@ function renderCert(meta, options) {
     extraH += bottomCellH + 6; // cell + gap
     var MACH_H = Math.max(80, machRows * 44 + 30 + extraH);
     var machCanvas = document.createElement('canvas');
-    machCanvas.width = MACH_W;
-    machCanvas.height = MACH_H;
-    machCanvas.style.width = '100%';
-    machCanvas.style.height = 'auto';
+    _setupHiDpi(machCanvas, MACH_W, MACH_H);
     machContainer.appendChild(machCanvas);
     machWrap.appendChild(machContainer);
     plate.appendChild(machWrap);
@@ -808,13 +863,10 @@ function renderCert(meta, options) {
 
     var skyWrap = _div('sky-band-wrap');
     var skyContainer = _div('sky-band-container');
-    var SKY_W = 604;
-    var SKY_H = 390;
+    var SKY_W = Math.min(604, Math.max(280, window.innerWidth - 96));
+    var SKY_H = Math.round(390 * (SKY_W / 604));
     var skyCanvas = document.createElement('canvas');
-    skyCanvas.width = SKY_W;
-    skyCanvas.height = SKY_H;
-    skyCanvas.style.width = '100%';
-    skyCanvas.style.height = 'auto';
+    _setupHiDpi(skyCanvas, SKY_W, SKY_H);
     skyContainer.appendChild(skyCanvas);
     skyWrap.appendChild(skyContainer);
     plate.appendChild(skyWrap);
@@ -875,6 +927,72 @@ function renderCert(meta, options) {
     var pLen = born.gps_locked && (born.gps_locked.len || born.gps_locked.plaintext_length) || '?';
     footnote.innerHTML = '* ' + escapeHtml('' + tExp) + ' sequential squarings of 2 mod N, SHA-256 the result, XOR with ciphertext. First ' + escapeHtml('' + pLen) + ' bytes = GPS.';
     gpsContainer.appendChild(footnote);
+
+    // Password-based GPS unlock — the creator can reveal their own
+    // GPS instantly by entering the password set at conception time,
+    // no need to wait 10 years for the time-lock puzzle to finish.
+    // Only rendered when the record actually carries an AES envelope.
+    if (meta.gps_encrypted) {
+      var unlockWrap = _div('gps-unlock');
+      var unlockLabel = _div('gps-mod-label');
+      unlockLabel.textContent = 'Creator password \u2014 unlock instantly';
+      unlockWrap.appendChild(unlockLabel);
+
+      var unlockRow = _div('gps-unlock-row');
+      var pwInput = document.createElement('input');
+      pwInput.type = 'password';
+      pwInput.className = 'gps-pw';
+      pwInput.placeholder = 'password';
+      unlockRow.appendChild(pwInput);
+
+      var unlockBtn = document.createElement('button');
+      unlockBtn.type = 'button';
+      unlockBtn.className = 'gps-unlock-btn';
+      unlockBtn.textContent = 'Unlock';
+      unlockRow.appendChild(unlockBtn);
+      unlockWrap.appendChild(unlockRow);
+
+      var resultSlot = _div('gps-unlock-result');
+      unlockWrap.appendChild(resultSlot);
+      gpsContainer.appendChild(unlockWrap);
+
+      var envRef = meta.gps_encrypted;
+      function _hex2bytes(h) {
+        return new Uint8Array(h.match(/.{2}/g).map(function(b){ return parseInt(b, 16); }));
+      }
+      async function doUnlock() {
+        var pw = pwInput.value;
+        if (!pw) { resultSlot.innerHTML = '<span class="gps-unlock-err">Enter password</span>'; return; }
+        unlockBtn.disabled = true;
+        resultSlot.innerHTML = '<span class="gps-unlock-pending">Decrypting\u2026</span>';
+        try {
+          var salt = _hex2bytes(envRef.salt);
+          var iv = _hex2bytes(envRef.iv);
+          var ct = _hex2bytes(envRef.ct);
+          var tag = _hex2bytes(envRef.tag);
+          var km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+          var key = await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: salt, iterations: 600000, hash: 'SHA-256' },
+            km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+          );
+          var combined = new Uint8Array(ct.length + tag.length);
+          combined.set(ct); combined.set(tag, ct.length);
+          var plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, combined);
+          var coords = new TextDecoder().decode(plain).split(',');
+          resultSlot.innerHTML =
+            '<div class="gps-unlock-coords">' +
+              '<div><span class="gps-unlock-k">LAT</span> <span class="gps-unlock-v">' + escapeHtml(coords[0]) + '</span></div>' +
+              '<div><span class="gps-unlock-k">LON</span> <span class="gps-unlock-v">' + escapeHtml(coords[1] || '') + '</span></div>' +
+            '</div>';
+        } catch (e) {
+          resultSlot.innerHTML = '<span class="gps-unlock-err">Wrong password</span>';
+        } finally {
+          unlockBtn.disabled = false;
+        }
+      }
+      unlockBtn.addEventListener('click', doUnlock);
+      pwInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') doUnlock(); });
+    }
 
     plate.appendChild(gpsContainer);
   }
