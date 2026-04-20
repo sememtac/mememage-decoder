@@ -208,7 +208,7 @@
      the consistency buys predictable layout. The compact element rules
      below (drop-zone, Source, inputs, hints) keep every max state under
      360px so overflow never happens. */
-  @media (max-width: 1199px) {
+  @media (max-width: 679px) {
     .input-panel {
       height: auto;
       min-height: 0;
@@ -918,7 +918,7 @@
      cascade wins over the top-level defaults above — moving any of
      these rules earlier causes later rules to silently override them.
      ================================================================ */
-  @media (max-width: 1199px) {
+  @media (max-width: 679px) {
     .input-panel.active { height: 300px; }
     /* #imagePanel .drop-error has margin-top:auto + 1.6rem min-height on
        desktop to pin the error slot to the panel bottom — on mobile that
@@ -2090,7 +2090,7 @@
     overflow: hidden;
     display: none;
   }
-  @media (max-width: 1199px) {
+  @media (max-width: 679px) {
     /* Player spans the plate's full width + flushes with plate bottom.
        Plate has padding: 36px 28px 28px, so the player's natural width
        is 56px narrower than the plate and its natural bottom is 28px

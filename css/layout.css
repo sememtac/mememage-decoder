@@ -56,7 +56,7 @@
    cert-wrap's content area, not the player's margins; position:
    relative on panel-right pulls the containing block down to cover
    the player and lets sticky engage. */
-@media (max-width: 1199px) {
+@media (max-width: 679px) {
   .panel-right {
     overflow: visible;
     clip-path: inset(0 round 14px);
@@ -74,7 +74,7 @@
    it fresh (the "second flash" on hot fetches). On mobile, PanelSwap
    doesn't animate (viewport-gated), so .visible is the single place
    that introduces the panel. */
-@media (max-width: 1199px) {
+@media (max-width: 679px) {
   .panel-right.visible {
     animation: panelFadeIn 0.6s ease-out;
   }
@@ -232,7 +232,7 @@
 /* Mobile: trim the header so the system box + portal fit under iOS
    Chrome's chrome (top URL bar + bottom toolbar). Every reclaimed
    pixel goes into the panel below. */
-@media (max-width: 1199px) {
+@media (max-width: 679px) {
   .page-header { margin-bottom: 0.5rem; }
   .page-header h1 { font-size: 1.35rem; margin-bottom: 0.15rem; letter-spacing: 0.15em; }
   .page-header .subtitle { font-size: 0.66rem; }
@@ -268,7 +268,7 @@
    — no scrolling to reach the footer on an idle page. Letter-spacing
    on the tagline forced a 2-line wrap that clipped "generated images";
    drop it so the line fits the phone's width. */
-@media (max-width: 1199px) {
+@media (max-width: 679px) {
   .panel-footer { margin-top: 0.3rem; }
   .panel-footer .note {
     font-size: 0.62rem;

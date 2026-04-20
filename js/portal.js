@@ -879,7 +879,10 @@ var ButtonLoading = (function() {
 // the panel stays compact. Users can still expand it with one tap.
 // =====================================================================
 (function closeSourceOnMobile() {
-  if (window.innerWidth > 1199) return;
+  // Mobile-styling threshold matches the CSS: viewport narrower than
+  // the system box (~680px wide). On desktop viewports (including
+  // narrow-but-wider-than-box), Source stays open as the user expects.
+  if (window.innerWidth > 679) return;
   function apply() {
     document.querySelectorAll('details.lookup-source[open]').forEach(function(d) {
       d.removeAttribute('open');
