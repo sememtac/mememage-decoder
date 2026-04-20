@@ -891,3 +891,89 @@ var ButtonLoading = (function() {
     apply();
   }
 })();
+
+// =====================================================================
+// TouchTooltip — surfaces title-attribute tooltips on touch devices.
+// Desktop mice hover and reveal native title tooltips; phones don't,
+// so tapping a trait badge / verification badge / chain arrow never
+// surfaces the explanation.
+//
+// On a touch-only device (hover: none), tapping any element with a
+// `title` attribute shows the title text in a floating tooltip near
+// the element. Tap again on the same element, tap elsewhere, or
+// scroll to dismiss. Native title is moved to data-title while the
+// tooltip is active so iOS Safari doesn't fight us with its own
+// (non-functional) title handling.
+// =====================================================================
+(function() {
+  if (!window.matchMedia || window.matchMedia('(hover: hover)').matches) return;
+
+  var tooltipEl = null;
+  var activeTarget = null;
+
+  function ensureEl() {
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div');
+      tooltipEl.className = 'touch-tooltip';
+      document.body.appendChild(tooltipEl);
+    }
+    return tooltipEl;
+  }
+
+  function position(target) {
+    var t = tooltipEl;
+    // Two rAFs so the tooltip has a layout size before we measure.
+    requestAnimationFrame(function() {
+      var rect = target.getBoundingClientRect();
+      var ttRect = t.getBoundingClientRect();
+      var left = rect.left + rect.width / 2 - ttRect.width / 2;
+      var top = rect.top - ttRect.height - 10;
+      left = Math.max(8, Math.min(left, window.innerWidth - ttRect.width - 8));
+      if (top < 8) top = rect.bottom + 10;
+      t.style.left = left + 'px';
+      t.style.top = top + 'px';
+    });
+  }
+
+  function show(target) {
+    var text = target.getAttribute('title') || target.getAttribute('data-title');
+    if (!text) return;
+    // Stash the title so iOS's native title behavior doesn't interfere.
+    if (target.hasAttribute('title')) {
+      target.setAttribute('data-title', text);
+      target.removeAttribute('title');
+    }
+    var t = ensureEl();
+    t.textContent = text;
+    t.classList.add('visible');
+    position(target);
+    activeTarget = target;
+  }
+
+  function hide() {
+    if (tooltipEl) tooltipEl.classList.remove('visible');
+    // Restore title on the element we hid from so hover/other devices work.
+    if (activeTarget && activeTarget.hasAttribute('data-title') && !activeTarget.hasAttribute('title')) {
+      activeTarget.setAttribute('title', activeTarget.getAttribute('data-title'));
+    }
+    activeTarget = null;
+  }
+
+  document.addEventListener('click', function(e) {
+    var el = e.target.closest('[title], [data-title]');
+    if (el && (el.getAttribute('title') || el.getAttribute('data-title'))) {
+      if (activeTarget === el) {
+        hide();
+      } else {
+        if (activeTarget) hide();
+        show(el);
+      }
+    } else if (activeTarget) {
+      hide();
+    }
+  });
+
+  // Hide on scroll so a sticky tooltip doesn't hang mid-air while the
+  // element it's anchored to moves off-screen.
+  window.addEventListener('scroll', function() { if (activeTarget) hide(); }, { passive: true });
+})();

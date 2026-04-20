@@ -879,6 +879,37 @@
   }
 
   /* ================================================================
+     TOUCH TOOLTIP — the JS counterpart lives in js/portal.js. Native
+     title attributes don't surface on mobile, so on (hover: none)
+     devices we render a floating tooltip on tap. Kept universally
+     styled (not in a media query) so desktop-simulating viewports
+     show it cleanly if needed.
+     ================================================================ */
+  .touch-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    max-width: 280px;
+    padding: 8px 12px;
+    background: rgba(12, 12, 16, 0.92);
+    color: #e4e4e8;
+    font-size: 11px;
+    line-height: 1.45;
+    font-family: inherit;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    z-index: 10000;
+    white-space: normal;
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  .touch-tooltip.visible { opacity: 1; }
+
+  /* ================================================================
      MOBILE COMPACT — system box fits on one screen, every tab reserves
      the same height (360px) so switching tabs or toggling Source never
      changes the outer box. Every element above is shrunk enough that
