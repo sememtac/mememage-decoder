@@ -39,19 +39,16 @@ function _hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slic
 function _div(cls) { var d = document.createElement('div'); if (cls) d.className = cls; return d; }
 function _divider() { return _div('plate-divider'); }
 
-// Set up a canvas for hi-DPI rendering. CSS sizing stays fluid
-// (width: 100%, max-width: maxLogicalW) so the canvas follows its
-// container width; buffer size = actual rendered CSS width × dpr for
+// Set up a canvas for hi-DPI rendering. Canvas CSS width stays
+// fluid (the caller sets style.width: 100%); we measure the actual
+// rendered width at init time and allocate a DPR-scaled buffer for
 // crisp text at any viewport. Band init functions draw in logical
 // coordinates — this wrapper pre-scales the context so they stay
-// agnostic to DPR. Call AFTER the canvas is attached to the DOM
-// (we measure clientWidth).
-function _setupHiDpi(canvas, maxLogicalW, heightForWidth) {
-  canvas.style.width = '100%';
-  canvas.style.maxWidth = maxLogicalW + 'px';
+// agnostic to DPR. Call AFTER the canvas is attached to the DOM so
+// clientWidth is accurate.
+function _setupHiDpi(canvas, fallbackW, heightForWidth) {
   var dpr = window.devicePixelRatio || 1;
-  var cssW = canvas.clientWidth || maxLogicalW;
-  if (cssW > maxLogicalW) cssW = maxLogicalW;
+  var cssW = canvas.clientWidth || fallbackW;
   var cssH = typeof heightForWidth === 'function'
     ? heightForWidth(cssW)
     : heightForWidth;
@@ -801,7 +798,6 @@ function renderCert(meta, options) {
     // Fluid CSS sizing so band width matches the plate. _setupHiDpi
     // measures actual rendered width in the setTimeout below.
     genCanvas.style.width = '100%';
-    genCanvas.style.maxWidth = GEN_W + 'px';
     genContainer.appendChild(genCanvas);
     genWrap.appendChild(genContainer);
     plate.appendChild(genWrap);
@@ -849,7 +845,6 @@ function renderCert(meta, options) {
     var MACH_H = Math.max(80, machRows * 44 + 30 + extraH);
     var machCanvas = document.createElement('canvas');
     machCanvas.style.width = '100%';
-    machCanvas.style.maxWidth = MACH_W + 'px';
     machContainer.appendChild(machCanvas);
     machWrap.appendChild(machContainer);
     plate.appendChild(machWrap);
@@ -876,7 +871,6 @@ function renderCert(meta, options) {
     var SKY_W = 604;
     var skyCanvas = document.createElement('canvas');
     skyCanvas.style.width = '100%';
-    skyCanvas.style.maxWidth = SKY_W + 'px';
     skyContainer.appendChild(skyCanvas);
     skyWrap.appendChild(skyContainer);
     plate.appendChild(skyWrap);
