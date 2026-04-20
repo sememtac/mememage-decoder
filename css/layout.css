@@ -247,17 +247,20 @@
 
 /* Mobile: tighten the footer stack so the whole block sits above iOS
    Chrome's bottom toolbar. Matches the system-box compact philosophy
-   — no scrolling to reach the footer on an idle page. */
+   — no scrolling to reach the footer on an idle page. Letter-spacing
+   on the tagline forced a 2-line wrap that clipped "generated images";
+   drop it so the line fits the phone's width. */
 @media (max-width: 1199px) {
-  .panel-footer { margin-top: 0.5rem; }
+  .panel-footer { margin-top: 0.3rem; }
   .panel-footer .note {
-    font-size: 0.66rem;
-    margin: 0.6rem 0 0;
-    line-height: 1.4;
+    font-size: 0.62rem;
+    margin: 0.3rem 0 0;
+    line-height: 1.35;
   }
   .panel-footer .page-footer {
-    margin-top: 0.4rem;
-    font-size: 0.62rem;
+    margin-top: 0.2rem;
+    font-size: 0.55rem;
+    letter-spacing: 0;
   }
 }
 
