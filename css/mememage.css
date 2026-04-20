@@ -1990,12 +1990,14 @@
     display: none;
   }
   @media (max-width: 1199px) {
-    /* Zero the negative horizontal margins on mobile. Desktop uses
-       margin:-30px to poke past the plate's rounded bottom (backdrop
-       glass overlaps the edge); on mobile we want the player to sit
-       INSIDE the plate's clip-path so the plate rounds the bottom
-       corners exactly when the player touches the plate bottom. */
-    .cosmic-player { margin: 0; }
+    /* Player spans the plate's full width + flushes with plate bottom.
+       Plate has padding: 36px 28px 28px, so the player's natural width
+       is 56px narrower than the plate and its natural bottom is 28px
+       above the plate bottom. Negative horizontal margins extend it
+       past the horizontal padding; negative bottom margin pushes it
+       into the bottom padding area so it sits flush with plate bottom.
+       Plate's clip-path rounds the corners at rest. */
+    .cosmic-player { margin: 0 -28px -28px; }
   }
   .cosmic-player.visible {
     display: block;
