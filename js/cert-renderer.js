@@ -39,19 +39,27 @@ function _hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slic
 function _div(cls) { var d = document.createElement('div'); if (cls) d.className = cls; return d; }
 function _divider() { return _div('plate-divider'); }
 
-// Set up a canvas for hi-DPI rendering. Buffer size = logical × dpr
-// so fills/strokes/text render at physical device resolution while
-// draw coordinates stay in logical space. Band init functions take
-// (canvas, logicalW, logicalH) and draw at logical coords — this
-// wrapper pre-scales the context so they don't need to know about
-// DPR. Called before the band's init runs.
-function _setupHiDpi(canvas, logicalW, logicalH) {
+// Set up a canvas for hi-DPI rendering. CSS sizing stays fluid
+// (width: 100%, max-width: maxLogicalW) so the canvas follows its
+// container width; buffer size = actual rendered CSS width × dpr for
+// crisp text at any viewport. Band init functions draw in logical
+// coordinates — this wrapper pre-scales the context so they stay
+// agnostic to DPR. Call AFTER the canvas is attached to the DOM
+// (we measure clientWidth).
+function _setupHiDpi(canvas, maxLogicalW, heightForWidth) {
+  canvas.style.width = '100%';
+  canvas.style.maxWidth = maxLogicalW + 'px';
   var dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(logicalW * dpr);
-  canvas.height = Math.round(logicalH * dpr);
-  canvas.style.width = logicalW + 'px';
-  canvas.style.height = logicalH + 'px';
+  var cssW = canvas.clientWidth || maxLogicalW;
+  if (cssW > maxLogicalW) cssW = maxLogicalW;
+  var cssH = typeof heightForWidth === 'function'
+    ? heightForWidth(cssW)
+    : heightForWidth;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.height = cssH + 'px';
   canvas.getContext('2d').scale(dpr, dpr);
+  return { w: cssW, h: cssH };
 }
 function _sectionLabel(text) { var d = _div('plate-section-label'); d.textContent = text; return d; }
 function _copyable(el, text) {
@@ -775,11 +783,9 @@ function renderCert(meta, options) {
 
     var genWrap = _div('sky-band-wrap');
     var genContainer = _div('sky-band-container');
-    // On mobile the canvas renders at the plate's actual content
-    // width (~295px on iPhone 12) instead of 604 scaled down, so 7-11px
-    // fonts render at their intended size instead of being downsampled
-    // to ~4-6 physical px. Desktop stays at 604.
-    var GEN_W = Math.min(604, Math.max(280, window.innerWidth - 96));
+    // Max logical width; actual canvas buffer width is measured post-mount
+    // so the band always matches the plate's real content area.
+    var GEN_W = 604;
     // Count rows accounting for span 1/2/3 cells in a 3-col grid.
     // Mirrors the packing in gen-band.js so canvas height matches.
     var _gpCol = 0, _gpRow = 0;
@@ -792,15 +798,18 @@ function renderCert(meta, options) {
     var genRows = _gpRow + (_gpCol > 0 ? 1 : 0);
     var GEN_H = Math.max(80, genRows * 50 + 30);
     var genCanvas = document.createElement('canvas');
-    _setupHiDpi(genCanvas, GEN_W, GEN_H);
+    // Fluid CSS sizing so band width matches the plate. _setupHiDpi
+    // measures actual rendered width in the setTimeout below.
+    genCanvas.style.width = '100%';
+    genCanvas.style.maxWidth = GEN_W + 'px';
     genContainer.appendChild(genCanvas);
     genWrap.appendChild(genContainer);
     plate.appendChild(genWrap);
 
     setTimeout(function() {
-      if (typeof initGenBand === 'function') {
-        initGenBand(genCanvas, GEN_W, GEN_H, GEN_PARAMS, KERNEL_ENTROPY, BAR_SPEC, barFragments.gen, tierColor, rarityScore);
-      }
+      if (typeof initGenBand !== 'function') return;
+      var dims = _setupHiDpi(genCanvas, GEN_W, GEN_H);
+      initGenBand(genCanvas, dims.w, dims.h, GEN_PARAMS, KERNEL_ENTROPY, BAR_SPEC, barFragments.gen, tierColor, rarityScore);
     }, 0);
   }
 
@@ -812,7 +821,7 @@ function renderCert(meta, options) {
 
     var machWrap = _div('sky-band-wrap');
     var machContainer = _div('sky-band-container');
-    var MACH_W = Math.min(604, Math.max(280, window.innerWidth - 96));
+    var MACH_W = 604;
     // Compute row count using same span-based packing as machine-band.
     // Each row's spans sum to 3 (full width).
     var machRowSum = 0, machRows = 0;
@@ -839,7 +848,8 @@ function renderCert(meta, options) {
     extraH += bottomCellH + 6; // cell + gap
     var MACH_H = Math.max(80, machRows * 44 + 30 + extraH);
     var machCanvas = document.createElement('canvas');
-    _setupHiDpi(machCanvas, MACH_W, MACH_H);
+    machCanvas.style.width = '100%';
+    machCanvas.style.maxWidth = MACH_W + 'px';
     machContainer.appendChild(machCanvas);
     machWrap.appendChild(machContainer);
     plate.appendChild(machWrap);
@@ -849,9 +859,9 @@ function renderCert(meta, options) {
     var haloData = rarity.halo || rarity.echo || null;
 
     setTimeout(function() {
-      if (typeof initMachineBand === 'function') {
-        initMachineBand(machCanvas, MACH_W, MACH_H, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore);
-      }
+      if (typeof initMachineBand !== 'function') return;
+      var dims = _setupHiDpi(machCanvas, MACH_W, MACH_H);
+      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore);
     }, 0);
   }
 
@@ -863,17 +873,23 @@ function renderCert(meta, options) {
 
     var skyWrap = _div('sky-band-wrap');
     var skyContainer = _div('sky-band-container');
-    var SKY_W = Math.min(604, Math.max(280, window.innerWidth - 96));
-    var SKY_H = Math.round(390 * (SKY_W / 604));
+    var SKY_W = 604;
     var skyCanvas = document.createElement('canvas');
-    _setupHiDpi(skyCanvas, SKY_W, SKY_H);
+    skyCanvas.style.width = '100%';
+    skyCanvas.style.maxWidth = SKY_W + 'px';
     skyContainer.appendChild(skyCanvas);
     skyWrap.appendChild(skyContainer);
     plate.appendChild(skyWrap);
 
     var celestialTraits = (rarity.celestial || []).map(function(t) { return t.trait; });
     var birthTemp = meta.birth_temperament || '';
-    initSkyBand(skyCanvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, m, ageTier, rarityScore, celestialTraits, birthTemp);
+    // Sky-band needs its canvas sized before init (draws immediately).
+    // Defer setup/init until after the plate is mounted so clientWidth
+    // reflects the real CSS size.
+    setTimeout(function() {
+      var dims = _setupHiDpi(skyCanvas, SKY_W, function(w) { return Math.round(390 * (w / 604)); });
+      initSkyBand(skyCanvas, dims.w, dims.h, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, m, ageTier, rarityScore, celestialTraits, birthTemp);
+    }, 0);
 
     if (typeof enableCanvasSave === 'function') {
       var skyMeta = {};
