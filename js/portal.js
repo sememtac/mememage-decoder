@@ -906,8 +906,11 @@ var ButtonLoading = (function() {
 // (non-functional) title handling.
 // =====================================================================
 (function() {
-  if (!window.matchMedia || window.matchMedia('(hover: hover)').matches) return;
-
+  // No hover-capability gate. matchMedia('(hover: hover)') can mis-
+  // report on iOS when an accessory is paired or in various browser
+  // modes, and the user reported the tooltip not showing. Always
+  // install the handler — on desktop, clicking a badge is a
+  // reasonable alternative to hovering (you get the same info).
   var tooltipEl = null;
   var activeTarget = null;
 
