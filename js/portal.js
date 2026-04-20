@@ -959,7 +959,15 @@ var ButtonLoading = (function() {
     activeTarget = null;
   }
 
-  document.addEventListener('click', function(e) {
+  var lastTap = 0;
+  function handle(e) {
+    // Dedupe touchend → synthetic click on iOS.
+    var now = Date.now();
+    if (e.type === 'touchend') {
+      lastTap = now;
+    } else if (now - lastTap < 500) {
+      return; // click is iOS's follow-up; already handled by touchend
+    }
     var el = e.target.closest('[title], [data-title]');
     if (el && (el.getAttribute('title') || el.getAttribute('data-title'))) {
       if (activeTarget === el) {
@@ -971,7 +979,14 @@ var ButtonLoading = (function() {
     } else if (activeTarget) {
       hide();
     }
-  });
+  }
+
+  // Capture phase on both events so DragScroll's click-swallow (which
+  // also runs in capture phase on .plate) can't pre-empt the tooltip.
+  // touchend is the primary trigger on iOS — click on non-interactive
+  // elements (span, div) is unreliable there.
+  document.addEventListener('click', handle, true);
+  document.addEventListener('touchend', handle, true);
 
   // Hide on scroll so a sticky tooltip doesn't hang mid-air while the
   // element it's anchored to moves off-screen.
