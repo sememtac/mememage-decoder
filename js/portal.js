@@ -912,6 +912,7 @@ var ButtonLoading = (function() {
   // reasonable alternative to hovering (same info, different surface).
   var tooltipEl = null;
   var activeTarget = null;
+  var autoHideTimer = null;
 
   function ensureEl() {
     if (!tooltipEl) {
@@ -944,9 +945,16 @@ var ButtonLoading = (function() {
     t.classList.add('visible');
     position(target);
     activeTarget = target;
+    // Auto-dismiss after 2.5s. Covers the case where the tapped
+    // element also triggers another action (e.g. the image preview
+    // both has a tooltip AND opens a lightbox on click) — the tooltip
+    // won't linger over the modal.
+    if (autoHideTimer) clearTimeout(autoHideTimer);
+    autoHideTimer = setTimeout(hide, 2500);
   }
 
   function hide() {
+    if (autoHideTimer) { clearTimeout(autoHideTimer); autoHideTimer = null; }
     if (tooltipEl) tooltipEl.classList.remove('visible');
     // Restore title on the element we hid from so hover/other devices work.
     if (activeTarget && activeTarget.hasAttribute('data-title') && !activeTarget.hasAttribute('title')) {
