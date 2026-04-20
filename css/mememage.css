@@ -1989,6 +1989,25 @@
        breathing room keeps the last line from hugging the top edge
        of the player. */
     .plate { padding-bottom: 124px; }
+    /* Match the plate's visible width — body carries 1.2rem horizontal
+       padding on mobile, so the plate sits inside a 20.4px inset on
+       each side. Pin the player to the same inset so it aligns with
+       the plate's rounded edges instead of bleeding to the viewport
+       edges. Round the bottom corners so it reads as a continuation
+       of the plate. */
+    .cosmic-player {
+      left: 1.2rem;
+      right: 1.2rem;
+      border-radius: 0 0 14px 14px;
+    }
+    /* When a cert is on screen, suppress the page-footer so the cert
+       IS the last thing on the page. Otherwise the fixed player would
+       hover over the footer's "mememage — steganographic…" text as
+       the user scrolls past the cert, clipping it permanently. With
+       the footer hidden, max-scroll lands the user exactly at the
+       cert's bottom, and the fixed player reads as resting on top of
+       the plate's padding-bottom area. */
+    .panel-layout.layout-active .panel-footer { display: none; }
   }
   .cosmic-player.visible {
     display: block;
