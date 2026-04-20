@@ -45,6 +45,18 @@
   overflow: hidden;
 }
 
+/* Mobile: swap overflow: hidden for clip-path so the cosmic player
+   inside the plate can engage position: sticky against the window
+   scroll. overflow: hidden on an ancestor traps sticky (makes it
+   behave like position: relative); clip-path rounds the corners
+   without creating a new flow root. Same trick .plate already uses. */
+@media (max-width: 1199px) {
+  .panel-right {
+    overflow: visible;
+    clip-path: inset(0 round 14px);
+  }
+}
+
 .panel-right.visible {
   display: block;
 }
