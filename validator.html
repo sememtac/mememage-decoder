@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="css/mememage.css?v=20260416">
 <script>if(location.search.indexOf('from=')>=0)document.documentElement.classList.add('portal-transit');</script>
 <style>
-html { overflow-x: hidden; }
+html { overflow-x: clip; }
 html.portal-transit .input-section { opacity:0; transform:perspective(1200px) rotateY(-90deg); }
 html.portal-transit .panel-footer { opacity:0; }
 /* ================================================================
@@ -28,7 +28,11 @@ body {
   align-items: center;
   padding: 2.5rem 1.2rem 3rem;
   position: relative;
-  overflow-x: hidden;
+  /* overflow-x: clip — prevents horizontal overflow without creating a
+     scroll container. `hidden` would break position: sticky on the
+     cosmic player (sticky needs the document scroll, not a body scroll
+     container). */
+  overflow-x: clip;
 }
 
 /* Starfield — dark stars on light background */

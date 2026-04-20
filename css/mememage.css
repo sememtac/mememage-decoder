@@ -81,7 +81,13 @@
     align-items: center;
     padding: 2.5rem 1.2rem 3rem;
     position: relative;
-    overflow-x: hidden;
+    /* overflow-x: clip instead of hidden — both prevent horizontal
+       overflow, but `hidden` makes the body a scroll container (even
+       in the X axis alone), which breaks position: sticky on any
+       descendant. `clip` just clips without creating a scroll root,
+       so sticky on the cosmic player still engages against the
+       document scroll. */
+    overflow-x: clip;
   }
 
   /* --- Star field background --- */
@@ -1958,19 +1964,20 @@
   /* ================================================================
      COSMIC AUDIO PLAYER
      ================================================================ */
-  /* Mobile/default: pin to the viewport bottom (position: fixed) so
-     the player stays visible while the user scrolls through the cert,
-     and naturally overlaps the cert's bottom when the page reaches its
-     end. Sticky wouldn't engage here — the player is the last child
-     in its container, leaving zero range for sticky to stick within.
-     Desktop overrides further below make it position: absolute inside
-     the right panel so it anchors to the panel bottom with internal
-     scroll on the plate. */
+  /* Default: position: sticky so the player rides the viewport bottom
+     while the user scrolls through the cert, then settles naturally at
+     the plate's bottom when the page bottoms out. The plate has
+     padding-bottom (mobile rule below) to give sticky the range it
+     needs — without that slack, the player is the last thing in its
+     container and sticky has zero range. The plate's clip-path rounds
+     the player's bottom ONLY when it reaches the plate bottom; during
+     scroll, the player stays a flat rectangle inside the plate. That
+     means no bevel-against-cert glitch mid-scroll, and a clean round
+     of the player's corners when it docks at the cert's end.
+     Desktop overrides further below make it position: absolute. */
   .cosmic-player {
-    position: fixed;
+    position: sticky;
     bottom: 0;
-    left: 0;
-    right: 0;
     z-index: 10;
     background: rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(20px) saturate(1.2);
@@ -1978,36 +1985,17 @@
     border-top: none;
     box-shadow: none;
     border-radius: 0;
-    margin: 0;
+    margin: 24px -30px -30px;
     overflow: hidden;
     display: none;
   }
   @media (max-width: 1199px) {
-    /* Reserve space at the bottom of the plate so content doesn't
-       render behind the fixed player. 104px matches the player's
-       measured height (eq canvas 40 + controls 64); extra 20px of
-       breathing room keeps the last line from hugging the top edge
-       of the player. */
-    .plate { padding-bottom: 124px; }
-    /* Match the plate's visible width — body carries 1.2rem horizontal
-       padding on mobile, so the plate sits inside a 20.4px inset on
-       each side. Pin the player to the same inset so it aligns with
-       the plate's rounded edges instead of bleeding to the viewport
-       edges. Round the bottom corners so it reads as a continuation
-       of the plate. */
-    .cosmic-player {
-      left: 1.2rem;
-      right: 1.2rem;
-      border-radius: 0 0 14px 14px;
-    }
-    /* When a cert is on screen, suppress the page-footer so the cert
-       IS the last thing on the page. Otherwise the fixed player would
-       hover over the footer's "mememage — steganographic…" text as
-       the user scrolls past the cert, clipping it permanently. With
-       the footer hidden, max-scroll lands the user exactly at the
-       cert's bottom, and the fixed player reads as resting on top of
-       the plate's padding-bottom area. */
-    .panel-layout.layout-active .panel-footer { display: none; }
+    /* Zero the negative horizontal margins on mobile. Desktop uses
+       margin:-30px to poke past the plate's rounded bottom (backdrop
+       glass overlaps the edge); on mobile we want the player to sit
+       INSIDE the plate's clip-path so the plate rounds the bottom
+       corners exactly when the player touches the plate bottom. */
+    .cosmic-player { margin: 0; }
   }
   .cosmic-player.visible {
     display: block;

@@ -575,13 +575,11 @@ var CosmicPlayer = (function() {
       // position: absolute; bottom: 0 anchors it to the panel bottom.
       if (player.parentElement !== slot) slot.appendChild(player);
     } else {
-      // Mobile / narrow: player belongs inside the plate so it follows
-      // page flow. Mobile CSS gives it position: fixed; bottom: 0 so it
-      // pins to the viewport bottom while the cert scrolls behind it,
-      // and naturally sits over the cert's last pixels when the page
-      // reaches its end. (position: sticky wouldn't engage here — the
-      // player is the last thing inside its container, leaving zero
-      // range for sticky to actually stick.)
+      // Mobile / narrow: player stays as the last child of the plate.
+      // The plate carries padding-bottom on mobile, which extends the
+      // containing block past the player's natural position and gives
+      // position: sticky the range it needs to ride the viewport bottom
+      // through the cert scroll.
       var plate = slot.querySelector('.plate');
       if (plate && player.parentElement !== plate) plate.appendChild(player);
     }
