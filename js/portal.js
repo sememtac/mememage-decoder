@@ -959,16 +959,18 @@ var ButtonLoading = (function() {
     activeTarget = null;
   }
 
-  var lastTap = 0;
+  var lastHandled = 0;
   function handle(e) {
-    // Dedupe touchend → synthetic click on iOS.
+    // Dedupe across touchstart/touchend/click — they all fire in
+    // sequence on a single iOS tap. First-wins inside a 500ms window.
     var now = Date.now();
-    if (e.type === 'touchend') {
-      lastTap = now;
-    } else if (now - lastTap < 500) {
-      return; // click is iOS's follow-up; already handled by touchend
-    }
-    var el = e.target.closest('[title], [data-title]');
+    if (now - lastHandled < 500) return;
+    lastHandled = now;
+
+    // touchstart's e.target is the raw DOM node. closest walks up.
+    var t = e.target;
+    if (t && t.nodeType === 3) t = t.parentElement;  // text node → element
+    var el = t && t.closest ? t.closest('[title], [data-title]') : null;
     if (el && (el.getAttribute('title') || el.getAttribute('data-title'))) {
       if (activeTarget === el) {
         hide();
@@ -981,11 +983,15 @@ var ButtonLoading = (function() {
     }
   }
 
-  // Capture phase on both events so DragScroll's click-swallow (which
-  // also runs in capture phase on .plate) can't pre-empt the tooltip.
-  // touchend is the primary trigger on iOS — click on non-interactive
-  // elements (span, div) is unreliable there.
+  // Listen broadly in capture phase on document so DragScroll's
+  // click-swallow (which runs in capture on .plate) can't pre-empt us.
+  // touchstart is the earliest and most reliable trigger on iOS —
+  // `click` is suppressed on non-button spans like .trait-badge unless
+  // they have cursor: pointer or an onclick, and touchend can be
+  // consumed by pointer-event-based gesture handlers. Pairing them
+  // catches every device path.
   document.addEventListener('click', handle, true);
+  document.addEventListener('touchstart', handle, true);
   document.addEventListener('touchend', handle, true);
 
   // Hide on scroll so a sticky tooltip doesn't hang mid-air while the
