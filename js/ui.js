@@ -631,7 +631,6 @@ function processImage(file){
     previewImg.src = objUrl;
     preview.className = 'console-preview visible';
     previewImg.style.cursor = 'pointer';
-    previewImg.title = 'Click to view full size';
     window._lastDecodedCanvas = canvas;
 
     renderBar(decoded);
