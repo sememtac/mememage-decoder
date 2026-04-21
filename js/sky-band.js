@@ -237,9 +237,15 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
 
   function renderPlanetSnapshot() {
     planetSnapCanvas = document.createElement('canvas');
-    planetSnapCanvas.width = SKY_W;
-    planetSnapCanvas.height = SKY_H;
+    // Mirror the main canvas's DPR scaling so the static planet grid +
+    // text layer composites 1:1 onto the hi-DPI main canvas instead of
+    // being upscaled from logical px (what made cell text look blurry
+    // on mobile). Draw coords stay in logical space via ctx.scale.
+    var _dpr = window.devicePixelRatio || 1;
+    planetSnapCanvas.width = Math.round(SKY_W * _dpr);
+    planetSnapCanvas.height = Math.round(SKY_H * _dpr);
     var pctx = planetSnapCanvas.getContext('2d');
+    pctx.scale(_dpr, _dpr);
     var skyGrad = pctx.createLinearGradient(0, 0, 0, SKY_H);
     skyGrad.addColorStop(0, _skyC[0]);
     skyGrad.addColorStop(0.5, _skyC[1]);
@@ -577,11 +583,15 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
   });
   canvas.addEventListener('mouseleave', function() { mouseX = -1; mouseY = -1; });
 
-  // Offscreen sky canvas for compositing
+  // Offscreen sky canvas for compositing. Mirror the main canvas's
+  // DPR so the per-frame star / meteor draws stay pixel-crisp when
+  // composited back to the hi-DPI main canvas.
   var offCanvas = document.createElement('canvas');
-  offCanvas.width = SKY_W;
-  offCanvas.height = SKY_H;
+  var _offDpr = window.devicePixelRatio || 1;
+  offCanvas.width = Math.round(SKY_W * _offDpr);
+  offCanvas.height = Math.round(SKY_H * _offDpr);
   var offCtx = offCanvas.getContext('2d');
+  offCtx.scale(_offDpr, _offDpr);
 
   function initAnimation() {
     // Seed initial meteors staggered
@@ -656,8 +666,11 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
     offCtx.fillStyle = _skyC[0];
     offCtx.fillRect(0, 0, SKY_W, SKY_H);
 
-    // Re-stamp planet snapshot
-    if (planetSnapReady) offCtx.drawImage(planetSnapCanvas, 0, 0);
+    // Re-stamp planet snapshot. Explicit logical size on drawImage so
+    // the DPR-scaled snap canvas maps 1:1 onto the DPR-scaled offscreen
+    // (2-arg drawImage uses intrinsic pixel size, which would double-
+    // scale since both ctxs are pre-scaled by dpr).
+    if (planetSnapReady) offCtx.drawImage(planetSnapCanvas, 0, 0, SKY_W, SKY_H);
 
     // Twinkling stars — draw over the snapshot with animated alpha
     var _now = Date.now() * 0.001;
@@ -798,8 +811,9 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
       }
     }
 
-    // Composite to visible canvas
-    ctx.drawImage(offCanvas, 0, 0);
+    // Composite to visible canvas — explicit size, same reason as the
+    // planetSnap composite above.
+    ctx.drawImage(offCanvas, 0, 0, SKY_W, SKY_H);
 
     // Celestial rarity traits at the bottom of the band. If the joined
     // line fits, render it on one line at 8px (original look). If not
