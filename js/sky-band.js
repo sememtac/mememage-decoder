@@ -801,21 +801,25 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
     // Composite to visible canvas
     ctx.drawImage(offCanvas, 0, 0);
 
-    // Celestial rarity traits at the bottom of the band
+    // Celestial rarity traits at the bottom of the band. If the joined
+    // line fits, render it on one line at 8px (original look). If not
+    // — typical on narrow canvases where two conjunction strings don't
+    // fit side-by-side — stack them one per line so each trait can be
+    // read comfortably instead of shrinking the font past legibility.
     if (celestialTraits && celestialTraits.length) {
-      var traitText = celestialTraits.join(' \u00b7 ');
-      // Shrink to fit — conjunction strings can be long and the
-      // centered render overflows both edges on narrow canvases.
       var _ttW = SKY_W - 20;
-      var _tts = 8;
-      ctx.font = '400 ' + _tts + 'px "JetBrains Mono", monospace';
-      while (ctx.measureText(traitText).width > _ttW && _tts > 5.5) {
-        _tts -= 0.5;
-        ctx.font = '400 ' + _tts + 'px "JetBrains Mono", monospace';
-      }
+      var joined = celestialTraits.join(' \u00b7 ');
+      ctx.font = '400 8px "JetBrains Mono", monospace';
+      var lines = ctx.measureText(joined).width <= _ttW
+        ? [joined]
+        : celestialTraits.slice();
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(136, 152, 184, 0.7)';
-      ctx.fillText(traitText, SKY_W / 2, SKY_H - 12);
+      var lineH = 11;
+      var startY = SKY_H - 10 - (lines.length - 1) * lineH;
+      for (var li = 0; li < lines.length; li++) {
+        ctx.fillText(lines[li], SKY_W / 2, startY + li * lineH);
+      }
       ctx.textAlign = 'left';
     }
 

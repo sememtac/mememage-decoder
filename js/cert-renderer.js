@@ -883,8 +883,14 @@ function renderCert(meta, options) {
     // scaling H proportionally with W pushes them off-canvas on mobile.
     // Keeping 390 means mobile gets a portrait-aspect sky (narrower
     // but same tall) with every graphical element intact.
+    // Reserve extra height for the trait-list footer when there are
+    // multiple traits — on narrow canvases they stack one per line
+    // (see sky-band.js), so we need +11px per extra trait to keep them
+    // from overlapping the celestial reading text above. Desktop
+    // renders them on one line and just leaves the reserve empty.
+    var skyExtraH = Math.max(0, celestialTraits.length - 1) * 11;
     setTimeout(function() {
-      var dims = _setupHiDpi(skyCanvas, SKY_W, 390);
+      var dims = _setupHiDpi(skyCanvas, SKY_W, 390 + skyExtraH);
       initSkyBand(skyCanvas, dims.w, dims.h, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, m, ageTier, rarityScore, celestialTraits, birthTemp);
     }, 0);
 
