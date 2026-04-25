@@ -1020,6 +1020,51 @@ var ButtonLoading = (function() {
 // for slow cert-renderer work (planets, bands) that can push the
 // target further down after the first pass.
 // =====================================================================
+// =====================================================================
+// dismissPanel — shared dismiss-then-collapse helper for the
+// decoder/validator portal departure flow. Both pages need to:
+//   1. If panel isn't visible, just call done() and return
+//   2. Run an optional beforeDismiss hook (e.g., CosmicPlayer.dismiss)
+//   3. Add .dismissing → wait for animationend (or 600ms safety fallback)
+//   4. Remove .visible/.dismissing, reset innerHTML
+//   5. Collapse the layout-active two-panel back to single-column on
+//      desktop (gated on innerWidth >= 1200; mobile CSS already
+//      released the fixed-panel lock so the wait is dead time)
+//   6. Call done()
+//
+// opts: { resetHtml: string, beforeDismiss: function }
+// =====================================================================
+function dismissPanel(panel, opts, done) {
+  opts = opts || {};
+  if (!panel || !panel.classList.contains('visible')) { done(); return; }
+  if (typeof opts.beforeDismiss === 'function') opts.beforeDismiss();
+  panel.classList.add('dismissing');
+  var finished = false;
+  function finish() {
+    if (finished) return;
+    finished = true;
+    panel.classList.remove('visible', 'dismissing');
+    panel.innerHTML = opts.resetHtml || '';
+    var dm = document.querySelector('.panel-layout');
+    var isDesktop = window.innerWidth >= 1200;
+    if (dm && dm.classList.contains('layout-active') && isDesktop) {
+      dm.classList.add('layout-collapsing');
+      setTimeout(function() {
+        dm.classList.remove('layout-active', 'layout-collapsing');
+        setTimeout(done, 100);
+      }, 500);
+    } else {
+      if (dm) dm.classList.remove('layout-active');
+      done();
+    }
+  }
+  panel.addEventListener('animationend', finish, { once: true });
+  // Safety fallback — animationend can fail to fire (CSS cascade bug,
+  // reduced-motion preference, animation interrupted by class change).
+  // 600ms is well past panelFadeOut's 0.4s duration.
+  setTimeout(finish, 600);
+}
+
 function scrollResultIntoView(el) {
   if (!el) return;
   function go() {

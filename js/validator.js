@@ -2494,23 +2494,9 @@ Portal.init({
   },
 
   dismissResults: function(done) {
-    var rw = document.getElementById('resultsWrap');
-    if (!rw || !rw.classList.contains('visible')) { done(); return; }
-    rw.classList.add('dismissing');
-    rw.addEventListener('animationend', function() {
-      rw.classList.remove('visible', 'dismissing');
-      rw.innerHTML = '<div id="imgResults"></div><div id="certResults"></div>';
-      var dm = document.querySelector('.panel-layout');
-      if (dm && dm.classList.contains('layout-active')) {
-        dm.classList.add('layout-collapsing');
-        setTimeout(function() {
-          dm.classList.remove('layout-active', 'layout-collapsing');
-          setTimeout(done, 100);
-        }, 500);
-      } else {
-        done();
-      }
-    }, { once: true });
+    dismissPanel(document.getElementById('resultsWrap'), {
+      resetHtml: '<div id="imgResults"></div><div id="certResults"></div>'
+    }, done);
   },
 });
 
