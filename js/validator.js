@@ -1605,8 +1605,23 @@ function renderAudit(rec, identifier, out) {
     sigRows += auditRow('Public Key', rec.public_key ? rec.public_key.slice(0, 16) + '...' : 'missing', rec.public_key ? '' : 'audit-fail');
     sigRows += auditRow('Fingerprint', rec.key_fingerprint || 'missing', rec.key_fingerprint ? 'audit-info' : 'audit-fail');
     if (rec.creator_name) sigRows += auditRow('Creator (TOFU)', rec.creator_name, 'audit-info');
-    // TODO: actual Ed25519 verification would go here
-    sigRows += auditRow('Signed', 'Yes \u2014 signature present', 'audit-pass');
+    // Real Ed25519 verification — deferred update mirrors the content-hash
+    // pattern above. verifySignature returns true | false | null (browser
+    // can't verify Ed25519, e.g., very old Safari).
+    sigRows += '<div id="auditSigResult">' + auditRow('Verifying...', '', 'audit-dim') + '</div>';
+    var sigId = rec.identifier || identifier;
+    var sigHash = rec.content_hash || '';
+    verifySignature(sigId, sigHash, rec.signature, rec.public_key).then(function(valid) {
+      var sigEl = document.getElementById('auditSigResult');
+      if (!sigEl) return;
+      if (valid === true) {
+        sigEl.innerHTML = auditRow('Verdict', 'VALID \u2014 signature verifies against public key', 'audit-pass');
+      } else if (valid === false) {
+        sigEl.innerHTML = auditRow('Verdict', 'INVALID \u2014 signature does not verify (forged or tampered)', 'audit-fail');
+      } else {
+        sigEl.innerHTML = auditRow('Verdict', 'Inconclusive \u2014 browser cannot verify Ed25519', 'audit-warn');
+      }
+    });
   } else {
     sigRows += auditRow('Status', 'UNSIGNED \u2014 no Ed25519 signature', 'audit-warn');
     sigRows += auditRow('Risk', 'Thumbnail and non-hashed fields are unprotected', 'audit-warn');
