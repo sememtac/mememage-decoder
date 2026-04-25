@@ -6,6 +6,10 @@
     /* Prevent iOS Safari's auto text-size adjust on orientation
        change — keeps rem-based sizing predictable. */
     -webkit-text-size-adjust: 100%;
+    /* scroll-behavior at the root so window.scrollTo(x, y) animates on
+       capable browsers without needing the iOS-16+ options-object form
+       of scrollTo. */
+    scroll-behavior: smooth;
   }
 
   /* Mobile typography bump: +6% root size so rem-based sizing reads

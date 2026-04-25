@@ -1244,7 +1244,12 @@ function renderCert(meta, options) {
   certWrap.appendChild(plate);
   // Only add .visible on first reveal — re-adding it mid-swap re-triggers
   // panelFadeIn and double-fades with PanelSwap's intro animation.
-  if (!wasVisible) certWrap.classList.add('visible');
+  if (!wasVisible) {
+    certWrap.classList.add('visible');
+    if (window.innerWidth < 1200 && typeof scrollResultIntoView === 'function') {
+      scrollResultIntoView(certWrap);
+    }
+  }
   // Drag-to-scroll on the plate (scrollable when player is injected).
   // Sample mode doesn't scroll, but the helper is idempotent and only
   // has visible effect when there's overflow — safe to attach always.

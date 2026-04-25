@@ -1006,3 +1006,45 @@ var ButtonLoading = (function() {
   // scroll rails, etc.).
   document.addEventListener('scroll', function() { if (activeTarget) hide(); }, { capture: true, passive: true });
 })();
+
+// =====================================================================
+// SCROLL RESULT INTO VIEW — shared helper for mobile reveal flows.
+// Below 1200px the two-panel fixed layout isn't active, so the cert /
+// results-wrap stacks below the input-section and lands below the fold
+// after a fetch. This pulls the document to its start.
+//
+// Uses the 2-arg scrollTo(x, y) form — the object form with `behavior`
+// is iOS 16+ only, so we rely on CSS `html { scroll-behavior: smooth }`
+// for the animation and a plain scrollTo for the target. Two passes:
+// 150ms lets initial layout + panelFadeIn kick in; 600ms compensates
+// for slow cert-renderer work (planets, bands) that can push the
+// target further down after the first pass.
+// =====================================================================
+function scrollResultIntoView(el) {
+  if (!el) return;
+  var dbg = document.createElement('div');
+  dbg.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:99999;background:#000;color:#0f0;font:11px/1.3 monospace;padding:6px;border-radius:4px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-all;';
+  document.body.appendChild(dbg);
+  var lines = [];
+  function log(s) { lines.push(s); dbg.textContent = lines.join('\n'); }
+  log('scrollResultIntoView called');
+  log('innerWidth=' + window.innerWidth + ' innerHeight=' + window.innerHeight);
+  log('docScrollHeight=' + document.documentElement.scrollHeight + ' docClientHeight=' + document.documentElement.clientHeight);
+  log('scrollingElement=' + (document.scrollingElement ? document.scrollingElement.tagName : 'null'));
+  function go(tag) {
+    var rect = el.getBoundingClientRect();
+    var before = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    var y = rect.top + before - 8;
+    if (y < 0) y = 0;
+    log(tag + ': rect.top=' + rect.top.toFixed(1) + ' before=' + before + ' target=' + y.toFixed(1));
+    window.scrollTo(0, y);
+    setTimeout(function() {
+      var after = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      log(tag + ' → after=' + after);
+    }, 50);
+  }
+  setTimeout(function() { go('pass1@150'); }, 150);
+  setTimeout(function() { go('pass2@600'); }, 600);
+  setTimeout(function() { dbg.remove(); }, 8000);
+  dbg.addEventListener('click', function() { dbg.remove(); });
+}

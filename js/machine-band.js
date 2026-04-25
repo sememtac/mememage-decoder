@@ -84,14 +84,89 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
     bottomCell = { x: PAD, y: bcY, w: W - PAD * 2, h: bcH, hover: 0 };
   }
 
-  // Mouse
-  var mx = -1, my = -1;
-  canvas.addEventListener('mousemove', function(e) {
+  // Mouse + touch. Cursor position drives the drip system below.
+  var mx = -1, my = -1, cursorActive = false;
+  function setCursor(cx, cy) {
     var r = canvas.getBoundingClientRect();
-    mx = (e.clientX - r.left) / r.width * W;
-    my = (e.clientY - r.top) / r.height * H;
-  });
-  canvas.addEventListener('mouseleave', function() { mx = -1; my = -1; });
+    mx = (cx - r.left) / r.width * W;
+    my = (cy - r.top) / r.height * H;
+    cursorActive = true;
+  }
+  canvas.addEventListener('mousemove', function(e) { setCursor(e.clientX, e.clientY); });
+  canvas.addEventListener('mouseleave', function() { mx = -1; my = -1; cursorActive = false; });
+  canvas.addEventListener('touchmove', function(e) {
+    if (!e.touches || !e.touches[0]) return;
+    setCursor(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  canvas.addEventListener('touchstart', function(e) {
+    if (!e.touches || !e.touches[0]) return;
+    setCursor(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  canvas.addEventListener('touchend', function() { cursorActive = false; });
+
+  // Cursor drips — when the cursor hovers over the canvas, characters
+  // spawn at that point and fall straight down. Reads like the cursor
+  // punctured the matrix and code is leaking from the wound. Drips
+  // continue falling after the cursor leaves; only spawning stops.
+  var cursorDrips = [];
+  var dripsMax = 400;
+  var spawnThrottle = 0;
+  function spawnDrip() {
+    if (!cursorActive) return;
+    if (mx < 0 || my < 0 || mx > W || my > H) return;
+    // One char every other frame — reads as a single regular stream
+    // rather than a dense cascade.
+    spawnThrottle++;
+    if (spawnThrottle % 2 !== 0) return;
+    // Match the background rain's fall-speed envelope so the drip
+    // reads as native to the column field (baseSpeed + variance,
+    // both rarity-scaled — see rainCols below).
+    var dripSpeed = baseSpeed + Math.random() * speedVariance;
+    cursorDrips.push({
+      x: mx + (Math.random() - 0.5) * 2,  // slight horizontal jitter
+      y: my,
+      char: rainSource[Math.floor(Math.random() * rainSource.length)],
+      speed: dripSpeed,
+      life: 1.0,
+      fadeRate: 0.006 + Math.random() * 0.008,
+      changeTimer: 0,
+      changeRate: 4 + Math.floor(Math.random() * 5)
+    });
+    if (cursorDrips.length > dripsMax) cursorDrips.splice(0, cursorDrips.length - dripsMax);
+  }
+
+  function drawCursorDrips() {
+    spawnDrip();
+    if (cursorDrips.length === 0) return;
+    ctx.font = '400 10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    for (var i = cursorDrips.length - 1; i >= 0; i--) {
+      var d = cursorDrips[i];
+      d.y += d.speed;
+      d.life -= d.fadeRate;
+      if (d.life <= 0 || d.y > H + 12) { cursorDrips.splice(i, 1); continue; }
+
+      d.changeTimer++;
+      if (d.changeTimer >= d.changeRate) {
+        d.changeTimer = 0;
+        d.char = rainSource[Math.floor(Math.random() * rainSource.length)];
+      }
+
+      // Tone: the trail sits just a whisker above the background rain's
+      // trail alpha (baseAlphaTrail = 0.08-0.30). A small source pop on
+      // the freshest chars anchors the cursor point without pulling the
+      // eye off the data readout above.
+      var trailAlpha = baseAlphaTrail + 0.04;  // a tad brighter than rain trail
+      var alpha = Math.pow(d.life, 0.6) * trailAlpha;
+      ctx.fillStyle = 'rgba(' + trR + ',' + trG + ',' + trB + ',' + alpha + ')';
+      ctx.fillText(d.char, d.x, d.y);
+      if (d.life > 0.85) {
+        var pop = (d.life - 0.85) * 6.67;  // 0 → 1 over the top 15% of life
+        ctx.fillStyle = 'rgba(' + trR + ',' + trG + ',' + trB + ',' + (pop * 0.35) + ')';
+        ctx.fillText(d.char, d.x, d.y);
+      }
+    }
+  }
 
   // Parse tier color for background tinting
   function hexToRgb(hex) {
@@ -267,6 +342,11 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
         ctx.fillText(rc.chars[ch], rc.x, chy);
       }
     }
+
+    // Cursor-driven drip leak — layered above the static matrix rain,
+    // below the cells. Each frame spawns 2 chars at the cursor that
+    // fall straight down, fading as they go.
+    drawCursorDrips();
 
     ctx.textAlign = 'center';
 
