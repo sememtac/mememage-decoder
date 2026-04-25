@@ -2450,9 +2450,9 @@ async function unlockGPS(idx){
   var out=document.getElementById('gps-result-'+idx);if(!out)return;
   var res = await Access.decryptGps(r.gps_encrypted, pw.value);
   if (res.ok) {
-    out.innerHTML='<div class="ev-g"><div class="ev-m"><div class="ev-ml">Latitude</div><div class="ev-mv pass">'+res.lat+'</div></div><div class="ev-m"><div class="ev-ml">Longitude</div><div class="ev-mv pass">'+res.lon+'</div></div></div>';
+    out.innerHTML='<div class="ev-g"><div class="ev-m"><div class="ev-ml">Latitude</div><div class="ev-mv pass">'+escapeHtml(res.lat)+'</div></div><div class="ev-m"><div class="ev-ml">Longitude</div><div class="ev-mv pass">'+escapeHtml(res.lon)+'</div></div></div>';
   } else {
-    out.innerHTML='<span style="color:#f87171;font-size:0.7rem;">'+(res.error||'Wrong password')+'</span>';
+    out.innerHTML='<span style="color:#f87171;font-size:0.7rem;">'+escapeHtml(res.error||'Wrong password')+'</span>';
   }
 }
 

@@ -1294,8 +1294,6 @@ function renderCert(meta, options) {
   }
 }
 
-function escapeHtml(s) {
-  var d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
+// escapeHtml lives in portal.js (shared with validator); keeping the
+// local definition out of here avoids the redeclaration if a future
+// consumer also picks it up.

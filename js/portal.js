@@ -1020,6 +1020,13 @@ var ButtonLoading = (function() {
 // for slow cert-renderer work (planets, bands) that can push the
 // target further down after the first pass.
 // =====================================================================
+// Tiny utility shared by both pages — text-to-HTML escape.
+function escapeHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s == null ? '' : s;
+  return d.innerHTML;
+}
+
 // =====================================================================
 // dismissPanel — shared dismiss-then-collapse helper for the
 // decoder/validator portal departure flow. Both pages need to:
