@@ -187,8 +187,16 @@ function analyze(file){
       var cls=barOk?'both':'lost';
       var label=barOk?'Bar Survived':'Bar Lost';
 
+      // file.name + file.type are user-controlled (drag-and-drop); decoded.*
+      // is bar-validated (format-checked by decodePayload) but escape on
+      // principle so a future codec change can't surprise us.
+      var safeName = escapeHtml(file.name);
+      var safeType = escapeHtml(file.type || file.name.split('.').pop());
+      var safeHash = escapeHtml(decoded ? decoded.content_hash : '');
+      var safeId   = escapeHtml(decoded ? (decoded.identifier || '') : '');
+
       var o='<div class="ev">';
-      o+='<div class="ev-h '+cls+'"><span class="ev-t">'+file.name+'</span><span class="ev-b '+cls+'">'+label+'</span></div>';
+      o+='<div class="ev-h '+cls+'"><span class="ev-t">'+safeName+'</span><span class="ev-b '+cls+'">'+label+'</span></div>';
       o+='<div class="ev-body">';
 
       // Bar region
@@ -199,9 +207,9 @@ function analyze(file){
       o+='<div class="ev-sec">Bar</div><div class="ev-g">';
       if(decoded){
         o+='<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv pass">SURVIVED</div></div>';
-        o+='<div class="ev-m"><div class="ev-ml">Content Hash</div><div class="ev-mv pass">'+decoded.content_hash+'</div></div>';
-        o+='<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv">'+(decoded.identifier?'<a href="#" class="audit-link" data-id="'+decoded.identifier+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+decoded.identifier+'</a>':'\u2014')+'</div></div>';
-        o+='<div class="ev-m"><div class="ev-ml">Soul</div><div class="ev-mv" style="font-size:0.68rem;">'+(decoded.identifier||'')+'.'+decoded.content_hash+'.soul</div></div>';
+        o+='<div class="ev-m"><div class="ev-ml">Content Hash</div><div class="ev-mv pass">'+safeHash+'</div></div>';
+        o+='<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv">'+(safeId?'<a href="#" class="audit-link" data-id="'+safeId+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeId+'</a>':'\u2014')+'</div></div>';
+        o+='<div class="ev-m"><div class="ev-ml">Soul</div><div class="ev-mv" style="font-size:0.68rem;">'+safeId+'.'+safeHash+'.soul</div></div>';
       }else{
         o+='<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv fail">LOST</div></div>';
         o+='<div class="ev-m w"><div class="ev-ml">Diagnosis</div><div class="ev-mv fail">'+(detected?'M/Y/C bands detected but data unreadable \u2014 compression destroyed brightness encoding':'No M/Y/C bands found \u2014 image cropped, resized, or not a Mememage image')+'</div></div>';
@@ -209,7 +217,7 @@ function analyze(file){
       // File info
       o+='<div class="ev-m"><div class="ev-ml">Size</div><div class="ev-mv">'+(file.size/1024).toFixed(0)+' KB</div></div>';
       o+='<div class="ev-m"><div class="ev-ml">Dimensions</div><div class="ev-mv">'+w+' \u00d7 '+h+'</div></div>';
-      o+='<div class="ev-m"><div class="ev-ml">Format</div><div class="ev-mv">'+(file.type||file.name.split('.').pop())+'</div></div>';
+      o+='<div class="ev-m"><div class="ev-ml">Format</div><div class="ev-mv">'+safeType+'</div></div>';
       if(bands.M)o+='<div class="ev-m"><div class="ev-ml">M / Y / C</div><div class="ev-mv" style="font-size:0.68rem;">'+bands.M+' '+bands.Y+' '+bands.C+'</div></div>';
       o+='</div>';
 
@@ -305,7 +313,7 @@ function analyze(file){
       imgCon.classList.remove('error-only');
       document.getElementById('imgConsoleThumb').src = thumbUri;
       if (decoded) {
-        document.getElementById('imgConsoleId').innerHTML = '<a href="#" class="audit-link" data-id="' + decoded.identifier + '">' + decoded.identifier + '</a>';
+        document.getElementById('imgConsoleId').innerHTML = '<a href="#" class="audit-link" data-id="' + escapeHtml(decoded.identifier) + '">' + escapeHtml(decoded.identifier) + '</a>';
         document.getElementById('imgConsoleHash').textContent = decoded.content_hash;
         var st = document.getElementById('imgConsoleStatus');
         st.className = 'img-console-status ok';
@@ -471,7 +479,7 @@ async function analyzeMeta(files){
 
   // Error rows first
   for(var ei=0;ei<recs.length;ei++){var er=recs[ei];if(!er._err)continue;
-    html+='<div style="padding:0.4rem 0.8rem;border-bottom:1px solid #1a1a2a;"><span style="color:#f87171;font-size:0.75rem;">'+er._fn+' \u2014 '+er._err+'</span></div>';}
+    html+='<div style="padding:0.4rem 0.8rem;border-bottom:1px solid #1a1a2a;"><span style="color:#f87171;font-size:0.75rem;">'+escapeHtml(er._fn)+' \u2014 '+escapeHtml(er._err)+'</span></div>';}
 
   // Valid record rows
   for(var ri=0;ri<valid.length;ri++){
@@ -482,12 +490,16 @@ async function analyzeMeta(files){
     var isDk2=ti!=null&&ti>=360&&ti<=363,isEp2=ti===364;
 
     // Compact row — white labels, green only for verified badge
-    html+='<div id="rec-'+(ti!=null?ti:ri)+'" data-identifier="'+(r.identifier||'')+'" data-age="'+(r.decoder_age_name||'')+'" data-con="'+(r.constellation_name||'')+'" data-chunk="'+(r.decoder_chunk_index!=null?r.decoder_chunk_index:'')+'" style="border-bottom:1px solid #1a1a2a;">';
+    // Records can come from user-dropped .soul files in the Observatory
+    // tab — every field is attacker-controllable. Escape on every
+    // interpolation. _h is a local alias for portal.js's escapeHtml.
+    var _h = escapeHtml;
+    html+='<div id="rec-'+(ti!=null?ti:ri)+'" data-identifier="'+_h(r.identifier||'')+'" data-age="'+_h(r.decoder_age_name||'')+'" data-con="'+_h(r.constellation_name||'')+'" data-chunk="'+(r.decoder_chunk_index!=null?+r.decoder_chunk_index:'')+'" style="border-bottom:1px solid #1a1a2a;">';
     html+='<div class="meta-row" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="padding:0.35rem 0.8rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'none\'">';
     html+='<span style="font-size:0.72rem;color:'+rBadgeCol+';min-width:1rem;">'+rBadge+'</span>';
-    html+='<span style="font-size:0.7rem;font-family:monospace;min-width:10rem;color:#d0d0d8;">'+(r.identifier?r.identifier.slice(-16):(r._fn||'').slice(-16))+'</span>';
-    if(ti!=null)html+='<span style="font-size:0.6rem;color:'+(isEp2?'#d4b87b':isDk2?'#8a7050':'#6a6a80')+';">T'+ti+(r.decoder_chunk_index!=null?' D'+r.decoder_chunk_index:'')+'</span>';
-    if(r.constellation_name)html+='<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+r.constellation_name+'</span>';
+    html+='<span style="font-size:0.7rem;font-family:monospace;min-width:10rem;color:#d0d0d8;">'+_h(r.identifier?r.identifier.slice(-16):(r._fn||'').slice(-16))+'</span>';
+    if(ti!=null)html+='<span style="font-size:0.6rem;color:'+(isEp2?'#d4b87b':isDk2?'#8a7050':'#6a6a80')+';">T'+(+ti)+(r.decoder_chunk_index!=null?' D'+(+r.decoder_chunk_index):'')+'</span>';
+    if(r.constellation_name)html+='<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+_h(r.constellation_name)+'</span>';
     html+='</div>';
 
     // Expandable detail (hidden by default)
@@ -500,21 +512,22 @@ async function analyzeMeta(files){
     var cls=match?'both':stored?'lost':'bar-only';
     var badge=match?'Verified':stored?'Hash Mismatch':'No Hash';
 
-    html+='<div class="ev"><div class="ev-h '+cls+'"><span class="ev-t">'+r._fn+'</span><span class="ev-b '+cls+'">'+badge+'</span></div><div class="ev-body">';
+    html+='<div class="ev"><div class="ev-h '+cls+'"><span class="ev-t">'+_h(r._fn)+'</span><span class="ev-b '+cls+'">'+badge+'</span></div><div class="ev-body">';
 
     // Identity
     html+='<div class="ev-sec">Identity</div><div class="ev-g">';
-    html+='<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv">'+(r.identifier?'<a href="#" class="audit-link" data-id="'+r.identifier+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+r.identifier+'</a>':'\u2014')+'</div></div>';
-    html+='<div class="ev-m"><div class="ev-ml">Conceived</div><div class="ev-mv">'+(r.conceived||r.timestamp||'\u2014')+'</div></div>';
-    html+='<div class="ev-m"><div class="ev-ml">Parent</div><div class="ev-mv">'+(r.parent_id||'none (genesis)')+'</div></div>';
+    var safeRid = _h(r.identifier||'');
+    html+='<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv">'+(r.identifier?'<a href="#" class="audit-link" data-id="'+safeRid+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeRid+'</a>':'\u2014')+'</div></div>';
+    html+='<div class="ev-m"><div class="ev-ml">Conceived</div><div class="ev-mv">'+_h(r.conceived||r.timestamp||'\u2014')+'</div></div>';
+    html+='<div class="ev-m"><div class="ev-ml">Parent</div><div class="ev-mv">'+_h(r.parent_id||'none (genesis)')+'</div></div>';
     if(r.chain_visibility)html+='<div class="ev-m"><div class="ev-ml">Chain</div><div class="ev-mv" style="color:'+(r.chain_visibility==='dark_matter'?'#8080a0':'#d4b87b')+';">'+(r.chain_visibility==='dark_matter'?'Dark Matter (private)':'Light Energy (public)')+'</div></div>';
-    if(r.prompt)html+='<div class="ev-m w"><div class="ev-ml">Prompt</div><div class="ev-mv" style="font-style:italic;font-size:0.72rem;word-break:break-word;">'+r.prompt+'</div></div>';
+    if(r.prompt)html+='<div class="ev-m w"><div class="ev-ml">Prompt</div><div class="ev-mv" style="font-style:italic;font-size:0.72rem;word-break:break-word;">'+_h(r.prompt)+'</div></div>';
     html+='</div>';
 
     // Hash verification
     html+='<div class="ev-sec">Content Hash</div><div class="ev-g">';
-    html+='<div class="ev-m"><div class="ev-ml">Stored</div><div class="ev-mv '+(match?'pass':stored?'fail':'')+'">'+(stored||'none')+'</div></div>';
-    html+='<div class="ev-m"><div class="ev-ml">Computed</div><div class="ev-mv '+(match?'pass':computed?'fail':'')+'">'+(computed||'unavailable')+'</div></div>';
+    html+='<div class="ev-m"><div class="ev-ml">Stored</div><div class="ev-mv '+(match?'pass':stored?'fail':'')+'">'+_h(stored||'none')+'</div></div>';
+    html+='<div class="ev-m"><div class="ev-ml">Computed</div><div class="ev-mv '+(match?'pass':computed?'fail':'')+'">'+_h(computed||'unavailable')+'</div></div>';
     html+='<div class="ev-m w"><div class="ev-ml">Verdict</div><div class="ev-mv '+(match?'pass':'fail')+'">'+(match?'Untampered \u2014 hashes match':stored&&computed?'MISMATCH \u2014 record may be modified':'Cannot verify')+'</div></div>';
     html+='</div>';
 
@@ -522,7 +535,7 @@ async function analyzeMeta(files){
     html+='<div class="ev-sec">Field Audit</div>';
     html+='<div style="display:flex;flex-wrap:wrap;gap:3px;margin:0.3rem 0;">';
     var allK=Object.keys(r).filter(function(k){return k[0]!=='_';}).sort();
-    for(var ki=0;ki<allK.length;ki++){var k=allK[ki];var inH=HASH_INCLUDED.has(k);html+='<span style="font-size:0.58rem;padding:0.1rem 0.3rem;border-radius:3px;background:'+(inH?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.02)')+';color:'+(inH?'#a0a0a8':'#505058')+';font-family:monospace;">'+k+'</span>';}
+    for(var ki=0;ki<allK.length;ki++){var k=allK[ki];var inH=HASH_INCLUDED.has(k);html+='<span style="font-size:0.58rem;padding:0.1rem 0.3rem;border-radius:3px;background:'+(inH?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.02)')+';color:'+(inH?'#a0a0a8':'#505058')+';font-family:monospace;">'+_h(k)+'</span>';}
     html+='</div><div style="font-size:0.6rem;color:#8a8a9a;">'+Object.keys(hashable).length+' hashed, '+(allK.length-Object.keys(hashable).length)+' excluded</div>';
 
     // Generation Parameters
@@ -530,23 +543,23 @@ async function analyzeMeta(files){
     var hasGen=genF.some(function(g){return r[g[0]]!==undefined;});
     if(hasGen){
       html+='<div class="ev-sec">Generation Parameters</div><div class="ev-g">';
-      for(var gi=0;gi<genF.length;gi++){if(r[genF[gi][0]]!==undefined)html+='<div class="ev-m"><div class="ev-ml">'+genF[gi][1]+'</div><div class="ev-mv">'+r[genF[gi][0]]+'</div></div>';}
-      if(r.lora)html+='<div class="ev-m"><div class="ev-ml">LoRA</div><div class="ev-mv">'+r.lora+(r.lora_strength!==undefined?' ('+r.lora_strength+')':'')+'</div></div>';
+      for(var gi=0;gi<genF.length;gi++){if(r[genF[gi][0]]!==undefined)html+='<div class="ev-m"><div class="ev-ml">'+genF[gi][1]+'</div><div class="ev-mv">'+_h(r[genF[gi][0]])+'</div></div>';}
+      if(r.lora)html+='<div class="ev-m"><div class="ev-ml">LoRA</div><div class="ev-mv">'+_h(r.lora)+(r.lora_strength!==undefined?' ('+_h(r.lora_strength)+')':'')+'</div></div>';
       html+='</div>';
     }
 
     // Cycle position
     if(r.decoder_chunk_index!==undefined||r.truth_chunk_index!==undefined){
       html+='<div class="ev-sec">Cycle Position</div><div class="ev-g">';
-      if(r.decoder_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Decoder</div><div class="ev-mv">'+r.decoder_chunk_index+' / '+(r.decoder_total_chunks||12)+'</div></div>';
-      if(r.truth_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Truth</div><div class="ev-mv">'+r.truth_chunk_index+' / 365</div></div>';
-      if(r.proof_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Proof</div><div class="ev-mv">'+r.proof_chunk_index+(r.proof_day==='sunday'?' (sunday)':'')+'</div></div>';
-      if(r.decoder_age_name)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+r.decoder_age_name+'</div></div>';
-      if(r.decoder_hash)html+='<div class="ev-m"><div class="ev-ml">Decoder Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+r.decoder_hash+'</div></div>';
-      if(r.decoder_version)html+='<div class="ev-m"><div class="ev-ml">Decoder Version</div><div class="ev-mv" style="font-size:0.68rem;">'+r.decoder_version+'</div></div>';
-      if(r.constellation_name)html+='<div class="ev-m"><div class="ev-ml">Constellation</div><div class="ev-mv">'+r.constellation_name+'</div></div>';
-      if(r.heart_star_id)html+='<div class="ev-m"><div class="ev-ml">Heart Star</div><div class="ev-mv" style="font-size:0.68rem;">'+r.heart_star_id+'</div></div>';
-      if(r.schematic_chunk)html+='<div class="ev-m"><div class="ev-ml">Schematic</div><div class="ev-mv" style="color:#8a7050;">Dark day '+(r.schematic_chunk_index+1)+'</div></div>';
+      if(r.decoder_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Decoder</div><div class="ev-mv">'+_h(r.decoder_chunk_index)+' / '+_h(r.decoder_total_chunks||12)+'</div></div>';
+      if(r.truth_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Truth</div><div class="ev-mv">'+_h(r.truth_chunk_index)+' / 365</div></div>';
+      if(r.proof_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Proof</div><div class="ev-mv">'+_h(r.proof_chunk_index)+(r.proof_day==='sunday'?' (sunday)':'')+'</div></div>';
+      if(r.decoder_age_name)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(r.decoder_age_name)+'</div></div>';
+      if(r.decoder_hash)html+='<div class="ev-m"><div class="ev-ml">Decoder Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_hash)+'</div></div>';
+      if(r.decoder_version)html+='<div class="ev-m"><div class="ev-ml">Decoder Version</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_version)+'</div></div>';
+      if(r.constellation_name)html+='<div class="ev-m"><div class="ev-ml">Constellation</div><div class="ev-mv">'+_h(r.constellation_name)+'</div></div>';
+      if(r.heart_star_id)html+='<div class="ev-m"><div class="ev-ml">Heart Star</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.heart_star_id)+'</div></div>';
+      if(r.schematic_chunk)html+='<div class="ev-m"><div class="ev-ml">Schematic</div><div class="ev-mv" style="color:#8a7050;">Dark day '+_h(r.schematic_chunk_index+1)+'</div></div>';
       if(r.claim_chunk)html+='<div class="ev-m"><div class="ev-ml">Claim</div><div class="ev-mv" style="color:#d4b87b;">Epagomenal</div></div>';
       if(r.easter_egg)html+='<div class="ev-m"><div class="ev-ml">Easter Egg</div><div class="ev-mv" style="color:#c47bbb;">Madeline</div></div>';
       html+='</div>';
@@ -560,9 +573,9 @@ async function analyzeMeta(files){
       var hasCelestial=bodies.some(function(b){return !!born[b];});
       if(hasCelestial){
         html+='<div class="ev-sec">Celestial State at Birth</div><div class="ev-g">';
-        for(var ci2=0;ci2<bodies.length;ci2++){var cb=bodies[ci2];if(born[cb]){var extra=cb==='moon'&&born.moon_phase?' ('+born.moon_phase+')':'';html+='<div class="ev-m"><div class="ev-ml">'+bNames[cb]+'</div><div class="ev-mv">'+born[cb]+extra+'</div></div>';}}
-        if(born.angular_spread)html+='<div class="ev-m"><div class="ev-ml">Angular Spread</div><div class="ev-mv">'+born.angular_spread+'\u00b0</div></div>';
-        if(r.constellation_hash)html+='<div class="ev-m"><div class="ev-ml">Constellation Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+r.constellation_hash+'</div></div>';
+        for(var ci2=0;ci2<bodies.length;ci2++){var cb=bodies[ci2];if(born[cb]){var extra=cb==='moon'&&born.moon_phase?' ('+_h(born.moon_phase)+')':'';html+='<div class="ev-m"><div class="ev-ml">'+bNames[cb]+'</div><div class="ev-mv">'+_h(born[cb])+extra+'</div></div>';}}
+        if(born.angular_spread)html+='<div class="ev-m"><div class="ev-ml">Angular Spread</div><div class="ev-mv">'+_h(born.angular_spread)+'\u00b0</div></div>';
+        if(r.constellation_hash)html+='<div class="ev-m"><div class="ev-ml">Constellation Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.constellation_hash)+'</div></div>';
         html+='</div>';
       }
 
@@ -571,19 +584,19 @@ async function analyzeMeta(files){
         var m=born.machine;
         html+='<div class="ev-sec">Machine State at Birth</div><div class="ev-g">';
         var mF=[['cpu','CPU'],['cores','Cores'],['gpu_cores','GPU'],['ram','RAM'],['mem_active','Active'],['mem_compressed','Compressed'],['mem_free','Free'],['load','Load'],['power','Power'],['disk_io','Disk I/O'],['net_rx','Net \u2193'],['net_tx','Net \u2191'],['uptime','Uptime']];
-        for(var mi=0;mi<mF.length;mi++){if(m[mF[mi][0]]!==undefined)html+='<div class="ev-m"><div class="ev-ml">'+mF[mi][1]+'</div><div class="ev-mv" style="font-size:0.7rem;">'+m[mF[mi][0]]+'</div></div>';}
+        for(var mi=0;mi<mF.length;mi++){if(m[mF[mi][0]]!==undefined)html+='<div class="ev-m"><div class="ev-ml">'+mF[mi][1]+'</div><div class="ev-mv" style="font-size:0.7rem;">'+_h(m[mF[mi][0]])+'</div></div>';}
         html+='</div>';
-        if(m.entropy){html+='<div class="ev-sec">Kernel Entropy</div><div class="ev-m w" style="margin:0.3rem 0;"><div class="ev-mv" style="font-size:0.55rem;word-break:break-all;line-height:1.5;color:#8898b8;">'+m.entropy+'</div></div>';}
+        if(m.entropy){html+='<div class="ev-sec">Kernel Entropy</div><div class="ev-m w" style="margin:0.3rem 0;"><div class="ev-mv" style="font-size:0.55rem;word-break:break-all;line-height:1.5;color:#8898b8;">'+_h(m.entropy)+'</div></div>';}
       }
 
       // GPS Time-Lock
       if(born.gps_locked){
         var gps=born.gps_locked;
         html+='<div class="ev-sec">Birthplace \u2014 Time-Locked</div><div class="ev-g">';
-        if(gps.ct)html+='<div class="ev-m w"><div class="ev-ml">Ciphertext</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+gps.ct+'</div></div>';
-        if(gps.N)html+='<div class="ev-m w"><div class="ev-ml">RSA Modulus N</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+gps.N+'</div></div>';
-        if(gps.T)html+='<div class="ev-m"><div class="ev-ml">Squarings</div><div class="ev-mv">'+gps.T.toLocaleString()+'</div></div>';
-        if(gps.e)html+='<div class="ev-m"><div class="ev-ml">RSA e</div><div class="ev-mv">'+gps.e+'</div></div>';
+        if(gps.ct)html+='<div class="ev-m w"><div class="ev-ml">Ciphertext</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+_h(gps.ct)+'</div></div>';
+        if(gps.N)html+='<div class="ev-m w"><div class="ev-ml">RSA Modulus N</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+_h(gps.N)+'</div></div>';
+        if(gps.T)html+='<div class="ev-m"><div class="ev-ml">Squarings</div><div class="ev-mv">'+_h(typeof gps.T==='number'?gps.T.toLocaleString():gps.T)+'</div></div>';
+        if(gps.e)html+='<div class="ev-m"><div class="ev-ml">RSA e</div><div class="ev-mv">'+_h(gps.e)+'</div></div>';
         html+='</div>';
       }
 
@@ -604,8 +617,8 @@ async function analyzeMeta(files){
       var rs=r.rarity_score;var rTier=rs>=80?'Legendary':rs>=70?'Epic':rs>=60?'Very Rare':rs>=46?'Rare':rs>=35?'Uncommon':'Common';
       var rCol=rs>=80?'#f87171':rs>=70?'#facc15':rs>=60?'#c084fc':rs>=46?'#60a5fa':rs>=35?'#4ade80':'#a0a0a0';
       html+='<div class="ev-m"><div class="ev-ml">Score</div><div class="ev-mv" style="color:'+rCol+';font-weight:700;">'+rs+' \u2014 '+rTier+'</div></div>';
-      if(r.machine_fingerprint)html+='<div class="ev-m"><div class="ev-ml">Fingerprint</div><div class="ev-mv">'+r.machine_fingerprint+'</div></div>';
-      if(r.rarity&&typeof r.rarity==='object'){for(var rd of['celestial','machine','entropy']){var rT=r.rarity[rd];if(rT&&rT.length)html+='<div class="ev-m"><div class="ev-ml">'+rd.charAt(0).toUpperCase()+rd.slice(1)+'</div><div class="ev-mv" style="font-size:0.7rem;">'+rT.map(function(t){return t.trait+' (+'+t.points+')';}).join(', ')+'</div></div>';}}
+      if(r.machine_fingerprint)html+='<div class="ev-m"><div class="ev-ml">Fingerprint</div><div class="ev-mv">'+_h(r.machine_fingerprint)+'</div></div>';
+      if(r.rarity&&typeof r.rarity==='object'){for(var rd of['celestial','machine','entropy']){var rT=r.rarity[rd];if(rT&&rT.length)html+='<div class="ev-m"><div class="ev-ml">'+rd.charAt(0).toUpperCase()+rd.slice(1)+'</div><div class="ev-mv" style="font-size:0.7rem;">'+_h(rT.map(function(t){return t.trait+' (+'+t.points+')';}).join(', '))+'</div></div>';}}
       html+='</div>';
     }
 
@@ -613,18 +626,21 @@ async function analyzeMeta(files){
     if(r.birth_temperament){
       html+='<div class="ev-sec">Birth Temperament</div><div class="ev-g">';
       var hasMedals=r.birth_traits&&r.birth_traits.length&&typeof BIRTH_TRAITS!=='undefined';
-      html+='<div class="ev-m w"><div class="ev-ml">'+r.birth_temperament+'</div>'+(!hasMedals&&r.birth_summary?'<div class="ev-mv" style="font-style:italic;font-size:0.72rem;">'+r.birth_summary+'</div>':'')+'</div>';
+      html+='<div class="ev-m w"><div class="ev-ml">'+_h(r.birth_temperament)+'</div>'+(!hasMedals&&r.birth_summary?'<div class="ev-mv" style="font-style:italic;font-size:0.72rem;">'+_h(r.birth_summary)+'</div>':'')+'</div>';
       if(hasMedals){
         html+='<div class="ev-m w" style="padding:0.5rem;">';
         for(var bti=0;bti<r.birth_traits.length;bti++){
           var btKey=r.birth_traits[bti],btDef=BIRTH_TRAITS[btKey];
           if(btDef){
             html+='<div style="display:flex;align-items:center;gap:0.5rem;margin:0.25rem 0;">';
-            html+='<img src="img/traits/'+btKey+'.png" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" alt="'+btDef.name+'">';
-            html+='<span style="font-size:0.72rem;color:#c0c0cc;"><strong style="color:#d0d0d8;">'+btDef.name+'</strong> \u2014 '+btDef.desc+'</span>';
+            // btKey is from r.birth_traits (user-controllable). btDef
+            // values come from BIRTH_TRAITS constant — already trusted —
+            // but escape on principle in case the constant grows.
+            html+='<img src="img/traits/'+encodeURIComponent(btKey)+'.png" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" alt="'+_h(btDef.name)+'">';
+            html+='<span style="font-size:0.72rem;color:#c0c0cc;"><strong style="color:#d0d0d8;">'+_h(btDef.name)+'</strong> \u2014 '+_h(btDef.desc)+'</span>';
             html+='</div>';
           }else{
-            html+='<div style="font-size:0.72rem;color:#8a8a94;margin:0.25rem 0;">'+btKey.replace(/_/g,' ')+'</div>';
+            html+='<div style="font-size:0.72rem;color:#8a8a94;margin:0.25rem 0;">'+_h(btKey.replace(/_/g,' '))+'</div>';
           }
         }
         html+='</div>';
@@ -649,8 +665,8 @@ async function analyzeMeta(files){
       var col=!pid?'#8898b8':ok2?'#4ade80':'#facc15';
       html+='<div style="padding:0.1rem 0;display:flex;gap:0.3rem;align-items:center;">';
       html+='<span style="width:5px;height:5px;border-radius:50%;background:'+col+';"></span>';
-      html+='<span style="color:#8888a0;font-family:monospace;font-size:0.58rem;">'+(cr.identifier||cr._fn).slice(-14)+'</span>';
-      html+='<span style="color:'+col+';font-size:0.55rem;">'+(!pid?'genesis':ok2?'\u2190'+pid.slice(-10):'\u2190'+pid.slice(-10)+' (ext)')+'</span></div>';}
+      html+='<span style="color:#8888a0;font-family:monospace;font-size:0.58rem;">'+escapeHtml((cr.identifier||cr._fn||'').slice(-14))+'</span>';
+      html+='<span style="color:'+col+';font-size:0.55rem;">'+(!pid?'genesis':escapeHtml(ok2?'\u2190'+pid.slice(-10):'\u2190'+pid.slice(-10)+' (ext)'))+'</span></div>';}
     html+='</div></details>';
     html+='<div style="font-size:0.62rem;color:#8a8a9a;margin-top:0.2rem;"><span style="color:#4ade80;">'+chainOk+' valid</span>'+(chainExt?' <span style="color:#facc15;">'+chainExt+' external</span>':'')+'</div>';
 
@@ -662,16 +678,16 @@ async function analyzeMeta(files){
       html+='<div class="ev-sec">Constellations ('+conNames.length+')</div>';
       for(var cni=0;cni<conNames.length;cni++){var cn2=conNames[cni],cd=conMap[cn2],cc=cd.chunks.size===12;
         html+='<div style="margin:0.3rem 0;padding:0.25rem 0.4rem;background:rgba(60,60,80,0.08);border-left:2px solid '+(cc?'rgba(74,158,74,0.4)':'rgba(180,160,60,0.3)')+';border-radius:3px;">';
-        html+='<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">'+cn2+'</span><span style="font-size:0.55rem;color:'+(cc?'#4ade80':'#facc15')+';">'+cd.chunks.size+'/12</span></div>';
+        html+='<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">'+escapeHtml(cn2)+'</span><span style="font-size:0.55rem;color:'+(cc?'#4ade80':'#facc15')+';">'+cd.chunks.size+'/12</span></div>';
         html+='<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:0.15rem;">';
         for(var cri=0;cri<cd.recs.length&&cri<12;cri++){var cr2=cd.recs[cri];var isH=cr2.identifier&&cr2.identifier===cd.heart;
           var starLetter=cr2.constellation_star||BAYER[cri];
-          html+='<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:'+(isH?'#d4b87b':'#4a4a60')+';">'+starLetter+'</span>';}
+          html+='<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:'+(isH?'#d4b87b':'#4a4a60')+';">'+escapeHtml(starLetter)+'</span>';}
         html+='</div></div>';}}
 
     // Age
     var ages=new Set();valid.forEach(function(r2){if(r2.decoder_age_name)ages.add(r2.decoder_age_name);});
-    if(ages.size>0)html+='<div class="ev-sec">Age</div><div style="font-size:0.72rem;color:'+(ages.size===1?'#4ade80':'#f87171')+';">'+Array.from(ages).join(', ')+(ages.size===1?' (consistent)':' (mixed)')+'</div>';
+    if(ages.size>0)html+='<div class="ev-sec">Age</div><div style="font-size:0.72rem;color:'+(ages.size===1?'#4ade80':'#f87171')+';">'+escapeHtml(Array.from(ages).join(', '))+(ages.size===1?' (consistent)':' (mixed)')+'</div>';
 
     html+='</div></div>';
   }
@@ -1552,7 +1568,12 @@ function auditRow(label, value, cls) {
   // single-click selects the entire cell's content (user-select: all),
   // ready for Cmd+C. Same affordance as the cert's prompt/timestamp
   // fields so audit values don't feel like different material.
-  return '<div class="audit-row"><span class="audit-label">' + label + '</span><span class="audit-val selectable ' + (cls || '') + '">' + value + '</span></div>';
+  //
+  // escapeHtml on label + value: callers pass record fields straight
+  // through (rec.creator_name, rec.identifier, rec.signature, etc.) and
+  // a malicious record could ship script tags. Class names come from
+  // a closed set of known constants, no escape needed.
+  return '<div class="audit-row"><span class="audit-label">' + escapeHtml(label) + '</span><span class="audit-val selectable ' + (cls || '') + '">' + escapeHtml(value == null ? '' : value) + '</span></div>';
 }
 
 function auditSection(title, rows) {
@@ -1691,8 +1712,10 @@ function renderAudit(rec, identifier, out) {
       var btKey = rec.birth_traits[bti], btDef = BIRTH_TRAITS[btKey];
       if (btDef) {
         traitHtml += '<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">';
-        traitHtml += '<img src="img/traits/' + btKey + '.png" style="width:20px;height:20px;object-fit:contain;" alt="' + btDef.name + '">';
-        traitHtml += '<span style="font-size:0.68rem;color:#c0c0cc;">' + btDef.name + ' \u2014 <span style="color:#8a8a94;">' + btDef.desc + '</span></span>';
+        // btKey is from rec.birth_traits (user-controllable). Use
+        // encodeURIComponent for the URL slot, escapeHtml for attrs/text.
+        traitHtml += '<img src="img/traits/' + encodeURIComponent(btKey) + '.png" style="width:20px;height:20px;object-fit:contain;" alt="' + escapeHtml(btDef.name) + '">';
+        traitHtml += '<span style="font-size:0.68rem;color:#c0c0cc;">' + escapeHtml(btDef.name) + ' \u2014 <span style="color:#8a8a94;">' + escapeHtml(btDef.desc) + '</span></span>';
         traitHtml += '</div>';
       }
     }
