@@ -594,12 +594,18 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
 }
 
 function processImage(file){
+  var d = _uploadDbgBanner();
+  d.log('processImage entry, file=' + (file ? file.name + ' ' + file.size : 'null'));
+  d.log('viewport=' + window.innerWidth + 'x' + window.innerHeight);
   var certWrap = document.getElementById('certWrap');
+  d.log('certWrap=' + (certWrap ? 'found' : 'MISSING'));
   // Cross-fade: if a prior cert is on screen, outtro it before the new
   // flow replaces the panel. The async body runs inside the callback
   // and PanelSwap waits for the new cert to render before the intro.
   PanelSwap(certWrap, async function() {
+    d.log('PanelSwap renderFn entered');
     resetAll();
+    d.log('resetAll done');
     // Errors go to the inline #imageError element inside #imagePanel
     // (mirrors validator's error-only img-console): no right panel,
     // no compact, no layout shift. The shared console-status is
@@ -615,8 +621,10 @@ function processImage(file){
     // Shared decode pipeline — load image, draw to canvas, run
     // detectBar + extractBits + decodeFrame + decodePayload. Returns
     // {ok, detected, frame, decoded, canvas, objUrl, error, …}.
+    d.log('about to decodeImageBar');
     var res = await decodeImageBar(file);
-    if (!res.ok) { setImgError(res.error); return; }
+    d.log('decodeImageBar: ok=' + res.ok + ' detected=' + res.detected + ' err=' + (res.error||'-'));
+    if (!res.ok) { d.log('EARLY RETURN: ' + res.error); setImgError(res.error); return; }
     var decoded = res.decoded;
     var canvas = res.canvas;
     var objUrl = res.objUrl;
@@ -654,14 +662,23 @@ function processImage(file){
       // CORS/mixed-content paths) doesn't leave the user staring at
       // "Fetching…" indefinitely. Race the real work against a
       // rejection that surfaces the failure to the catch handler.
+      d.log('about to fetchAndRender id=' + decoded.identifier);
       await Promise.race([
         fetchAndRender(decoded.identifier, decoded.content_hash || null, null, imgSourceBase),
         new Promise(function(_, reject) {
           setTimeout(function() { reject(new Error('Fetch timed out after 20s')); }, 20000);
         })
       ]);
+      d.log('fetchAndRender done');
+      var cw = document.getElementById('certWrap');
+      d.log('certWrap.visible=' + (cw && cw.classList.contains('visible')) + ' children=' + (cw ? cw.children.length : 'null'));
+      if (cw) {
+        var rect = cw.getBoundingClientRect();
+        d.log('certWrap rect: top=' + rect.top.toFixed(0) + ' h=' + rect.height.toFixed(0));
+      }
     } catch (err) {
       console.error('[processImage] fetch failed:', err);
+      d.log('FETCH ERROR: ' + (err.message || err));
       setImgError('Fetch failed: ' + (err && err.message ? err.message : 'unknown error') + '. Check the Source URL and CORS.');
     } finally {
       if (hintEl) hintEl.innerHTML = hintOriginal;

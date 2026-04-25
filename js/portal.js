@@ -1020,6 +1020,27 @@ var ButtonLoading = (function() {
 // for slow cert-renderer work (planets, bands) that can push the
 // target further down after the first pass.
 // =====================================================================
+// =====================================================================
+// DEBUG BANNER (temporary) — shared diagnostic overlay used by the
+// upload flow. Returns a { log(s) } handle. Self-removes after 12s or
+// on tap. Multiple calls return the same banner instance per session.
+// =====================================================================
+function _uploadDbgBanner(){
+  if (window._uploadDbg) return window._uploadDbg;
+  var dbg = document.createElement('div');
+  dbg.className = 'touch-tooltip';
+  dbg.setAttribute('style', 'position:fixed !important;top:8px;left:8px;right:8px;z-index:99999 !important;background:#000;color:#0f0;font:11px/1.3 monospace;padding:6px;border-radius:4px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-all;');
+  document.documentElement.appendChild(dbg);
+  var lines = [];
+  window._uploadDbg = {
+    log: function(s) { lines.push(s); dbg.textContent = lines.join('\n'); },
+    el: dbg
+  };
+  setTimeout(function(){ dbg.remove(); window._uploadDbg = null; }, 12000);
+  dbg.addEventListener('click', function(){ dbg.remove(); window._uploadDbg = null; });
+  return window._uploadDbg;
+}
+
 function scrollResultIntoView(el) {
   if (!el) return;
   function go() {
