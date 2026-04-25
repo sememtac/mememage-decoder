@@ -129,12 +129,6 @@ DropZone.attach({
 function extractBitBrightness(px,w,h,ppb){ppb=ppb||PIXELS_PER_BIT;var v=[],dpr=w-HEADER_PIXELS-FOOTER_PIXELS,bpr=Math.floor(dpr/ppb);for(var row=0;row<SIG_ROWS;row++){var y=h-1-row;for(var b=0;b<bpr;b++){var cx=HEADER_PIXELS+b*ppb+Math.floor(ppb/2);var i=(y*w+cx)*4;v.push((px[i]+px[i+1]+px[i+2])/3);}}return v;}
 
 function analyze(file){
-  if (typeof _uploadDbgBanner === 'function') {
-    var d = _uploadDbgBanner();
-    d.log('validator analyze entry, file=' + (file ? file.name : 'null'));
-    d.log('viewport=' + window.innerWidth + 'x' + window.innerHeight);
-    window._validatorDbg = d;
-  }
   clearOtherResults('img');
   imgResults.innerHTML='';
   // Shared decode pipeline — js/image-decode.js. Returns the canvas +
