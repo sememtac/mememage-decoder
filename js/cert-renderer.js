@@ -982,38 +982,22 @@ function renderCert(meta, options) {
       gpsContainer.appendChild(unlockWrap);
 
       var envRef = meta.gps_encrypted;
-      function _hex2bytes(h) {
-        return new Uint8Array(h.match(/.{2}/g).map(function(b){ return parseInt(b, 16); }));
-      }
       async function doUnlock() {
         var pw = pwInput.value;
         if (!pw) { resultSlot.innerHTML = '<span class="gps-unlock-err">Enter password</span>'; return; }
         unlockBtn.disabled = true;
         resultSlot.innerHTML = '<span class="gps-unlock-pending">Decrypting\u2026</span>';
-        try {
-          var salt = _hex2bytes(envRef.salt);
-          var iv = _hex2bytes(envRef.iv);
-          var ct = _hex2bytes(envRef.ct);
-          var tag = _hex2bytes(envRef.tag);
-          var km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
-          var key = await crypto.subtle.deriveKey(
-            { name: 'PBKDF2', salt: salt, iterations: 600000, hash: 'SHA-256' },
-            km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
-          );
-          var combined = new Uint8Array(ct.length + tag.length);
-          combined.set(ct); combined.set(tag, ct.length);
-          var plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, combined);
-          var coords = new TextDecoder().decode(plain).split(',');
+        var res = await Access.decryptGps(envRef, pw);
+        if (res.ok) {
           resultSlot.innerHTML =
             '<div class="gps-unlock-coords">' +
-              '<div><span class="gps-unlock-k">LAT</span> <span class="gps-unlock-v">' + escapeHtml(coords[0]) + '</span></div>' +
-              '<div><span class="gps-unlock-k">LON</span> <span class="gps-unlock-v">' + escapeHtml(coords[1] || '') + '</span></div>' +
+              '<div><span class="gps-unlock-k">LAT</span> <span class="gps-unlock-v">' + escapeHtml(res.lat) + '</span></div>' +
+              '<div><span class="gps-unlock-k">LON</span> <span class="gps-unlock-v">' + escapeHtml(res.lon) + '</span></div>' +
             '</div>';
-        } catch (e) {
-          resultSlot.innerHTML = '<span class="gps-unlock-err">Wrong password</span>';
-        } finally {
-          unlockBtn.disabled = false;
+        } else {
+          resultSlot.innerHTML = '<span class="gps-unlock-err">' + escapeHtml(res.error || 'Wrong password') + '</span>';
         }
+        unlockBtn.disabled = false;
       }
       unlockBtn.addEventListener('click', doUnlock);
       pwInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') doUnlock(); });

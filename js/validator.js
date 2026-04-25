@@ -2427,28 +2427,17 @@ link.addEventListener('click', function(e) {
 });
 })();
 
-// GPS Password Unlock — AES-256-GCM decryption via SubtleCrypto
+// GPS Password Unlock — AES-256-GCM decryption via Access helper.
 var _gpsRecords=[];
 async function unlockGPS(idx){
   var r=_gpsRecords[idx];if(!r||!r.gps_encrypted)return;
   var pw=document.getElementById('gps-pw-'+idx);if(!pw)return;
   var out=document.getElementById('gps-result-'+idx);if(!out)return;
-  var password=pw.value;if(!password){out.innerHTML='<span style="color:#f87171;font-size:0.7rem;">Enter password</span>';return;}
-  try{
-    var env=r.gps_encrypted;
-    var salt=new Uint8Array(env.salt.match(/.{2}/g).map(function(b){return parseInt(b,16);}));
-    var iv=new Uint8Array(env.iv.match(/.{2}/g).map(function(b){return parseInt(b,16);}));
-    var ct=new Uint8Array(env.ct.match(/.{2}/g).map(function(b){return parseInt(b,16);}));
-    var tag=new Uint8Array(env.tag.match(/.{2}/g).map(function(b){return parseInt(b,16);}));
-    var keyMaterial=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);
-    var key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:600000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['decrypt']);
-    var combined=new Uint8Array(ct.length+tag.length);combined.set(ct);combined.set(tag,ct.length);
-    var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:iv},key,combined);
-    var text=new TextDecoder().decode(plain);
-    var parts=text.split(',');
-    out.innerHTML='<div class="ev-g"><div class="ev-m"><div class="ev-ml">Latitude</div><div class="ev-mv pass">'+parts[0]+'</div></div><div class="ev-m"><div class="ev-ml">Longitude</div><div class="ev-mv pass">'+parts[1]+'</div></div></div>';
-  }catch(e){
-    out.innerHTML='<span style="color:#f87171;font-size:0.7rem;">Wrong password</span>';
+  var res = await Access.decryptGps(r.gps_encrypted, pw.value);
+  if (res.ok) {
+    out.innerHTML='<div class="ev-g"><div class="ev-m"><div class="ev-ml">Latitude</div><div class="ev-mv pass">'+res.lat+'</div></div><div class="ev-m"><div class="ev-ml">Longitude</div><div class="ev-mv pass">'+res.lon+'</div></div></div>';
+  } else {
+    out.innerHTML='<span style="color:#f87171;font-size:0.7rem;">'+(res.error||'Wrong password')+'</span>';
   }
 }
 
