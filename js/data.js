@@ -3,6 +3,12 @@
 // =====================================================================
 const SIG_ROWS=2,HEADER_BAND=8,HEADER_PIXELS=24,FOOTER_PIXELS=24,PIXELS_PER_BIT=3,RGB_THRESHOLD=128;
 
+// Default source URL for record fetches. {id} expands to the
+// identifier; the decoder + validator both probe several filename
+// variants under this base. Self-hosters override via the Source URL
+// input (one per page; persisted in localStorage by SourceConfig).
+const SOURCE_DEFAULT = 'https://archive.org/download/{id}/';
+
 // =====================================================================
 // ASSET RESOLUTION — packer injects INLINE_ASSETS before this script
 // =====================================================================

@@ -1331,8 +1331,8 @@ document.getElementById('auditInput').addEventListener('keydown', function(e) {
   SourceConfig.init({
     prefix: 'source',
     baseEl: input,
-    defaultUrl: 'https://archive.org/download/{id}/',
-    placeholder: 'https://archive.org/download/{id}/',
+    defaultUrl: SOURCE_DEFAULT,
+    placeholder: SOURCE_DEFAULT,
     resetEl: input && input.parentElement ? input.parentElement.querySelector('label') : null,
     modeEl: wrap ? wrap.querySelector('[data-source-mode-select]') : null,
     modeContainer: wrap
@@ -1432,7 +1432,7 @@ function runAudit() {
   // {id} before probing so "https://archive.org/download/{id}/" and
   // "https://yourhost.com/" share one code path.
   var sourceEl = document.getElementById('auditSource');
-  var base = (sourceEl ? sourceEl.value.trim() : 'https://archive.org/download/{id}/');
+  var base = (sourceEl ? sourceEl.value.trim() : SOURCE_DEFAULT);
   var expanded = base.replace(/\{id\}/g, identifier).replace(/\/+$/, '');
   var isArchiveOrg = /archive\.org/.test(base);
   var offlineMode = SourceConfig.getMode('source') === 'offline';

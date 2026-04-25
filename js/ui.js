@@ -798,7 +798,7 @@ document.getElementById('lookupInput').addEventListener('keydown',e=>{if(e.key==
 // decoder appends `{id}.soul` directly. Two UIs registered under the
 // same 'source' prefix; SourceConfig mirrors edits between them.
 // Storage key: mememage-source-url.
-var SOURCE_DEFAULT = 'https://archive.org/download/{id}/';
+// SOURCE_DEFAULT is defined in data.js (shared with validator).
 function _sourceLabelFor(inputId) {
   var input = document.getElementById(inputId);
   if (!input) return null;

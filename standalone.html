@@ -507,6 +507,12 @@ html.portal-animating body { overflow: hidden !important; }
 // =====================================================================
 const SIG_ROWS=2,HEADER_BAND=8,HEADER_PIXELS=24,FOOTER_PIXELS=24,PIXELS_PER_BIT=3,RGB_THRESHOLD=128;
 
+// Default source URL for record fetches. {id} expands to the
+// identifier; the decoder + validator both probe several filename
+// variants under this base. Self-hosters override via the Source URL
+// input (one per page; persisted in localStorage by SourceConfig).
+const SOURCE_DEFAULT = 'https://archive.org/download/{id}/';
+
 // =====================================================================
 // ASSET RESOLUTION — packer injects INLINE_ASSETS before this script
 // =====================================================================
@@ -8151,7 +8157,7 @@ document.getElementById('lookupInput').addEventListener('keydown',e=>{if(e.key==
 // decoder appends `{id}.soul` directly. Two UIs registered under the
 // same 'source' prefix; SourceConfig mirrors edits between them.
 // Storage key: mememage-source-url.
-var SOURCE_DEFAULT = 'https://archive.org/download/{id}/';
+// SOURCE_DEFAULT is defined in data.js (shared with validator).
 function _sourceLabelFor(inputId) {
   var input = document.getElementById(inputId);
   if (!input) return null;
