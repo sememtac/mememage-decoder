@@ -1022,32 +1022,12 @@ var ButtonLoading = (function() {
 // =====================================================================
 function scrollResultIntoView(el) {
   if (!el) return;
-  var dbg = document.createElement('div');
-  // touch-tooltip class excludes this from body > *:not(#starfield):not(.touch-tooltip)
-  // which forces position: relative. Inline !important as belt+suspenders.
-  dbg.className = 'touch-tooltip';
-  dbg.setAttribute('style', 'position:fixed !important;top:8px;left:8px;right:8px;z-index:99999 !important;background:#000;color:#0f0;font:11px/1.3 monospace;padding:6px;border-radius:4px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-all;');
-  document.documentElement.appendChild(dbg);
-  var lines = [];
-  function log(s) { lines.push(s); dbg.textContent = lines.join('\n'); }
-  log('scrollResultIntoView called');
-  log('innerWidth=' + window.innerWidth + ' innerHeight=' + window.innerHeight);
-  log('docScrollHeight=' + document.documentElement.scrollHeight + ' docClientHeight=' + document.documentElement.clientHeight);
-  log('scrollingElement=' + (document.scrollingElement ? document.scrollingElement.tagName : 'null'));
-  function go(tag) {
+  function go() {
     var rect = el.getBoundingClientRect();
-    var before = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-    var y = rect.top + before - 8;
+    var y = rect.top + (window.pageYOffset || document.documentElement.scrollTop || 0) - 8;
     if (y < 0) y = 0;
-    log(tag + ': rect.top=' + rect.top.toFixed(1) + ' before=' + before + ' target=' + y.toFixed(1));
     window.scrollTo(0, y);
-    setTimeout(function() {
-      var after = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      log(tag + ' → after=' + after);
-    }, 50);
   }
-  setTimeout(function() { go('pass1@150'); }, 150);
-  setTimeout(function() { go('pass2@600'); }, 600);
-  setTimeout(function() { dbg.remove(); }, 8000);
-  dbg.addEventListener('click', function() { dbg.remove(); });
+  setTimeout(go, 150);
+  setTimeout(go, 600);
 }
