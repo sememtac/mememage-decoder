@@ -1635,28 +1635,33 @@
     border-radius: 10px;
     pointer-events: none;
     z-index: 2;
+    /* Uniform 3px chamfer on all four edges. Hard pixels only, no
+       graded falloffs — graded shadows blend with the band's content
+       behind them and made the bevel appear to react to the background.
+       All edges use the same intensities so the bevel reads as a
+       symmetric raised lip with equal weight on every side. */
     box-shadow:
-      /* TOP edge highlight — strongest, light hits face square */
-      inset 0 2px 0 rgba(255,255,255,0.32),
-      inset 0 3px 1px rgba(255,255,255,0.18),
-      inset 0 8px 12px rgba(255,255,255,0.05),
-      /* LEFT edge highlight — light from upper-left, slightly weaker */
-      inset 2px 0 0 rgba(255,255,255,0.20),
-      inset 3px 0 1px rgba(255,255,255,0.10),
-      inset 8px 0 12px rgba(255,255,255,0.04),
-      /* BOTTOM edge shadow — strongest, face drops into shadow */
-      inset 0 -2px 0 rgba(0,0,0,0.85),
-      inset 0 -3px 1px rgba(0,0,0,0.6),
-      inset 0 -8px 14px rgba(0,0,0,0.45),
-      /* RIGHT edge shadow — slightly weaker than bottom */
-      inset -2px 0 0 rgba(0,0,0,0.65),
-      inset -3px 0 1px rgba(0,0,0,0.4),
-      inset -8px 0 12px rgba(0,0,0,0.3),
-      /* rarity rim along all four bevel edges */
-      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 50%, #404040),
-      inset 1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 40%, #303030),
-      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, #000000),
-      inset -1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 30%, #000000);
+      /* TOP highlight — 3 stacked lines for a thicker bevel face */
+      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 2px 0 rgba(255,255,255,0.30),
+      inset 0 3px 0 rgba(255,255,255,0.15),
+      /* LEFT highlight — same intensities as top */
+      inset 1px 0 0 rgba(255,255,255,0.55),
+      inset 2px 0 0 rgba(255,255,255,0.30),
+      inset 3px 0 0 rgba(255,255,255,0.15),
+      /* BOTTOM shadow — same intensities as right, opposite of top */
+      inset 0 -1px 0 rgba(0,0,0,0.85),
+      inset 0 -2px 0 rgba(0,0,0,0.55),
+      inset 0 -3px 0 rgba(0,0,0,0.30),
+      /* RIGHT shadow */
+      inset -1px 0 0 rgba(0,0,0,0.85),
+      inset -2px 0 0 rgba(0,0,0,0.55),
+      inset -3px 0 0 rgba(0,0,0,0.30),
+      /* rarity rim — outermost edge, picks up tier hue */
+      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent);
   }
   .sky-band-container canvas {
     display: block;
@@ -1725,28 +1730,28 @@
     border: none;
     padding: 16px 14px;
     margin: 8px 0;
-    /* Same chamfer as the bands — raised face on all four edges:
-       top + left = highlight (light from upper-left), bottom + right =
-       shadow, plus rarity rim around the full perimeter. */
+    /* Same uniform chamfer as the bands — equal-thickness 3px bevel
+       on all four edges, hard pixels only (no graded falloff that
+       would blend with content). */
     box-shadow:
       0 -1px 0 rgba(255,255,255,0.18),
       0 2px 5px rgba(0,0,0,0.55),
-      inset 0 2px 0 rgba(255,255,255,0.32),
-      inset 0 3px 1px rgba(255,255,255,0.18),
-      inset 0 8px 12px rgba(255,255,255,0.05),
-      inset 2px 0 0 rgba(255,255,255,0.20),
-      inset 3px 0 1px rgba(255,255,255,0.10),
-      inset 8px 0 12px rgba(255,255,255,0.04),
-      inset 0 -2px 0 rgba(0,0,0,0.85),
-      inset 0 -3px 1px rgba(0,0,0,0.6),
-      inset 0 -8px 14px rgba(0,0,0,0.45),
-      inset -2px 0 0 rgba(0,0,0,0.65),
-      inset -3px 0 1px rgba(0,0,0,0.4),
-      inset -8px 0 12px rgba(0,0,0,0.3),
-      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 50%, #404040),
-      inset 1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 40%, #303030),
-      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, #000000),
-      inset -1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 30%, #000000);
+      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 2px 0 rgba(255,255,255,0.30),
+      inset 0 3px 0 rgba(255,255,255,0.15),
+      inset 1px 0 0 rgba(255,255,255,0.55),
+      inset 2px 0 0 rgba(255,255,255,0.30),
+      inset 3px 0 0 rgba(255,255,255,0.15),
+      inset 0 -1px 0 rgba(0,0,0,0.85),
+      inset 0 -2px 0 rgba(0,0,0,0.55),
+      inset 0 -3px 0 rgba(0,0,0,0.30),
+      inset -1px 0 0 rgba(0,0,0,0.85),
+      inset -2px 0 0 rgba(0,0,0,0.55),
+      inset -3px 0 0 rgba(0,0,0,0.30),
+      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent);
   }
   .gps-cipher {
     font-size: 7px;
