@@ -1599,16 +1599,38 @@
     word-break: break-all;
   }
 
-  /* --- Sky Band Container --- */
+  /* --- Sky Band Container ---
+     Used by gen, machine, sky bands. The inset bevel makes the band
+     read as recessed into the cert plate — a chamfered edge picks up
+     light on the top-left, drops into shadow on the bottom-right.
+     A subtle outer highlight just below the band suggests the plate's
+     reflective surface continuing past the cut.
+     The tier-color rim (top + bottom) inherits --rarity-color from
+     the .plate, so the bevel takes a green/blue/purple/amber/red tint
+     matching the cert's rarity. Common = neutral. */
   .sky-band-wrap {
     margin: 12px 0 16px;
   }
   .sky-band-container {
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
     position: relative;
     background: linear-gradient(180deg, #0d0d1a 0%, #1a1a35 50%, #0a0a18 100%);
-    border: 1px solid rgba(0,0,0,0.2);
+    border: none;
+    box-shadow:
+      /* outer drop — lifts the band off the plate */
+      0 2px 4px rgba(0,0,0,0.45),
+      /* outer highlight just below — plate catches reflected light */
+      0 1px 0 rgba(255,255,255,0.08),
+      /* inset chamfer — light top-left edge */
+      inset 1px 1px 0 rgba(255,255,255,0.18),
+      /* inset chamfer — shadow bottom-right edge */
+      inset -1px -1px 0 rgba(0,0,0,0.55),
+      /* rarity rim — subtle hue along the bevel */
+      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 30%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 25%, #000000),
+      /* inner shadow — recessed look, deepens toward edges */
+      inset 0 2px 6px rgba(0,0,0,0.35);
   }
   .sky-band-container canvas {
     display: block;
