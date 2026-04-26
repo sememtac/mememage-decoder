@@ -1635,38 +1635,34 @@
     border-radius: 10px;
     pointer-events: none;
     z-index: 2;
-    /* Inverted hard chamfer — the band is a jewel sitting in a socket
-       cut into the plate. Each chamfer face is ONE solid color across
-       its entire width (no gradient between layers).
-         top / left  = dark (back of the chamfer cut, facing away from
-                       overhead light)
-         bottom / right = bright (catches reflected light from inside
-                                  the socket cavity)
-       Single solid band per face. Order matters: outer 4px painted
-       first (sits on top); inner 1px line under, only visible on the
-       row that the outer band doesn't cover — yielding a clean solid
-       chamfer with a sharp edge boundary. */
+    /* Inverted hard chamfer — back to the stacked-pixel falloff that
+       reads more sculptural, with the highlight side dialed down so
+       the bright bottom-right doesn't blow out against dark band
+       content. Top + left = shadow (back of cut, away from light);
+       bottom + right = subtle highlight (cavity catching reflected
+       light). */
     box-shadow:
-      /* TOP — solid 4px dark band */
-      inset 0 4px 0 rgba(0,0,0,0.55),
-      /* LEFT — solid 4px dark band */
-      inset 4px 0 0 rgba(0,0,0,0.55),
-      /* BOTTOM — solid 4px bright band */
-      inset 0 -4px 0 rgba(255,255,255,0.30),
-      /* RIGHT — solid 4px bright band */
-      inset -4px 0 0 rgba(255,255,255,0.30),
-      /* Sharp 1px boundary line where jewel meets socket — sits
-         directly underneath the chamfer faces, only visible at the
-         inside edge of each band */
-      inset 0 5px 0 rgba(0,0,0,0.7),
-      inset 5px 0 0 rgba(0,0,0,0.7),
-      inset 0 -5px 0 rgba(255,255,255,0.20),
-      inset -5px 0 0 rgba(255,255,255,0.20),
-      /* Rarity rim — outermost 1px, picks up tier hue */
-      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 60%, #000000),
-      inset 1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 60%, #000000),
-      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 70%, transparent),
-      inset -1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 70%, transparent);
+      /* TOP shadow — strong */
+      inset 0 1px 0 rgba(0,0,0,0.85),
+      inset 0 2px 0 rgba(0,0,0,0.55),
+      inset 0 3px 0 rgba(0,0,0,0.30),
+      /* LEFT shadow */
+      inset 1px 0 0 rgba(0,0,0,0.85),
+      inset 2px 0 0 rgba(0,0,0,0.55),
+      inset 3px 0 0 rgba(0,0,0,0.30),
+      /* BOTTOM highlight — dialed down (was 0.55/0.30/0.15) */
+      inset 0 -1px 0 rgba(255,255,255,0.30),
+      inset 0 -2px 0 rgba(255,255,255,0.16),
+      inset 0 -3px 0 rgba(255,255,255,0.08),
+      /* RIGHT highlight — dialed down */
+      inset -1px 0 0 rgba(255,255,255,0.30),
+      inset -2px 0 0 rgba(255,255,255,0.16),
+      inset -3px 0 0 rgba(255,255,255,0.08),
+      /* Rarity rim along all four edges */
+      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent);
   }
   .sky-band-container canvas {
     display: block;
@@ -1735,23 +1731,27 @@
     border: none;
     padding: 16px 14px;
     margin: 8px 0;
-    /* Same hard solid chamfer as the bands — jewel-in-socket look,
-       solid color per face, no gradient stack. */
+    /* Same stacked-pixel chamfer as the bands, with the highlight
+       side dialed down. */
     box-shadow:
       0 -1px 0 rgba(255,255,255,0.18),
       0 2px 5px rgba(0,0,0,0.55),
-      inset 0 4px 0 rgba(0,0,0,0.55),
-      inset 4px 0 0 rgba(0,0,0,0.55),
-      inset 0 -4px 0 rgba(255,255,255,0.30),
-      inset -4px 0 0 rgba(255,255,255,0.30),
-      inset 0 5px 0 rgba(0,0,0,0.7),
-      inset 5px 0 0 rgba(0,0,0,0.7),
-      inset 0 -5px 0 rgba(255,255,255,0.20),
-      inset -5px 0 0 rgba(255,255,255,0.20),
-      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 60%, #000000),
-      inset 1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 60%, #000000),
-      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 70%, transparent),
-      inset -1px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 70%, transparent);
+      inset 0 1px 0 rgba(0,0,0,0.85),
+      inset 0 2px 0 rgba(0,0,0,0.55),
+      inset 0 3px 0 rgba(0,0,0,0.30),
+      inset 1px 0 0 rgba(0,0,0,0.85),
+      inset 2px 0 0 rgba(0,0,0,0.55),
+      inset 3px 0 0 rgba(0,0,0,0.30),
+      inset 0 -1px 0 rgba(255,255,255,0.30),
+      inset 0 -2px 0 rgba(255,255,255,0.16),
+      inset 0 -3px 0 rgba(255,255,255,0.08),
+      inset -1px 0 0 rgba(255,255,255,0.30),
+      inset -2px 0 0 rgba(255,255,255,0.16),
+      inset -3px 0 0 rgba(255,255,255,0.08),
+      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
+      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent);
   }
   .gps-cipher {
     font-size: 7px;
