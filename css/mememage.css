@@ -1618,22 +1618,26 @@
     background: linear-gradient(180deg, #0d0d1a 0%, #1a1a35 50%, #0a0a18 100%);
     border: none;
     box-shadow:
-      /* outer highlight on top — plate edge catching overhead light
-         where the band rises up out of it */
-      0 -1px 0 rgba(255,255,255,0.10),
-      /* outer shadow below — band casts a small drop onto the plate */
-      0 2px 4px rgba(0,0,0,0.45),
-      /* inset chamfer — shadow on top-left (band's edge falls away
-         from the light into its own form) */
-      inset 1px 1px 0 rgba(0,0,0,0.55),
-      /* inset chamfer — highlight on bottom-right (raised face
-         catches light reflecting up from the plate) */
-      inset -1px -1px 0 rgba(255,255,255,0.18),
-      /* rarity rim — subtle hue along the bevel */
-      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 25%, #000000),
-      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 30%, transparent),
-      /* inner highlight near top — soft glow on the raised face */
-      inset 0 -2px 6px rgba(255,255,255,0.04);
+      /* outer highlight at the lip — plate metal catching light just
+         above where it cuts down into the recess */
+      0 -1px 0 rgba(255,255,255,0.18),
+      /* outer drop — recess casts a soft shadow on the plate below */
+      0 2px 5px rgba(0,0,0,0.55),
+      /* hard top edge shadow — inside top of recess, the lip's
+         underside falls fully into shadow */
+      inset 0 2px 0 rgba(0,0,0,0.85),
+      inset 0 3px 1px rgba(0,0,0,0.6),
+      /* graded falloff into the cavity */
+      inset 0 8px 14px rgba(0,0,0,0.45),
+      /* hard bottom edge highlight — back wall of the recess catches
+         reflected light bouncing off the plate floor */
+      inset 0 -2px 0 rgba(255,255,255,0.32),
+      inset 0 -3px 1px rgba(255,255,255,0.18),
+      /* graded ambient bounce upward from the bottom */
+      inset 0 -8px 12px rgba(255,255,255,0.05),
+      /* rarity rim — subtle hue along the bevel edges */
+      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, #000000),
+      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 50%, #404040);
   }
   .sky-band-container canvas {
     display: block;
@@ -1699,9 +1703,23 @@
     overflow: hidden;
     position: relative;
     background: linear-gradient(180deg, #141414 0%, #1c1c1c 50%, #101010 100%);
-    border: 1px solid rgba(0,0,0,0.2);
+    border: none;
     padding: 16px 14px;
     margin: 8px 0;
+    /* Same chamfer treatment as the bands — recessed cavity look,
+       hard shadow at the top lip + highlight at the bottom wall, soft
+       falloff toward the middle, rarity-rim along the bevel. */
+    box-shadow:
+      0 -1px 0 rgba(255,255,255,0.18),
+      0 2px 5px rgba(0,0,0,0.55),
+      inset 0 2px 0 rgba(0,0,0,0.85),
+      inset 0 3px 1px rgba(0,0,0,0.6),
+      inset 0 8px 14px rgba(0,0,0,0.45),
+      inset 0 -2px 0 rgba(255,255,255,0.32),
+      inset 0 -3px 1px rgba(255,255,255,0.18),
+      inset 0 -8px 12px rgba(255,255,255,0.05),
+      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, #000000),
+      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 50%, #404040);
   }
   .gps-cipher {
     font-size: 7px;
