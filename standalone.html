@@ -1991,10 +1991,17 @@ function renderCert(meta, options) {
   setTimeout(function() {
     var rect = plate.getBoundingClientRect();
     var dpr = window.devicePixelRatio || 1;
+    // Use scrollHeight (full content) instead of getBoundingClientRect
+    // height (visible viewport only). Without this the grain stops at
+    // the bottom of the first viewport when the cert scrolls.
+    var totalH = Math.max(plate.scrollHeight, rect.height);
     var GW = Math.round(rect.width * dpr);
-    var GH = Math.round(rect.height * dpr);
+    var GH = Math.round(totalH * dpr);
     _grainCanvas.width = GW;
     _grainCanvas.height = GH;
+    // Override the CSS height: 100% (which clamps to visible viewport)
+    // with an explicit pixel value matching the full scrollable area.
+    _grainCanvas.style.height = totalH + 'px';
     var gc = _grainCanvas.getContext('2d');
 
     // Draw horizontal hairlines
@@ -2006,7 +2013,9 @@ function renderCert(meta, options) {
       gc.fillRect(0, gy + dpr, GW, 0.5 * dpr);
     }
 
-    // Erase center — large ellipse, grain only in the narrow edge margins
+    // Erase center — large ellipse, grain only in the narrow edge margins.
+    // For tall scrollable plates the ellipse stretches vertically; the
+    // grain stays as a thin band on the left + right edges throughout.
     gc.globalCompositeOperation = 'destination-out';
     gc.save();
     gc.translate(GW / 2, GH * 0.45);
