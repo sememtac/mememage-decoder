@@ -1600,69 +1600,16 @@
   }
 
   /* --- Sky Band Container ---
-     Used by gen, machine, sky bands. The inset bevel makes the band
-     read as recessed into the cert plate — a chamfered edge picks up
-     light on the top-left, drops into shadow on the bottom-right.
-     A subtle outer highlight just below the band suggests the plate's
-     reflective surface continuing past the cut.
-     The tier-color rim (top + bottom) inherits --rarity-color from
-     the .plate, so the bevel takes a green/blue/purple/amber/red tint
-     matching the cert's rarity. Common = neutral. */
+     Used by gen, machine, sky bands. */
   .sky-band-wrap {
     margin: 12px 0 16px;
   }
   .sky-band-container {
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
     position: relative;
     background: linear-gradient(180deg, #0d0d1a 0%, #1a1a35 50%, #0a0a18 100%);
-    border: none;
-    /* Outer-only shadow lives on the container itself. The inset
-       chamfer cannot paint here because the canvas child fills the
-       container edge-to-edge and covers any inset shadow — it goes
-       on the ::after pseudo-element below, layered over the canvas. */
-    box-shadow:
-      0 -1px 0 rgba(255,255,255,0.18),
-      0 2px 5px rgba(0,0,0,0.55);
-  }
-  /* Chamfer overlay — sits on top of the canvas so the bevel reads
-     against the band's painted content. pointer-events: none keeps
-     the canvas's interactive layers (cells, hover) usable through it. */
-  .sky-band-container::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 10px;
-    pointer-events: none;
-    z-index: 2;
-    /* Inverted hard chamfer — back to the stacked-pixel falloff that
-       reads more sculptural, with the highlight side dialed down so
-       the bright bottom-right doesn't blow out against dark band
-       content. Top + left = shadow (back of cut, away from light);
-       bottom + right = subtle highlight (cavity catching reflected
-       light). */
-    box-shadow:
-      /* TOP shadow — softened */
-      inset 0 1px 0 rgba(0,0,0,0.55),
-      inset 0 2px 0 rgba(0,0,0,0.32),
-      inset 0 3px 0 rgba(0,0,0,0.16),
-      /* LEFT shadow */
-      inset 1px 0 0 rgba(0,0,0,0.55),
-      inset 2px 0 0 rgba(0,0,0,0.32),
-      inset 3px 0 0 rgba(0,0,0,0.16),
-      /* BOTTOM highlight */
-      inset 0 -1px 0 rgba(255,255,255,0.18),
-      inset 0 -2px 0 rgba(255,255,255,0.10),
-      inset 0 -3px 0 rgba(255,255,255,0.05),
-      /* RIGHT highlight */
-      inset -1px 0 0 rgba(255,255,255,0.18),
-      inset -2px 0 0 rgba(255,255,255,0.10),
-      inset -3px 0 0 rgba(255,255,255,0.05),
-      /* Rarity rim along all four edges */
-      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
-      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
-      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
-      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent);
+    border: 1px solid rgba(0,0,0,0.2);
   }
   .sky-band-container canvas {
     display: block;
@@ -1728,29 +1675,9 @@
     overflow: hidden;
     position: relative;
     background: linear-gradient(180deg, #141414 0%, #1c1c1c 50%, #101010 100%);
-    border: none;
+    border: 1px solid rgba(0,0,0,0.2);
     padding: 16px 14px;
     margin: 8px 0;
-    /* Same softened chamfer as the bands. */
-    box-shadow:
-      0 -1px 0 rgba(255,255,255,0.12),
-      0 2px 5px rgba(0,0,0,0.45),
-      inset 0 1px 0 rgba(0,0,0,0.55),
-      inset 0 2px 0 rgba(0,0,0,0.32),
-      inset 0 3px 0 rgba(0,0,0,0.16),
-      inset 1px 0 0 rgba(0,0,0,0.55),
-      inset 2px 0 0 rgba(0,0,0,0.32),
-      inset 3px 0 0 rgba(0,0,0,0.16),
-      inset 0 -1px 0 rgba(255,255,255,0.18),
-      inset 0 -2px 0 rgba(255,255,255,0.10),
-      inset 0 -3px 0 rgba(255,255,255,0.05),
-      inset -1px 0 0 rgba(255,255,255,0.18),
-      inset -2px 0 0 rgba(255,255,255,0.10),
-      inset -3px 0 0 rgba(255,255,255,0.05),
-      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
-      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
-      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
-      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent);
   }
   .gps-cipher {
     font-size: 7px;
