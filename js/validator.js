@@ -109,10 +109,29 @@ function syncResultsVisibility(tabName) {
   if (certR) certR.style.display = (tabName === 'meta') ? 'none' : '';
   if (metaR) metaR.style.display = (tabName === 'meta' || (!hasImg && !hasCert)) ? '' : 'none';
 
-  // Keep sidebar visible if any results exist (including Observatory)
-  var hasAny = hasImg || hasCert || hasMeta;
-  if (hasAny && tabName !== 'attack') {
+  // Compact mode tracks the ACTIVE tab's own result slot, not the
+  // existence of any results across the page. Each tab has one
+  // canonical result location:
+  //   img tab  → imgResults (or certResults if audit ran from img click)
+  //   cert tab → certResults
+  //   meta tab → metaSidebarResults
+  // If the active tab's slot is empty, exit compact mode so the user
+  // doesn't see an empty plate next to a compacted system box. Other
+  // tabs may still hold content; switching to those re-engages compact.
+  if (tabName === 'attack') return;
+  var activeHasContent;
+  if (tabName === 'meta') {
+    activeHasContent = !!hasMeta;
+  } else if (tabName === 'cert') {
+    activeHasContent = !!hasCert;
+  } else { // 'img' or anything that lands on the image flow
+    activeHasContent = !!(hasImg || hasCert);
+  }
+
+  if (activeHasContent) {
     showResultsSidebar();
+  } else if (rw.classList.contains('visible')) {
+    hideResultsSidebar(true);
   }
 }
 
