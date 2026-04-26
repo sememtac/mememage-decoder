@@ -5328,6 +5328,10 @@ var CosmicAudio = (function() {
         env.gain.linearRampToValueAtTime(0, start + dur);
         osc.connect(env); env.connect(dest);
         osc.start(start); osc.stop(start + dur + 0.1);
+        // Disconnect on end — without this, silent oscillators accumulate
+        // in the graph and their internal denormal-float state spikes the
+        // audio thread CPU over time, producing static.
+        osc.onended = function() { try { osc.disconnect(); env.disconnect(); } catch (e) {} };
 
         // Detuned twin for binaural width
         var osc2 = ctx.createOscillator();
@@ -5343,6 +5347,7 @@ var CosmicAudio = (function() {
         pan.pan.value = ((noteIdx % 2 === 0) ? 0.15 : -0.15) * stereoWidth;
         env2.connect(pan); pan.connect(dest);
         osc2.start(start); osc2.stop(start + dur + 0.1);
+        osc2.onended = function() { try { osc2.disconnect(); env2.disconnect(); pan.disconnect(); } catch (e) {} };
 
         // Next tone starts before this one ends (crossfade overlap)
         toneStartTime = start + dur - crossfade;
@@ -5410,6 +5415,12 @@ var CosmicAudio = (function() {
 
         src.connect(filt); filt.connect(env); env.connect(pan); pan.connect(dest);
         src.start(now); src.stop(now + dur + 0.05);
+        // Disconnect on end so the dust particle doesn't linger in the
+        // audio graph after fading out — denormal-float CPU drift over
+        // hours is a known cause of accumulating static.
+        src.onended = function() {
+          try { src.disconnect(); filt.disconnect(); env.disconnect(); pan.disconnect(); } catch (e) {}
+        };
 
         // Next particle: 3-15 seconds (sparser at new moon, denser at full)
         var minGap = 4 + (1 - moonBright) * 6;  // 4-10s
