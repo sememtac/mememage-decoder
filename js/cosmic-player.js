@@ -18,11 +18,11 @@ var CosmicPlayer = (function() {
   var FADE_OUT = 1.2;
 
   var RARITY_COLORS = {
-    common: [96,96,104], uncommon: [42,112,48], rare: [42,80,144],
+    common: [96,96,96], uncommon: [42,112,48], rare: [42,80,144],
     veryrare: [90,42,138], epic: [138,98,16], legendary: [212,64,64]
   };
   var RARITY_BRIGHT = {
-    common: [160,160,175], uncommon: [80,200,95], rare: [80,150,240],
+    common: [160,160,160], uncommon: [80,200,95], rare: [80,150,240],
     veryrare: [160,90,235], epic: [230,175,50], legendary: [255,100,100]
   };
 

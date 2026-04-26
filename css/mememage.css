@@ -30,7 +30,7 @@
     --border-glow: rgba(200, 200, 210, 0.15);
     --text-primary: #d0d0d4;
     --text-secondary: #a0a0a8;
-    --text-muted: #606068;
+    --text-muted: #606060;
     --text-dim: #404048;
     --accent-purple: #9b8cd4;
     --accent-blue: #8898b8;
@@ -2054,7 +2054,7 @@
      hover styles on the first tap — without the gate, iOS Safari shows the
      hover state and swallows the click, requiring a second tap to navigate. */
   .portal-yin { color: #6a6a72; }
-  .portal-yang { color: #606068; }
+  .portal-yang { color: #606060; }
   @media (hover: hover) {
     .portal-yin:hover {
       color: #000;
@@ -2153,7 +2153,7 @@
   }
   .player-accent {
     height: 2px;
-    background: linear-gradient(90deg, transparent 2%, var(--rarity-color, #606068) 20%, var(--rarity-color, #606068) 80%, transparent 98%);
+    background: linear-gradient(90deg, transparent 2%, var(--rarity-color, #606060) 20%, var(--rarity-color, #606060) 80%, transparent 98%);
     opacity: 0.7;
   }
   .player-inner { width: 100%; }
@@ -2177,7 +2177,7 @@
     color: #e8e8f0;
     border-color: rgba(255,255,255,0.3);
     background: rgba(255,255,255,0.08);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3), 0 0 8px var(--rarity-glow, rgba(96,96,104,0.2));
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3), 0 0 8px var(--rarity-glow, rgba(96,96,96,0.2));
     transition: color 0.4s ease, border-color 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
   }
   .player-btn .play-icon, .player-btn .stop-icon { position: absolute; transition: opacity 0.3s ease, transform 0.3s ease; }
@@ -2227,7 +2227,7 @@
   .player-volume::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--thumb-color, #808088); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 1px 3px rgba(0,0,0,0.4); cursor: pointer; }
 
   /* Rarity schemes */
-  .cosmic-player[data-rarity="common"]    { --rarity-color: #606068; --rarity-glow: rgba(96,96,104,0.2); }
+  .cosmic-player[data-rarity="common"]    { --rarity-color: #606060; --rarity-glow: rgba(96,96,96,0.2); }
   .cosmic-player[data-rarity="uncommon"]  { --rarity-color: #2a7030; --rarity-glow: rgba(42,112,48,0.2); }
   .cosmic-player[data-rarity="rare"]      { --rarity-color: #2a5090; --rarity-glow: rgba(42,80,144,0.2); }
   .cosmic-player[data-rarity="veryrare"]  { --rarity-color: #5a2a8a; --rarity-glow: rgba(90,42,138,0.2); }

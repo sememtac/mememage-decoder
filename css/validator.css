@@ -145,7 +145,7 @@ body > *:not(#starfield):not(.touch-tooltip) { position: relative; z-index: 1; }
    mememage.css can trim its padding without fighting inline styles. */
 #attackToggle { border-top: 1px solid rgba(255,255,255,0.04); }
 #attackToggleLink {
-  color: #606068; font-size: 0.72rem; font-weight: 300;
+  color: #606060; font-size: 0.72rem; font-weight: 300;
   text-decoration: none; letter-spacing: 0.04em; transition: color 0.3s;
 }
 #attackToggleLink:hover { color: #909098; }
@@ -276,7 +276,7 @@ body > *:not(#starfield):not(.touch-tooltip) { position: relative; z-index: 1; }
 /* Source disclosure — yin palette overrides for the internals that
    mememage.css defines with yang colors. Structure (margin, flex
    layout, font-size) inherits; only ink shifts. */
-.lookup-source-row label { color: #606068; }
+.lookup-source-row label { color: #606060; }
 .lookup-source-row input[type="text"] {
   background: rgba(255,255,255,0.03);
   border-color: rgba(255,255,255,0.06);
@@ -458,7 +458,7 @@ body > *:not(#starfield):not(.touch-tooltip) { position: relative; z-index: 1; }
 .orbit-age.near-2 { color:rgba(200,176,128,0.15); font-size:0.44rem; cursor:pointer; }
 .orbit-age.near-2:hover { color:rgba(200,176,128,0.3); }
 .orbit-age.off { opacity:0; font-size:0.38rem; }
-.orbit-arrow { font-size:0.7rem; cursor:pointer; color:#606068; transition:color 0.2s; padding:0 0.5rem; flex-shrink:0; }
+.orbit-arrow { font-size:0.7rem; cursor:pointer; color:#606060; transition:color 0.2s; padding:0 0.5rem; flex-shrink:0; }
 .orbit-arrow:hover { color:#c8b080; }
 
 .orbit-controls { display:flex; justify-content:center; gap:0.6rem; align-items:center; margin-bottom:0.3rem; flex-wrap:wrap; }
@@ -472,7 +472,7 @@ body > *:not(#starfield):not(.touch-tooltip) { position: relative; z-index: 1; }
 .orbit-tbl { border-collapse:collapse; width:100%; table-layout:fixed; border-spacing:0; }
 .orbit-tbl td { padding:0; }
 
-.orbit-hdr { text-align:center; color:#606068; font-size:0.38rem; padding:1px 0; }
+.orbit-hdr { text-align:center; color:#606060; font-size:0.38rem; padding:1px 0; }
 
 .orbit-row { transition: height 0.4s ease, opacity 0.4s ease; }
 .orbit-row.collapsed { height:0; opacity:0; overflow:hidden; line-height:0; }
@@ -497,7 +497,7 @@ body > *:not(#starfield):not(.touch-tooltip) { position: relative; z-index: 1; }
 .orbit-c.epag { color:#48443e; background:rgba(200,176,128,0.08); }
 .orbit-c.epag.supplied { background:rgba(200,176,128,0.35); color:#c8b080; }
 
-.orbit-stats { display:flex; gap:0.8rem; justify-content:center; flex-wrap:wrap; margin-top:0.3rem; font-size:0.46rem; color:#606068; }
+.orbit-stats { display:flex; gap:0.8rem; justify-content:center; flex-wrap:wrap; margin-top:0.3rem; font-size:0.46rem; color:#606060; }
 .orbit-stats span { display:flex; align-items:center; gap:0.15rem; }
 .orbit-stats .pass { color:#4ade80; }
 .orbit-stats .warn { color:#facc15; }

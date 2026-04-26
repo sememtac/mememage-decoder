@@ -229,8 +229,10 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
     if (total === 0) callback();
   }
 
-  // Sky background tinted by rarity (hoisted for animation loop access)
-  var _skyBgs = {common:['#12121a','#1a1a24','#0e0e16'],uncommon:['#0e1810','#142018','#0a120c'],rare:['#0e1018','#141a24','#0a0e14'],veryrare:['#140e18','#1a1420','#100a14'],epic:['#18140e','#201a12','#12100a'],legendary:['#140a0a','#1c1012','#100808']};
+  // Sky background tinted by rarity (hoisted for animation loop access).
+  // Common is pure neutral grey — earlier values had B > R = G which
+  // read as a blue cast on calibrated displays. Other tiers keep hue.
+  var _skyBgs = {common:['#141414','#1c1c1c','#101010'],uncommon:['#0e1810','#142018','#0a120c'],rare:['#0e1018','#141a24','#0a0e14'],veryrare:['#140e18','#1a1420','#100a14'],epic:['#18140e','#201a12','#12100a'],legendary:['#140a0a','#1c1012','#100808']};
   var _skyTier = rarityScore>=80?'legendary':rarityScore>=70?'epic':rarityScore>=60?'veryrare':rarityScore>=46?'rare':rarityScore>=35?'uncommon':'common';
   var _skyC = _skyBgs[_skyTier];
   var _stars = [];

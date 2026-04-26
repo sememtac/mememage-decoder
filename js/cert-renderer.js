@@ -12,7 +12,7 @@
 // =====================================================================
 
 // --- Rarity tier lookup (Age of Aries thresholds) ---
-var RARITY_TIERS = [[80,'Legendary','#d44040'],[70,'Epic','#8a6210'],[60,'Very Rare','#5a2a8a'],[46,'Rare','#2a5090'],[35,'Uncommon','#2a7030'],[0,'Common','#606068']];
+var RARITY_TIERS = [[80,'Legendary','#d44040'],[70,'Epic','#8a6210'],[60,'Very Rare','#5a2a8a'],[46,'Rare','#2a5090'],[35,'Uncommon','#2a7030'],[0,'Common','#606060']];
 
 function getRarityTier(score) {
   for (var i = 0; i < RARITY_TIERS.length; i++) {
