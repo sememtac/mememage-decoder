@@ -85,7 +85,9 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
 // =====================================================================
 
 function soulFilename(identifier, contentHash) {
-  if (contentHash) return identifier + '.' + contentHash + '.soul';
+  // The identifier is honest enough on its own. Old records on IA may
+  // still be at {identifier}.{hash}.soul — the fetch probe handles them.
+  // The contentHash arg is kept in the signature for backward compat.
   return identifier + '.soul';
 }
 
@@ -551,7 +553,7 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
   if (existingSoulBtn) existingSoulBtn.remove();
   var _inExampleFlow = document.querySelector('.input-section').classList.contains('example-active');
   if (!_inExampleFlow && identifier && meta.content_hash) {
-    var soulFile = identifier + '.' + meta.content_hash + '.soul';
+    var soulFile = soulFilename(identifier, meta.content_hash);
     var soulUrl = meta._source || ('https://archive.org/download/' + identifier + '/' + soulFile);
     var soulBtn = document.createElement('button');
     soulBtn.id = 'downloadSoulBtn';

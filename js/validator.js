@@ -209,7 +209,7 @@ function analyze(file){
         o+='<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv pass">SURVIVED</div></div>';
         o+='<div class="ev-m"><div class="ev-ml">Content Hash</div><div class="ev-mv pass">'+safeHash+'</div></div>';
         o+='<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv">'+(safeId?'<a href="#" class="audit-link" data-id="'+safeId+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeId+'</a>':'\u2014')+'</div></div>';
-        o+='<div class="ev-m"><div class="ev-ml">Soul</div><div class="ev-mv" style="font-size:0.68rem;">'+safeId+'.'+safeHash+'.soul</div></div>';
+        o+='<div class="ev-m"><div class="ev-ml">Soul</div><div class="ev-mv" style="font-size:0.68rem;">'+safeId+'.soul</div></div>';
       }else{
         o+='<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv fail">LOST</div></div>';
         o+='<div class="ev-m w"><div class="ev-ml">Diagnosis</div><div class="ev-mv fail">'+(detected?'M/Y/C bands detected but data unreadable \u2014 compression destroyed brightness encoding':'No M/Y/C bands found \u2014 image cropped, resized, or not a Mememage image')+'</div></div>';
@@ -1577,9 +1577,9 @@ function runAudit() {
   }
 
   // Probe the expanded URL for the canonical .soul / .json forms.
-  // Archive.org's actual filename is {id}.{hash}.soul (hash unknown
-  // for bare-identifier input), so we fall back to IA's /metadata/
-  // API to discover the file when direct probes miss.
+  // Current upload writes {identifier}.soul; older records on IA may
+  // be at {identifier}.{hash}.soul — IA /metadata/ fallback covers
+  // those when direct probes miss.
   var soulUrl = expanded + '/' + identifier + '.soul';
   var jsonUrl = expanded + '/' + identifier + '.json';
   function iaFallback() {
