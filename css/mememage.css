@@ -1635,28 +1635,27 @@
     border-radius: 10px;
     pointer-events: none;
     z-index: 2;
-    /* Uniform 3px chamfer on all four edges. Hard pixels only, no
-       graded falloffs — graded shadows blend with the band's content
-       behind them and made the bevel appear to react to the background.
-       All edges use the same intensities so the bevel reads as a
-       symmetric raised lip with equal weight on every side. */
+    /* Uniform 3px chamfer on all four edges, inverted: top + left =
+       shadow, bottom + right = highlight (light from lower-right,
+       reads as a recessed cavity). Hard pixels only — no graded
+       falloffs blending with content. */
     box-shadow:
-      /* TOP highlight — 3 stacked lines for a thicker bevel face */
-      inset 0 1px 0 rgba(255,255,255,0.55),
-      inset 0 2px 0 rgba(255,255,255,0.30),
-      inset 0 3px 0 rgba(255,255,255,0.15),
-      /* LEFT highlight — same intensities as top */
-      inset 1px 0 0 rgba(255,255,255,0.55),
-      inset 2px 0 0 rgba(255,255,255,0.30),
-      inset 3px 0 0 rgba(255,255,255,0.15),
-      /* BOTTOM shadow — same intensities as right, opposite of top */
-      inset 0 -1px 0 rgba(0,0,0,0.85),
-      inset 0 -2px 0 rgba(0,0,0,0.55),
-      inset 0 -3px 0 rgba(0,0,0,0.30),
-      /* RIGHT shadow */
-      inset -1px 0 0 rgba(0,0,0,0.85),
-      inset -2px 0 0 rgba(0,0,0,0.55),
-      inset -3px 0 0 rgba(0,0,0,0.30),
+      /* TOP shadow — lip's underside, falls into shadow */
+      inset 0 1px 0 rgba(0,0,0,0.85),
+      inset 0 2px 0 rgba(0,0,0,0.55),
+      inset 0 3px 0 rgba(0,0,0,0.30),
+      /* LEFT shadow */
+      inset 1px 0 0 rgba(0,0,0,0.85),
+      inset 2px 0 0 rgba(0,0,0,0.55),
+      inset 3px 0 0 rgba(0,0,0,0.30),
+      /* BOTTOM highlight — back wall catching reflected light */
+      inset 0 -1px 0 rgba(255,255,255,0.55),
+      inset 0 -2px 0 rgba(255,255,255,0.30),
+      inset 0 -3px 0 rgba(255,255,255,0.15),
+      /* RIGHT highlight */
+      inset -1px 0 0 rgba(255,255,255,0.55),
+      inset -2px 0 0 rgba(255,255,255,0.30),
+      inset -3px 0 0 rgba(255,255,255,0.15),
       /* rarity rim — outermost edge, picks up tier hue */
       inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
       inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
@@ -1730,24 +1729,23 @@
     border: none;
     padding: 16px 14px;
     margin: 8px 0;
-    /* Same uniform chamfer as the bands — equal-thickness 3px bevel
-       on all four edges, hard pixels only (no graded falloff that
-       would blend with content). */
+    /* Inverted chamfer matching the bands — top + left = shadow,
+       bottom + right = highlight (recessed-cavity look). */
     box-shadow:
       0 -1px 0 rgba(255,255,255,0.18),
       0 2px 5px rgba(0,0,0,0.55),
-      inset 0 1px 0 rgba(255,255,255,0.55),
-      inset 0 2px 0 rgba(255,255,255,0.30),
-      inset 0 3px 0 rgba(255,255,255,0.15),
-      inset 1px 0 0 rgba(255,255,255,0.55),
-      inset 2px 0 0 rgba(255,255,255,0.30),
-      inset 3px 0 0 rgba(255,255,255,0.15),
-      inset 0 -1px 0 rgba(0,0,0,0.85),
-      inset 0 -2px 0 rgba(0,0,0,0.55),
-      inset 0 -3px 0 rgba(0,0,0,0.30),
-      inset -1px 0 0 rgba(0,0,0,0.85),
-      inset -2px 0 0 rgba(0,0,0,0.55),
-      inset -3px 0 0 rgba(0,0,0,0.30),
+      inset 0 1px 0 rgba(0,0,0,0.85),
+      inset 0 2px 0 rgba(0,0,0,0.55),
+      inset 0 3px 0 rgba(0,0,0,0.30),
+      inset 1px 0 0 rgba(0,0,0,0.85),
+      inset 2px 0 0 rgba(0,0,0,0.55),
+      inset 3px 0 0 rgba(0,0,0,0.30),
+      inset 0 -1px 0 rgba(255,255,255,0.55),
+      inset 0 -2px 0 rgba(255,255,255,0.30),
+      inset 0 -3px 0 rgba(255,255,255,0.15),
+      inset -1px 0 0 rgba(255,255,255,0.55),
+      inset -2px 0 0 rgba(255,255,255,0.30),
+      inset -3px 0 0 rgba(255,255,255,0.15),
       inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
       inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
       inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
