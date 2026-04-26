@@ -1104,6 +1104,24 @@ function dismissPanel(panel, opts, done) {
   setTimeout(finish, 600);
 }
 
+// Diagnostic banner — temporary visible debug log for mobile testing.
+// Returns a { log(s) } handle. Self-removes after 12s or on tap.
+function _uploadDbgBanner(){
+  if (window._uploadDbg) return window._uploadDbg;
+  var dbg = document.createElement('div');
+  dbg.className = 'touch-tooltip';
+  dbg.setAttribute('style', 'position:fixed !important;top:8px;left:8px;right:8px;z-index:99999 !important;background:#000;color:#0f0;font:11px/1.3 monospace;padding:6px;border-radius:4px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-all;');
+  document.documentElement.appendChild(dbg);
+  var lines = [];
+  window._uploadDbg = {
+    log: function(s) { lines.push(s); dbg.textContent = lines.join('\n'); },
+    el: dbg
+  };
+  setTimeout(function(){ dbg.remove(); window._uploadDbg = null; }, 12000);
+  dbg.addEventListener('click', function(){ dbg.remove(); window._uploadDbg = null; });
+  return window._uploadDbg;
+}
+
 function scrollResultIntoView(el) {
   if (!el) return;
   function go() {

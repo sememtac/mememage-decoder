@@ -128,6 +128,16 @@ function syncResultsVisibility(tabName) {
     activeHasContent = !!(hasImg || hasCert);
   }
 
+  // DIAGNOSTIC banner — temporary, dropped after we confirm fix
+  try {
+    var d = (typeof _uploadDbgBanner === 'function') ? _uploadDbgBanner() : null;
+    if (d) {
+      d.log('sync: tab=' + tabName + ' hasImg=' + !!hasImg + ' hasCert=' + !!hasCert +
+            ' hasMeta=' + !!hasMeta + ' active=' + !!activeHasContent +
+            ' rwVisible=' + rw.classList.contains('visible'));
+    }
+  } catch (e) {}
+
   if (activeHasContent) {
     showResultsSidebar();
   } else if (rw.classList.contains('visible')) {
