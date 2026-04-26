@@ -754,12 +754,24 @@ function renderCert(meta, options) {
           img.src = imgUrl;
           img.alt = traitDef.name;
           img.className = 'trait-img';
+          // If the icon 404s, swap to the readable text fallback so the
+          // badge doesn't render as a broken image symbol.
+          img.onerror = function() {
+            var b = this.parentElement;
+            if (!b) return;
+            this.remove();
+            b.classList.add('trait-badge-text');
+            b.textContent = traitDef.name;
+            b.style.removeProperty('--trait-mask');
+          };
           badge.style.setProperty('--trait-mask', 'url(' + imgUrl + ')');
           badge.appendChild(img);
           badge.title = traitDef.name + ' \u2014 ' + traitDef.desc;
         } else {
-          badge.textContent = traitKey.charAt(0).toUpperCase();
-          badge.title = traitKey.replace(/_/g, ' ');
+          // Trait isn't in BIRTH_TRAITS at all — show the key humanized.
+          badge.classList.add('trait-badge-text');
+          badge.textContent = traitKey.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+          badge.title = badge.textContent;
         }
         tempTraits.appendChild(badge);
       }

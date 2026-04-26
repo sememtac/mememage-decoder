@@ -116,9 +116,16 @@ var BIRTH_TRAITS = {
   // File descriptors — gold
   entangled:      { name: 'Entangled',      cat: 'I/O',    metal: 'gold',   desc: 'File descriptors aligned at a round number' },
   unraveled:      { name: 'Unraveled',      cat: 'I/O',    metal: 'silver', desc: 'The connections were fraying at the edges' },
-  // Load — silver
+  // Load — silver/gold (forged_in_fire is the rare overload tier)
   under_pressure: { name: 'Under Pressure', cat: 'Load',   metal: 'silver', desc: 'The system was straining' },
-  // Time — gold
+  forged_in_fire: { name: 'Forged in Fire', cat: 'Load',   metal: 'gold',   desc: 'The machine was overwhelmed at the moment of birth' },
+  in_silence:     { name: 'In Silence',     cat: 'Load',   metal: 'silver', desc: 'The machine was barely conscious' },
+  // Memory in flux — bronze
+  in_flux:        { name: 'In Flux',        cat: 'Pages',  metal: 'bronze', desc: 'The machine was deciding what to keep' },
+  // Power — bronze/gold (battery state)
+  last_light:     { name: 'Last Light',     cat: 'Power',  metal: 'gold',   desc: 'Born as power was fading' },
+  untethered:     { name: 'Untethered',     cat: 'Power',  metal: 'bronze', desc: 'Born free from the wall' },
+  // Time — silver/gold
   night_owl:      { name: 'Night Owl',      cat: 'Time',   metal: 'silver', desc: 'The world was asleep' },
   dawn:           { name: 'Dawn',           cat: 'Time',   metal: 'gold',   desc: 'Born at first light' },
 };

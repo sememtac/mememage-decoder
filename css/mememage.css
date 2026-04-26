@@ -1833,6 +1833,22 @@
     height: 100%;
     object-fit: contain;
   }
+  /* Text fallback for traits without an icon — readable label inside a
+     wider rounded-rectangle badge with the same metallic gradient
+     vocabulary as the iconned variants. */
+  .trait-badge.trait-badge-text {
+    width: auto;
+    height: auto;
+    padding: 4px 10px;
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    background: linear-gradient(180deg, rgba(200,200,210,0.12) 0%, rgba(140,140,160,0.08) 100%);
+    border: 1px solid rgba(220,220,235,0.18);
+    color: rgba(240,240,250,0.85);
+    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+  }
   .plate-rarity-legendary .temperament-cell { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.06); }
   .plate-rarity-legendary .plate-temperament-name { color: #e8d8d8; }
   .plate-rarity-legendary .plate-temperament-summary { color: #c0a8a8; }
