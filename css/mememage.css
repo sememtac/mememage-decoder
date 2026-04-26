@@ -1013,6 +1013,23 @@
      scroll and the cosmic-player's glass overlap at the bottom.
      ================================================================ */
   @media (min-width: 1200px) {
+    /* Belt over suspenders: paint the right panel with the same silver
+       gradient as the plate, so if the plate-bg ever fails to cover the
+       full scroll height (rare stacking-context bug), the user sees
+       silver continuing rather than the dark page background. */
+    .panel-layout.layout-active .panel-right-has-player {
+      background: linear-gradient(180deg, #b8b8bc 0%, #969698 20%, #808084 50%, #6e6e72 100%);
+    }
+    .panel-layout.layout-active .panel-right-has-player:has(.plate-rarity-uncommon) {
+      background: linear-gradient(180deg, #1a2a1c 0%, #0c1a10 100%);
+    }
+    .panel-layout.layout-active .panel-right-has-player:has(.plate-rarity-rare),
+    .panel-layout.layout-active .panel-right-has-player:has(.plate-rarity-veryrare),
+    .panel-layout.layout-active .panel-right-has-player:has(.plate-rarity-epic),
+    .panel-layout.layout-active .panel-right-has-player:has(.plate-rarity-legendary) {
+      background: linear-gradient(180deg, #14141a 0%, #08080c 100%);
+    }
+
     /* Plate fills the right panel minus space for the player; scrolls internally. */
     .panel-layout.layout-active .panel-right-has-player .plate {
       height: calc(100vh - 3.5rem);
@@ -1125,6 +1142,10 @@
     border-radius: 16px;
     background: linear-gradient(180deg, #b8b8bc 0%, #969698 20%, #808084 50%, #6e6e72 100%);
     z-index: 0;
+    /* min-height ensures coverage when content is shorter than the
+       scroll viewport (otherwise the abs box collapses to content
+       height and scrolling reveals the dark page behind). */
+    min-height: 100%;
   }
   /* Brushed metal grain — canvas with radial fade */
   .plate-grain {
