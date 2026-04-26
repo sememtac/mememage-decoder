@@ -2470,15 +2470,20 @@ function renderCert(meta, options) {
           img.alt = traitDef.name;
           img.className = 'trait-img';
           // If the icon 404s, swap to the readable text fallback so the
-          // badge doesn't render as a broken image symbol.
-          img.onerror = function() {
-            var b = this.parentElement;
-            if (!b) return;
-            this.remove();
-            b.classList.add('trait-badge-text');
-            b.textContent = traitDef.name;
-            b.style.removeProperty('--trait-mask');
-          };
+          // badge doesn't render as a broken image symbol. Capture the
+          // current iteration's traitDef in an IIFE — `var` has function
+          // scope, so without this the onerror callback fires later
+          // with whatever the last loop iteration left in traitDef.
+          img.onerror = (function(name) {
+            return function() {
+              var b = this.parentElement;
+              if (!b) return;
+              this.remove();
+              b.classList.add('trait-badge-text');
+              b.textContent = name;
+              b.style.removeProperty('--trait-mask');
+            };
+          })(traitDef.name);
           badge.style.setProperty('--trait-mask', 'url(' + imgUrl + ')');
           badge.appendChild(img);
           badge.title = traitDef.name + ' \u2014 ' + traitDef.desc;
