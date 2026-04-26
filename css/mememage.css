@@ -1618,19 +1618,22 @@
     background: linear-gradient(180deg, #0d0d1a 0%, #1a1a35 50%, #0a0a18 100%);
     border: none;
     box-shadow:
-      /* outer drop — lifts the band off the plate */
+      /* outer highlight on top — plate edge catching overhead light
+         where the band rises up out of it */
+      0 -1px 0 rgba(255,255,255,0.10),
+      /* outer shadow below — band casts a small drop onto the plate */
       0 2px 4px rgba(0,0,0,0.45),
-      /* outer highlight just below — plate catches reflected light */
-      0 1px 0 rgba(255,255,255,0.08),
-      /* inset chamfer — light top-left edge */
-      inset 1px 1px 0 rgba(255,255,255,0.18),
-      /* inset chamfer — shadow bottom-right edge */
-      inset -1px -1px 0 rgba(0,0,0,0.55),
+      /* inset chamfer — shadow on top-left (band's edge falls away
+         from the light into its own form) */
+      inset 1px 1px 0 rgba(0,0,0,0.55),
+      /* inset chamfer — highlight on bottom-right (raised face
+         catches light reflecting up from the plate) */
+      inset -1px -1px 0 rgba(255,255,255,0.18),
       /* rarity rim — subtle hue along the bevel */
-      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 30%, transparent),
-      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 25%, #000000),
-      /* inner shadow — recessed look, deepens toward edges */
-      inset 0 2px 6px rgba(0,0,0,0.35);
+      inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 25%, #000000),
+      inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 30%, transparent),
+      /* inner highlight near top — soft glow on the raised face */
+      inset 0 -2px 6px rgba(255,255,255,0.04);
   }
   .sky-band-container canvas {
     display: block;
