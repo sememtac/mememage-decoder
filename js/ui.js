@@ -252,13 +252,32 @@ function showPanelError(head, body) {
   PanelError.set(active.id, head, body);
 }
 
-// Tab ownership for the left-panel evidence elements that live outside
-// the tab panels (preview, barCard, status, iaLinkBanner). Configure
-// which IDs participate; shared impl lives in TabScope (portal.js).
-TabScope.configure(['preview', 'barCard', 'status', 'iaLinkBanner']);
+// Tab ownership for the left-panel evidence elements + the cert
+// itself. Each query stamps its tab id; on tab switches, owners that
+// don't match the active tab pick up .tab-scope-hidden (display:none).
+// certWrap participates so the cert only renders on the tab that
+// produced it — switching to a tab without its own cert collapses
+// the layout back to default. Mirrors the validator's per-tab slot
+// behavior in syncResultsVisibility.
+TabScope.configure(['preview', 'barCard', 'status', 'iaLinkBanner', 'certWrap']);
 function setTabOwner(tabId) { TabScope.setOwner(tabId); }
 function clearTabOwners() { TabScope.clear(); }
-function applyTabScope(activeId) { TabScope.apply(activeId); }
+function applyTabScope(activeId) {
+  TabScope.apply(activeId);
+  // Sync compact-mode with the cert's ownership. If the active tab
+  // doesn't own a visible cert, drop layout-active so the system box
+  // returns to default size.
+  var cw = document.getElementById('certWrap');
+  var dm = document.querySelector('.panel-layout');
+  if (!cw || !dm) return;
+  var ownsActiveCert = cw.classList.contains('visible')
+    && !cw.classList.contains('tab-scope-hidden');
+  if (ownsActiveCert) {
+    dm.classList.add('layout-active');
+  } else {
+    dm.classList.remove('layout-active');
+  }
+}
 
 function resetAll(){
   // Fade out cosmic audio before destroying the certificate

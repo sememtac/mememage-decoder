@@ -103,30 +103,21 @@ function syncResultsVisibility(tabName) {
   var hasCert = certR && certR.innerHTML.trim();
   var hasMeta = metaR && metaR.innerHTML.trim();
 
-  // Show the result div matching the active tab context, hide others.
-  // Results persist until replaced by new query in their own tab.
-  if (imgR) imgR.style.display = (tabName === 'meta') ? 'none' : '';
-  if (certR) certR.style.display = (tabName === 'meta') ? 'none' : '';
-  if (metaR) metaR.style.display = (tabName === 'meta' || (!hasImg && !hasCert)) ? '' : 'none';
+  // Each tab owns ONE result slot. Visibility and compact-mode follow
+  // the active tab's slot only — other tabs' results stay in DOM but
+  // hidden, so switching back to them restores the result + compact.
+  //   img  → imgResults
+  //   cert → certResults
+  //   meta → metaSidebarResults
+  if (imgR)  imgR.style.display  = (tabName === 'img')  ? '' : 'none';
+  if (certR) certR.style.display = (tabName === 'cert') ? '' : 'none';
+  if (metaR) metaR.style.display = (tabName === 'meta') ? '' : 'none';
 
-  // Compact mode tracks the ACTIVE tab's own result slot, not the
-  // existence of any results across the page. Each tab has one
-  // canonical result location:
-  //   img tab  → imgResults (or certResults if audit ran from img click)
-  //   cert tab → certResults
-  //   meta tab → metaSidebarResults
-  // If the active tab's slot is empty, exit compact mode so the user
-  // doesn't see an empty plate next to a compacted system box. Other
-  // tabs may still hold content; switching to those re-engages compact.
   if (tabName === 'attack') return;
-  var activeHasContent;
-  if (tabName === 'meta') {
-    activeHasContent = !!hasMeta;
-  } else if (tabName === 'cert') {
-    activeHasContent = !!hasCert;
-  } else { // 'img' or anything that lands on the image flow
-    activeHasContent = !!(hasImg || hasCert);
-  }
+  var activeHasContent =
+    (tabName === 'img'  && !!hasImg)  ||
+    (tabName === 'cert' && !!hasCert) ||
+    (tabName === 'meta' && !!hasMeta);
 
   if (activeHasContent) {
     showResultsSidebar();
