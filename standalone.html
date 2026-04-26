@@ -5623,8 +5623,24 @@ var CosmicAudio = (function() {
       start: function(audioContext, destination) {
         if (running) return;
         ctx = audioContext;
-        dest = destination;
         running = true;
+        // Master limiter — every internal layer routes through this
+        // before reaching the caller's destination. Without it, the
+        // ambient drone + harmonics + drift + dust can phase-align to
+        // peaks above 1.0, the output clips, and the clipping reads as
+        // intermittent static that creeps in over time. The compressor
+        // is configured as a soft limiter (high threshold, fast attack,
+        // gentle ratio) so the texture stays untouched until peaks
+        // genuinely exceed safe levels.
+        var limiter = audioContext.createDynamicsCompressor();
+        limiter.threshold.value = -3;     // dB — only catch true peaks
+        limiter.knee.value = 6;           // dB — soft knee for musical clamping
+        limiter.ratio.value = 8;          // strong but not brick-wall
+        limiter.attack.value = 0.003;     // 3ms — fast enough to catch transients
+        limiter.release.value = 0.15;     // 150ms — let dust through cleanly
+        limiter.connect(destination);
+        dest = limiter;
+        ambientNodes.push(limiter);
         startAmbient();
         startDrift();
         startDust();
@@ -5639,8 +5655,10 @@ var CosmicAudio = (function() {
         driftTimeouts = [];
         for (var i = 0; i < ambientNodes.length; i++) {
           try { ambientNodes[i].stop(); } catch(e) {}
+          try { ambientNodes[i].disconnect(); } catch(e) {}
         }
         ambientNodes = [];
+        dest = null;
       },
 
       /** Whether audio is currently playing. */
