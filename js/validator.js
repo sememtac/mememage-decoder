@@ -727,7 +727,11 @@ async function analyzeMeta(files){
         html+='</div></div>';}}
 
     // Age
-    var ages=new Set();valid.forEach(function(r2){if(r2.decoder_age_name)ages.add(r2.decoder_age_name);});
+    var ages=new Set();valid.forEach(function(r2){
+      var d2=getChunk(r2,'decoder');
+      var an=(d2&&d2.age_name)||r2.decoder_age_name;
+      if(an)ages.add(an);
+    });
     if(ages.size>0)html+='<div class="ev-sec">Age</div><div style="font-size:0.72rem;color:'+(ages.size===1?'#4ade80':'#f87171')+';">'+escapeHtml(Array.from(ages).join(', '))+(ages.size===1?' (consistent)':' (mixed)')+'</div>';
 
     html+='</div></div>';
@@ -757,11 +761,21 @@ function buildOrbitInspector(records, collected) {
   // first decoder cycle rather than rendering an empty grid.
   var ages = {}, ageOrder = [];
   records.forEach(function(r) {
-    var a = r.decoder_age_name || '_';
+    // Read chunk metadata via shared helper (handles nested + legacy flat).
+    var rDec = getChunk(r, 'decoder');
+    var rTruth = getChunk(r, 'truth');
+    var a = (rDec && rDec.age_name) || r.decoder_age_name || '_';
     if (!ages[a]) { ages[a] = { byPos: {}, recs: [] }; ageOrder.push(a); }
     ages[a].recs.push(r);
-    var ti = r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index;
+    // Position on the 365-grid prefers truth index; fall back to
+    // decoder index (0-11) so a solo drop still lights a cell.
+    var ti = rTruth && rTruth.index != null ? rTruth.index
+           : (rDec && rDec.index != null ? rDec.index
+              : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index));
     if (ti != null) ages[a].byPos[ti] = r;
+    // Cache for downstream rendering loops
+    r._gridPos = ti;
+    r._ageName = a;
   });
 
   var curAge = ageOrder[0], curSector = 0, mode = 'orbit', curFilter = 'all';
@@ -801,11 +815,11 @@ function buildOrbitInspector(records, collected) {
     el.innerHTML = '';
     var ad = ages[curAge];
 
-    // Row → constellation name map
+    // Row → constellation name map (uses cached _gridPos from above)
     var rowCon = {}, rowHeart = {};
     ad.recs.forEach(function(r) {
-      if (r.truth_chunk_index != null) {
-        var row = Math.floor(r.truth_chunk_index / 12);
+      if (r._gridPos != null) {
+        var row = Math.floor(r._gridPos / 12);
         if (r.constellation_name) rowCon[row] = r.constellation_name;
         if (r.heart_star_id && r.identifier === r.heart_star_id) rowHeart[row] = true;
       }
@@ -1705,17 +1719,22 @@ function renderAudit(rec, identifier, out) {
   html += auditSection('Chain Position', chainRows);
 
   // === CYCLE INTEGRITY ===
+  // Chunks pulled via getChunk so both nested + legacy flat shapes work.
   var cycleRows = '';
-  if (rec.decoder_age_name) cycleRows += auditRow('Age', rec.decoder_age_name + ' (' + rec.decoder_age + ')');
-  if (rec.decoder_chunk_index !== undefined) {
-    cycleRows += auditRow('Decoder Chunk', (rec.decoder_chunk_index + 1) + ' of ' + (rec.decoder_total_chunks || 12));
+  var auDec = getChunk(rec, 'decoder');
+  var auProof = getChunk(rec, 'proof');
+  var auAgeName = (auDec && auDec.age_name) || rec.decoder_age_name;
+  var auAge = (auDec && auDec.age) || rec.decoder_age;
+  if (auAgeName) cycleRows += auditRow('Age', auAgeName + (auAge ? ' (' + auAge + ')' : ''));
+  if (auDec && auDec.index !== undefined) {
+    cycleRows += auditRow('Decoder Chunk', (auDec.index + 1) + ' of ' + (auDec.total || 12));
     cycleRows += auditRow('Decoder Hash', rec.decoder_hash ? rec.decoder_hash.slice(0, 12) + '...' : 'missing', rec.decoder_hash ? '' : 'audit-warn');
-    cycleRows += auditRow('Decoder Version', rec.decoder_version || '?');
+    cycleRows += auditRow('Decoder Version', auDec.version || '?');
   }
-  if (rec.proof_chunk_index !== undefined) {
-    cycleRows += auditRow('Proof Chunk', (rec.proof_chunk_index + 1) + ' of ' + (rec.proof_total_chunks || 7));
-    cycleRows += auditRow('Proof Day', rec.proof_day || '?');
-    cycleRows += auditRow('Proof Version', rec.proof_version || '?');
+  if (auProof && auProof.index !== undefined) {
+    cycleRows += auditRow('Proof Chunk', (auProof.index + 1) + ' of ' + (auProof.total || 7));
+    cycleRows += auditRow('Proof Day', auProof.day || '?');
+    cycleRows += auditRow('Proof Version', auProof.version || '?');
   }
   if (rec.chain_visibility) cycleRows += auditRow('Visibility', rec.chain_visibility, rec.chain_visibility === 'dark_matter' ? 'audit-warn' : '');
   if (cycleRows) html += auditSection('Cycle Position', cycleRows);
