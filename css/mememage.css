@@ -1617,25 +1617,36 @@
     position: relative;
     background: linear-gradient(180deg, #0d0d1a 0%, #1a1a35 50%, #0a0a18 100%);
     border: none;
+    /* Outer-only shadow lives on the container itself. The inset
+       chamfer cannot paint here because the canvas child fills the
+       container edge-to-edge and covers any inset shadow — it goes
+       on the ::after pseudo-element below, layered over the canvas. */
     box-shadow:
-      /* outer highlight at the lip — plate metal catching light just
-         above where it cuts down into the recess */
       0 -1px 0 rgba(255,255,255,0.18),
-      /* outer drop — recess casts a soft shadow on the plate below */
-      0 2px 5px rgba(0,0,0,0.55),
-      /* hard top edge shadow — inside top of recess, the lip's
-         underside falls fully into shadow */
+      0 2px 5px rgba(0,0,0,0.55);
+  }
+  /* Chamfer overlay — sits on top of the canvas so the bevel reads
+     against the band's painted content. pointer-events: none keeps
+     the canvas's interactive layers (cells, hover) usable through it. */
+  .sky-band-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow:
+      /* hard top edge shadow — lip's underside in shadow */
       inset 0 2px 0 rgba(0,0,0,0.85),
       inset 0 3px 1px rgba(0,0,0,0.6),
       /* graded falloff into the cavity */
       inset 0 8px 14px rgba(0,0,0,0.45),
-      /* hard bottom edge highlight — back wall of the recess catches
-         reflected light bouncing off the plate floor */
+      /* hard bottom edge highlight — back wall catches bounce light */
       inset 0 -2px 0 rgba(255,255,255,0.32),
       inset 0 -3px 1px rgba(255,255,255,0.18),
-      /* graded ambient bounce upward from the bottom */
+      /* graded ambient bounce upward */
       inset 0 -8px 12px rgba(255,255,255,0.05),
-      /* rarity rim — subtle hue along the bevel edges */
+      /* rarity rim along the bevel edges */
       inset 0 1px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, #000000),
       inset 0 -1px 0 color-mix(in srgb, var(--rarity-color, #909090) 50%, #404040);
   }
