@@ -1126,10 +1126,17 @@
     .panel-right-has-player:has(.plate-rarity-legendary) { --plate-rim-top: rgba(255,220,220,0.9);  --plate-rim-mid: rgba(200,60,60,0.4);   --plate-rim-bottom: rgba(130,30,30,0.6); }
   }
 
-  /* --- Silver Plate --- */
+  /* --- Silver Plate ---
+     The plate is also the scroll container on desktop (overflow-y: auto
+     applied below in the panel-right-has-player rules). Putting the
+     silver gradient directly on .plate's background means it covers the
+     full scroll height — an absolutely-positioned child like .plate-bg
+     is sized relative to the visible padding box, so it can't track the
+     scrolled-past area. The .plate-bg element below is now a no-op for
+     coverage but kept for the existing z-index/grain layering. */
   .plate {
     position: relative;
-    background: none;
+    background: linear-gradient(180deg, #b8b8bc 0%, #969698 20%, #808084 50%, #6e6e72 100%);
     border-radius: 16px;
     padding: 36px 28px 28px;
     border: none;
@@ -1137,15 +1144,10 @@
     clip-path: inset(0 round 16px);  /* clips like overflow:hidden but doesn't break position:sticky */
   }
   .plate-bg {
-    position: absolute;
-    inset: 0;
-    border-radius: 16px;
-    background: linear-gradient(180deg, #b8b8bc 0%, #969698 20%, #808084 50%, #6e6e72 100%);
-    z-index: 0;
-    /* min-height ensures coverage when content is shorter than the
-       scroll viewport (otherwise the abs box collapses to content
-       height and scrolling reveals the dark page behind). */
-    min-height: 100%;
+    /* Legacy element — kept so JS that appends it doesn't error. The
+       gradient lives on .plate now (above) so it covers the full scroll
+       height regardless of content. */
+    display: none;
   }
   /* Brushed metal grain — canvas with radial fade */
   .plate-grain {
