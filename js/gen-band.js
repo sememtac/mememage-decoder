@@ -159,6 +159,24 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
     });
   }
 
+  // Precompute per-pixel gaussian falloff for each breath zone. The zones
+  // are static (cx/cy/radius set once), so the spatial falloff is constant —
+  // only the per-frame intensity changes. Lifts ~67k Math.exp() calls per
+  // frame out of the inner pixel loop.
+  var breathFalloffs = [];
+  for (var bzInit = 0; bzInit < BREATH_ZONES.length; bzInit++) {
+    var bzI = BREATH_ZONES[bzInit];
+    var falloff = new Float32Array(VOR_W * VOR_H);
+    var inv = 1 / (bzI.radius * bzI.radius * 0.5);
+    for (var byInit = 0; byInit < VOR_H; byInit++) {
+      for (var bxInit = 0; bxInit < VOR_W; bxInit++) {
+        var bdxI = bxInit - bzI.cx, bdyI = byInit - bzI.cy;
+        falloff[byInit * VOR_W + bxInit] = Math.exp(-(bdxI * bdxI + bdyI * bdyI) * inv);
+      }
+    }
+    breathFalloffs.push(falloff);
+  }
+
   // --- Spontaneous firing: random edge flickers ---
   var spontFire = []; // per voronoi point: 0 = quiet, >0 = flicker brightness
   for (var sfi = 0; sfi < NUM_POINTS; sfi++) spontFire.push(0);
@@ -170,6 +188,10 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
   var vorMxSmooth = -1, vorMySmooth = -1;
   var REPULSE_RADIUS = 22;
   var SMOOTH_FACTOR = 0.08;
+
+  // Reusable per-frame warp lookup arrays (prevents GC churn).
+  var warpRowDx = new Float32Array(VOR_H);
+  var warpColDy = new Float32Array(VOR_W);
 
   function renderVoronoi() {
     // Move points
@@ -333,10 +355,22 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 
     var imgData = vorCtx.createImageData(VOR_W, VOR_H);
     var px = imgData.data;
+
+    // Warp offset depends only on (vy, warpPhase) for wx and (vx, warpPhase)
+    // for wy — precompute once per frame instead of VOR_W*VOR_H times.
+    for (var wpy = 0; wpy < VOR_H; wpy++) {
+      warpRowDx[wpy] = Math.sin(wpy * warpFreq + warpPhase) * warpAmp;
+    }
+    var _warpPhase13 = warpPhase * 1.3;
+    for (var wpx = 0; wpx < VOR_W; wpx++) {
+      warpColDy[wpx] = Math.sin(wpx * warpFreq + _warpPhase13) * warpAmp;
+    }
+
     for (var vy = 0; vy < VOR_H; vy++) {
+      var _rowDx = warpRowDx[vy];
       for (var vx = 0; vx < VOR_W; vx++) {
-        var wx = vx + Math.sin(vy * warpFreq + warpPhase) * warpAmp;
-        var wy = vy + Math.sin(vx * warpFreq + warpPhase * 1.3) * warpAmp;
+        var wx = vx + _rowDx;
+        var wy = vy + warpColDy[vx];
         var d1 = 99999, d2 = 99999, nearest = 0;
         for (var vp = 0; vp < totalPoints; vp++) {
           var dx = wx - adjX[vp], dy = wy - adjY[vp];
@@ -369,14 +403,13 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 
         var brightness = cellBright * (1 - blend) + edgeBright * blend;
 
-        // Regional breathing — overlapping gaussian zones pulse slowly
+        // Regional breathing — overlapping gaussian zones pulse slowly.
+        // Spatial falloff precomputed at init; only the per-frame intensity
+        // (breathVals) changes.
         var breathBoost = 0;
+        var _pxIdx = vy * VOR_W + vx;
         for (var bzi = 0; bzi < BREATH_ZONES.length; bzi++) {
-          var bz = BREATH_ZONES[bzi];
-          var bdx = vx - bz.cx, bdy = vy - bz.cy;
-          var bDistSq = bdx * bdx + bdy * bdy;
-          var bFall = Math.exp(-bDistSq / (bz.radius * bz.radius * 0.5));
-          breathBoost += breathVals[bzi] * bFall;
+          breathBoost += breathVals[bzi] * breathFalloffs[bzi][_pxIdx];
         }
 
         // Spontaneous edge flicker — nearest base point's fire state boosts edges
@@ -387,7 +420,7 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 
         brightness += breathBoost + spontBoost;
 
-        var idx = (vy * VOR_W + vx) * 4;
+        var idx = _pxIdx * 4;
         px[idx] = Math.floor(bgR + tc[0] * brightness * vorBrightMult);
         px[idx + 1] = Math.floor(bgG + tc[1] * brightness * vorBrightMult);
         px[idx + 2] = Math.floor(bgB + tc[2] * brightness * vorBrightMult);

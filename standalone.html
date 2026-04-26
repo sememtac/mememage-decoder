@@ -4076,6 +4076,24 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
     });
   }
 
+  // Precompute per-pixel gaussian falloff for each breath zone. The zones
+  // are static (cx/cy/radius set once), so the spatial falloff is constant —
+  // only the per-frame intensity changes. Lifts ~67k Math.exp() calls per
+  // frame out of the inner pixel loop.
+  var breathFalloffs = [];
+  for (var bzInit = 0; bzInit < BREATH_ZONES.length; bzInit++) {
+    var bzI = BREATH_ZONES[bzInit];
+    var falloff = new Float32Array(VOR_W * VOR_H);
+    var inv = 1 / (bzI.radius * bzI.radius * 0.5);
+    for (var byInit = 0; byInit < VOR_H; byInit++) {
+      for (var bxInit = 0; bxInit < VOR_W; bxInit++) {
+        var bdxI = bxInit - bzI.cx, bdyI = byInit - bzI.cy;
+        falloff[byInit * VOR_W + bxInit] = Math.exp(-(bdxI * bdxI + bdyI * bdyI) * inv);
+      }
+    }
+    breathFalloffs.push(falloff);
+  }
+
   // --- Spontaneous firing: random edge flickers ---
   var spontFire = []; // per voronoi point: 0 = quiet, >0 = flicker brightness
   for (var sfi = 0; sfi < NUM_POINTS; sfi++) spontFire.push(0);
@@ -4087,6 +4105,10 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
   var vorMxSmooth = -1, vorMySmooth = -1;
   var REPULSE_RADIUS = 22;
   var SMOOTH_FACTOR = 0.08;
+
+  // Reusable per-frame warp lookup arrays (prevents GC churn).
+  var warpRowDx = new Float32Array(VOR_H);
+  var warpColDy = new Float32Array(VOR_W);
 
   function renderVoronoi() {
     // Move points
@@ -4250,10 +4272,22 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 
     var imgData = vorCtx.createImageData(VOR_W, VOR_H);
     var px = imgData.data;
+
+    // Warp offset depends only on (vy, warpPhase) for wx and (vx, warpPhase)
+    // for wy — precompute once per frame instead of VOR_W*VOR_H times.
+    for (var wpy = 0; wpy < VOR_H; wpy++) {
+      warpRowDx[wpy] = Math.sin(wpy * warpFreq + warpPhase) * warpAmp;
+    }
+    var _warpPhase13 = warpPhase * 1.3;
+    for (var wpx = 0; wpx < VOR_W; wpx++) {
+      warpColDy[wpx] = Math.sin(wpx * warpFreq + _warpPhase13) * warpAmp;
+    }
+
     for (var vy = 0; vy < VOR_H; vy++) {
+      var _rowDx = warpRowDx[vy];
       for (var vx = 0; vx < VOR_W; vx++) {
-        var wx = vx + Math.sin(vy * warpFreq + warpPhase) * warpAmp;
-        var wy = vy + Math.sin(vx * warpFreq + warpPhase * 1.3) * warpAmp;
+        var wx = vx + _rowDx;
+        var wy = vy + warpColDy[vx];
         var d1 = 99999, d2 = 99999, nearest = 0;
         for (var vp = 0; vp < totalPoints; vp++) {
           var dx = wx - adjX[vp], dy = wy - adjY[vp];
@@ -4286,14 +4320,13 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 
         var brightness = cellBright * (1 - blend) + edgeBright * blend;
 
-        // Regional breathing — overlapping gaussian zones pulse slowly
+        // Regional breathing — overlapping gaussian zones pulse slowly.
+        // Spatial falloff precomputed at init; only the per-frame intensity
+        // (breathVals) changes.
         var breathBoost = 0;
+        var _pxIdx = vy * VOR_W + vx;
         for (var bzi = 0; bzi < BREATH_ZONES.length; bzi++) {
-          var bz = BREATH_ZONES[bzi];
-          var bdx = vx - bz.cx, bdy = vy - bz.cy;
-          var bDistSq = bdx * bdx + bdy * bdy;
-          var bFall = Math.exp(-bDistSq / (bz.radius * bz.radius * 0.5));
-          breathBoost += breathVals[bzi] * bFall;
+          breathBoost += breathVals[bzi] * breathFalloffs[bzi][_pxIdx];
         }
 
         // Spontaneous edge flicker — nearest base point's fire state boosts edges
@@ -4304,7 +4337,7 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 
         brightness += breathBoost + spontBoost;
 
-        var idx = (vy * VOR_W + vx) * 4;
+        var idx = _pxIdx * 4;
         px[idx] = Math.floor(bgR + tc[0] * brightness * vorBrightMult);
         px[idx + 1] = Math.floor(bgG + tc[1] * brightness * vorBrightMult);
         px[idx + 2] = Math.floor(bgB + tc[2] * brightness * vorBrightMult);
@@ -4552,6 +4585,40 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
     if (allTraitsList.length) bcH += 12;
     if (haloData) bcH += 12;
     bottomCell = { x: PAD, y: bcY, w: W - PAD * 2, h: bcH, hover: 0 };
+  }
+
+  // Precompute font fits for static text (FP, traits, halo, entropy hex).
+  // These strings are fixed at init, so the shrink-to-fit measureText
+  // loops don't need to run every frame. Cached font strings are looked
+  // up in the tick instead.
+  function _fitFont(text, weight, maxW, maxPx, minPx) {
+    var size = maxPx;
+    ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
+    while (ctx.measureText(text).width > maxW && size > minPx) {
+      size -= 0.5;
+      ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
+    }
+    return weight + ' ' + size + 'px "JetBrains Mono", monospace';
+  }
+  var _fpText = fingerprint ? 'FP: ' + fingerprint : '';
+  var _traitText = allTraitsList.length ? allTraitsList.join(' \u00b7 ') : '';
+  var _haloText = haloData ? '\u2728 Halo \u2014 0xAD4E found in entropy' : '';
+  var _fpFont = '', _traitFont = '', _haloFont = '';
+  if (bottomCell) {
+    var _bottomMaxW = bottomCell.w - 16;
+    if (fingerprint) _fpFont = _fitFont(_fpText, '300', _bottomMaxW, 7, 5);
+    if (allTraitsList.length) _traitFont = _fitFont(_traitText, '400', _bottomMaxW, 8, 5);
+    if (haloData) _haloFont = _fitFont(_haloText, 'italic 400', _bottomMaxW, 8, 5);
+  }
+  var _entropyLine1 = '', _entropyLine2 = '', _entropyFont = '';
+  if (entropyCell && entropyHex) {
+    var _eClean = entropyHex.replace(/\s/g, '');
+    var _eHalf = Math.ceil(_eClean.length / 2);
+    _entropyLine1 = _eClean.slice(0, _eHalf).split('').join(' ');
+    _entropyLine2 = _eClean.slice(_eHalf).split('').join(' ');
+    var _eAvailW = entropyCell.w - 24;
+    var _eTestLine = _entropyLine1.length > _entropyLine2.length ? _entropyLine1 : _entropyLine2;
+    _entropyFont = _fitFont(_eTestLine, '300', _eAvailW, 8, 4);
   }
 
   // Mouse + touch. Cursor position drives the drip system below.
@@ -4848,24 +4915,11 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
       ctx.fillStyle = 'rgba(255,255,255,' + (0.45 + eh * 0.35) + ')';
       ctx.fillText('KERNEL ENTROPY', ec.x + ec.w / 2, ec.y + 12);
 
-      var eClean = entropyHex.replace(/\s/g, '');
-      // Space characters evenly across the cell width
-      var entropyPad = 12;
-      var availW = ec.w - entropyPad * 2;
-      var half = Math.ceil(eClean.length / 2);
-      var line1 = eClean.slice(0, half).split('').join(' ');
-      var line2 = eClean.slice(half).split('').join(' ');
-      // Size font to fit the wider line
-      var testLine = line1.length > line2.length ? line1 : line2;
-      var fontSize = 8;
-      ctx.font = '300 ' + fontSize + 'px "JetBrains Mono", monospace';
-      while (ctx.measureText(testLine).width > availW && fontSize > 4) {
-        fontSize -= 0.5;
-        ctx.font = '300 ' + fontSize + 'px "JetBrains Mono", monospace';
-      }
+      // Entropy hex layout + font precomputed at init (static input).
+      ctx.font = _entropyFont;
       ctx.fillStyle = 'rgba(255,255,255,' + (0.35 + eh * 0.3) + ')';
-      ctx.fillText(line1, ec.x + ec.w / 2, ec.y + 26);
-      ctx.fillText(line2, ec.x + ec.w / 2, ec.y + 38);
+      ctx.fillText(_entropyLine1, ec.x + ec.w / 2, ec.y + 26);
+      ctx.fillText(_entropyLine2, ec.x + ec.w / 2, ec.y + 38);
     }
 
     // Identity + traits cell
@@ -4880,37 +4934,23 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
       var totalTextH = lineCount * lineH;
       var btY = bottomCell.y + (bottomCell.h - totalTextH) / 2 + lineH - 2;
 
-      // Auto-shrink helper: drop font-size until text fits the cell's
-      // inner width. Used by the bottom-cell lines (FP, trait list,
-      // halo caption) so they don't bleed past the canvas edge when
-      // the canvas is narrow (mobile).
-      var _maxW = bottomCell.w - 16;
-      function _fit(text, weight, maxPx, minPx) {
-        var size = maxPx;
-        ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
-        while (ctx.measureText(text).width > _maxW && size > minPx) {
-          size -= 0.5;
-          ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
-        }
-      }
+      // FP, trait list, halo caption — fonts precomputed at init.
       if (fingerprint) {
-        _fit('FP: ' + fingerprint, '300', 7, 5);
+        ctx.font = _fpFont;
         ctx.fillStyle = 'rgba(255,255,255,' + (0.25 + bh * 0.3) + ')';
-        ctx.fillText('FP: ' + fingerprint, W / 2, btY);
+        ctx.fillText(_fpText, W / 2, btY);
         btY += lineH;
       }
       if (allTraitsList.length) {
-        var traitLine = allTraitsList.join(' \u00b7 ');
-        _fit(traitLine, '400', 8, 5);
+        ctx.font = _traitFont;
         ctx.fillStyle = 'rgba(255,255,255,' + (0.45 + bh * 0.35) + ')';
-        ctx.fillText(traitLine, W / 2, btY);
+        ctx.fillText(_traitText, W / 2, btY);
         btY += lineH;
       }
       if (haloData) {
-        var haloText = '\u2728 Halo \u2014 0xAD4E found in entropy';
-        _fit(haloText, 'italic 400', 8, 5);
+        ctx.font = _haloFont;
         ctx.fillStyle = 'rgba(160, 140, 240,' + (0.6 + bh * 0.15) + ')';
-        ctx.fillText(haloText, W / 2, btY);
+        ctx.fillText(_haloText, W / 2, btY);
       }
     }
 

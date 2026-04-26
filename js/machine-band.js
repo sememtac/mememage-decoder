@@ -84,6 +84,40 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
     bottomCell = { x: PAD, y: bcY, w: W - PAD * 2, h: bcH, hover: 0 };
   }
 
+  // Precompute font fits for static text (FP, traits, halo, entropy hex).
+  // These strings are fixed at init, so the shrink-to-fit measureText
+  // loops don't need to run every frame. Cached font strings are looked
+  // up in the tick instead.
+  function _fitFont(text, weight, maxW, maxPx, minPx) {
+    var size = maxPx;
+    ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
+    while (ctx.measureText(text).width > maxW && size > minPx) {
+      size -= 0.5;
+      ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
+    }
+    return weight + ' ' + size + 'px "JetBrains Mono", monospace';
+  }
+  var _fpText = fingerprint ? 'FP: ' + fingerprint : '';
+  var _traitText = allTraitsList.length ? allTraitsList.join(' \u00b7 ') : '';
+  var _haloText = haloData ? '\u2728 Halo \u2014 0xAD4E found in entropy' : '';
+  var _fpFont = '', _traitFont = '', _haloFont = '';
+  if (bottomCell) {
+    var _bottomMaxW = bottomCell.w - 16;
+    if (fingerprint) _fpFont = _fitFont(_fpText, '300', _bottomMaxW, 7, 5);
+    if (allTraitsList.length) _traitFont = _fitFont(_traitText, '400', _bottomMaxW, 8, 5);
+    if (haloData) _haloFont = _fitFont(_haloText, 'italic 400', _bottomMaxW, 8, 5);
+  }
+  var _entropyLine1 = '', _entropyLine2 = '', _entropyFont = '';
+  if (entropyCell && entropyHex) {
+    var _eClean = entropyHex.replace(/\s/g, '');
+    var _eHalf = Math.ceil(_eClean.length / 2);
+    _entropyLine1 = _eClean.slice(0, _eHalf).split('').join(' ');
+    _entropyLine2 = _eClean.slice(_eHalf).split('').join(' ');
+    var _eAvailW = entropyCell.w - 24;
+    var _eTestLine = _entropyLine1.length > _entropyLine2.length ? _entropyLine1 : _entropyLine2;
+    _entropyFont = _fitFont(_eTestLine, '300', _eAvailW, 8, 4);
+  }
+
   // Mouse + touch. Cursor position drives the drip system below.
   var mx = -1, my = -1, cursorActive = false;
   function setCursor(cx, cy) {
@@ -378,24 +412,11 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
       ctx.fillStyle = 'rgba(255,255,255,' + (0.45 + eh * 0.35) + ')';
       ctx.fillText('KERNEL ENTROPY', ec.x + ec.w / 2, ec.y + 12);
 
-      var eClean = entropyHex.replace(/\s/g, '');
-      // Space characters evenly across the cell width
-      var entropyPad = 12;
-      var availW = ec.w - entropyPad * 2;
-      var half = Math.ceil(eClean.length / 2);
-      var line1 = eClean.slice(0, half).split('').join(' ');
-      var line2 = eClean.slice(half).split('').join(' ');
-      // Size font to fit the wider line
-      var testLine = line1.length > line2.length ? line1 : line2;
-      var fontSize = 8;
-      ctx.font = '300 ' + fontSize + 'px "JetBrains Mono", monospace';
-      while (ctx.measureText(testLine).width > availW && fontSize > 4) {
-        fontSize -= 0.5;
-        ctx.font = '300 ' + fontSize + 'px "JetBrains Mono", monospace';
-      }
+      // Entropy hex layout + font precomputed at init (static input).
+      ctx.font = _entropyFont;
       ctx.fillStyle = 'rgba(255,255,255,' + (0.35 + eh * 0.3) + ')';
-      ctx.fillText(line1, ec.x + ec.w / 2, ec.y + 26);
-      ctx.fillText(line2, ec.x + ec.w / 2, ec.y + 38);
+      ctx.fillText(_entropyLine1, ec.x + ec.w / 2, ec.y + 26);
+      ctx.fillText(_entropyLine2, ec.x + ec.w / 2, ec.y + 38);
     }
 
     // Identity + traits cell
@@ -410,37 +431,23 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
       var totalTextH = lineCount * lineH;
       var btY = bottomCell.y + (bottomCell.h - totalTextH) / 2 + lineH - 2;
 
-      // Auto-shrink helper: drop font-size until text fits the cell's
-      // inner width. Used by the bottom-cell lines (FP, trait list,
-      // halo caption) so they don't bleed past the canvas edge when
-      // the canvas is narrow (mobile).
-      var _maxW = bottomCell.w - 16;
-      function _fit(text, weight, maxPx, minPx) {
-        var size = maxPx;
-        ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
-        while (ctx.measureText(text).width > _maxW && size > minPx) {
-          size -= 0.5;
-          ctx.font = weight + ' ' + size + 'px "JetBrains Mono", monospace';
-        }
-      }
+      // FP, trait list, halo caption — fonts precomputed at init.
       if (fingerprint) {
-        _fit('FP: ' + fingerprint, '300', 7, 5);
+        ctx.font = _fpFont;
         ctx.fillStyle = 'rgba(255,255,255,' + (0.25 + bh * 0.3) + ')';
-        ctx.fillText('FP: ' + fingerprint, W / 2, btY);
+        ctx.fillText(_fpText, W / 2, btY);
         btY += lineH;
       }
       if (allTraitsList.length) {
-        var traitLine = allTraitsList.join(' \u00b7 ');
-        _fit(traitLine, '400', 8, 5);
+        ctx.font = _traitFont;
         ctx.fillStyle = 'rgba(255,255,255,' + (0.45 + bh * 0.35) + ')';
-        ctx.fillText(traitLine, W / 2, btY);
+        ctx.fillText(_traitText, W / 2, btY);
         btY += lineH;
       }
       if (haloData) {
-        var haloText = '\u2728 Halo \u2014 0xAD4E found in entropy';
-        _fit(haloText, 'italic 400', 8, 5);
+        ctx.font = _haloFont;
         ctx.fillStyle = 'rgba(160, 140, 240,' + (0.6 + bh * 0.15) + ')';
-        ctx.fillText(haloText, W / 2, btY);
+        ctx.fillText(_haloText, W / 2, btY);
       }
     }
 
