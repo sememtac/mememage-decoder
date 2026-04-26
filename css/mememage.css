@@ -1662,11 +1662,18 @@
   }
 
   /* --- GPS Time-Lock --- */
+  /* GPS section interior tints follow rarity. cert-renderer sets
+     --rarity-color on the .plate; descendants here derive their tint
+     via color-mix(). Common (#606060) reads as grey; Uncommon as
+     green; Rare as blue; Very Rare as purple; Epic as amber;
+     Legendary as red. Each property has a static fallback before the
+     color-mix line so legacy browsers (no color-mix support) still
+     get a sensible grey/silver default. */
   .gps-container {
     border-radius: 12px;
     overflow: hidden;
     position: relative;
-    background: linear-gradient(180deg, #12121e 0%, #1a1a2a 50%, #0e0e18 100%);
+    background: linear-gradient(180deg, #141414 0%, #1c1c1c 50%, #101010 100%);
     border: 1px solid rgba(0,0,0,0.2);
     padding: 16px 14px;
     margin: 8px 0;
@@ -1674,21 +1681,25 @@
   .gps-cipher {
     font-size: 7px;
     font-weight: 300;
-    color: #8898b8;
+    color: #a0a0a0;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 55%, #d8d8d8);
     text-align: center;
     word-break: break-all;
     line-height: 1.6;
     user-select: all;
     cursor: pointer;
     padding: 8px 10px;
-    background: rgba(100,120,180,0.06);
-    border: 1px solid rgba(100,120,180,0.12);
+    background: rgba(180,180,180,0.06);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 8%, transparent);
+    border: 1px solid rgba(180,180,180,0.12);
+    border: 1px solid color-mix(in srgb, var(--rarity-color, #909090) 18%, transparent);
     border-radius: 6px;
     transition: border-color 0.3s ease;
   }
   .gps-mod-label {
     font-size: 7px;
-    color: #606878;
+    color: #707070;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 50%, #888888);
     text-align: center;
     margin-top: 10px;
     margin-bottom: 4px;
@@ -1698,13 +1709,16 @@
   .gps-modulus {
     font-size: 6px;
     font-weight: 300;
-    color: #606878;
+    color: #707070;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 50%, #888888);
     text-align: center;
     word-break: break-all;
     line-height: 1.6;
     padding: 6px 10px;
-    background: rgba(100,120,180,0.04);
-    border: 1px solid rgba(100,120,180,0.08);
+    background: rgba(180,180,180,0.04);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 5%, transparent);
+    border: 1px solid rgba(180,180,180,0.08);
+    border: 1px solid color-mix(in srgb, var(--rarity-color, #909090) 12%, transparent);
     border-radius: 6px;
     max-height: 40px;
     overflow: hidden;
@@ -1717,7 +1731,8 @@
   }
   .gps-footnote {
     font-size: 7px;
-    color: #606878;
+    color: #707070;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 50%, #888888);
     text-align: center;
     margin-top: 10px;
     line-height: 1.6;
@@ -1727,7 +1742,8 @@
   .gps-unlock {
     margin-top: 14px;
     padding-top: 10px;
-    border-top: 1px dashed rgba(100,120,180,0.12);
+    border-top: 1px dashed rgba(180,180,180,0.12);
+    border-top: 1px dashed color-mix(in srgb, var(--rarity-color, #909090) 18%, transparent);
   }
   .gps-unlock .gps-mod-label { margin-top: 0; margin-bottom: 6px; }
   .gps-unlock-row {
@@ -1741,15 +1757,21 @@
     font-family: inherit;
     font-size: 16px;  /* prevents iOS auto-zoom on focus */
     padding: 6px 10px;
-    background: rgba(100,120,180,0.06);
-    color: #b8c4d8;
-    border: 1px solid rgba(100,120,180,0.18);
+    background: rgba(180,180,180,0.06);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 8%, transparent);
+    color: #c8c8c8;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 35%, #e0e0e0);
+    border: 1px solid rgba(180,180,180,0.18);
+    border: 1px solid color-mix(in srgb, var(--rarity-color, #909090) 25%, transparent);
     border-radius: 5px;
     outline: none;
     transition: border-color 0.2s ease;
   }
-  .gps-pw:focus { border-color: rgba(140,160,210,0.5); }
-  .gps-pw::placeholder { color: rgba(100,120,160,0.4); }
+  .gps-pw:focus {
+    border-color: rgba(210,210,210,0.5);
+    border-color: color-mix(in srgb, var(--rarity-color, #909090) 60%, transparent);
+  }
+  .gps-pw::placeholder { color: rgba(160,160,160,0.4); }
   .gps-unlock-btn {
     padding: 6px 14px;
     font-family: inherit;
@@ -1757,36 +1779,49 @@
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #8898b8;
-    background: rgba(100,120,180,0.1);
-    border: 1px solid rgba(100,120,180,0.25);
+    color: #a0a0a0;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 55%, #d8d8d8);
+    background: rgba(180,180,180,0.1);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 12%, transparent);
+    border: 1px solid rgba(180,180,180,0.25);
+    border: 1px solid color-mix(in srgb, var(--rarity-color, #909090) 30%, transparent);
     border-radius: 5px;
     cursor: pointer;
     transition: all 0.2s ease;
   }
   .gps-unlock-btn:hover:not(:disabled) {
-    background: rgba(100,120,180,0.18);
-    border-color: rgba(140,160,210,0.45);
-    color: #c8d4e8;
+    background: rgba(180,180,180,0.18);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 22%, transparent);
+    border-color: rgba(210,210,210,0.45);
+    border-color: color-mix(in srgb, var(--rarity-color, #909090) 50%, transparent);
+    color: #d0d0d0;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 30%, #f0f0f0);
   }
   .gps-unlock-btn:disabled { opacity: 0.5; cursor: default; }
   .gps-unlock-result { margin-top: 8px; text-align: center; min-height: 1em; }
   .gps-unlock-err { color: #e66b6b; font-size: 8px; letter-spacing: 0.04em; }
-  .gps-unlock-pending { color: #8898b8; font-size: 8px; font-style: italic; }
+  .gps-unlock-pending {
+    color: #a0a0a0;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 50%, #d0d0d0);
+    font-size: 8px; font-style: italic;
+  }
   .gps-unlock-coords {
     display: flex;
     justify-content: center;
     gap: 16px;
     font-size: 9px;
-    color: #c8d4e8;
+    color: #d0d0d0;
     padding: 6px 10px;
+    /* Successful unlock — green tint stays as the universal "yes"
+       signal regardless of rarity. */
     background: rgba(100,160,120,0.08);
     border: 1px solid rgba(100,160,120,0.2);
     border-radius: 5px;
   }
   .gps-unlock-k {
     font-size: 7px;
-    color: #7a8898;
+    color: #888888;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 45%, #a0a0a0);
     text-transform: uppercase;
     letter-spacing: 0.15em;
     margin-right: 4px;

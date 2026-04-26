@@ -1974,6 +1974,10 @@ function renderCert(meta, options) {
   // ===================================================================
   var plate = document.createElement('div');
   plate.className = 'plate plate-age-' + ageTier + ' plate-rarity-' + rarityTier;
+  // Expose the rarity color as a CSS variable so descendants (GPS
+  // section, etc.) can derive their own tints via color-mix() instead
+  // of hardcoding a single hue per element.
+  plate.style.setProperty('--rarity-color', tierColor);
 
   var plateBg = _div('plate-bg');
   plate.appendChild(plateBg);
