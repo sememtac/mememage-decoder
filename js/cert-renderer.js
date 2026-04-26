@@ -312,7 +312,11 @@ function renderCert(meta, options) {
   // produces a different celestial snapshot, so every constellation is unique.
   // Fallback chain: constellation_hash → constellation_name → content_hash (legacy)
   var conSeed = meta.constellation_hash || meta.constellation_name || meta.content_hash || meta._content_hash || '';
-  var myChunkIdx = (meta.decoder_chunk_index !== undefined) ? meta.decoder_chunk_index : -1;
+  // Read decoder chunk index from new nested shape, fall back to flat
+  // (legacy records pre-chunks-spec migration).
+  var _dec = (meta.chunks && meta.chunks.decoder) || null;
+  var myChunkIdx = _dec && _dec.index !== undefined ? _dec.index
+                 : (meta.decoder_chunk_index !== undefined ? meta.decoder_chunk_index : -1);
   var isHeartStar = meta.heart_star_id && meta.heart_star_id === meta._identifier;
   if (isHeartStar) myChunkIdx = 0;
 

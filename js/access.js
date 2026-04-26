@@ -74,8 +74,34 @@ var Access = (function() {
     return { ok: true, lat: parts[0] || '', lon: parts[1] || '' };
   }
 
+  // Convenience wrapper for the encrypted_soul envelope. The plaintext
+  // is canonical-JSON of all PROTECTED_FIELDS as one dict.
+  async function decryptSoul(envelope, password) {
+    var res = await decryptEnvelope(envelope, password);
+    if (!res.ok) return res;
+    try {
+      return { ok: true, soul: JSON.parse(res.plaintext) };
+    } catch (e) {
+      return { ok: false, error: 'Soul JSON parse failed' };
+    }
+  }
+
+  // Convenience wrapper for the encrypted_chunks envelope. The plaintext
+  // is canonical-JSON of the chunks namespace dict (decoder, truth, ...).
+  async function decryptChunks(envelope, password) {
+    var res = await decryptEnvelope(envelope, password);
+    if (!res.ok) return res;
+    try {
+      return { ok: true, chunks: JSON.parse(res.plaintext) };
+    } catch (e) {
+      return { ok: false, error: 'Chunks JSON parse failed' };
+    }
+  }
+
   return {
     decryptEnvelope: decryptEnvelope,
-    decryptGps: decryptGps
+    decryptGps: decryptGps,
+    decryptSoul: decryptSoul,
+    decryptChunks: decryptChunks
   };
 })();

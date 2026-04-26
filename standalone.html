@@ -1672,9 +1672,35 @@ var Access = (function() {
     return { ok: true, lat: parts[0] || '', lon: parts[1] || '' };
   }
 
+  // Convenience wrapper for the encrypted_soul envelope. The plaintext
+  // is canonical-JSON of all PROTECTED_FIELDS as one dict.
+  async function decryptSoul(envelope, password) {
+    var res = await decryptEnvelope(envelope, password);
+    if (!res.ok) return res;
+    try {
+      return { ok: true, soul: JSON.parse(res.plaintext) };
+    } catch (e) {
+      return { ok: false, error: 'Soul JSON parse failed' };
+    }
+  }
+
+  // Convenience wrapper for the encrypted_chunks envelope. The plaintext
+  // is canonical-JSON of the chunks namespace dict (decoder, truth, ...).
+  async function decryptChunks(envelope, password) {
+    var res = await decryptEnvelope(envelope, password);
+    if (!res.ok) return res;
+    try {
+      return { ok: true, chunks: JSON.parse(res.plaintext) };
+    } catch (e) {
+      return { ok: false, error: 'Chunks JSON parse failed' };
+    }
+  }
+
   return {
     decryptEnvelope: decryptEnvelope,
-    decryptGps: decryptGps
+    decryptGps: decryptGps,
+    decryptSoul: decryptSoul,
+    decryptChunks: decryptChunks
   };
 })();
 
@@ -1994,7 +2020,11 @@ function renderCert(meta, options) {
   // produces a different celestial snapshot, so every constellation is unique.
   // Fallback chain: constellation_hash → constellation_name → content_hash (legacy)
   var conSeed = meta.constellation_hash || meta.constellation_name || meta.content_hash || meta._content_hash || '';
-  var myChunkIdx = (meta.decoder_chunk_index !== undefined) ? meta.decoder_chunk_index : -1;
+  // Read decoder chunk index from new nested shape, fall back to flat
+  // (legacy records pre-chunks-spec migration).
+  var _dec = (meta.chunks && meta.chunks.decoder) || null;
+  var myChunkIdx = _dec && _dec.index !== undefined ? _dec.index
+                 : (meta.decoder_chunk_index !== undefined ? meta.decoder_chunk_index : -1);
   var isHeartStar = meta.heart_star_id && meta.heart_star_id === meta._identifier;
   if (isHeartStar) myChunkIdx = 0;
 
@@ -7296,6 +7326,38 @@ function escapeHtml(s) {
   var d = document.createElement('div');
   d.textContent = s == null ? '' : s;
   return d.innerHTML;
+}
+
+// =====================================================================
+// getChunk(record, type) — read a chunk by type, handling both shapes.
+// New nested: record.chunks[type] = { index, total, hash, data, ... }
+// Legacy flat: record.{type}_chunk + record.{type}_chunk_index + ...
+//
+// Returns the normalized nested shape, or null if absent.
+// Drop the legacy fallback after the constellation re-mint completes.
+// =====================================================================
+function getChunk(record, type) {
+  if (!record) return null;
+  if (record.chunks && record.chunks[type]) return record.chunks[type];
+
+  // Legacy fallback — reconstruct nested shape from flat keys.
+  var dataKey = type + '_chunk';
+  if (!(dataKey in record)) return null;
+  var out = { data: record[dataKey] };
+  if ((type + '_chunk_index')   in record) out.index   = record[type + '_chunk_index'];
+  if ((type + '_total_chunks')  in record) out.total   = record[type + '_total_chunks'];
+  if ((type + '_chunk_hash')    in record) out.hash    = record[type + '_chunk_hash'];
+  if ((type + '_version')       in record) out.version = record[type + '_version'];
+  if (type === 'decoder') {
+    if ('decoder_age'        in record) out.age        = record.decoder_age;
+    if ('decoder_age_name'   in record) out.age_name   = record.decoder_age_name;
+    if ('decoder_reassembly' in record) out.reassembly = record.decoder_reassembly;
+  }
+  if (type === 'schematic') {
+    if ('schematic_index' in record) out.index = record.schematic_index;
+    if ('schematic_total' in record) out.total = record.schematic_total;
+  }
+  return out;
 }
 
 // =====================================================================

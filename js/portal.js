@@ -1028,6 +1028,38 @@ function escapeHtml(s) {
 }
 
 // =====================================================================
+// getChunk(record, type) — read a chunk by type, handling both shapes.
+// New nested: record.chunks[type] = { index, total, hash, data, ... }
+// Legacy flat: record.{type}_chunk + record.{type}_chunk_index + ...
+//
+// Returns the normalized nested shape, or null if absent.
+// Drop the legacy fallback after the constellation re-mint completes.
+// =====================================================================
+function getChunk(record, type) {
+  if (!record) return null;
+  if (record.chunks && record.chunks[type]) return record.chunks[type];
+
+  // Legacy fallback — reconstruct nested shape from flat keys.
+  var dataKey = type + '_chunk';
+  if (!(dataKey in record)) return null;
+  var out = { data: record[dataKey] };
+  if ((type + '_chunk_index')   in record) out.index   = record[type + '_chunk_index'];
+  if ((type + '_total_chunks')  in record) out.total   = record[type + '_total_chunks'];
+  if ((type + '_chunk_hash')    in record) out.hash    = record[type + '_chunk_hash'];
+  if ((type + '_version')       in record) out.version = record[type + '_version'];
+  if (type === 'decoder') {
+    if ('decoder_age'        in record) out.age        = record.decoder_age;
+    if ('decoder_age_name'   in record) out.age_name   = record.decoder_age_name;
+    if ('decoder_reassembly' in record) out.reassembly = record.decoder_reassembly;
+  }
+  if (type === 'schematic') {
+    if ('schematic_index' in record) out.index = record.schematic_index;
+    if ('schematic_total' in record) out.total = record.schematic_total;
+  }
+  return out;
+}
+
+// =====================================================================
 // dismissPanel — shared dismiss-then-collapse helper for the
 // decoder/validator portal departure flow. Both pages need to:
 //   1. If panel isn't visible, just call done() and return

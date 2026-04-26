@@ -420,7 +420,14 @@ async function analyzeMeta(files){
   // the transient "Analyzing..." note from the error slot.
   if (metaErr) { metaErr.textContent = ''; metaErr.style.color = ''; }
   showResultsSidebar();
-  valid.sort(function(a,b){var aa=a.decoder_age||a.decoder_age_name||'';var ba=b.decoder_age||b.decoder_age_name||'';if(aa!==ba)return aa<ba?-1:1;var ai=a.truth_chunk_index!=null?a.truth_chunk_index:0;var bi=b.truth_chunk_index!=null?b.truth_chunk_index:0;return ai-bi;});
+  valid.sort(function(a,b){
+    var ad=getChunk(a,'decoder')||{}, bd=getChunk(b,'decoder')||{};
+    var aa=ad.age||ad.age_name||'', ba=bd.age||bd.age_name||'';
+    if(aa!==ba)return aa<ba?-1:1;
+    var at=getChunk(a,'truth')||{}, bt=getChunk(b,'truth')||{};
+    var ai=at.index!=null?at.index:0, bi=bt.index!=null?bt.index:0;
+    return ai-bi;
+  });
 
   // Compute hashes for all valid records
   for(var vi=0;vi<valid.length;vi++){
@@ -430,32 +437,47 @@ async function analyzeMeta(files){
     r._match=stored&&r._computed&&stored===r._computed;
   }
 
-  // Accumulate chunks from these records
+  // Accumulate chunks from these records (handles both nested + flat shapes)
   for(var ci=0;ci<valid.length;ci++){
     var cr=valid[ci];
-    if(cr.decoder_chunk_index!==undefined&&cr.decoder_chunk){
-      var di=cr.decoder_chunk_index;
-      collected.decoder[di]={data:cr.decoder_chunk,hash:cr.decoder_chunk_hash||null,verified:null};
+    var d_=getChunk(cr,'decoder');
+    if(d_ && d_.index!==undefined && d_.data){
+      collected.decoder[d_.index]={data:d_.data,hash:d_.hash||null,verified:null};
     }
-    if(cr.proof_chunk_index!==undefined&&cr.proof_chunk){
-      var pi2=cr.proof_chunk_index;
-      collected.proof[pi2]={data:cr.proof_chunk,hash:cr.proof_chunk_hash||null,verified:null};
+    var p_=getChunk(cr,'proof');
+    if(p_ && p_.index!==undefined && p_.data){
+      collected.proof[p_.index]={data:p_.data,hash:p_.hash||null,verified:null};
     }
-    if(cr.truth_chunk_index!==undefined&&cr.truth_chunk){
-      collected.truth[cr.truth_chunk_index]={data:cr.truth_chunk,hash:cr.truth_chunk_hash||null,verified:null};
+    var t_=getChunk(cr,'truth');
+    if(t_ && t_.index!==undefined && t_.data){
+      collected.truth[t_.index]={data:t_.data,hash:t_.hash||null,verified:null};
     }
-    if(cr.schematic_chunk_index!==undefined&&cr.schematic_chunk){
-      collected.schematic[cr.schematic_chunk_index]={data:cr.schematic_chunk,hash:cr.schematic_chunk_hash||null,verified:null};
+    var s_=getChunk(cr,'schematic');
+    if(s_ && s_.index!==undefined && s_.data){
+      collected.schematic[s_.index]={data:s_.data,hash:s_.hash||null,verified:null};
     }
-    if(cr.claim_chunk){
-      collected.claim={data:cr.claim_chunk,hash:cr.claim_chunk_hash||null,verified:null};
+    var c_=getChunk(cr,'claim');
+    if(c_ && c_.data){
+      collected.claim={data:c_.data,hash:c_.hash||null,verified:null};
     }
-    if(cr.easter_egg){
+    // Easter egg has a legacy flag-style fallback in addition to nested.
+    var e_=getChunk(cr,'easter_egg');
+    if(e_ && e_.data){
       collected.egg={
-        text:cr.easter_egg_text||cr.easter_egg_chunk||'',
-        image:cr.easter_egg_image||null,
-        data:cr.easter_egg_chunk||cr.easter_egg_text||'',
-        hash:cr.easter_egg_hash||null,verified:null
+        text: e_.text || e_.data,
+        image: e_.image || null,
+        data: e_.data,
+        hash: e_.hash || null,
+        verified: null
+      };
+    } else if(cr.easter_egg && cr.easter_egg_chunk){
+      // Legacy fallback (boolean flag + flat content)
+      collected.egg={
+        text: cr.easter_egg_text || cr.easter_egg_chunk || '',
+        image: cr.easter_egg_image || null,
+        data: cr.easter_egg_chunk || cr.easter_egg_text || '',
+        hash: cr.easter_egg_hash || null,
+        verified: null
       };
     }
   }
@@ -486,7 +508,17 @@ async function analyzeMeta(files){
     var r=valid[ri];
     var rBadgeCol=r._match?'#4ade80':r.content_hash?'#f87171':'#4a4a60';
     var rBadge=r._match?'\u2713':r.content_hash?'\u2717':'\u2014';
-    var ti=r.truth_chunk_index;
+    // Pull chunk metadata once via the shared helper (handles both
+    // nested + legacy flat shapes; see portal.js getChunk).
+    var rDec = getChunk(r,'decoder');
+    var rTruth = getChunk(r,'truth');
+    var rProof = getChunk(r,'proof');
+    var rSch  = getChunk(r,'schematic');
+    var rClm  = getChunk(r,'claim');
+    var rEgg  = getChunk(r,'easter_egg');
+    var ti = rTruth ? rTruth.index : (r.truth_chunk_index !== undefined ? r.truth_chunk_index : null);
+    var di_ = rDec ? rDec.index : (r.decoder_chunk_index !== undefined ? r.decoder_chunk_index : null);
+    var ageName = (rDec && rDec.age_name) || r.decoder_age_name || '';
     var isDk2=ti!=null&&ti>=360&&ti<=363,isEp2=ti===364;
 
     // Compact row — white labels, green only for verified badge
@@ -494,11 +526,11 @@ async function analyzeMeta(files){
     // tab — every field is attacker-controllable. Escape on every
     // interpolation. _h is a local alias for portal.js's escapeHtml.
     var _h = escapeHtml;
-    html+='<div id="rec-'+(ti!=null?ti:ri)+'" data-identifier="'+_h(r.identifier||'')+'" data-age="'+_h(r.decoder_age_name||'')+'" data-con="'+_h(r.constellation_name||'')+'" data-chunk="'+(r.decoder_chunk_index!=null?+r.decoder_chunk_index:'')+'" style="border-bottom:1px solid #1a1a2a;">';
+    html+='<div id="rec-'+(ti!=null?ti:ri)+'" data-identifier="'+_h(r.identifier||'')+'" data-age="'+_h(ageName)+'" data-con="'+_h(r.constellation_name||'')+'" data-chunk="'+(di_!=null?+di_:'')+'" style="border-bottom:1px solid #1a1a2a;">';
     html+='<div class="meta-row" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="padding:0.35rem 0.8rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'none\'">';
     html+='<span style="font-size:0.72rem;color:'+rBadgeCol+';min-width:1rem;">'+rBadge+'</span>';
     html+='<span style="font-size:0.7rem;font-family:monospace;min-width:10rem;color:#d0d0d8;">'+_h(r.identifier?r.identifier.slice(-16):(r._fn||'').slice(-16))+'</span>';
-    if(ti!=null)html+='<span style="font-size:0.6rem;color:'+(isEp2?'#d4b87b':isDk2?'#8a7050':'#6a6a80')+';">T'+(+ti)+(r.decoder_chunk_index!=null?' D'+(+r.decoder_chunk_index):'')+'</span>';
+    if(ti!=null)html+='<span style="font-size:0.6rem;color:'+(isEp2?'#d4b87b':isDk2?'#8a7050':'#6a6a80')+';">T'+(+ti)+(di_!=null?' D'+(+di_):'')+'</span>';
     if(r.constellation_name)html+='<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+_h(r.constellation_name)+'</span>';
     html+='</div>';
 
@@ -548,20 +580,21 @@ async function analyzeMeta(files){
       html+='</div>';
     }
 
-    // Cycle position
-    if(r.decoder_chunk_index!==undefined||r.truth_chunk_index!==undefined){
+    // Cycle position (chunk metadata read via getChunk; works for both
+    // nested + legacy flat shapes)
+    if(rDec || rTruth){
       html+='<div class="ev-sec">Cycle Position</div><div class="ev-g">';
-      if(r.decoder_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Decoder</div><div class="ev-mv">'+_h(r.decoder_chunk_index)+' / '+_h(r.decoder_total_chunks||12)+'</div></div>';
-      if(r.truth_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Truth</div><div class="ev-mv">'+_h(r.truth_chunk_index)+' / 365</div></div>';
-      if(r.proof_chunk_index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Proof</div><div class="ev-mv">'+_h(r.proof_chunk_index)+(r.proof_day==='sunday'?' (sunday)':'')+'</div></div>';
-      if(r.decoder_age_name)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(r.decoder_age_name)+'</div></div>';
+      if(rDec && rDec.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Decoder</div><div class="ev-mv">'+_h(rDec.index)+' / '+_h(rDec.total||12)+'</div></div>';
+      if(rTruth && rTruth.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Truth</div><div class="ev-mv">'+_h(rTruth.index)+' / '+_h(rTruth.total||365)+'</div></div>';
+      if(rProof && rProof.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Proof</div><div class="ev-mv">'+_h(rProof.index)+(rProof.day==='sunday'?' (sunday)':'')+'</div></div>';
+      if(rDec && rDec.age_name)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(rDec.age_name)+'</div></div>';
       if(r.decoder_hash)html+='<div class="ev-m"><div class="ev-ml">Decoder Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_hash)+'</div></div>';
-      if(r.decoder_version)html+='<div class="ev-m"><div class="ev-ml">Decoder Version</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_version)+'</div></div>';
+      if(rDec && rDec.version)html+='<div class="ev-m"><div class="ev-ml">Decoder Version</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(rDec.version)+'</div></div>';
       if(r.constellation_name)html+='<div class="ev-m"><div class="ev-ml">Constellation</div><div class="ev-mv">'+_h(r.constellation_name)+'</div></div>';
       if(r.heart_star_id)html+='<div class="ev-m"><div class="ev-ml">Heart Star</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.heart_star_id)+'</div></div>';
-      if(r.schematic_chunk)html+='<div class="ev-m"><div class="ev-ml">Schematic</div><div class="ev-mv" style="color:#8a7050;">Dark day '+_h(r.schematic_chunk_index+1)+'</div></div>';
-      if(r.claim_chunk)html+='<div class="ev-m"><div class="ev-ml">Claim</div><div class="ev-mv" style="color:#d4b87b;">Epagomenal</div></div>';
-      if(r.easter_egg)html+='<div class="ev-m"><div class="ev-ml">Easter Egg</div><div class="ev-mv" style="color:#c47bbb;">Madeline</div></div>';
+      if(rSch)html+='<div class="ev-m"><div class="ev-ml">Schematic</div><div class="ev-mv" style="color:#8a7050;">Dark day '+_h((rSch.index||0)+1)+'</div></div>';
+      if(rClm)html+='<div class="ev-m"><div class="ev-ml">Claim</div><div class="ev-mv" style="color:#d4b87b;">Epagomenal</div></div>';
+      if(rEgg)html+='<div class="ev-m"><div class="ev-ml">Easter Egg</div><div class="ev-mv" style="color:#c47bbb;">Madeline</div></div>';
       html+='</div>';
     }
 
@@ -671,7 +704,15 @@ async function analyzeMeta(files){
     html+='<div style="font-size:0.62rem;color:#8a8a9a;margin-top:0.2rem;"><span style="color:#4ade80;">'+chainOk+' valid</span>'+(chainExt?' <span style="color:#facc15;">'+chainExt+' external</span>':'')+'</div>';
 
     // Constellation Map
-    var conMap={};valid.forEach(function(r2){var cn=r2.constellation_name||'_none';if(!conMap[cn])conMap[cn]={recs:[],heart:null,chunks:new Set()};conMap[cn].recs.push(r2);if(r2.decoder_chunk_index!==undefined)conMap[cn].chunks.add(r2.decoder_chunk_index);if(r2.heart_star_id)conMap[cn].heart=r2.heart_star_id;});
+    var conMap={};valid.forEach(function(r2){
+      var cn=r2.constellation_name||'_none';
+      if(!conMap[cn])conMap[cn]={recs:[],heart:null,chunks:new Set()};
+      conMap[cn].recs.push(r2);
+      var d2=getChunk(r2,'decoder');
+      var dIdx = d2 ? d2.index : (r2.decoder_chunk_index !== undefined ? r2.decoder_chunk_index : undefined);
+      if(dIdx!==undefined)conMap[cn].chunks.add(dIdx);
+      if(r2.heart_star_id)conMap[cn].heart=r2.heart_star_id;
+    });
     var conNames=Object.keys(conMap).filter(function(n){return n!=='_none';});
     if(conNames.length>0){
       var BAYER=['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
@@ -1029,12 +1070,12 @@ function buildOrbitInspector(records, collected) {
     var ageDecChunks = {}, ageProofChunks = {}, ageTruthChunks = {}, ageSchemChunks = {};
     var ageHasClaim = false, ageHasEgg = false;
     ad.recs.forEach(function(r) {
-      if (r.decoder_chunk_index !== undefined && r.decoder_chunk) ageDecChunks[r.decoder_chunk_index] = true;
-      if (r.proof_chunk_index !== undefined && r.proof_chunk) ageProofChunks[r.proof_chunk_index] = true;
-      if (r.truth_chunk_index !== undefined && r.truth_chunk) ageTruthChunks[r.truth_chunk_index] = true;
-      if (r.schematic_chunk_index !== undefined && r.schematic_chunk) ageSchemChunks[r.schematic_chunk_index] = true;
-      if (r.claim_chunk) ageHasClaim = true;
-      if (r.easter_egg) ageHasEgg = true;
+      var rD=getChunk(r,'decoder'); if(rD && rD.index!==undefined && rD.data) ageDecChunks[rD.index]=true;
+      var rP=getChunk(r,'proof');   if(rP && rP.index!==undefined && rP.data) ageProofChunks[rP.index]=true;
+      var rT=getChunk(r,'truth');   if(rT && rT.index!==undefined && rT.data) ageTruthChunks[rT.index]=true;
+      var rS=getChunk(r,'schematic'); if(rS && rS.index!==undefined && rS.data) ageSchemChunks[rS.index]=true;
+      if(getChunk(r,'claim')) ageHasClaim = true;
+      if(getChunk(r,'easter_egg') || r.easter_egg) ageHasEgg = true;
     });
     var decCount = Object.keys(ageDecChunks).length;
     var proofCount = Object.keys(ageProofChunks).length;
