@@ -1642,27 +1642,27 @@
        bottom + right = subtle highlight (cavity catching reflected
        light). */
     box-shadow:
-      /* TOP shadow — strong */
-      inset 0 1px 0 rgba(0,0,0,0.85),
-      inset 0 2px 0 rgba(0,0,0,0.55),
-      inset 0 3px 0 rgba(0,0,0,0.30),
+      /* TOP shadow — softened */
+      inset 0 1px 0 rgba(0,0,0,0.55),
+      inset 0 2px 0 rgba(0,0,0,0.32),
+      inset 0 3px 0 rgba(0,0,0,0.16),
       /* LEFT shadow */
-      inset 1px 0 0 rgba(0,0,0,0.85),
-      inset 2px 0 0 rgba(0,0,0,0.55),
-      inset 3px 0 0 rgba(0,0,0,0.30),
-      /* BOTTOM highlight — dialed down (was 0.55/0.30/0.15) */
-      inset 0 -1px 0 rgba(255,255,255,0.30),
-      inset 0 -2px 0 rgba(255,255,255,0.16),
-      inset 0 -3px 0 rgba(255,255,255,0.08),
-      /* RIGHT highlight — dialed down */
-      inset -1px 0 0 rgba(255,255,255,0.30),
-      inset -2px 0 0 rgba(255,255,255,0.16),
-      inset -3px 0 0 rgba(255,255,255,0.08),
+      inset 1px 0 0 rgba(0,0,0,0.55),
+      inset 2px 0 0 rgba(0,0,0,0.32),
+      inset 3px 0 0 rgba(0,0,0,0.16),
+      /* BOTTOM highlight */
+      inset 0 -1px 0 rgba(255,255,255,0.18),
+      inset 0 -2px 0 rgba(255,255,255,0.10),
+      inset 0 -3px 0 rgba(255,255,255,0.05),
+      /* RIGHT highlight */
+      inset -1px 0 0 rgba(255,255,255,0.18),
+      inset -2px 0 0 rgba(255,255,255,0.10),
+      inset -3px 0 0 rgba(255,255,255,0.05),
       /* Rarity rim along all four edges */
-      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
-      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
-      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
-      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent);
+      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
+      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
+      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent);
   }
   .sky-band-container canvas {
     display: block;
@@ -1731,27 +1731,26 @@
     border: none;
     padding: 16px 14px;
     margin: 8px 0;
-    /* Same stacked-pixel chamfer as the bands, with the highlight
-       side dialed down. */
+    /* Same softened chamfer as the bands. */
     box-shadow:
-      0 -1px 0 rgba(255,255,255,0.18),
-      0 2px 5px rgba(0,0,0,0.55),
-      inset 0 1px 0 rgba(0,0,0,0.85),
-      inset 0 2px 0 rgba(0,0,0,0.55),
-      inset 0 3px 0 rgba(0,0,0,0.30),
-      inset 1px 0 0 rgba(0,0,0,0.85),
-      inset 2px 0 0 rgba(0,0,0,0.55),
-      inset 3px 0 0 rgba(0,0,0,0.30),
-      inset 0 -1px 0 rgba(255,255,255,0.30),
-      inset 0 -2px 0 rgba(255,255,255,0.16),
-      inset 0 -3px 0 rgba(255,255,255,0.08),
-      inset -1px 0 0 rgba(255,255,255,0.30),
-      inset -2px 0 0 rgba(255,255,255,0.16),
-      inset -3px 0 0 rgba(255,255,255,0.08),
-      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
-      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
-      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent),
-      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 35%, transparent);
+      0 -1px 0 rgba(255,255,255,0.12),
+      0 2px 5px rgba(0,0,0,0.45),
+      inset 0 1px 0 rgba(0,0,0,0.55),
+      inset 0 2px 0 rgba(0,0,0,0.32),
+      inset 0 3px 0 rgba(0,0,0,0.16),
+      inset 1px 0 0 rgba(0,0,0,0.55),
+      inset 2px 0 0 rgba(0,0,0,0.32),
+      inset 3px 0 0 rgba(0,0,0,0.16),
+      inset 0 -1px 0 rgba(255,255,255,0.18),
+      inset 0 -2px 0 rgba(255,255,255,0.10),
+      inset 0 -3px 0 rgba(255,255,255,0.05),
+      inset -1px 0 0 rgba(255,255,255,0.18),
+      inset -2px 0 0 rgba(255,255,255,0.10),
+      inset -3px 0 0 rgba(255,255,255,0.05),
+      inset 0 4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
+      inset 0 -4px 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent),
+      inset -4px 0 0 color-mix(in srgb, var(--rarity-color, #909090) 28%, transparent);
   }
   .gps-cipher {
     font-size: 7px;
