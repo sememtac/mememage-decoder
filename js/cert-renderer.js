@@ -284,9 +284,11 @@ function renderCert(meta, options) {
     var GH = Math.round(totalH * dpr);
     _grainCanvas.width = GW;
     _grainCanvas.height = GH;
-    // Override the CSS height: 100% (which clamps to visible viewport)
-    // with an explicit pixel value matching the full scrollable area.
-    _grainCanvas.style.height = totalH + 'px';
+    // Override the CSS height: 100% !important (which clamps to visible
+    // viewport) with an explicit pixel value matching the full scrollable
+    // area. Must use setProperty with priority='important' to beat the
+    // CSS !important.
+    _grainCanvas.style.setProperty('height', totalH + 'px', 'important');
     var gc = _grainCanvas.getContext('2d');
 
     // Draw horizontal hairlines
