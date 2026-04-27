@@ -1104,6 +1104,19 @@ function dismissPanel(panel, opts, done) {
   setTimeout(finish, 600);
 }
 
+// Hold the cert column offscreen during the system box's width
+// animation, then fade it in. Adds .cert-entering for one beat
+// (matching the CSS animation: 0.45s delay + 0.4s fade) so the cert
+// stays at opacity 0 while the system box shrinks. Desktop only —
+// mobile has no compact mode. Callers: ui.applyTabScope (re-revealing
+// a cert tab), cert-renderer.renderCert (initial cert reveal), and
+// validator's showResultsSidebar / attack-lab activate.
+function holdCertEntering(panelEl) {
+  if (!panelEl || window.innerWidth < 1200) return;
+  panelEl.classList.add('cert-entering');
+  setTimeout(function() { panelEl.classList.remove('cert-entering'); }, 900);
+}
+
 function scrollResultIntoView(el) {
   if (!el) return;
   function go() {

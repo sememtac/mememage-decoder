@@ -2,21 +2,10 @@
 // SKY BAND CANVAS ANIMATION
 // =====================================================================
 function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, machineData, ageTier, rarityScore, celestialTraits, birthTemperament, tierColor) {
-  // Variant C cell colors — brightened rarity tint, low intensity.
-  // Brighten by mixing toward white by 0.3 so dark tiers (legendary
-  // red, very rare purple) still read on the dark plate.
-  var _ctcHex = tierColor || '#a0a0a0';
-  var _ctcR = parseInt(_ctcHex.slice(1,3),16);
-  var _ctcG = parseInt(_ctcHex.slice(3,5),16);
-  var _ctcB = parseInt(_ctcHex.slice(5,7),16);
-  var _ctcBR = Math.round(_ctcR + (255 - _ctcR) * 0.3);
-  var _ctcBG = Math.round(_ctcG + (255 - _ctcG) * 0.3);
-  var _ctcBB = Math.round(_ctcB + (255 - _ctcB) * 0.3);
-  var _cellTint = _ctcBR + ',' + _ctcBG + ',' + _ctcBB;
-  var CELL_FILL_BASE   = 'rgba(' + _cellTint + ',0.07)';
-  var CELL_STROKE_BASE = 'rgba(' + _cellTint + ',0.18)';
-  function CELL_FILL_HOVER(h)   { return 'rgba(' + _cellTint + ',' + (h * 0.15) + ')'; }
-  function CELL_STROKE_HOVER(h) { return 'rgba(' + _cellTint + ',' + (h * 0.5)  + ')'; }
+  // Cell colors — shared rarity tint (variant C) from cert-renderer.
+  var _cc = rarityCellColors(tierColor);
+  var CELL_FILL_BASE = _cc.base, CELL_STROKE_BASE = _cc.baseStroke;
+  var CELL_FILL_HOVER = _cc.hoverFill, CELL_STROKE_HOVER = _cc.hoverStroke;
   // Time decay affects meteor speed and brightness
   var decayMult = {fresh:1, young:0.9, aged:0.7, vintage:0.45, ancient:0.2};
   var meteorSpeedMult = decayMult[ageTier] || 1;
@@ -79,9 +68,7 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
   else if (moonPhaseStr.indexOf('New') >= 0) moonBright = 0.35;
 
   // 3. Angular spread → direction spread (tight = focused, wide = scattered)
-  var angSpread = 180;
-  for (var pi = 0; pi < PLANET_DATA.length; pi++) { /* angular_spread from born data if available */ }
-  // Use entropy to simulate if not directly available
+  // Driven from entropy (no born-data field for angular_spread yet).
   var dirSpread = 0.3 + (entropyBytes[2] || 128) / 255 * 0.7; // 0.3-1.0 (focused to scattered)
 
   // 4. Machine state → behavior

@@ -9,19 +9,10 @@
 function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, haloData, tierColor, aboutText, rarityScore) {
   var ctx = canvas.getContext('2d');
 
-  // Variant C cell colors — brightened rarity tint, low intensity.
-  var _ctcHex = tierColor || '#a0a0a0';
-  var _ctcR = parseInt(_ctcHex.slice(1,3),16);
-  var _ctcG = parseInt(_ctcHex.slice(3,5),16);
-  var _ctcB = parseInt(_ctcHex.slice(5,7),16);
-  var _ctcBR = Math.round(_ctcR + (255 - _ctcR) * 0.3);
-  var _ctcBG = Math.round(_ctcG + (255 - _ctcG) * 0.3);
-  var _ctcBB = Math.round(_ctcB + (255 - _ctcB) * 0.3);
-  var _cellTint = _ctcBR + ',' + _ctcBG + ',' + _ctcBB;
-  var CELL_FILL_BASE   = 'rgba(' + _cellTint + ',0.07)';
-  var CELL_STROKE_BASE = 'rgba(' + _cellTint + ',0.18)';
-  function CELL_FILL_HOVER(h)   { return 'rgba(' + _cellTint + ',' + (h * 0.15) + ')'; }
-  function CELL_STROKE_HOVER(h) { return 'rgba(' + _cellTint + ',' + (h * 0.5)  + ')'; }
+  // Cell colors — shared rarity tint (variant C) from cert-renderer.
+  var _cc = rarityCellColors(tierColor);
+  var CELL_FILL_BASE = _cc.base, CELL_STROKE_BASE = _cc.baseStroke;
+  var CELL_FILL_HOVER = _cc.hoverFill, CELL_STROKE_HOVER = _cc.hoverStroke;
 
   // Layout
   var COL = 3, PAD = 20, GAP = 6, CELL_H = 38;

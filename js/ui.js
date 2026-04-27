@@ -311,10 +311,7 @@ function applyTabScope(activeId) {
   if (ownsActiveCert) {
     // Fresh entry into compact mode — delay the cert fade-in until
     // the system box has finished its shrink animation.
-    if (!wasActive && window.innerWidth >= 1200) {
-      cw.classList.add('cert-entering');
-      setTimeout(function() { cw.classList.remove('cert-entering'); }, 900);
-    }
+    if (!wasActive) holdCertEntering(cw);
     dm.classList.add('layout-active');
   } else {
     dm.classList.remove('layout-active');

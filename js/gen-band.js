@@ -72,15 +72,10 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
   var bgR = Math.floor(tc[0] * 0.14), bgG = Math.floor(tc[1] * 0.14), bgB = Math.floor(tc[2] * 0.14);
   var bgMidR = Math.floor(tc[0] * 0.19), bgMidG = Math.floor(tc[1] * 0.19), bgMidB = Math.floor(tc[2] * 0.19);
 
-  // Variant C cell colors — brightened rarity tint, low intensity.
-  var _ctcBR = Math.round(tc[0] + (255 - tc[0]) * 0.3);
-  var _ctcBG = Math.round(tc[1] + (255 - tc[1]) * 0.3);
-  var _ctcBB = Math.round(tc[2] + (255 - tc[2]) * 0.3);
-  var _cellTint = _ctcBR + ',' + _ctcBG + ',' + _ctcBB;
-  var CELL_FILL_BASE   = 'rgba(' + _cellTint + ',0.07)';
-  var CELL_STROKE_BASE = 'rgba(' + _cellTint + ',0.18)';
-  function CELL_FILL_HOVER(h)   { return 'rgba(' + _cellTint + ',' + (h * 0.15) + ')'; }
-  function CELL_STROKE_HOVER(h) { return 'rgba(' + _cellTint + ',' + (h * 0.5)  + ')'; }
+  // Cell colors — shared rarity tint (variant C) from cert-renderer.
+  var _cc = rarityCellColors(tierColor);
+  var CELL_FILL_BASE = _cc.base, CELL_STROKE_BASE = _cc.baseStroke;
+  var CELL_FILL_HOVER = _cc.hoverFill, CELL_STROKE_HOVER = _cc.hoverStroke;
 
   // Voronoi noise at low resolution, upscaled
   var VOR_SCALE = 4;

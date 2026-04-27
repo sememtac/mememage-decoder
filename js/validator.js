@@ -38,13 +38,9 @@ function showResultsSidebar() {
   rw.classList.add('visible');
   var dm = document.querySelector('.panel-layout');
   if (dm) {
-    var wasActive = dm.classList.contains('layout-active');
     // Fresh entry into compact mode — hold cert column offscreen
     // through the system box's width animation, then fade in.
-    if (!wasActive && window.innerWidth >= 1200) {
-      rw.classList.add('cert-entering');
-      setTimeout(function() { rw.classList.remove('cert-entering'); }, 900);
-    }
+    if (!dm.classList.contains('layout-active')) holdCertEntering(rw);
     dm.classList.add('layout-active');
   }
   if (window.innerWidth < 1200) scrollResultIntoView(rw);
@@ -2502,11 +2498,7 @@ async function activate() {
   });
   var dm = document.querySelector('.panel-layout');
   if (dm) {
-    var wasActive = dm.classList.contains('layout-active');
-    if (!wasActive && window.innerWidth >= 1200) {
-      resultsWrap.classList.add('cert-entering');
-      setTimeout(function() { resultsWrap.classList.remove('cert-entering'); }, 900);
-    }
+    if (!dm.classList.contains('layout-active')) holdCertEntering(resultsWrap);
     dm.classList.add('layout-active');
   }
 

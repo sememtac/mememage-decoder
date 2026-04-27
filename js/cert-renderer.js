@@ -39,6 +39,25 @@ function _hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slic
 function _div(cls) { var d = document.createElement('div'); if (cls) d.className = cls; return d; }
 function _divider() { return _div('plate-divider'); }
 
+// Variant C cell colors for canvas bands — brightened rarity tint
+// (mixed toward white by 0.3 so dark hexes still read on the dark
+// plate), low intensity. Returns base fill/stroke strings + hover
+// builders. Each band's drawCell uses this so the cell visuals stay
+// consistent across gen/machine/sky.
+function rarityCellColors(tierColor) {
+  var rgb = _hexToRgb(tierColor || '#a0a0a0');
+  var br = Math.round(rgb[0] + (255 - rgb[0]) * 0.3);
+  var bg = Math.round(rgb[1] + (255 - rgb[1]) * 0.3);
+  var bb = Math.round(rgb[2] + (255 - rgb[2]) * 0.3);
+  var tint = br + ',' + bg + ',' + bb;
+  return {
+    base:        'rgba(' + tint + ',0.07)',
+    baseStroke:  'rgba(' + tint + ',0.18)',
+    hoverFill:   function(h) { return 'rgba(' + tint + ',' + (h * 0.15) + ')'; },
+    hoverStroke: function(h) { return 'rgba(' + tint + ',' + (h * 0.5)  + ')'; }
+  };
+}
+
 // Set up a canvas for hi-DPI rendering. Canvas CSS width stays
 // fluid (the caller sets style.width: 100%); we measure the actual
 // rendered width at init time and allocate a DPR-scaled buffer for
@@ -1278,13 +1297,9 @@ function renderCert(meta, options) {
   if (activateLayout) {
     var desktopMain = document.querySelector('.panel-layout');
     if (desktopMain) {
-      var _wasActive = desktopMain.classList.contains('layout-active');
       // Fresh entry into compact mode — hold the cert offscreen
       // through the system box's width animation, then fade in.
-      if (!_wasActive && window.innerWidth >= 1200) {
-        certWrap.classList.add('cert-entering');
-        setTimeout(function() { certWrap.classList.remove('cert-entering'); }, 900);
-      }
+      if (!desktopMain.classList.contains('layout-active')) holdCertEntering(certWrap);
       desktopMain.classList.add('layout-active');
     }
   }
