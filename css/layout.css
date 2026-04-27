@@ -140,6 +140,16 @@
   .panel-right.cert-entering {
     animation: panelFadeIn 0.4s ease-out 0.45s both;
   }
+
+  /* Leaving compact mode — fade the cert out first, then JS removes
+     layout-active so the system box's width animation runs after the
+     cert has cleared. Mirrors the validator's existing dismissing
+     flow but kept distinct from .dismissing so it can run while the
+     cert stays mounted (only display:none kicks in afterward via
+     tab-scope-hidden). */
+  .panel-right.cert-leaving {
+    animation: panelFadeOut 0.3s ease-in forwards;
+  }
 }
 
 /* .panel-footer now sits as a direct child of .panel-layout after

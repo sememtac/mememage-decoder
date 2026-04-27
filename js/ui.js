@@ -262,22 +262,55 @@ function showPanelError(head, body) {
 TabScope.configure(['preview', 'barCard', 'status', 'iaLinkBanner', 'certWrap']);
 function setTabOwner(tabId) { TabScope.setOwner(tabId); }
 function clearTabOwners() { TabScope.clear(); }
+// Tracks any in-flight cert-leaving fade so a rapid second tab click
+// (back into the cert before the fade finishes) can cancel cleanly.
+var _certLeavingTimer = null;
 function applyTabScope(activeId) {
-  TabScope.apply(activeId);
-  // Sync compact-mode with the cert's ownership. If the active tab
-  // doesn't own a visible cert, drop layout-active so the system box
-  // returns to default size. CSS transitions on .panel-left and
-  // .input-section width handle the visible size animation.
   var cw = document.getElementById('certWrap');
   var dm = document.querySelector('.panel-layout');
-  if (!cw || !dm) return;
+  if (!cw || !dm) { TabScope.apply(activeId); return; }
+
+  var wasActive = dm.classList.contains('layout-active');
+  // Peek at what TabScope.apply WILL do so we can decide whether to
+  // run the leaving fade before applying it. willBeHidden mirrors
+  // TabScope's owner-check.
+  var willBeHidden = cw.dataset.owner && cw.dataset.owner !== activeId;
+  var willOwnActiveCert = cw.classList.contains('visible') && !willBeHidden;
+
+  // Leaving compact mode on desktop — fade the cert out first, then
+  // remove layout-active so the system box width animation runs after
+  // the cert has cleared. Sequenced to avoid the cert covering the
+  // still-wide system box during its shrink/grow animation.
+  if (wasActive && !willOwnActiveCert && window.innerWidth >= 1200
+      && cw.classList.contains('visible')) {
+    if (_certLeavingTimer) clearTimeout(_certLeavingTimer);
+    cw.classList.remove('cert-entering');
+    cw.classList.add('cert-leaving');
+    // Apply TabScope to the OTHER scoped elements immediately, but
+    // keep certWrap visible until the fade ends.
+    TabScope.apply(activeId);
+    cw.classList.remove('tab-scope-hidden');
+    _certLeavingTimer = setTimeout(function() {
+      _certLeavingTimer = null;
+      cw.classList.remove('cert-leaving');
+      cw.classList.add('tab-scope-hidden');
+      dm.classList.remove('layout-active');
+    }, 300);
+    return;
+  }
+
+  // Default flow — apply TabScope, then sync layout-active.
+  if (_certLeavingTimer) {
+    clearTimeout(_certLeavingTimer);
+    _certLeavingTimer = null;
+    cw.classList.remove('cert-leaving');
+  }
+  TabScope.apply(activeId);
   var ownsActiveCert = cw.classList.contains('visible')
     && !cw.classList.contains('tab-scope-hidden');
-  var wasActive = dm.classList.contains('layout-active');
   if (ownsActiveCert) {
     // Fresh entry into compact mode — delay the cert fade-in until
-    // the system box has finished its shrink animation, so the cert
-    // doesn't cover the still-wide system box mid-transition.
+    // the system box has finished its shrink animation.
     if (!wasActive && window.innerWidth >= 1200) {
       cw.classList.add('cert-entering');
       setTimeout(function() { cw.classList.remove('cert-entering'); }, 900);
