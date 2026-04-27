@@ -266,20 +266,13 @@ function applyTabScope(activeId) {
   TabScope.apply(activeId);
   // Sync compact-mode with the cert's ownership. If the active tab
   // doesn't own a visible cert, drop layout-active so the system box
-  // returns to default size.
+  // returns to default size. CSS transitions on .panel-left and
+  // .input-section width handle the visible size animation.
   var cw = document.getElementById('certWrap');
   var dm = document.querySelector('.panel-layout');
   if (!cw || !dm) return;
   var ownsActiveCert = cw.classList.contains('visible')
     && !cw.classList.contains('tab-scope-hidden');
-  var wasActive = dm.classList.contains('layout-active');
-  // When the layout state actually changes (cert appearing or
-  // disappearing), run the brief fade-bloom that masks the position
-  // snap. Same-state tab switches stay instant.
-  if (ownsActiveCert !== wasActive && window.innerWidth >= 1200) {
-    dm.classList.add('layout-shifting');
-    setTimeout(function() { dm.classList.remove('layout-shifting'); }, 450);
-  }
   if (ownsActiveCert) {
     dm.classList.add('layout-active');
   } else {

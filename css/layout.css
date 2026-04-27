@@ -117,24 +117,17 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Layout-shift fade — applied for one beat (450ms) when the layout
-   state is toggling between compact (.layout-active, fixed two-panel)
-   and non-compact (centered single-column). The position-snap that
-   comes with that toggle (position: fixed -> static, panel widths
-   reflowing) cannot be tweened directly, but a brief opacity dip on
-   panel-left + panel-right masks the jump. JS adds .layout-shifting
-   for the duration of the transition; same-state tab switches don't
-   trigger it (so they stay snappy). Desktop only — mobile has no
-   compact mode to swap. */
-@keyframes layoutShiftBloom {
-  0%   { opacity: 1; }
-  35%  { opacity: 0.45; }
-  100% { opacity: 1; }
-}
+/* Layout-shift size transition — when the layout toggles between
+   compact (.layout-active, fixed two-panel) and non-compact (single
+   column, centered), the visible width of panel-left and the system
+   box change. Tweening width here gives the box a real physical
+   resize instead of a snap. position: static <-> fixed itself can't
+   be tweened, but the width change is the most visible part of the
+   transition. Desktop only — mobile has no compact mode. */
 @media (min-width: 1200px) {
-  .panel-layout.layout-shifting .panel-left,
-  .panel-layout.layout-shifting .panel-right {
-    animation: layoutShiftBloom 0.45s ease-in-out;
+  .panel-left,
+  .input-section {
+    transition: width 0.45s ease, max-width 0.45s ease;
   }
 }
 
