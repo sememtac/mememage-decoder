@@ -2950,6 +2950,23 @@ function renderCert(meta, options) {
       var preGr = c.createLinearGradient(0, M, 0, 5000);
       for (var si3 = 0; si3 < pg.stops.length; si3++) preGr.addColorStop(pg.stops[si3][1], pg.stops[si3][0]);
       c.fillStyle = preGr; c.beginPath(); c.roundRect(M, M, W-M*2, 5980, 10*S); c.fill();
+
+      // Constellation overlay — drawn before text so the header reads
+      // on top, matching the live cert's z-order. conCanvas is the
+      // hoisted reference from the constellation block at the top of
+      // renderCert; absent if there's no constellation seed.
+      if (typeof conCanvas !== 'undefined' && conCanvas && conCanvas.width) {
+        var _consW = (W - M * 2) * 1.10;            // 110% of plate width (matches CSS left:-5%)
+        var _consX = M + (W - M * 2 - _consW) / 2;  // centered (negative offset)
+        var _consY = M + 10 * S;                    // matches CSS top:10px (scaled)
+        var _consH = _consW * (conCanvas.height / conCanvas.width);
+        c.save();
+        c.beginPath(); c.roundRect(M, M, W - M * 2, 5980, 10 * S); c.clip();
+        c.globalAlpha = 0.35;
+        c.drawImage(conCanvas, _consX, _consY, _consW, _consH);
+        c.restore();
+      }
+
       c.textAlign = 'center';
       var y = PAD + M;
 
