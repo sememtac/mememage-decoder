@@ -272,6 +272,14 @@ function applyTabScope(activeId) {
   if (!cw || !dm) return;
   var ownsActiveCert = cw.classList.contains('visible')
     && !cw.classList.contains('tab-scope-hidden');
+  var wasActive = dm.classList.contains('layout-active');
+  // When the layout state actually changes (cert appearing or
+  // disappearing), run the brief fade-bloom that masks the position
+  // snap. Same-state tab switches stay instant.
+  if (ownsActiveCert !== wasActive && window.innerWidth >= 1200) {
+    dm.classList.add('layout-shifting');
+    setTimeout(function() { dm.classList.remove('layout-shifting'); }, 450);
+  }
   if (ownsActiveCert) {
     dm.classList.add('layout-active');
   } else {

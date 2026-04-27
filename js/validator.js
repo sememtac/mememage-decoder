@@ -31,13 +31,25 @@ TabBar.wire(function(panelId) {
 DragScroll.attach(document.getElementById('resultsWrap'));
 
 // === Results sidebar management ===
+// Add the brief fade-bloom class for one beat — masks the position
+// snap that happens when layout-active toggles. Desktop-only; same-
+// state calls are a no-op.
+function _runLayoutShift(dm) {
+  if (!dm || window.innerWidth < 1200) return;
+  dm.classList.add('layout-shifting');
+  setTimeout(function() { dm.classList.remove('layout-shifting'); }, 450);
+}
+
 function showResultsSidebar() {
   var rw = document.getElementById('resultsWrap');
   if (!rw) return;
   rw.classList.remove('dismissing');
   rw.classList.add('visible');
   var dm = document.querySelector('.panel-layout');
-  if (dm) dm.classList.add('layout-active');
+  if (dm) {
+    if (!dm.classList.contains('layout-active')) _runLayoutShift(dm);
+    dm.classList.add('layout-active');
+  }
   if (window.innerWidth < 1200) scrollResultIntoView(rw);
 }
 
@@ -49,11 +61,17 @@ function hideResultsSidebar(animate) {
     rw.classList.add('dismissing');
     rw.addEventListener('animationend', function() {
       rw.classList.remove('visible', 'dismissing');
-      if (dm) dm.classList.remove('layout-active');
+      if (dm && dm.classList.contains('layout-active')) {
+        _runLayoutShift(dm);
+        dm.classList.remove('layout-active');
+      }
     }, { once: true });
   } else {
     rw.classList.remove('visible', 'dismissing');
-    if (dm) dm.classList.remove('layout-active');
+    if (dm && dm.classList.contains('layout-active')) {
+      _runLayoutShift(dm);
+      dm.classList.remove('layout-active');
+    }
   }
 }
 

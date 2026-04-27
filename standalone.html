@@ -132,6 +132,27 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Layout-shift fade — applied for one beat (450ms) when the layout
+   state is toggling between compact (.layout-active, fixed two-panel)
+   and non-compact (centered single-column). The position-snap that
+   comes with that toggle (position: fixed -> static, panel widths
+   reflowing) cannot be tweened directly, but a brief opacity dip on
+   panel-left + panel-right masks the jump. JS adds .layout-shifting
+   for the duration of the transition; same-state tab switches don't
+   trigger it (so they stay snappy). Desktop only — mobile has no
+   compact mode to swap. */
+@keyframes layoutShiftBloom {
+  0%   { opacity: 1; }
+  35%  { opacity: 0.45; }
+  100% { opacity: 1; }
+}
+@media (min-width: 1200px) {
+  .panel-layout.layout-shifting .panel-left,
+  .panel-layout.layout-shifting .panel-right {
+    animation: layoutShiftBloom 0.45s ease-in-out;
+  }
+}
+
 /* .panel-footer now sits as a direct child of .panel-layout after
    .panel-right. On mobile that DOM order gives the scroll flow we
    want naturally (input → cert → footer) without needing
@@ -7842,6 +7863,14 @@ function applyTabScope(activeId) {
   if (!cw || !dm) return;
   var ownsActiveCert = cw.classList.contains('visible')
     && !cw.classList.contains('tab-scope-hidden');
+  var wasActive = dm.classList.contains('layout-active');
+  // When the layout state actually changes (cert appearing or
+  // disappearing), run the brief fade-bloom that masks the position
+  // snap. Same-state tab switches stay instant.
+  if (ownsActiveCert !== wasActive && window.innerWidth >= 1200) {
+    dm.classList.add('layout-shifting');
+    setTimeout(function() { dm.classList.remove('layout-shifting'); }, 450);
+  }
   if (ownsActiveCert) {
     dm.classList.add('layout-active');
   } else {
