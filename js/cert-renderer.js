@@ -1168,7 +1168,13 @@ function renderCert(meta, options) {
     });
 
     saveBtn.addEventListener('click', function() {
-      var canvases = plate.querySelectorAll('canvas');
+      // Only the three intended band canvases (gen / machine / sky)
+      // belong in the saved composite. plate.querySelectorAll('canvas')
+      // also picks up the brushed-metal-grain canvas (now sized to the
+      // full scrollHeight, which is huge), the constellation overlay,
+      // the save button's sparkle canvas, and any cosmic-player nodes.
+      // Drawing those as sequential "bands" blows the layout apart.
+      var canvases = plate.querySelectorAll('.sky-band-container > canvas');
       var S = 3; // Resolution scale (3x retina)
       var W = 604*S, M = 8*S, PAD = 20*S, GAP = 8*S, INNER = 40*S;
       var FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
