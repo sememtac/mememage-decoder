@@ -234,7 +234,10 @@ DropZone.attach({
   multiple: true,
   onFiles: _ingestFragments
 });
-document.getElementById('reconstructBtn').addEventListener('click', function() {
+document.getElementById('reconstructBtn').addEventListener('click', function(e) {
+  // Button lives inside the drop zone; stop the click from bubbling
+  // up so the zone doesn't also fire its file-picker handler.
+  e.stopPropagation();
   var any = _recState.gen || _recState.sky || _recState.machine;
   if (!any || typeof generateCanonicalBarPng !== 'function') return;
   generateCanonicalBarPng(any.parentId, any.parentHash).then(function(blob) {
