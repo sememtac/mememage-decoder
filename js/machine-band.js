@@ -9,6 +9,20 @@
 function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, haloData, tierColor, aboutText, rarityScore) {
   var ctx = canvas.getContext('2d');
 
+  // Variant C cell colors — brightened rarity tint, low intensity.
+  var _ctcHex = tierColor || '#a0a0a0';
+  var _ctcR = parseInt(_ctcHex.slice(1,3),16);
+  var _ctcG = parseInt(_ctcHex.slice(3,5),16);
+  var _ctcB = parseInt(_ctcHex.slice(5,7),16);
+  var _ctcBR = Math.round(_ctcR + (255 - _ctcR) * 0.3);
+  var _ctcBG = Math.round(_ctcG + (255 - _ctcG) * 0.3);
+  var _ctcBB = Math.round(_ctcB + (255 - _ctcB) * 0.3);
+  var _cellTint = _ctcBR + ',' + _ctcBG + ',' + _ctcBB;
+  var CELL_FILL_BASE   = 'rgba(' + _cellTint + ',0.07)';
+  var CELL_STROKE_BASE = 'rgba(' + _cellTint + ',0.18)';
+  function CELL_FILL_HOVER(h)   { return 'rgba(' + _cellTint + ',' + (h * 0.15) + ')'; }
+  function CELL_STROKE_HOVER(h) { return 'rgba(' + _cellTint + ',' + (h * 0.5)  + ')'; }
+
   // Layout
   var COL = 3, PAD = 20, GAP = 6, CELL_H = 38;
   var LABEL_SIZE = 7, VALUE_SIZE = 9;
@@ -318,18 +332,18 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
     if (c.hover > 1) c.hover = 1;
     var h = c.hover;
 
-    // Default (sky band standard)
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    // Default cell (variant C: rarity-tinted, low intensity)
+    ctx.fillStyle = CELL_FILL_BASE;
     ctx.beginPath(); ctx.roundRect(c.x, c.y, c.w, c.h, 6); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.strokeStyle = CELL_STROKE_BASE;
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.roundRect(c.x, c.y, c.w, c.h, 6); ctx.stroke();
 
-    // Hover additive (sky band standard)
+    // Hover additive
     if (h > 0.01) {
-      ctx.fillStyle = 'rgba(255,255,255,' + (h * 0.1) + ')';
+      ctx.fillStyle = CELL_FILL_HOVER(h);
       ctx.beginPath(); ctx.roundRect(c.x, c.y, c.w, c.h, 6); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,' + (h * 0.3) + ')';
+      ctx.strokeStyle = CELL_STROKE_HOVER(h);
       ctx.lineWidth = 1 + h * 0.5;
       ctx.beginPath(); ctx.roundRect(c.x, c.y, c.w, c.h, 6); ctx.stroke();
     }

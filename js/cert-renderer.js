@@ -933,7 +933,7 @@ function renderCert(meta, options) {
         var traitExtra = Math.max(0, celestialTraits.length - 1) * 11;
         return 390 + readingExtra + traitExtra;
       });
-      initSkyBand(skyCanvas, dims.w, dims.h, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, m, ageTier, rarityScore, celestialTraits, birthTemp);
+      initSkyBand(skyCanvas, dims.w, dims.h, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, m, ageTier, rarityScore, celestialTraits, birthTemp, tierColor);
     }, 0);
 
     if (typeof enableCanvasSave === 'function') {

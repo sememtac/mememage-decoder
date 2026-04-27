@@ -1,7 +1,22 @@
 // =====================================================================
 // SKY BAND CANVAS ANIMATION
 // =====================================================================
-function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, machineData, ageTier, rarityScore, celestialTraits, birthTemperament) {
+function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTROPY, machineData, ageTier, rarityScore, celestialTraits, birthTemperament, tierColor) {
+  // Variant C cell colors — brightened rarity tint, low intensity.
+  // Brighten by mixing toward white by 0.3 so dark tiers (legendary
+  // red, very rare purple) still read on the dark plate.
+  var _ctcHex = tierColor || '#a0a0a0';
+  var _ctcR = parseInt(_ctcHex.slice(1,3),16);
+  var _ctcG = parseInt(_ctcHex.slice(3,5),16);
+  var _ctcB = parseInt(_ctcHex.slice(5,7),16);
+  var _ctcBR = Math.round(_ctcR + (255 - _ctcR) * 0.3);
+  var _ctcBG = Math.round(_ctcG + (255 - _ctcG) * 0.3);
+  var _ctcBB = Math.round(_ctcB + (255 - _ctcB) * 0.3);
+  var _cellTint = _ctcBR + ',' + _ctcBG + ',' + _ctcBB;
+  var CELL_FILL_BASE   = 'rgba(' + _cellTint + ',0.07)';
+  var CELL_STROKE_BASE = 'rgba(' + _cellTint + ',0.18)';
+  function CELL_FILL_HOVER(h)   { return 'rgba(' + _cellTint + ',' + (h * 0.15) + ')'; }
+  function CELL_STROKE_HOVER(h) { return 'rgba(' + _cellTint + ',' + (h * 0.5)  + ')'; }
   // Time decay affects meteor speed and brightness
   var decayMult = {fresh:1, young:0.9, aged:0.7, vintage:0.45, ancient:0.2};
   var meteorSpeedMult = decayMult[ageTier] || 1;
@@ -330,10 +345,10 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
 
       cellRects.push({ x: cX, y: cY, w: cW, h: skyCellH });
 
-      pctx.fillStyle = 'rgba(255,255,255,0.06)';
+      pctx.fillStyle = CELL_FILL_BASE;
       roundRect(pctx, cX, cY, cW, skyCellH, 6);
       pctx.fill();
-      pctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      pctx.strokeStyle = CELL_STROKE_BASE;
       pctx.lineWidth = 1;
       roundRect(pctx, cX, cY, cW, skyCellH, 6);
       pctx.stroke();
@@ -758,10 +773,10 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
 
       if (cellHover[ci] > 0.01) {
         var h = cellHover[ci];
-        offCtx.fillStyle = 'rgba(255,255,255,' + (h * 0.1) + ')';
+        offCtx.fillStyle = CELL_FILL_HOVER(h);
         roundRect(offCtx, cr.x, cr.y, cr.w, cr.h, 6);
         offCtx.fill();
-        offCtx.strokeStyle = 'rgba(255,255,255,' + (h * 0.3) + ')';
+        offCtx.strokeStyle = CELL_STROKE_HOVER(h);
         offCtx.lineWidth = 1 + h * 0.5;
         roundRect(offCtx, cr.x, cr.y, cr.w, cr.h, 6);
         offCtx.stroke();
