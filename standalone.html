@@ -958,6 +958,38 @@ function embedBits(px, w, h, frameBytes, ppb) {
   return true;
 }
 
+// =====================================================================
+// CANONICAL BAR GENERATOR — builds a 2-row PNG of the canonical bar
+// payload (mememage-XXXX\0<hash>) for the validator's reconstruct flow.
+// Returns a Promise<Blob> of the bar PNG. Width is derived from the
+// payload size at 2px/bit, plus the 48px M/Y/C bands.
+// =====================================================================
+function generateCanonicalBarPng(identifier, contentHash) {
+  var payload = identifier + '\x00' + contentHash;
+  var payloadBytes = new TextEncoder().encode(payload);
+  var frame = encodeFrame(payloadBytes);
+  var totalBits = frame.length * 8;
+  var ppb = 2;
+  // Bits split across SIG_ROWS (2). Per-row bits = ceil(totalBits / 2).
+  var bitsPerRow = Math.ceil(totalBits / SIG_ROWS);
+  // Width: M+Y+C left bands (24) + data + C+Y+M right bands (24).
+  var w = HEADER_PIXELS + bitsPerRow * ppb + FOOTER_PIXELS;
+  var h = SIG_ROWS;
+  var canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  var ctx = canvas.getContext('2d');
+  // Fill with mid-gray as a neutral background (the data pixels will
+  // overwrite to 64 or 192 so the gray only shows in any unused tail).
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, w, h);
+  var img = ctx.getImageData(0, 0, w, h);
+  embedBits(img.data, w, h, frame, ppb);
+  ctx.putImageData(img, 0, 0);
+  return new Promise(function(resolve) {
+    canvas.toBlob(function(blob) { resolve(blob); }, 'image/png');
+  });
+}
+
 function decodePayload(payload){
   const text=new TextDecoder().decode(payload);
   const sep=text.indexOf('\0');
@@ -1066,6 +1098,18 @@ async function decodeImageBar(file) {
 
   var decoded = decodePayload(frame.payload);
   if (!decoded) {
+    // Friendly nudge: if the payload starts with a band-fragment tag
+    // byte (0x01 gen / 0x02 sky / 0x03 machine), it's a saved band
+    // PNG, not a full image. Tell the user where to go instead of
+    // "unreadable".
+    var p = frame.payload;
+    if (p && p.length >= 1 && (p[0] === 0x01 || p[0] === 0x02 || p[0] === 0x03)) {
+      var fid = p[0] === 0x01 ? 'gen' : p[0] === 0x02 ? 'sky' : 'machine';
+      return Object.assign({
+        ok: false, detected: true, frame: frame, decoded: null, ppb: usedPpb, fragment: fid,
+        error: 'This is the ' + fid + ' band of a saved certificate \u2014 drop into the validator\u2019s reconstruct box to put the bar back together.'
+      }, base);
+    }
     return Object.assign({ ok: false, detected: true, frame: frame, decoded: null, ppb: usedPpb, error: 'Bar detected but the payload is unreadable.' }, base);
   }
 
@@ -1283,6 +1327,56 @@ function injectPngTextChunks(pngArrayBuffer, metadata) {
   result.set(src.subarray(iendOffset), offset);
 
   return result.buffer;
+}
+
+// --- Read tEXt + iTXt chunks from a PNG ArrayBuffer ---
+// Returns a flat keyword -> text map. Used by the validator's
+// reconstruct flow to read parent_id / parent_hash / fragment_id
+// from saved band PNGs without decoding pixel bars.
+function readPngTextChunks(arrayBuffer) {
+  var src = new Uint8Array(arrayBuffer);
+  var out = {};
+  // PNG signature is 8 bytes — chunks start at offset 8.
+  if (src.length < 16) return out;
+  var pos = 8;
+  while (pos + 8 < src.length) {
+    var len = (src[pos] * 0x1000000) + (src[pos+1] << 16) + (src[pos+2] << 8) + src[pos+3];
+    var type = String.fromCharCode(src[pos+4], src[pos+5], src[pos+6], src[pos+7]);
+    if (type === 'IEND') break;
+    var dataStart = pos + 8;
+    if ((type === 'iTXt' || type === 'tEXt') && len > 0 && dataStart + len <= src.length) {
+      var data = src.subarray(dataStart, dataStart + len);
+      // keyword runs to first null
+      var nullIdx = -1;
+      for (var i = 0; i < data.length; i++) {
+        if (data[i] === 0) { nullIdx = i; break; }
+      }
+      if (nullIdx > 0) {
+        var keyword = '';
+        for (var k = 0; k < nullIdx; k++) keyword += String.fromCharCode(data[k]);
+        var textBytes;
+        if (type === 'tEXt') {
+          textBytes = data.subarray(nullIdx + 1);
+        } else {
+          // iTXt: skip compression_flag (1B) + compression_method (1B),
+          // then language_tag (null-term), then translated_keyword (null-term).
+          var p = nullIdx + 3;
+          while (p < data.length && data[p] !== 0) p++;
+          p++;
+          while (p < data.length && data[p] !== 0) p++;
+          p++;
+          textBytes = data.subarray(p);
+        }
+        try {
+          out[keyword] = new TextDecoder('utf-8').decode(textBytes);
+        } catch (e) {
+          out[keyword] = '';
+        }
+      }
+    }
+    pos = dataStart + len + 4; // data + CRC
+  }
+  return out;
 }
 
 // Fragment tags for per-band bar reconstruction. Each band's bar

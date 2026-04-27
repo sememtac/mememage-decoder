@@ -140,6 +140,110 @@ DropZone.attach({
   onFiles: analyze
 });
 
+// === Reconstruct flow ===
+// User drops the three saved band PNGs; the box reads each band's
+// iTXt chunks (parent_id, parent_hash, fragment_id), confirms all
+// three belong to the same certificate, and offers a one-click
+// download of the canonical 2-row bar PNG. iTXt is authoritative;
+// the pixel-bar fragment is a fallback for screenshotted bands but
+// alone it can't prove cross-band parentage (each carries only its
+// piece), so the iTXt path is required for now.
+var _recState = { gen: null, sky: null, machine: null };
+function _recSlot(fid) { return document.querySelector('.reconstruct-slot[data-slot="' + fid + '"]'); }
+function _renderReconstruct() {
+  var fids = Object.keys(_recState).filter(function(k) { return _recState[k]; });
+  var pids = fids.map(function(k) { return _recState[k].parentId; });
+  var allAgree = pids.length === 0 || pids.every(function(p) { return p === pids[0]; });
+  ['gen', 'sky', 'machine'].forEach(function(fid) {
+    var el = _recSlot(fid);
+    var stateEl = el.querySelector('.reconstruct-slot-state');
+    var f = _recState[fid];
+    el.classList.remove('filled', 'mismatch');
+    if (f) {
+      el.classList.add(allAgree ? 'filled' : 'mismatch');
+      stateEl.textContent = allAgree ? '\u2713' : '\u2717';
+    } else {
+      stateEl.innerHTML = '\u00b7 \u00b7 \u00b7';
+    }
+  });
+  var statusEl = document.getElementById('reconstructStatus');
+  var btn = document.getElementById('reconstructBtn');
+  if (!allAgree) {
+    statusEl.className = 'reconstruct-status error';
+    statusEl.textContent = 'These bands aren\u2019t from the same certificate.';
+    btn.disabled = true;
+    return;
+  }
+  statusEl.className = 'reconstruct-status';
+  if (fids.length === 0) {
+    statusEl.textContent = '';
+  } else if (fids.length === 3) {
+    statusEl.textContent = 'All three found \u2014 ready to rebuild ' + (pids[0] || '?');
+  } else {
+    var missing = ['gen', 'sky', 'machine'].filter(function(f) { return !_recState[f]; });
+    statusEl.textContent = 'Drop ' + missing.join(' + ') + ' to finish.';
+  }
+  btn.disabled = !(fids.length === 3 && allAgree);
+}
+function _readFragmentFile(file) {
+  return new Promise(function(resolve) {
+    if (!file || !file.type || file.type.indexOf('image/') !== 0) { resolve(null); return; }
+    var reader = new FileReader();
+    reader.onload = function() {
+      var chunks = (typeof readPngTextChunks === 'function') ? readPngTextChunks(reader.result) : {};
+      var fid = chunks.fragment_id;
+      var pid = chunks.parent_id;
+      var phash = chunks.parent_hash;
+      if (fid && pid && phash && (fid === 'gen' || fid === 'sky' || fid === 'machine')) {
+        resolve({ fragmentId: fid, parentId: pid, parentHash: phash });
+      } else {
+        resolve(null);
+      }
+    };
+    reader.onerror = function() { resolve(null); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+function _ingestFragments(files) {
+  var statusEl = document.getElementById('reconstructStatus');
+  var arr = Array.from(files || []);
+  if (!arr.length) return;
+  var promises = arr.map(_readFragmentFile);
+  Promise.all(promises).then(function(results) {
+    var added = 0, rejected = 0;
+    results.forEach(function(r) {
+      if (r) { _recState[r.fragmentId] = r; added++; }
+      else rejected++;
+    });
+    _renderReconstruct();
+    if (added === 0 && rejected > 0) {
+      statusEl.className = 'reconstruct-status error';
+      statusEl.textContent = rejected === 1
+        ? 'That PNG doesn\u2019t carry band fragment data.'
+        : 'None of those PNGs carry band fragment data.';
+    }
+  });
+}
+DropZone.attach({
+  zone: document.getElementById('reconstructZone'),
+  input: document.getElementById('reconstructInput'),
+  accept: function(f) { return f.type.indexOf('image/') === 0; },
+  multiple: true,
+  onFiles: _ingestFragments
+});
+document.getElementById('reconstructBtn').addEventListener('click', function() {
+  var any = _recState.gen || _recState.sky || _recState.machine;
+  if (!any || typeof generateCanonicalBarPng !== 'function') return;
+  generateCanonicalBarPng(any.parentId, any.parentHash).then(function(blob) {
+    if (!blob) return;
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = any.parentId + '.bar.png';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+  });
+});
+
 // Raw bit brightness for forensic strip
 function extractBitBrightness(px,w,h,ppb){ppb=ppb||PIXELS_PER_BIT;var v=[],dpr=w-HEADER_PIXELS-FOOTER_PIXELS,bpr=Math.floor(dpr/ppb);for(var row=0;row<SIG_ROWS;row++){var y=h-1-row;for(var b=0;b<bpr;b++){var cx=HEADER_PIXELS+b*ppb+Math.floor(ppb/2);var i=(y*w+cx)*4;v.push((px[i]+px[i+1]+px[i+2])/3);}}return v;}
 

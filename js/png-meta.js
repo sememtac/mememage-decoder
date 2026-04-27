@@ -107,6 +107,56 @@ function injectPngTextChunks(pngArrayBuffer, metadata) {
   return result.buffer;
 }
 
+// --- Read tEXt + iTXt chunks from a PNG ArrayBuffer ---
+// Returns a flat keyword -> text map. Used by the validator's
+// reconstruct flow to read parent_id / parent_hash / fragment_id
+// from saved band PNGs without decoding pixel bars.
+function readPngTextChunks(arrayBuffer) {
+  var src = new Uint8Array(arrayBuffer);
+  var out = {};
+  // PNG signature is 8 bytes — chunks start at offset 8.
+  if (src.length < 16) return out;
+  var pos = 8;
+  while (pos + 8 < src.length) {
+    var len = (src[pos] * 0x1000000) + (src[pos+1] << 16) + (src[pos+2] << 8) + src[pos+3];
+    var type = String.fromCharCode(src[pos+4], src[pos+5], src[pos+6], src[pos+7]);
+    if (type === 'IEND') break;
+    var dataStart = pos + 8;
+    if ((type === 'iTXt' || type === 'tEXt') && len > 0 && dataStart + len <= src.length) {
+      var data = src.subarray(dataStart, dataStart + len);
+      // keyword runs to first null
+      var nullIdx = -1;
+      for (var i = 0; i < data.length; i++) {
+        if (data[i] === 0) { nullIdx = i; break; }
+      }
+      if (nullIdx > 0) {
+        var keyword = '';
+        for (var k = 0; k < nullIdx; k++) keyword += String.fromCharCode(data[k]);
+        var textBytes;
+        if (type === 'tEXt') {
+          textBytes = data.subarray(nullIdx + 1);
+        } else {
+          // iTXt: skip compression_flag (1B) + compression_method (1B),
+          // then language_tag (null-term), then translated_keyword (null-term).
+          var p = nullIdx + 3;
+          while (p < data.length && data[p] !== 0) p++;
+          p++;
+          while (p < data.length && data[p] !== 0) p++;
+          p++;
+          textBytes = data.subarray(p);
+        }
+        try {
+          out[keyword] = new TextDecoder('utf-8').decode(textBytes);
+        } catch (e) {
+          out[keyword] = '';
+        }
+      }
+    }
+    pos = dataStart + len + 4; // data + CRC
+  }
+  return out;
+}
+
 // Fragment tags for per-band bar reconstruction. Each band's bar
 // carries a 1-byte tag prefix so a screenshotted band still self-
 // identifies even when iTXt chunks have been stripped. Combining

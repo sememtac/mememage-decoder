@@ -183,6 +183,81 @@ body > *:not(#starfield):not(.touch-tooltip) { position: relative; z-index: 1; }
 .img-console.error-only .img-console-id,
 .img-console.error-only .img-console-hash { display: none; }
 .img-console.error-only .img-console-status { margin: 0; padding: 0.2rem 0; }
+/* Reconstruct zone — sits below the main drop on the Image tab.
+   User drops the three saved band PNGs and the box assembles the
+   canonical bar PNG for download. Styling stays subtle so the main
+   drop zone remains the primary action; this is the "or" path. */
+.reconstruct-zone {
+  margin: 0.6rem 0.6rem 0.4rem;
+  padding: 0.7rem 0.9rem 0.85rem;
+  border: 1px dashed rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.015);
+  transition: border-color 0.2s, background 0.2s;
+}
+.reconstruct-zone.drag-over {
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04);
+}
+.reconstruct-title {
+  font-size: 0.7rem; color: #9a9aa4; margin: 0 0 0.15rem;
+  letter-spacing: 0.04em; font-weight: 500; text-align: center;
+}
+.reconstruct-hint {
+  font-size: 0.62rem; color: #5a5a64; margin: 0 0 0.55rem;
+  text-align: center; line-height: 1.45;
+}
+.reconstruct-slots {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+.reconstruct-slot {
+  padding: 0.35rem 0.4rem; border-radius: 5px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  text-align: center; font-size: 0.62rem; line-height: 1.3;
+  transition: all 0.2s;
+}
+.reconstruct-slot.filled {
+  background: rgba(120,200,140,0.06);
+  border-color: rgba(120,200,140,0.25);
+}
+.reconstruct-slot.mismatch {
+  background: rgba(248,113,113,0.06);
+  border-color: rgba(248,113,113,0.3);
+}
+.reconstruct-slot-label {
+  display: block; font-weight: 500; color: #b0b0b8;
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.reconstruct-slot-state { display: block; color: #6a6a74; font-size: 0.6rem; margin-top: 0.1rem; }
+.reconstruct-slot.filled .reconstruct-slot-state { color: #98c0a0; }
+.reconstruct-slot.mismatch .reconstruct-slot-state { color: #f87171; }
+.reconstruct-status {
+  font-size: 0.62rem; color: #7a7a84; text-align: center;
+  min-height: 1.1rem; line-height: 1.4; margin-bottom: 0.5rem;
+}
+.reconstruct-status.error { color: #f87171; }
+.reconstruct-btn {
+  display: block; margin: 0 auto; padding: 0.4rem 1rem;
+  border: 1px solid rgba(120,200,140,0.3);
+  background: rgba(120,200,140,0.06);
+  color: #98c0a0; border-radius: 5px;
+  font-size: 0.7rem; font-family: inherit; letter-spacing: 0.04em;
+  cursor: pointer; transition: all 0.2s;
+}
+.reconstruct-btn:hover:not(:disabled) {
+  background: rgba(120,200,140,0.12);
+  border-color: rgba(120,200,140,0.5);
+  color: #b8d8b8;
+}
+.reconstruct-btn:disabled {
+  opacity: 0.35; cursor: default;
+  border-color: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  color: #707078;
+}
+
 /* Shared inline error line (Observatory, Audit). Same rule: show
    message in the left panel, don't open the right panel, don't
    compact the drop zone. Hidden when empty. */

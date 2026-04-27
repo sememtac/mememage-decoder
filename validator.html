@@ -43,6 +43,18 @@
   <div class="img-console-hash" id="imgConsoleHash"></div>
   <div class="img-console-status" id="imgConsoleStatus"></div>
 </div>
+<div class="reconstruct-zone" id="reconstructZone">
+  <p class="reconstruct-title">Or rebuild the bar from saved bands</p>
+  <p class="reconstruct-hint">drop the gen, sky, and machine PNGs you saved &mdash; the box puts them back together</p>
+  <div class="reconstruct-slots">
+    <div class="reconstruct-slot" data-slot="gen"><span class="reconstruct-slot-label">gen</span><span class="reconstruct-slot-state">&middot; &middot; &middot;</span></div>
+    <div class="reconstruct-slot" data-slot="sky"><span class="reconstruct-slot-label">sky</span><span class="reconstruct-slot-state">&middot; &middot; &middot;</span></div>
+    <div class="reconstruct-slot" data-slot="machine"><span class="reconstruct-slot-label">machine</span><span class="reconstruct-slot-state">&middot; &middot; &middot;</span></div>
+  </div>
+  <div class="reconstruct-status" id="reconstructStatus"></div>
+  <button class="reconstruct-btn" id="reconstructBtn" disabled>Generate bar</button>
+  <input type="file" id="reconstructInput" accept="image/png" multiple style="display:none">
+</div>
 </div>
 </div>
 

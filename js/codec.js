@@ -148,6 +148,38 @@ function embedBits(px, w, h, frameBytes, ppb) {
   return true;
 }
 
+// =====================================================================
+// CANONICAL BAR GENERATOR — builds a 2-row PNG of the canonical bar
+// payload (mememage-XXXX\0<hash>) for the validator's reconstruct flow.
+// Returns a Promise<Blob> of the bar PNG. Width is derived from the
+// payload size at 2px/bit, plus the 48px M/Y/C bands.
+// =====================================================================
+function generateCanonicalBarPng(identifier, contentHash) {
+  var payload = identifier + '\x00' + contentHash;
+  var payloadBytes = new TextEncoder().encode(payload);
+  var frame = encodeFrame(payloadBytes);
+  var totalBits = frame.length * 8;
+  var ppb = 2;
+  // Bits split across SIG_ROWS (2). Per-row bits = ceil(totalBits / 2).
+  var bitsPerRow = Math.ceil(totalBits / SIG_ROWS);
+  // Width: M+Y+C left bands (24) + data + C+Y+M right bands (24).
+  var w = HEADER_PIXELS + bitsPerRow * ppb + FOOTER_PIXELS;
+  var h = SIG_ROWS;
+  var canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  var ctx = canvas.getContext('2d');
+  // Fill with mid-gray as a neutral background (the data pixels will
+  // overwrite to 64 or 192 so the gray only shows in any unused tail).
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, w, h);
+  var img = ctx.getImageData(0, 0, w, h);
+  embedBits(img.data, w, h, frame, ppb);
+  ctx.putImageData(img, 0, 0);
+  return new Promise(function(resolve) {
+    canvas.toBlob(function(blob) { resolve(blob); }, 'image/png');
+  });
+}
+
 function decodePayload(payload){
   const text=new TextDecoder().decode(payload);
   const sep=text.indexOf('\0');

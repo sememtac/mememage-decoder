@@ -87,6 +87,18 @@ async function decodeImageBar(file) {
 
   var decoded = decodePayload(frame.payload);
   if (!decoded) {
+    // Friendly nudge: if the payload starts with a band-fragment tag
+    // byte (0x01 gen / 0x02 sky / 0x03 machine), it's a saved band
+    // PNG, not a full image. Tell the user where to go instead of
+    // "unreadable".
+    var p = frame.payload;
+    if (p && p.length >= 1 && (p[0] === 0x01 || p[0] === 0x02 || p[0] === 0x03)) {
+      var fid = p[0] === 0x01 ? 'gen' : p[0] === 0x02 ? 'sky' : 'machine';
+      return Object.assign({
+        ok: false, detected: true, frame: frame, decoded: null, ppb: usedPpb, fragment: fid,
+        error: 'This is the ' + fid + ' band of a saved certificate \u2014 drop into the validator\u2019s reconstruct box to put the bar back together.'
+      }, base);
+    }
     return Object.assign({ ok: false, detected: true, frame: frame, decoded: null, ppb: usedPpb, error: 'Bar detected but the payload is unreadable.' }, base);
   }
 
