@@ -184,6 +184,18 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
           }
           parent.appendChild(_savedImg);
         }
+        // When the bar is embedded, hide the bottom 2 rows from the
+        // visible overlay via CSS clip. The saved PNG (img.src) still
+        // contains the full image including the bar — the right-click
+        // → Save reads from the underlying bytes, not the clipped
+        // display. So the user never sees the bar in the band, but the
+        // file they save carries it.
+        if (barPayloadBytes && canvas.height > 0) {
+          var _barClipPct = (2 / canvas.height) * 100;
+          _savedImg.style.clipPath = 'inset(0 0 ' + _barClipPct.toFixed(3) + '% 0)';
+        } else {
+          _savedImg.style.clipPath = '';
+        }
         _savedImg.src = _savedBlobUrl;
       };
       reader.readAsArrayBuffer(blob);
