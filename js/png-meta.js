@@ -166,7 +166,13 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
       reader.onload = function() {
         var enriched = injectPngTextChunks(reader.result, metadata);
         var enrichedBlob = new Blob([enriched], {type: 'image/png'});
-        if (_savedBlobUrl) URL.revokeObjectURL(_savedBlobUrl);
+        // Defer revocation of the previous URL — if the user just kicked
+        // off a download, Chrome is still fetching from it. Immediate
+        // revoke surfaces as a "Check internet connection" error and
+        // forces the user to retry. 10s is well past any reasonable
+        // local download.
+        var prevUrl = _savedBlobUrl;
+        if (prevUrl) setTimeout(function() { URL.revokeObjectURL(prevUrl); }, 10000);
         _savedBlobUrl = URL.createObjectURL(enrichedBlob);
 
         if (!_savedImg) {
