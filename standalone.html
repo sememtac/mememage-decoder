@@ -1285,10 +1285,30 @@ function injectPngTextChunks(pngArrayBuffer, metadata) {
   return result.buffer;
 }
 
+// Fragment tags for per-band bar reconstruction. Each band's bar
+// carries a 1-byte tag prefix so a screenshotted band still self-
+// identifies even when iTXt chunks have been stripped. Combining
+// the three fragments (in order) reconstructs the canonical bar
+// payload `mememage-XXXX\0<hash>`.
+var FRAGMENT_TAG_GEN = 0x01;
+var FRAGMENT_TAG_SKY = 0x02;
+var FRAGMENT_TAG_MACHINE = 0x03;
+function fragmentBytes(text, tag) {
+  if (!text && text !== '') return null;
+  var enc = new TextEncoder().encode(text);
+  var out = new Uint8Array(enc.length + 1);
+  out[0] = tag;
+  out.set(enc, 1);
+  return out;
+}
+
 // --- Canvas save interception ---
-function enableCanvasSave(canvas, metadata) {
+function enableCanvasSave(canvas, metadata, barPayloadBytes) {
   // On right-click: swap canvas for a metadata-rich PNG img,
   // let the browser's native save dialog work, then swap back.
+  // If barPayloadBytes is provided, the saved PNG also carries a
+  // pixel bar in its bottom 2 rows (Mememage's standard codec) so
+  // the fragment survives screenshot/copy where iTXt would be lost.
   if (!canvas || !metadata) return;
 
   // Pre-generate the metadata-rich PNG and keep it ready
@@ -1296,7 +1316,30 @@ function enableCanvasSave(canvas, metadata) {
   var _savedImg = null;
 
   function _prepareSaveImg() {
-    canvas.toBlob(function(blob) {
+    var srcCanvas = canvas;
+    // If we have a bar fragment payload AND the codec is loaded, copy
+    // the live canvas to an offscreen buffer and embed the bar in the
+    // bottom 2 rows before PNG encoding. The live canvas is untouched
+    // so the on-screen render stays visually clean.
+    if (barPayloadBytes && typeof encodeFrame === 'function' && typeof embedBits === 'function') {
+      try {
+        srcCanvas = document.createElement('canvas');
+        srcCanvas.width = canvas.width;
+        srcCanvas.height = canvas.height;
+        var sctx = srcCanvas.getContext('2d');
+        sctx.drawImage(canvas, 0, 0);
+        var img = sctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+        var frame = encodeFrame(barPayloadBytes);
+        var ppb = srcCanvas.width >= 1024 ? 3 : 2;
+        embedBits(img.data, srcCanvas.width, srcCanvas.height, frame, ppb);
+        sctx.putImageData(img, 0, 0);
+      } catch (e) {
+        // Bar embed failed (e.g. canvas too narrow for fragment at 2px/bit)
+        // — fall back to plain canvas. iTXt chunks still carry the fragment.
+        srcCanvas = canvas;
+      }
+    }
+    srcCanvas.toBlob(function(blob) {
       var reader = new FileReader();
       reader.onload = function() {
         var enriched = injectPngTextChunks(reader.result, metadata);
@@ -2026,10 +2069,14 @@ function renderCert(meta, options) {
   // Bar payload fragments for triptych reconstruction
   var barId = meta._identifier || '';
   var barHash = meta._content_hash || '';
+  // Bar fragments — split the canonical bar payload (mememage-XXXX\0<hash>)
+  // across the three bands. Combining gen + sky + machine in order
+  // reconstructs the same payload that lives in the full-cert bar.
+  // No URL prefix; the bar stays source-agnostic.
   var barFragments = {
-    gen:     'archive.org/download/' + barId,
-    sky:     '/metadata.json\0',
-    machine: barHash
+    gen:     barId,         // "mememage-XXXXXXXXXXXX"
+    sky:     '\x00',        // canonical null separator
+    machine: barHash        // 16 hex
   };
 
   // ===================================================================
@@ -2620,7 +2667,7 @@ function renderCert(meta, options) {
     setTimeout(function() {
       if (typeof initGenBand !== 'function') return;
       var dims = _setupHiDpi(genCanvas, GEN_W, GEN_H);
-      initGenBand(genCanvas, dims.w, dims.h, GEN_PARAMS, KERNEL_ENTROPY, BAR_SPEC, barFragments.gen, tierColor, rarityScore);
+      initGenBand(genCanvas, dims.w, dims.h, GEN_PARAMS, KERNEL_ENTROPY, BAR_SPEC, barFragments.gen, tierColor, rarityScore, barId, barHash);
     }, 0);
   }
 
@@ -2671,7 +2718,7 @@ function renderCert(meta, options) {
     setTimeout(function() {
       if (typeof initMachineBand !== 'function') return;
       var dims = _setupHiDpi(machCanvas, MACH_W, MACH_H);
-      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore);
+      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore, barId, barHash);
     }, 0);
   }
 
@@ -2727,8 +2774,11 @@ function renderCert(meta, options) {
         celestial_positions: JSON.stringify(skyMeta),
         bar_spec: JSON.stringify(BAR_SPEC),
         bar_payload_2: barFragments.sky,
+        parent_id: barId,
+        parent_hash: barHash,
+        fragment_id: 'sky',
         Software: 'Mememage'
-      });
+      }, (typeof fragmentBytes === 'function') ? fragmentBytes(barFragments.sky, FRAGMENT_TAG_SKY) : null);
     }
   }
 
@@ -4017,7 +4067,7 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
 // diffusion models begin with — creation starts from static).
 // =====================================================================
 
-function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, tierColor, rarityScore) {
+function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, tierColor, rarityScore, parentId, parentHash) {
   var ctx = canvas.getContext('2d');
 
   // Layout
@@ -4594,8 +4644,12 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
     }
     var saveMeta = { generation_params: JSON.stringify(genJson), Software: 'Mememage' };
     if (barSpec) saveMeta.bar_spec = JSON.stringify(barSpec);
-    if (barFragment) saveMeta.bar_payload_1 = barFragment;
-    enableCanvasSave(canvas, saveMeta);
+    if (barFragment !== undefined && barFragment !== null) saveMeta.bar_payload_1 = barFragment;
+    if (parentId)   saveMeta.parent_id   = parentId;
+    if (parentHash) saveMeta.parent_hash = parentHash;
+    saveMeta.fragment_id = 'gen';
+    var fragBytes = (typeof fragmentBytes === 'function') ? fragmentBytes(barFragment, FRAGMENT_TAG_GEN) : null;
+    enableCanvasSave(canvas, saveMeta, fragBytes);
   }
 }
 
@@ -4609,7 +4663,7 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 // Includes kernel entropy cell, machine/entropy traits, and halo.
 // =====================================================================
 
-function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, haloData, tierColor, aboutText, rarityScore) {
+function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, haloData, tierColor, aboutText, rarityScore, parentId, parentHash) {
   var ctx = canvas.getContext('2d');
 
   // Cell colors — shared rarity tint (variant C) from cert-renderer.
@@ -5076,8 +5130,12 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
     if (entropyHex) vitalsJson.entropy = entropyHex;
     var saveMeta = { machine_vitals: JSON.stringify(vitalsJson), Software: 'Mememage' };
     if (barSpec) saveMeta.bar_spec = JSON.stringify(barSpec);
-    if (barFragment) saveMeta.bar_payload_3 = barFragment;
-    enableCanvasSave(canvas, saveMeta);
+    if (barFragment !== undefined && barFragment !== null) saveMeta.bar_payload_3 = barFragment;
+    if (parentId)   saveMeta.parent_id   = parentId;
+    if (parentHash) saveMeta.parent_hash = parentHash;
+    saveMeta.fragment_id = 'machine';
+    var fragBytes = (typeof fragmentBytes === 'function') ? fragmentBytes(barFragment, FRAGMENT_TAG_MACHINE) : null;
+    enableCanvasSave(canvas, saveMeta, fragBytes);
   }
 }
 

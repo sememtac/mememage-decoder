@@ -5,7 +5,7 @@
 // diffusion models begin with — creation starts from static).
 // =====================================================================
 
-function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, tierColor, rarityScore) {
+function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, tierColor, rarityScore, parentId, parentHash) {
   var ctx = canvas.getContext('2d');
 
   // Layout
@@ -582,7 +582,11 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
     }
     var saveMeta = { generation_params: JSON.stringify(genJson), Software: 'Mememage' };
     if (barSpec) saveMeta.bar_spec = JSON.stringify(barSpec);
-    if (barFragment) saveMeta.bar_payload_1 = barFragment;
-    enableCanvasSave(canvas, saveMeta);
+    if (barFragment !== undefined && barFragment !== null) saveMeta.bar_payload_1 = barFragment;
+    if (parentId)   saveMeta.parent_id   = parentId;
+    if (parentHash) saveMeta.parent_hash = parentHash;
+    saveMeta.fragment_id = 'gen';
+    var fragBytes = (typeof fragmentBytes === 'function') ? fragmentBytes(barFragment, FRAGMENT_TAG_GEN) : null;
+    enableCanvasSave(canvas, saveMeta, fragBytes);
   }
 }

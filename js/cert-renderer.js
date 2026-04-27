@@ -276,10 +276,14 @@ function renderCert(meta, options) {
   // Bar payload fragments for triptych reconstruction
   var barId = meta._identifier || '';
   var barHash = meta._content_hash || '';
+  // Bar fragments — split the canonical bar payload (mememage-XXXX\0<hash>)
+  // across the three bands. Combining gen + sky + machine in order
+  // reconstructs the same payload that lives in the full-cert bar.
+  // No URL prefix; the bar stays source-agnostic.
   var barFragments = {
-    gen:     'archive.org/download/' + barId,
-    sky:     '/metadata.json\0',
-    machine: barHash
+    gen:     barId,         // "mememage-XXXXXXXXXXXX"
+    sky:     '\x00',        // canonical null separator
+    machine: barHash        // 16 hex
   };
 
   // ===================================================================
@@ -870,7 +874,7 @@ function renderCert(meta, options) {
     setTimeout(function() {
       if (typeof initGenBand !== 'function') return;
       var dims = _setupHiDpi(genCanvas, GEN_W, GEN_H);
-      initGenBand(genCanvas, dims.w, dims.h, GEN_PARAMS, KERNEL_ENTROPY, BAR_SPEC, barFragments.gen, tierColor, rarityScore);
+      initGenBand(genCanvas, dims.w, dims.h, GEN_PARAMS, KERNEL_ENTROPY, BAR_SPEC, barFragments.gen, tierColor, rarityScore, barId, barHash);
     }, 0);
   }
 
@@ -921,7 +925,7 @@ function renderCert(meta, options) {
     setTimeout(function() {
       if (typeof initMachineBand !== 'function') return;
       var dims = _setupHiDpi(machCanvas, MACH_W, MACH_H);
-      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore);
+      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore, barId, barHash);
     }, 0);
   }
 
@@ -977,8 +981,11 @@ function renderCert(meta, options) {
         celestial_positions: JSON.stringify(skyMeta),
         bar_spec: JSON.stringify(BAR_SPEC),
         bar_payload_2: barFragments.sky,
+        parent_id: barId,
+        parent_hash: barHash,
+        fragment_id: 'sky',
         Software: 'Mememage'
-      });
+      }, (typeof fragmentBytes === 'function') ? fragmentBytes(barFragments.sky, FRAGMENT_TAG_SKY) : null);
     }
   }
 

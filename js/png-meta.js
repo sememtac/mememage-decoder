@@ -107,10 +107,30 @@ function injectPngTextChunks(pngArrayBuffer, metadata) {
   return result.buffer;
 }
 
+// Fragment tags for per-band bar reconstruction. Each band's bar
+// carries a 1-byte tag prefix so a screenshotted band still self-
+// identifies even when iTXt chunks have been stripped. Combining
+// the three fragments (in order) reconstructs the canonical bar
+// payload `mememage-XXXX\0<hash>`.
+var FRAGMENT_TAG_GEN = 0x01;
+var FRAGMENT_TAG_SKY = 0x02;
+var FRAGMENT_TAG_MACHINE = 0x03;
+function fragmentBytes(text, tag) {
+  if (!text && text !== '') return null;
+  var enc = new TextEncoder().encode(text);
+  var out = new Uint8Array(enc.length + 1);
+  out[0] = tag;
+  out.set(enc, 1);
+  return out;
+}
+
 // --- Canvas save interception ---
-function enableCanvasSave(canvas, metadata) {
+function enableCanvasSave(canvas, metadata, barPayloadBytes) {
   // On right-click: swap canvas for a metadata-rich PNG img,
   // let the browser's native save dialog work, then swap back.
+  // If barPayloadBytes is provided, the saved PNG also carries a
+  // pixel bar in its bottom 2 rows (Mememage's standard codec) so
+  // the fragment survives screenshot/copy where iTXt would be lost.
   if (!canvas || !metadata) return;
 
   // Pre-generate the metadata-rich PNG and keep it ready
@@ -118,7 +138,30 @@ function enableCanvasSave(canvas, metadata) {
   var _savedImg = null;
 
   function _prepareSaveImg() {
-    canvas.toBlob(function(blob) {
+    var srcCanvas = canvas;
+    // If we have a bar fragment payload AND the codec is loaded, copy
+    // the live canvas to an offscreen buffer and embed the bar in the
+    // bottom 2 rows before PNG encoding. The live canvas is untouched
+    // so the on-screen render stays visually clean.
+    if (barPayloadBytes && typeof encodeFrame === 'function' && typeof embedBits === 'function') {
+      try {
+        srcCanvas = document.createElement('canvas');
+        srcCanvas.width = canvas.width;
+        srcCanvas.height = canvas.height;
+        var sctx = srcCanvas.getContext('2d');
+        sctx.drawImage(canvas, 0, 0);
+        var img = sctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+        var frame = encodeFrame(barPayloadBytes);
+        var ppb = srcCanvas.width >= 1024 ? 3 : 2;
+        embedBits(img.data, srcCanvas.width, srcCanvas.height, frame, ppb);
+        sctx.putImageData(img, 0, 0);
+      } catch (e) {
+        // Bar embed failed (e.g. canvas too narrow for fragment at 2px/bit)
+        // — fall back to plain canvas. iTXt chunks still carry the fragment.
+        srcCanvas = canvas;
+      }
+    }
+    srcCanvas.toBlob(function(blob) {
       var reader = new FileReader();
       reader.onload = function() {
         var enriched = injectPngTextChunks(reader.result, metadata);

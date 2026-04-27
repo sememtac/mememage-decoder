@@ -6,7 +6,7 @@
 // Includes kernel entropy cell, machine/entropy traits, and halo.
 // =====================================================================
 
-function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, haloData, tierColor, aboutText, rarityScore) {
+function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, haloData, tierColor, aboutText, rarityScore, parentId, parentHash) {
   var ctx = canvas.getContext('2d');
 
   // Cell colors — shared rarity tint (variant C) from cert-renderer.
@@ -473,7 +473,11 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
     if (entropyHex) vitalsJson.entropy = entropyHex;
     var saveMeta = { machine_vitals: JSON.stringify(vitalsJson), Software: 'Mememage' };
     if (barSpec) saveMeta.bar_spec = JSON.stringify(barSpec);
-    if (barFragment) saveMeta.bar_payload_3 = barFragment;
-    enableCanvasSave(canvas, saveMeta);
+    if (barFragment !== undefined && barFragment !== null) saveMeta.bar_payload_3 = barFragment;
+    if (parentId)   saveMeta.parent_id   = parentId;
+    if (parentHash) saveMeta.parent_hash = parentHash;
+    saveMeta.fragment_id = 'machine';
+    var fragBytes = (typeof fragmentBytes === 'function') ? fragmentBytes(barFragment, FRAGMENT_TAG_MACHINE) : null;
+    enableCanvasSave(canvas, saveMeta, fragBytes);
   }
 }
