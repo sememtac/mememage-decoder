@@ -129,6 +129,17 @@
   .input-section {
     transition: width 0.45s ease, max-width 0.45s ease;
   }
+
+  /* Hold the cert column invisible during the system box's width
+     animation, then fade it in. Without the delay the cert pops in
+     immediately and covers the still-wide system box mid-shrink.
+     The .cert-entering class is added by JS only on the first reveal
+     after layout-active is freshly toggled on — never during in-place
+     content swaps (PanelSwap owns those) or repeat tab visits. The
+     class is removed once the animation finishes (~900ms total). */
+  .panel-right.cert-entering {
+    animation: panelFadeIn 0.4s ease-out 0.45s both;
+  }
 }
 
 /* .panel-footer now sits as a direct child of .panel-layout after

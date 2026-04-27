@@ -37,7 +37,16 @@ function showResultsSidebar() {
   rw.classList.remove('dismissing');
   rw.classList.add('visible');
   var dm = document.querySelector('.panel-layout');
-  if (dm) dm.classList.add('layout-active');
+  if (dm) {
+    var wasActive = dm.classList.contains('layout-active');
+    // Fresh entry into compact mode — hold cert column offscreen
+    // through the system box's width animation, then fade in.
+    if (!wasActive && window.innerWidth >= 1200) {
+      rw.classList.add('cert-entering');
+      setTimeout(function() { rw.classList.remove('cert-entering'); }, 900);
+    }
+    dm.classList.add('layout-active');
+  }
   if (window.innerWidth < 1200) scrollResultIntoView(rw);
 }
 
@@ -2492,7 +2501,14 @@ async function activate() {
     resultsWrap.classList.add('visible');
   });
   var dm = document.querySelector('.panel-layout');
-  if (dm) dm.classList.add('layout-active');
+  if (dm) {
+    var wasActive = dm.classList.contains('layout-active');
+    if (!wasActive && window.innerWidth >= 1200) {
+      resultsWrap.classList.add('cert-entering');
+      setTimeout(function() { resultsWrap.classList.remove('cert-entering'); }, 900);
+    }
+    dm.classList.add('layout-active');
+  }
 
   // Sync status line + badges with current edits (may be non-original
   // if user previously typed, then toggled off/on).

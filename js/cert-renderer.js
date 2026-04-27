@@ -1277,7 +1277,16 @@ function renderCert(meta, options) {
   // Activate side-by-side layout on desktop
   if (activateLayout) {
     var desktopMain = document.querySelector('.panel-layout');
-    if (desktopMain) desktopMain.classList.add('layout-active');
+    if (desktopMain) {
+      var _wasActive = desktopMain.classList.contains('layout-active');
+      // Fresh entry into compact mode — hold the cert offscreen
+      // through the system box's width animation, then fade in.
+      if (!_wasActive && window.innerWidth >= 1200) {
+        certWrap.classList.add('cert-entering');
+        setTimeout(function() { certWrap.classList.remove('cert-entering'); }, 900);
+      }
+      desktopMain.classList.add('layout-active');
+    }
   }
 
   // ===================================================================

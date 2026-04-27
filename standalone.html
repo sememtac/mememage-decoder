@@ -144,6 +144,17 @@
   .input-section {
     transition: width 0.45s ease, max-width 0.45s ease;
   }
+
+  /* Hold the cert column invisible during the system box's width
+     animation, then fade it in. Without the delay the cert pops in
+     immediately and covers the still-wide system box mid-shrink.
+     The .cert-entering class is added by JS only on the first reveal
+     after layout-active is freshly toggled on — never during in-place
+     content swaps (PanelSwap owns those) or repeat tab visits. The
+     class is removed once the animation finishes (~900ms total). */
+  .panel-right.cert-entering {
+    animation: panelFadeIn 0.4s ease-out 0.45s both;
+  }
 }
 
 /* .panel-footer now sits as a direct child of .panel-layout after
@@ -3006,7 +3017,16 @@ function renderCert(meta, options) {
   // Activate side-by-side layout on desktop
   if (activateLayout) {
     var desktopMain = document.querySelector('.panel-layout');
-    if (desktopMain) desktopMain.classList.add('layout-active');
+    if (desktopMain) {
+      var _wasActive = desktopMain.classList.contains('layout-active');
+      // Fresh entry into compact mode — hold the cert offscreen
+      // through the system box's width animation, then fade in.
+      if (!_wasActive && window.innerWidth >= 1200) {
+        certWrap.classList.add('cert-entering');
+        setTimeout(function() { certWrap.classList.remove('cert-entering'); }, 900);
+      }
+      desktopMain.classList.add('layout-active');
+    }
   }
 
   // ===================================================================
@@ -7857,7 +7877,15 @@ function applyTabScope(activeId) {
   if (!cw || !dm) return;
   var ownsActiveCert = cw.classList.contains('visible')
     && !cw.classList.contains('tab-scope-hidden');
+  var wasActive = dm.classList.contains('layout-active');
   if (ownsActiveCert) {
+    // Fresh entry into compact mode — delay the cert fade-in until
+    // the system box has finished its shrink animation, so the cert
+    // doesn't cover the still-wide system box mid-transition.
+    if (!wasActive && window.innerWidth >= 1200) {
+      cw.classList.add('cert-entering');
+      setTimeout(function() { cw.classList.remove('cert-entering'); }, 900);
+    }
     dm.classList.add('layout-active');
   } else {
     dm.classList.remove('layout-active');

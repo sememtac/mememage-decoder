@@ -273,7 +273,15 @@ function applyTabScope(activeId) {
   if (!cw || !dm) return;
   var ownsActiveCert = cw.classList.contains('visible')
     && !cw.classList.contains('tab-scope-hidden');
+  var wasActive = dm.classList.contains('layout-active');
   if (ownsActiveCert) {
+    // Fresh entry into compact mode — delay the cert fade-in until
+    // the system box has finished its shrink animation, so the cert
+    // doesn't cover the still-wide system box mid-transition.
+    if (!wasActive && window.innerWidth >= 1200) {
+      cw.classList.add('cert-entering');
+      setTimeout(function() { cw.classList.remove('cert-entering'); }, 900);
+    }
     dm.classList.add('layout-active');
   } else {
     dm.classList.remove('layout-active');
