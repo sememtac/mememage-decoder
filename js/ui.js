@@ -518,7 +518,7 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
       // switching back to Online.
       showPanelError(
         'Not in the offline cache.',
-        'Identifier <strong>' + identifier + '</strong> isn\u2019t among ' +
+        'Identifier <strong>' + escapeHtml(identifier) + '</strong> isn\u2019t among ' +
         OfflineRecords.count() + ' record(s) currently loaded. ' +
         'Load a different folder under <em>Source</em>, or switch to <em>Online</em>.'
       );
@@ -780,7 +780,7 @@ function lookupById(input, pushHistory){
       // user can save it and drop it into By Soul.
       var mcBase = sourceBase || (directUrl ? directUrl.replace(/\/[^/]*$/, '') : '');
       showPanelError(
-        'Mixed content blocked for ' + parsed.identifier,
+        'Mixed content blocked for ' + escapeHtml(parsed.identifier),
         'This page is served over HTTPS, but the source is HTTP \u2014 browsers block this silently.<br>' +
         'Open in a new tab (mixed-content rules don\u2019t apply to top-level navigation):<br>' +
         buildProbeLinks(mcBase, parsed.identifier, parsed.contentHash) + '<br>' +

@@ -1177,6 +1177,13 @@ function buildOrbitInspector(records, collected) {
       });
       if (hasEgg) dlBtnColored('Easter Egg', 'egg', function() {
         var egg = collected.egg;
+        // egg fields come from a .soul record (potentially user-supplied
+        // and hostile). The egg image must be a data: URL — anything
+        // else is rejected so a malicious record can't smuggle a remote
+        // URL into a downloaded HTML file. Text is HTML-escaped before
+        // interpolation.
+        var safeImg = (egg.image && /^data:image\//.test(egg.image)) ? egg.image : '';
+        var safeText = escapeHtml(egg.text || '').replace(/\u2014/g, '&mdash;');
         var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Madeline</title>' +
           '<style>body{margin:0;background:#000;color:#c0c0c8;font-family:Georgia,serif;' +
           'display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;}' +
@@ -1184,9 +1191,9 @@ function buildOrbitInspector(records, collected) {
           'p{margin-top:1.5rem;font-size:0.9rem;color:#909098;text-align:center;max-width:400px;line-height:1.6;}' +
           '.name{font-size:1.8rem;margin-top:1.2rem;letter-spacing:0.1em;color:#d0d0d8;}' +
           '.note{font-size:0.7rem;color:#505058;margin-top:2rem;font-style:italic;}</style></head><body>' +
-          (egg.image ? '<img src="' + egg.image + '" alt="Madeline">' : '') +
+          (safeImg ? '<img src="' + escapeHtml(safeImg) + '" alt="Madeline">' : '') +
           '<div class="name">Madeline</div>' +
-          '<p>' + (egg.text || '').replace(/\u2014/g, '&mdash;') + '</p>' +
+          '<p>' + safeText + '</p>' +
           '<p class="note">The real cat who started it all.<br>Sealed into the epagomenal day &mdash; the day outside all cycles.</p>' +
           '</body></html>';
         var b = new Blob([h], {type:'text/html'}); var a = document.createElement('a');
@@ -2250,7 +2257,10 @@ async function loadOriginal() {
       resolve(dHashFromCanvas(c));
     };
     img.onerror = function() { resolve(null); };
-    img.src = soul.thumbnail;
+    // Only allow inline data: image URLs — block remote thumbnails so
+    // a hostile soul can't beacon the viewer's IP via the dHash load.
+    var _stb = (typeof soul.thumbnail === 'string' && /^data:image\//.test(soul.thumbnail)) ? soul.thumbnail : '';
+    if (_stb) img.src = _stb; else resolve(null);
   });
 
   original = {

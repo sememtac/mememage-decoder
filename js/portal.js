@@ -735,7 +735,10 @@ function buildProbeLinks(base, identifier, contentHash) {
   } else {
     url = expanded + identifier + '.soul';
   }
-  return '<a href="' + url + '" target="_blank" rel="noopener" style="word-break:break-all;">' + url + '</a>';
+  // identifier is user-controllable (typed into By Word, parsed from URL
+  // params, etc.) so escape before interpolating into href/text content.
+  var safeUrl = escapeHtml(url);
+  return '<a href="' + safeUrl + '" target="_blank" rel="noopener" style="word-break:break-all;">' + safeUrl + '</a>';
 }
 
 // =====================================================================

@@ -39,6 +39,15 @@ function _hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slic
 function _div(cls) { var d = document.createElement('div'); if (cls) d.className = cls; return d; }
 function _divider() { return _div('plate-divider'); }
 
+// Thumbnails come from .soul records and may be hostile. Only allow
+// inline data: URLs — block remote URLs (http/https/blob) so a
+// malicious record can't beacon the viewer's IP/Referer to a remote
+// host when the cert renders. Returns '' if the value is not a safe
+// data: image URL.
+function _safeThumbnail(s) {
+  return (typeof s === 'string' && /^data:image\//.test(s)) ? s : '';
+}
+
 // Variant C cell colors for canvas bands — brightened rarity tint
 // (mixed toward white by 0.3 so dark hexes still read on the dark
 // plate), low intensity. Returns base fill/stroke strings + hover
@@ -605,13 +614,14 @@ function renderCert(meta, options) {
   // Bring the body (By Sight or By Soul) and the face is the reward.
   var vfEarly = meta._verification;
   var imageWasPresent = vfEarly && (vfEarly.status === 'verified' || vfEarly.status === 'bar_verified' || vfEarly.status === 'tampered');
-  if (meta.thumbnail && imageWasPresent) {
+  var safeThumb = _safeThumbnail(meta.thumbnail);
+  if (safeThumb && imageWasPresent) {
     var portraitWrap = _div();
     portraitWrap.style.cssText = 'text-align:center;margin-bottom:12px;position:relative;z-index:3';
     var portraitRing = _div();
     portraitRing.style.cssText = 'display:inline-block;width:64px;height:64px;border-radius:50%;overflow:hidden;border:2px solid rgba(0,0,0,0.08);box-shadow:0 2px 8px rgba(0,0,0,0.1)';
     var portraitImg = document.createElement('img');
-    portraitImg.src = meta.thumbnail;
+    portraitImg.src = safeThumb;
     portraitImg.style.cssText = 'width:100%;height:100%;object-fit:cover';
     portraitRing.appendChild(portraitImg);
     portraitWrap.appendChild(portraitRing);
@@ -1205,8 +1215,9 @@ function renderCert(meta, options) {
       function _wrap(t,mw,lh) { var ws=t.split(' '),ln=''; for(var i=0;i<ws.length;i++){var tt=ln+(ln?' ':'')+ws[i];if(c.measureText(tt).width>mw&&ln){c.fillText(ln,W/2,y);y+=lh;ln=ws[i];}else ln=tt;} if(ln){c.fillText(ln,W/2,y);y+=lh;} }
 
       // Portrait
-      var _hp = meta.thumbnail && meta._verification && (meta._verification.status==='verified'||meta._verification.status==='bar_verified');
-      if (_hp) { try { var _ti=new Image();_ti.src=meta.thumbnail;var cx=W/2,cy=y+32*S,r=30*S;c.save();c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.clip();c.drawImage(_ti,cx-r,cy-r,r*2,r*2);c.restore();c.strokeStyle=pg.div;c.lineWidth=1.5*S;c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.stroke();y+=70*S;} catch(e){} }
+      var _safeThumb = _safeThumbnail(meta.thumbnail);
+      var _hp = _safeThumb && meta._verification && (meta._verification.status==='verified'||meta._verification.status==='bar_verified');
+      if (_hp) { try { var _ti=new Image();_ti.src=_safeThumb;var cx=W/2,cy=y+32*S,r=30*S;c.save();c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.clip();c.drawImage(_ti,cx-r,cy-r,r*2,r*2);c.restore();c.strokeStyle=pg.div;c.lineWidth=1.5*S;c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.stroke();y+=70*S;} catch(e){} }
 
       // Constellation
       if (meta.constellation_name) { c.font='600 '+(9*S)+'px '+FONT; c.letterSpacing=(2*S)+'px'; c.textAlign='center'; _etch(meta.constellation_name.toUpperCase(),W/2,y+10*S,tK==='legendary'?'rgba(200,180,180,0.4)':'rgba(60,60,80,0.35)'); c.letterSpacing='0px'; y+=16*S; }
