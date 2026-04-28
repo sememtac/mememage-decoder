@@ -142,7 +142,7 @@
     <button data-mode="earth" onclick="setViewMode('earth')">Earth</button>
   </div>
   <canvas class="planetarium-canvas" id="planetariumCanvas"></canvas>
-  <div class="planetarium-hint" id="planetariumHint">drag to rotate &middot; scroll to zoom &middot; the destiny shape is one viewpoint</div>
+  <div class="planetarium-hint" id="planetariumHint">drag to rotate &middot; pinch or scroll to zoom &middot; the destiny shape is one viewpoint</div>
   <button class="planetarium-close" onclick="closePlanetarium()" aria-label="Close">&times;</button>
 </div>
 
@@ -694,36 +694,88 @@ function start() {
 }
 function stop() { if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; } }
 
-// --- Drag (both modes) ---
+// --- Pointer + pinch handling (mouse, touch, stylus) ---
+// Single pointer = drag (rotate or look around). Two pointers = pinch
+// to zoom. Transitioning between modes re-anchors so there's no jump.
 // Cosmic: drag rotates the SCENE around the viewer (orbital).
 // Earth:  drag rotates the viewer's GAZE direction (head-tilt).
+var activePointers = new Map();
+var pinchStartDist = 0;
+var pinchStartZoom = 1;
+
+function _activePts() {
+  var arr = []; activePointers.forEach(function(v) { arr.push(v); }); return arr;
+}
+
 canvas.addEventListener('pointerdown', function(e) {
-  dragging = true;
-  canvas.classList.add('dragging');
-  dragX0 = e.clientX; dragY0 = e.clientY;
-  theta0Y = thetaY; theta0X = thetaX;
-  velY = 0; velX = 0;
-  canvas.setPointerCapture(e.pointerId);
-});
-canvas.addEventListener('pointermove', function(e) {
-  if (!dragging) return;
-  var dx = e.clientX - dragX0, dy = e.clientY - dragY0;
-  thetaY = theta0Y + dx * 0.005;
-  thetaX = theta0X - dy * 0.005;
-  // Clamp X tilt
-  thetaX = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, thetaX));
-});
-canvas.addEventListener('pointerup', function(e) {
-  if (!dragging) return;
-  dragging = false;
-  canvas.classList.remove('dragging');
-  // Resume idle drift at the current mode's baseline pace
-  velY = (viewMode === 'earth') ? 0.00028 : 0.00055; // earth = slower (sky drift)
-  velX = 0;
-  canvas.releasePointerCapture(e.pointerId);
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+
+  if (activePointers.size === 1) {
+    // Drag start
+    dragging = true;
+    canvas.classList.add('dragging');
+    dragX0 = e.clientX; dragY0 = e.clientY;
+    theta0Y = thetaY; theta0X = thetaX;
+    velY = 0; velX = 0;
+  } else if (activePointers.size === 2) {
+    // Pinch start — drop drag, lock initial finger distance + zoom
+    dragging = false;
+    var pts = _activePts();
+    var dxp = pts[1].x - pts[0].x, dyp = pts[1].y - pts[0].y;
+    pinchStartDist = Math.sqrt(dxp * dxp + dyp * dyp);
+    pinchStartZoom = zoomTarget;
+  }
 });
 
-// --- Wheel zoom ---
+canvas.addEventListener('pointermove', function(e) {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activePointers.size === 1 && dragging) {
+    var dx = e.clientX - dragX0, dy = e.clientY - dragY0;
+    thetaY = theta0Y + dx * 0.005;
+    thetaX = theta0X - dy * 0.005;
+    thetaX = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, thetaX));
+  } else if (activePointers.size === 2 && pinchStartDist > 0) {
+    // Pinch zoom: target zoom = initial * (currentDist / initialDist)
+    var pts = _activePts();
+    var dxp = pts[1].x - pts[0].x, dyp = pts[1].y - pts[0].y;
+    var dist = Math.sqrt(dxp * dxp + dyp * dyp);
+    var nz = pinchStartZoom * (dist / pinchStartDist);
+    zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
+  }
+});
+
+function _pointerEnd(e) {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.delete(e.pointerId);
+
+  if (activePointers.size === 0) {
+    if (dragging) {
+      dragging = false;
+      canvas.classList.remove('dragging');
+      velY = (viewMode === 'earth') ? 0.00028 : 0.00055;
+      velX = 0;
+    }
+    pinchStartDist = 0;
+  } else if (activePointers.size === 1) {
+    // 2 -> 1: pinch ended, but a finger remains. Re-anchor as a drag
+    // continuation from the remaining pointer's current position so
+    // the view doesn't snap.
+    pinchStartDist = 0;
+    var remaining = _activePts()[0];
+    dragX0 = remaining.x; dragY0 = remaining.y;
+    theta0Y = thetaY; theta0X = thetaX;
+    dragging = true;
+    canvas.classList.add('dragging');
+  }
+}
+
+canvas.addEventListener('pointerup', _pointerEnd);
+canvas.addEventListener('pointercancel', _pointerEnd);
+
+// --- Wheel zoom (desktop trackpad / mouse) ---
 // deltaY < 0 = scroll up = zoom in. Exponential mapping keeps the
 // feel consistent across trackpad (small deltas) and mouse wheel
 // (big deltas). Render eases zoom toward zoomTarget so the response
@@ -750,11 +802,11 @@ function setViewMode(mode) {
     transStartTY = thetaY;
     transStartTX = thetaX;
     velY = 0; velX = 0;
-    if (hint) hint.textContent = 'drag to look around · scroll to zoom · you are standing on Earth';
+    if (hint) hint.textContent = 'drag to look around · pinch or scroll to zoom · you are standing on Earth';
   } else {
     transTo = null;
     velY = 0.00055;
-    if (hint) hint.textContent = 'drag to rotate · scroll to zoom · the destiny shape is one viewpoint';
+    if (hint) hint.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
   }
   // After transition completes, auto-drift speed is set by the mode
   // (handled in pointerup; the velY assignment above seeds the drift
@@ -782,7 +834,7 @@ function openPlanetarium() {
   });
   canvas.classList.remove('earth-mode');
   var hint = document.getElementById('planetariumHint');
-  if (hint) hint.textContent = 'drag to rotate · scroll to zoom · the destiny shape is one viewpoint';
+  if (hint) hint.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
   resize();
   document.getElementById('planetarium').classList.add('visible');
   document.getElementById('planetarium').setAttribute('aria-hidden', 'false');
