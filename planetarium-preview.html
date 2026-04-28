@@ -497,17 +497,24 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
-// Cached sprites for the 12 constellation stars — heart and normal,
-// glow + core baked in. Drawn at runtime via drawImage instead of
-// rebuilding a radial gradient each frame. Re-built on resize so DPR
-// changes are picked up. The heart sprite picks up the spectral class
-// of the heart's rarity (set in openPlanetarium).
-var spriteHeart = null, spriteCool = null;
-var heartRgbCache = [255, 240, 200]; // K-class default; overridden at open time
+// Cached sprites for the 12 constellation stars — heart, current,
+// and the rest. Glow + core baked in. Drawn at runtime via drawImage
+// instead of rebuilding a radial gradient each frame. Re-built on
+// resize and on open so DPR + spectral-color changes are picked up.
+//   spriteHeart   — heart star, sized larger, colored by heart rarity
+//   spriteCurrent — current star, normal size, colored by its rarity
+//   spriteCool    — every other star, neutral white (no per-star
+//                    rarity in the prototype data; production would
+//                    color each per its own rarity_score)
+var spriteHeart = null, spriteCool = null, spriteCurrent = null;
+var heartRgbCache = [255, 240, 200];   // K-class default
+var currentRgbCache = [245, 245, 250]; // neutral white default
 function buildStarSprites() {
   var hp = 'rgba(' + heartRgbCache[0] + ',' + heartRgbCache[1] + ',' + heartRgbCache[2];
   spriteHeart = makeSprite(hp, 4.5);
   spriteCool  = makeSprite('rgba(245,245,250', 3.0);
+  var cp = 'rgba(' + currentRgbCache[0] + ',' + currentRgbCache[1] + ',' + currentRgbCache[2];
+  spriteCurrent = makeSprite(cp, 3.0);
 }
 function makeSprite(rgbPrefix, baseSize) {
   var pad = baseSize * 4;
@@ -723,7 +730,10 @@ function render() {
   ctx.textAlign = 'left';
   for (var s = 0; s < sortedStars.length; s++) {
     var p = sortedStars[s];
-    var spr = p.isHeart ? spriteHeart : spriteCool;
+    var spr;
+    if (p.isHeart) spr = spriteHeart;
+    else if (p.i === currentStarIndex) spr = spriteCurrent;
+    else spr = spriteCool;
     var brightness = 0.7 + p.z * 0.5;
     if (brightness < 0.4) brightness = 0.4; else if (brightness > 1) brightness = 1;
     var sprScale = p.f;
@@ -931,9 +941,11 @@ function openPlanetarium() {
   var heartRarity = parseInt(document.getElementById('heartRarityInput').value, 10);
   if (isNaN(heartRarity)) heartRarity = 0;
   heartRgbCache = spectralFor(heartRarity).color.slice();
-  // Current star pulse color (drives radio pulse)
+  // Current star: spectral color drives its sprite core, tier color
+  // drives the radio pulse around it.
   var curRarity = parseInt(document.getElementById('currentRarityInput').value, 10);
   if (isNaN(curRarity)) curRarity = 0;
+  currentRgbCache = spectralFor(curRarity).color.slice();
   pulseRgb = brightenHex(tierColorFor(curRarity), 0.3);
   thetaY = 0; thetaX = 0; velY = 0.00055; velX = 0;
   zoom = 1.0; zoomTarget = 1.0;
