@@ -116,6 +116,10 @@
     <label>Heart star content_hash (per-star seed source)</label>
     <input id="chashInput" type="text" value="6903883e84e12184">
   </div>
+  <div class="control-row">
+    <label>You are (α β γ δ ε ζ η θ ι κ λ μ &mdash; or blank)</label>
+    <input id="currentStarInput" type="text" value="ε" maxlength="1">
+  </div>
 </div>
 
 <div class="triggers">
@@ -515,6 +519,11 @@ function makeSprite(rgbPrefix, baseSize) {
 
 var GREEK = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
 
+// Index of the "current" star — the one corresponding to the cert
+// being viewed. -1 = no highlight. Production: read from the record's
+// constellation_star field; map Greek letter to index 0..11.
+var currentStarIndex = -1;
+
 function render() {
   // Trail wash for slow motion smear (very subtle — the cosmic pace
   // is gentle so we don't need a heavy trail).
@@ -666,6 +675,27 @@ function render() {
     // Greek letter label
     ctx.fillStyle = 'rgba(200,200,220,' + (0.5 + 0.3 * brightness) + ')';
     ctx.fillText(GREEK[p.i], p.x + spr.base * sprScale + 6, p.y + 3);
+  }
+
+  // "You are here" — highlight the current star with a slowly pulsing
+  // ring and a small label. Always rendered last so the marker sits
+  // on top of any nearby stars/edges.
+  if (currentStarIndex >= 0 && currentStarIndex < projected.length) {
+    var me = projected[currentStarIndex];
+    if (me) {
+      var pulse = 0.5 + 0.4 * Math.sin(Date.now() * 0.0012); // ~5s cycle
+      var baseR = (me.isHeart ? 4.5 : 3.0) * me.f;
+      var ringR = baseR * 3.2 + pulse * 1.5;
+      ctx.strokeStyle = 'rgba(255,240,200,' + (0.35 + pulse * 0.35) + ')';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(me.x, me.y, ringR, 0, Math.PI * 2); ctx.stroke();
+      // Label below the ring so it doesn't crowd the Greek letter
+      ctx.font = '9px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,240,200,' + (0.55 + pulse * 0.25) + ')';
+      ctx.textAlign = 'center';
+      ctx.fillText('you are here', me.x, me.y + ringR + 12);
+      ctx.textAlign = 'left'; // restore
+    }
   }
 
   // Earth-view transition: ease thetaY/thetaX toward 0 over TRANS_MS,
@@ -829,6 +859,9 @@ function openPlanetarium() {
   stars = generateStars(name, hash);
   edges = buildEdges(stars);
   generateBgStars(name + ':' + hash);
+  // Pick up the "you are here" star from the input
+  var curRaw = (document.getElementById('currentStarInput').value || '').trim();
+  currentStarIndex = curRaw ? GREEK.indexOf(curRaw) : -1;
   thetaY = 0; thetaX = 0; velY = 0.00055; velX = 0;
   zoom = 1.0; zoomTarget = 1.0;
   // Always open in cosmic mode (default)
