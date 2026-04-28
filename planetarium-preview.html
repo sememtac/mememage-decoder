@@ -472,14 +472,46 @@ var TRANS_MS = 1500;
 
 var W = 0, H = 0, dpr = 1;
 function resize() {
-  dpr = window.devicePixelRatio || 1;
+  // Cap DPR at 2 — retina iPhones / 4K displays go up to 3, which
+  // multiplies trail-wash + per-star fill cost by 2.25x for visual
+  // gains nobody notices on tiny dots.
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
   W = window.innerWidth;
   H = window.innerHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  buildStarSprites();
 }
 window.addEventListener('resize', resize);
+
+// Cached sprites for the 12 constellation stars — heart and normal,
+// glow + core baked in. Drawn at runtime via drawImage instead of
+// rebuilding a radial gradient each frame. Re-built on resize so DPR
+// changes are picked up.
+var spriteHeart = null, spriteCool = null;
+function buildStarSprites() {
+  spriteHeart = makeSprite('rgba(255,240,200', 4.5);
+  spriteCool  = makeSprite('rgba(245,245,250', 3.0);
+}
+function makeSprite(rgbPrefix, baseSize) {
+  var pad = baseSize * 4;
+  var s = Math.ceil(pad * 2);
+  var spr = document.createElement('canvas');
+  spr.width = s; spr.height = s;
+  var sx = spr.getContext('2d');
+  var cx_ = s / 2, cy_ = s / 2;
+  // Outer glow
+  var g = sx.createRadialGradient(cx_, cy_, 0, cx_, cy_, baseSize * 4);
+  g.addColorStop(0, rgbPrefix + ',0.25)');
+  g.addColorStop(1, rgbPrefix + ',0)');
+  sx.fillStyle = g;
+  sx.beginPath(); sx.arc(cx_, cy_, baseSize * 4, 0, Math.PI * 2); sx.fill();
+  // Core
+  sx.fillStyle = rgbPrefix + ',1)';
+  sx.beginPath(); sx.arc(cx_, cy_, baseSize, 0, Math.PI * 2); sx.fill();
+  return { canvas: spr, base: baseSize, half: pad };
+}
 
 var GREEK = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
 
@@ -502,27 +534,30 @@ function render() {
   // the viewer). Earth: stars are pinned to the celestial dome at
   // infinity, translated together with gaze direction (no parallax,
   // uniform sizes — the way stars actually look from Earth).
+  // Use fillRect for bg dots — much cheaper than arc+fill at this
+  // count (~740) and the visual difference at sub-pixel sizes is
+  // imperceptible.
   if (viewMode === 'earth') {
     var pxPerRad = scale * 0.85;
     var fovLimit = Math.PI * 0.55; // ~100° forward FOV
+    var fadeStart = fovLimit * 0.7;
+    var fadeRange = fovLimit * 0.3;
     for (var b = 0; b < bgStars.length; b++) {
       var bs = bgStars[b];
       var dAzi = wrapPi(bs.azimuth - thetaY);
+      if (dAzi > fovLimit || dAzi < -fovLimit) continue;
       var dEle = thetaX - bs.elevation;
-      if (Math.abs(dAzi) > fovLimit) continue;
       var bgX = cx + dAzi * pxPerRad;
       var bgY = cy + dEle * pxPerRad;
       if (bgX < -8 || bgX > W + 8 || bgY < -8 || bgY > H + 8) continue;
-      // Fade smoothly at FOV edge so stars don't pop as they sweep out
-      var fade = 1 - Math.max(0, Math.abs(dAzi) - fovLimit * 0.7) / (fovLimit * 0.3);
-      fade = Math.max(0, Math.min(1, fade));
+      var aDAzi = dAzi < 0 ? -dAzi : dAzi;
+      var fade = aDAzi <= fadeStart ? 1 : Math.max(0, 1 - (aDAzi - fadeStart) / fadeRange);
       var ba = bs.brightness * fade;
       ctx.fillStyle = bs.warm
-        ? 'rgba(255, 240, 210, ' + ba + ')'
-        : 'rgba(210, 220, 240, ' + ba + ')';
-      ctx.beginPath();
-      ctx.arc(bgX, bgY, bs.size, 0, Math.PI * 2);
-      ctx.fill();
+        ? 'rgba(255,240,210,' + ba + ')'
+        : 'rgba(210,220,240,' + ba + ')';
+      var sz = bs.size;
+      ctx.fillRect(bgX - sz * 0.5, bgY - sz * 0.5, sz, sz);
     }
   } else {
     for (var b = 0; b < bgStars.length; b++) {
@@ -534,13 +569,13 @@ function render() {
       var bgX = cx + bg2.x * scale * bf;
       var bgY = cy + bg2.y * scale * bf;
       if (bgX < -8 || bgX > W + 8 || bgY < -8 || bgY > H + 8) continue;
-      var ba = bs.brightness * Math.max(0.15, Math.min(1, (bg2.z + 0.5) * 0.7));
+      var depthMix = bg2.z + 0.5;
+      var ba = bs.brightness * (depthMix < 0.215 ? 0.15 : (depthMix > 1.43 ? 1 : depthMix * 0.7));
       ctx.fillStyle = bs.warm
-        ? 'rgba(255, 240, 210, ' + ba + ')'
-        : 'rgba(210, 220, 240, ' + ba + ')';
-      ctx.beginPath();
-      ctx.arc(bgX, bgY, bs.size * Math.min(2, bf), 0, Math.PI * 2);
-      ctx.fill();
+        ? 'rgba(255,240,210,' + ba + ')'
+        : 'rgba(210,220,240,' + ba + ')';
+      var sz2 = bs.size * (bf < 2 ? bf : 2);
+      ctx.fillRect(bgX - sz2 * 0.5, bgY - sz2 * 0.5, sz2, sz2);
     }
   }
 
@@ -608,32 +643,25 @@ function render() {
     ctx.stroke();
   }
 
-  // Stars
+  // Stars — drawn from cached sprites (built once at resize) so we
+  // don't allocate a radial gradient per star per frame.
   var sortedStars = projected.slice().sort(function(a, b) { return a.z - b.z; });
+  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.textAlign = 'left';
   for (var s = 0; s < sortedStars.length; s++) {
     var p = sortedStars[s];
-    var sizeBase = p.isHeart ? 4.5 : 3.0;
-    var size = sizeBase * p.f;
-    // Brightness from depth — closer is brighter
-    var brightness = Math.max(0.4, Math.min(1, 0.7 + p.z * 0.5));
-
-    // Outer glow
-    var glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 4);
-    glow.addColorStop(0, 'rgba(255, 250, 230, ' + (0.25 * brightness) + ')');
-    glow.addColorStop(1, 'rgba(255, 250, 230, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(p.x, p.y, size * 4, 0, Math.PI * 2); ctx.fill();
-
-    // Core
-    var coreColor = p.isHeart ? 'rgba(255, 240, 200,' : 'rgba(245, 245, 250,';
-    ctx.fillStyle = coreColor + brightness + ')';
-    ctx.beginPath(); ctx.arc(p.x, p.y, size, 0, Math.PI * 2); ctx.fill();
-
+    var spr = p.isHeart ? spriteHeart : spriteCool;
+    var brightness = 0.7 + p.z * 0.5;
+    if (brightness < 0.4) brightness = 0.4; else if (brightness > 1) brightness = 1;
+    var sprScale = p.f;
+    var drawW = spr.canvas.width * sprScale;
+    var drawH = spr.canvas.height * sprScale;
+    ctx.globalAlpha = brightness;
+    ctx.drawImage(spr.canvas, p.x - drawW * 0.5, p.y - drawH * 0.5, drawW, drawH);
+    ctx.globalAlpha = 1;
     // Greek letter label
-    ctx.font = '10px -apple-system, system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(200, 200, 220, ' + (0.5 + 0.3 * brightness) + ')';
-    ctx.textAlign = 'left';
-    ctx.fillText(GREEK[p.i], p.x + size + 6, p.y + 3);
+    ctx.fillStyle = 'rgba(200,200,220,' + (0.5 + 0.3 * brightness) + ')';
+    ctx.fillText(GREEK[p.i], p.x + spr.base * sprScale + 6, p.y + 3);
   }
 
   // Earth-view transition: ease thetaY/thetaX toward 0 over TRANS_MS,
