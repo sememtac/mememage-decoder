@@ -730,21 +730,29 @@ function render() {
   ctx.textAlign = 'left';
   for (var s = 0; s < sortedStars.length; s++) {
     var p = sortedStars[s];
-    var spr;
-    if (p.isHeart) spr = spriteHeart;
-    else if (p.i === currentStarIndex) spr = spriteCurrent;
-    else spr = spriteCool;
     var brightness = 0.7 + p.z * 0.5;
     if (brightness < 0.4) brightness = 0.4; else if (brightness > 1) brightness = 1;
-    var sprScale = p.f;
-    var drawW = spr.canvas.width * sprScale;
-    var drawH = spr.canvas.height * sprScale;
-    ctx.globalAlpha = brightness;
-    ctx.drawImage(spr.canvas, p.x - drawW * 0.5, p.y - drawH * 0.5, drawW, drawH);
-    ctx.globalAlpha = 1;
-    // Greek letter label
-    ctx.fillStyle = 'rgba(200,200,220,' + (0.5 + 0.3 * brightness) + ')';
-    ctx.fillText(GREEK[p.i], p.x + spr.base * sprScale + 6, p.y + 3);
+    var isKnown = p.isHeart || p.i === currentStarIndex;
+    if (isKnown) {
+      // Known star — full glow sprite + Greek letter label
+      var spr = p.isHeart ? spriteHeart : spriteCurrent;
+      var sprScale = p.f;
+      var drawW = spr.canvas.width * sprScale;
+      var drawH = spr.canvas.height * sprScale;
+      ctx.globalAlpha = brightness;
+      ctx.drawImage(spr.canvas, p.x - drawW * 0.5, p.y - drawH * 0.5, drawW, drawH);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(220,220,235,' + (0.6 + 0.3 * brightness) + ')';
+      ctx.fillText(GREEK[p.i], p.x + spr.base * sprScale + 6, p.y + 3);
+    } else {
+      // Unobserved star — only its constellation position is known
+      // (positions are deterministic from constellation_name). Render
+      // as a small dim dot, no glow, no Greek letter — we don't know
+      // its identifier, rarity, or birth order from this cert alone.
+      var dotR = 1.7 * p.f;
+      ctx.fillStyle = 'rgba(170,175,195,' + (brightness * 0.55) + ')';
+      ctx.beginPath(); ctx.arc(p.x, p.y, dotR, 0, Math.PI * 2); ctx.fill();
+    }
   }
 
   // Radio pulse — rings grow outward from the current star and fade
