@@ -870,8 +870,12 @@ canvas.addEventListener('pointermove', function(e) {
 
   if (activePointers.size === 1 && dragging) {
     var dx = e.clientX - dragX0, dy = e.clientY - dragY0;
-    thetaY = theta0Y + dx * 0.005;
-    thetaX = theta0X - dy * 0.005;
+    // Scale pan sensitivity by 1/zoom so close-up zooms feel as
+    // controlled as wide views. At zoom=2, the same finger travel
+    // moves the view half as far in angle.
+    var sens = 0.005 / (zoom > 0.1 ? zoom : 0.1);
+    thetaY = theta0Y + dx * sens;
+    thetaX = theta0X - dy * sens;
     thetaX = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, thetaX));
   } else if (activePointers.size === 2 && pinchStartDist > 0) {
     // Pinch zoom: target zoom = initial * (currentDist / initialDist)
