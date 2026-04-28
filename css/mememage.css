@@ -192,17 +192,15 @@
     display: none;
     /* Locked to 365px — one day per day of the year. The system box
        stays visually stable across tab switches, Source-mode toggles,
-       and long error messages: content that exceeds the reserve
-       scrolls inside the panel (scrollbar hidden below); the box
-       itself never grows. Compact-mode rule overrides this to let
-       the left panel fit its collapsed form. */
+       and long error messages: the box itself never grows. Overflow
+       is hidden (not auto) — partial drag-scroll surfaces a confusing
+       half-visible row instead of a clean cutoff, and the panels
+       must fit naturally inside 365px (compact rules trim the drop
+       zone, Source disclosure, hints, etc as states change). */
     height: 365px;
-    overflow-y: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    overflow: hidden;
     transition: height var(--compact-duration) var(--compact-ease);
   }
-  .input-panel::-webkit-scrollbar { display: none; }
   /* Mobile: the system box fits on one screen. No scrolling inside
      the box, no height expansion when Source opens. Every tab reserves
      the same height (360px) — big enough to accommodate the tallest
