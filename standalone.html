@@ -2159,16 +2159,14 @@ function renderCert(meta, options) {
   // ===================================================================
   // TIME DECAY — compute age tier
   // ===================================================================
-  var ageSecs = 0;
   var ageTier = 'fresh';
-  var ageLabel = 'Fresh';
   if (TIMESTAMP) {
-    ageSecs = (Date.now() - new Date(TIMESTAMP).getTime()) / 1000;
-    if (ageSecs > 31536000) { ageTier = 'ancient'; ageLabel = 'Ancient'; }
-    else if (ageSecs > 2592000) { ageTier = 'vintage'; ageLabel = 'Vintage'; }
-    else if (ageSecs > 604800) { ageTier = 'aged'; ageLabel = 'Aged'; }
-    else if (ageSecs > 86400) { ageTier = 'young'; ageLabel = 'Young'; }
-    else { ageTier = 'fresh'; ageLabel = 'Fresh'; }
+    var ageSecs = (Date.now() - new Date(TIMESTAMP).getTime()) / 1000;
+    if (ageSecs > 31536000)      ageTier = 'ancient';
+    else if (ageSecs > 2592000)  ageTier = 'vintage';
+    else if (ageSecs > 604800)   ageTier = 'aged';
+    else if (ageSecs > 86400)    ageTier = 'young';
+    else                         ageTier = 'fresh';
   }
 
   // Rarity tier
@@ -2991,14 +2989,6 @@ function renderCert(meta, options) {
     footer.innerHTML = '<div class="plate-footer-line">Celestial positions computed via Meeus algorithms (J2000.0 epoch)</div>';
   }
   footer.innerHTML += '<div class="plate-footer-italic">The cosmos does not care, but it was watching.</div>';
-
-  // Age badge — hidden in sample mode, since the example isn't a real
-  // record accumulating age.
-  if (TIMESTAMP && ageTier !== 'fresh' && !isSample) {
-    var ageDays = Math.floor(ageSecs / 86400);
-    var ageStr = ageDays < 30 ? ageDays + ' days old' : ageDays < 365 ? Math.floor(ageDays / 30) + ' months old' : Math.floor(ageDays / 365) + ' years old';
-    footer.innerHTML += '<div style="text-align:center"><span class="age-badge">' + ageLabel + ' \u00b7 ' + ageStr + '</span></div>';
-  }
 
   plate.appendChild(footer);
 

@@ -1343,19 +1343,6 @@
     100% { transform: translateX(100%); opacity: 0; }
   }
 
-  /* Age badge */
-  .age-badge {
-    display: inline-block;
-    font-size: 6px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: #78787e;
-    padding: 2px 8px;
-    border: 1px solid rgba(0,0,0,0.08);
-    border-radius: 10px;
-    margin-top: 6px;
-  }
-
   /* --- Plate typography --- */
   /* Content children are lifted above the bg/grain layers. .shine is
      excluded so it keeps its own absolute positioning (200%×200%
