@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Constellation Planetarium &mdash; preview</title>
+<link rel="stylesheet" href="css/mememage.css">
 <style>
   html, body { margin: 0; padding: 0; background: #050508; color: #cccccd; font-family: -apple-system, system-ui, sans-serif; min-height: 100vh; }
   .page-wrap { padding: 32px; max-width: 720px; margin: 0 auto; }
@@ -157,6 +158,24 @@
   <div class="planetarium-hint" id="planetariumHint">drag to rotate &middot; pinch or scroll to zoom &middot; the destiny shape is one viewpoint</div>
   <button class="planetarium-close" onclick="closePlanetarium()" aria-label="Close">&times;</button>
 </div>
+
+<script src="js/cosmic-audio.js"></script>
+<script src="js/cosmic-player.js"></script>
+<script>
+// Cosmic-player needs cert-renderer.js's getRarityTier. Stub it from
+// the prototype's tier table so we don't have to import the full cert
+// renderer.
+function getRarityTier(score) {
+  for (var i = 0; i < RARITY_TIERS.length; i++) {
+    if (score >= RARITY_TIERS[i][0]) {
+      var hex = RARITY_TIERS[i][1];
+      var names = ['Legendary','Epic','Very Rare','Rare','Uncommon','Common'];
+      return { name: names[i], color: hex };
+    }
+  }
+  return { name: 'Common', color: '#606060' };
+}
+</script>
 
 <script>
 // =====================================================================
@@ -934,6 +953,46 @@ function setViewMode(mode) {
   }, TRANS_MS);
 }
 
+// --- Cosmic player integration ---
+// Builds a mock meta the player can render against, sets the rarity
+// CSS var so the accent picks up the current star's tier color, and
+// overrides the player's sticky positioning so it anchors to the
+// viewport bottom inside the planetarium (rather than being relative
+// to a scrolling cert plate).
+function injectPlanetariumPlayer(name, hash, rarityScore) {
+  if (typeof CosmicPlayer === 'undefined') return;
+  var dest = document.getElementById('planetarium');
+  // Tear down any previous instance first
+  if (typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
+  // Mock a meta record matching the shape the player reads from
+  var meta = {
+    _identifier: 'mememage-' + (hash || '').slice(0, 12),
+    content_hash: hash,
+    constellation_name: name,
+    rarity_score: rarityScore,
+    decoder_chunk_index: (currentStarIndex >= 0 ? currentStarIndex : 0),
+    born: { sun: 'Taurus 6.0\u00b0', moon_phase: 'Full Moon (100%)' },
+    birth_temperament: 'A serene birth'
+  };
+  // Set the rarity color CSS var so the player's accent line picks
+  // it up. Player CSS reads var(--rarity-color, #606060).
+  var tier = getRarityTier(rarityScore);
+  dest.style.setProperty('--rarity-color', tier.color);
+  // Inject into the planetarium overlay
+  CosmicPlayer.inject(dest, meta);
+  // Override sticky positioning -> fixed at viewport bottom so it
+  // floats over the canvas regardless of scroll/modal layout
+  var player = dest.querySelector('.cosmic-player');
+  if (player) {
+    player.style.position = 'fixed';
+    player.style.left = '0';
+    player.style.right = '0';
+    player.style.bottom = '0';
+    player.style.margin = '0';
+    player.style.zIndex = '20';
+  }
+}
+
 // --- Modal controls ---
 function openPlanetarium() {
   var name = document.getElementById('cnameInput').value.trim() || 'Gilamul';
@@ -955,6 +1014,12 @@ function openPlanetarium() {
   if (isNaN(curRarity)) curRarity = 0;
   currentRgbCache = spectralFor(curRarity).color.slice();
   pulseRgb = brightenHex(tierColorFor(curRarity), 0.3);
+  // Cosmic player — same widget the cert uses, fixed-anchored to the
+  // viewport bottom inside the planetarium so audio + visuals persist
+  // when the user enters from a cert. Production: detach the player
+  // from the cert plate on planetarium open, reattach on close. Here
+  // we mock a meta record so the player has something to render.
+  injectPlanetariumPlayer(name, hash, curRarity);
   thetaY = 0; thetaX = 0; velY = 0.00055; velX = 0;
   zoom = 1.0; zoomTarget = 1.0;
   // Always open in cosmic mode (default)
@@ -973,6 +1038,12 @@ function openPlanetarium() {
 function closePlanetarium() {
   document.getElementById('planetarium').classList.remove('visible');
   document.getElementById('planetarium').setAttribute('aria-hidden', 'true');
+  // Tear down the cosmic player + audio
+  if (typeof CosmicPlayer !== 'undefined' && typeof CosmicPlayer.dismiss === 'function') {
+    CosmicPlayer.dismiss();
+  }
+  var leftover = document.getElementById('planetarium').querySelector('.cosmic-player');
+  if (leftover && leftover.parentElement) leftover.parentElement.removeChild(leftover);
   // Defer stop so the fade-out plays
   setTimeout(stop, 700);
 }
