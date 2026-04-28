@@ -161,6 +161,16 @@ body > *:not(#starfield):not(.touch-tooltip) { position: relative; z-index: 1; }
 .panel-layout.layout-active #tab-img .drop-zone .drop-hint {
   max-height: 0; opacity: 0; margin-top: 0;
 }
+
+/* Same compact treatment when the img-console is in error-only state.
+   Without this, the error text bumps the Reliquary below it past the
+   bottom of the 365px input panel (scrollbar is hidden) so the button
+   becomes inaccessible. Shrinking the drop zone reclaims the room. */
+#tab-img:has(.img-console.error-only) .drop-zone { padding: 1.2rem 2rem; }
+#tab-img:has(.img-console.error-only) .drop-zone .drop-icon { font-size: 1.1rem; margin-bottom: 0.3rem; }
+#tab-img:has(.img-console.error-only) .drop-zone .drop-hint {
+  max-height: 0; opacity: 0; margin-top: 0;
+}
 .panel-layout.layout-active #tab-meta #jsonDrop { padding: 0.9rem 2rem !important; }
 .panel-layout.layout-active #tab-meta #jsonDrop .drop-icon { font-size: 1rem; margin-bottom: 0.3rem; }
 .panel-layout.layout-active #tab-meta #jsonDrop .drop-hint {
