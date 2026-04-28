@@ -170,7 +170,7 @@ function _renderReconstruct() {
   var btn = document.getElementById('reconstructBtn');
   if (!allAgree) {
     statusEl.className = 'reconstruct-status error';
-    statusEl.textContent = 'These bands aren\u2019t from the same certificate.';
+    statusEl.textContent = 'these relics belong to different souls.';
     btn.disabled = true;
     return;
   }
@@ -178,10 +178,10 @@ function _renderReconstruct() {
   if (fids.length === 0) {
     statusEl.textContent = '';
   } else if (fids.length === 3) {
-    statusEl.textContent = 'All three found \u2014 ready to rebuild ' + (pids[0] || '?');
+    statusEl.textContent = 'the relics are gathered \u2014 the spirit of ' + (pids[0] || '?') + ' can re-form.';
   } else {
     var missing = ['gen', 'sky', 'machine'].filter(function(f) { return !_recState[f]; });
-    statusEl.textContent = 'Drop ' + missing.join(' + ') + ' to finish.';
+    statusEl.textContent = 'gathered ' + fids.join(' + ') + '. drop ' + missing.join(' + ') + ' to call the spirit back.';
   }
   btn.disabled = !(fids.length === 3 && allAgree);
 }
@@ -222,8 +222,8 @@ function _ingestFragments(files) {
     if (added === 0 && rejected > 0) {
       statusEl.className = 'reconstruct-status error';
       statusEl.textContent = rejected === 1
-        ? 'That PNG doesn\u2019t carry band fragment data.'
-        : 'None of those PNGs carry band fragment data.';
+        ? 'that PNG isn\u2019t a band relic.'
+        : 'none of those PNGs are band relics.';
     }
   });
 }
