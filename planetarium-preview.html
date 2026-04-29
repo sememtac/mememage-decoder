@@ -165,6 +165,7 @@
   <button class="planetarium-close" onclick="closePlanetarium()" aria-label="Close">&times;</button>
 </div>
 
+<script src="js/cosmic-starfield.js"></script>
 <script src="js/cosmic-audio.js"></script>
 <script src="js/cosmic-player.js"></script>
 <script>
@@ -418,70 +419,11 @@ var canvas = document.getElementById('planetariumCanvas');
 var ctx = canvas.getContext('2d');
 var stars = [];
 var edges = [];
-var bgStars = []; // ambient sky around the constellation
 
-// Generate a sparse starfield on a shell around the origin so the
-// constellation feels embedded in a 3D sky. Same rotation as the
-// constellation — as the user rotates the view, bg sweeps with it,
-// giving the sense of "sitting among the stars". Deterministic seed
-// keeps the sky stable across re-opens of the same constellation.
-function generateBgStars(seed) {
-  bgStars = [];
-  var rng = makeRng(strSeed('cosmos:' + seed));
-
-  // Each star is generated with both its 3D position (cosmic-mode
-  // depth scatter) AND its celestial angles (earth-mode dome
-  // projection — stars at infinity, no parallax). Both modes read
-  // the appropriate fields without recomputing.
-  function pushStar(x, y, z, R, brightness, size, warm) {
-    bgStars.push({
-      x: x, y: y, z: z,
-      azimuth: Math.atan2(x, z),  // horizontal angle from forward (+z)
-      elevation: Math.asin(y / R), // angle above horizontal plane
-      brightness: brightness, size: size, warm: warm
-    });
-  }
-
-  // Outer shell — distant ambient sky surrounding the scene.
-  for (var i = 0; i < 360; i++) {
-    var phi = rng() * Math.PI * 2;
-    var u = rng() * 2 - 1;
-    var theta = Math.acos(u);
-    var R = 1.5 + rng() * 0.6;
-    pushStar(
-      R * Math.sin(theta) * Math.cos(phi),
-      R * Math.sin(theta) * Math.sin(phi),
-      R * Math.cos(theta),
-      R,
-      0.2 + rng() * 0.55,
-      0.4 + rng() * 0.9,
-      rng() > 0.75
-    );
-  }
-
-  // Inner volume — fills the space between the constellation (extends
-  // to ~0.6) and the outer shell (starts at 1.5). Uniform volume
-  // distribution (radius cube-rooted) so stars don't pile up at the
-  // inner boundary. Slightly dimmer + smaller than the shell so the
-  // constellation still reads cleanly through them.
-  var rMinCubed = 0.7 * 0.7 * 0.7;
-  var rMaxCubed = 1.45 * 1.45 * 1.45;
-  for (var j = 0; j < 380; j++) {
-    var phi2 = rng() * Math.PI * 2;
-    var u2 = rng() * 2 - 1;
-    var theta2 = Math.acos(u2);
-    var R2 = Math.cbrt(rMinCubed + rng() * (rMaxCubed - rMinCubed));
-    pushStar(
-      R2 * Math.sin(theta2) * Math.cos(phi2),
-      R2 * Math.sin(theta2) * Math.sin(phi2),
-      R2 * Math.cos(theta2),
-      R2,
-      0.15 + rng() * 0.45,
-      0.35 + rng() * 0.65,
-      rng() > 0.8
-    );
-  }
-}
+// Background starfield is now driven by CosmicStarfield (shared engine
+// in js/cosmic-starfield.js). The prototype just calls .generate(seed)
+// on open and dispatches to renderCosmic / renderDome inside the per-
+// frame render loop.
 // Camera state. In cosmic mode these rotate the SCENE around the viewer
 // (orbital — user circles the constellation in 3D). In earth mode they
 // rotate the viewer's GAZE direction (head-tilt — user stays fixed at
@@ -635,52 +577,21 @@ function render() {
   // the viewer). Earth: stars are pinned to the celestial dome at
   // infinity, translated together with gaze direction (no parallax,
   // uniform sizes — the way stars actually look from Earth).
-  // Use fillRect for bg dots — much cheaper than arc+fill at this
-  // count (~740) and the visual difference at sub-pixel sizes is
-  // imperceptible.
-  // Earth-view pan uses "grab the sky" direction — drag right and the
-  // sky follows your finger right (rather than the head-turn convention
-  // where the world slides opposite to the drag).
+  // Background starfield — delegated to the shared engine. Cosmic
+  // mode = 3D rotation + perspective parallax. Earth mode = celestial
+  // dome projection (stars at infinity, no parallax). Same star data
+  // either way; the engine picks the projection. Earth mode uses
+  // invertPan: true so drag right -> sky follows right.
   if (viewMode === 'earth') {
-    var pxPerRad = scale * 0.85;
-    var fovLimit = Math.PI * 0.55; // ~100° forward FOV
-    var fadeStart = fovLimit * 0.7;
-    var fadeRange = fovLimit * 0.3;
-    for (var b = 0; b < bgStars.length; b++) {
-      var bs = bgStars[b];
-      var dAzi = wrapPi(bs.azimuth - thetaY);
-      if (dAzi > fovLimit || dAzi < -fovLimit) continue;
-      var dEle = thetaX - bs.elevation;
-      var bgX = cx - dAzi * pxPerRad;
-      var bgY = cy - dEle * pxPerRad;
-      if (bgX < -8 || bgX > W + 8 || bgY < -8 || bgY > H + 8) continue;
-      var aDAzi = dAzi < 0 ? -dAzi : dAzi;
-      var fade = aDAzi <= fadeStart ? 1 : Math.max(0, 1 - (aDAzi - fadeStart) / fadeRange);
-      var ba = bs.brightness * fade;
-      ctx.fillStyle = bs.warm
-        ? 'rgba(255,240,210,' + ba + ')'
-        : 'rgba(210,220,240,' + ba + ')';
-      var sz = bs.size;
-      ctx.fillRect(bgX - sz * 0.5, bgY - sz * 0.5, sz, sz);
-    }
+    CosmicStarfield.renderDome(ctx, {
+      cx: cx, cy: cy, W: W, H: H, scale: scale,
+      thetaY: thetaY, thetaX: thetaX, invertPan: true
+    });
   } else {
-    for (var b = 0; b < bgStars.length; b++) {
-      var bs = bgStars[b];
-      var bg1 = rotateY(bs, cy2, sy);
-      var bg2 = rotateX(bg1, cx2, sx);
-      var bf = perspective / (perspective - bg2.z);
-      if (bf <= 0 || bf > 3.5) continue;
-      var bgX = cx + bg2.x * scale * bf;
-      var bgY = cy + bg2.y * scale * bf;
-      if (bgX < -8 || bgX > W + 8 || bgY < -8 || bgY > H + 8) continue;
-      var depthMix = bg2.z + 0.5;
-      var ba = bs.brightness * (depthMix < 0.215 ? 0.15 : (depthMix > 1.43 ? 1 : depthMix * 0.7));
-      ctx.fillStyle = bs.warm
-        ? 'rgba(255,240,210,' + ba + ')'
-        : 'rgba(210,220,240,' + ba + ')';
-      var sz2 = bs.size * (bf < 2 ? bf : 2);
-      ctx.fillRect(bgX - sz2 * 0.5, bgY - sz2 * 0.5, sz2, sz2);
-    }
+    CosmicStarfield.renderCosmic(ctx, {
+      cx: cx, cy: cy, W: W, H: H, scale: scale,
+      thetaY: thetaY, thetaX: thetaX, perspective: perspective
+    });
   }
 
   // Project the constellation. Cosmic mode: full 3D — each star's
@@ -1021,7 +932,7 @@ function openPlanetarium() {
   document.getElementById('planetariumName').textContent = name;
   stars = generateStars(name, hash);
   edges = buildEdges(stars);
-  generateBgStars(name + ':' + hash);
+  CosmicStarfield.generate(name + ':' + hash);
   // Pick up the current star from the input
   var curRaw = (document.getElementById('currentStarInput').value || '').trim();
   currentStarIndex = curRaw ? GREEK.indexOf(curRaw) : -1;
