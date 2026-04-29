@@ -1,99 +1,57 @@
 // =====================================================================
-// STAR FIELD — ambient twinkling background, theme-aware.
+// STAR FIELD — ambient cosmic backdrop, theme-aware.
 //
 // Auto-initializes on any page with a <canvas id="starfield">. The
 // canvas's data-theme attribute picks the palette:
-//   data-theme="yin"   — dark stars on a light background (validator)
-//   data-theme="yang"  — light stars on a dark background (decoder, default)
+//   data-theme="yin"   — dark ink on a cream background (validator)
+//   data-theme="yang"  — light stars on a dark background (decoder)
+//
+// Backed by js/cosmic-starfield.js — the same 3D engine the planetarium
+// uses. In ambient mode the dome projection runs with very slow drift
+// (~600s per revolution) and per-star twinkle. When a planetarium
+// session opens, it can take over the same engine for full 3D control,
+// then hand back to ambient on close — no engine swap, no flash.
 // =====================================================================
 (function initStarfield() {
   var canvas = document.getElementById('starfield');
-  if (!canvas) return;
+  if (!canvas || typeof CosmicStarfield === 'undefined') return;
   var ctx = canvas.getContext('2d');
   var theme = canvas.getAttribute('data-theme') === 'yin' ? 'yin' : 'yang';
-  // Yang (decoder): soft blue-white stars, 200 of them.
-  // Yin (validator): plain black stars, 160 of them — sparser + deeper
-  // per-star alpha reads like distant punctuation on a cream page.
-  var COUNT = theme === 'yin' ? 160 : 200;
-  var stars = [];
 
-  function buildStars(w, h) {
-    stars = [];
-    for (var i = 0; i < COUNT; i++) {
-      if (theme === 'yin') {
-        // Dark stars on a cream/light background need more ink than
-        // light stars on dark need luminance — the eye reads black at
-        // low alpha as washed-out gray before it reads as "star". Higher
-        // alpha floor + ceiling brings yin stars to the same perceptual
-        // weight as yang's soft-blue dots.
-        stars.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          r: 0.5 + Math.random() * 1.5,
-          alpha: 0.25 + Math.random() * 0.35,
-          phase: Math.random() * Math.PI * 2,
-          speed: 0.003 + Math.random() * 0.008
-        });
-      } else {
-        stars.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          r: Math.random() * 1.2 + 0.2,
-          alpha: Math.random() * 0.5 + 0.1,
-          phase: Math.random() * Math.PI * 2,
-          speed: Math.random() * 0.008 + 0.002
-        });
-      }
-    }
-  }
+  // Sparser than the planetarium's planetary-scale density. Ambient
+  // mode is wallpaper, not subject — fewer stars, dimmer, lots of
+  // breathing room.
+  CosmicStarfield.generate('ambient:' + theme, {
+    outerCount: 220,
+    innerCount: 110,
+    warmFreq: theme === 'yin' ? 0 : 0.2 // yin paints in pure ink, no warm tint
+  });
 
   function resize() {
-    var prevW = canvas.width || window.innerWidth;
-    var prevH = canvas.height || window.innerHeight;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    if (stars.length === 0) {
-      // First run — seed the field to fit the current viewport.
-      buildStars(canvas.width, canvas.height);
-    } else {
-      // iOS Safari / Chrome fire `resize` when the URL bar or bottom
-      // toolbar toggles during scroll — that used to reshuffle every
-      // star on every tick, reading as a visible pattern change. Keep
-      // the existing field; rescale positions proportionally so stars
-      // spread across the new canvas dimensions instead of clumping.
-      var sx = prevW ? canvas.width / prevW : 1;
-      var sy = prevH ? canvas.height / prevH : 1;
-      if (sx !== 1 || sy !== 1) {
-        for (var j = 0; j < stars.length; j++) {
-          stars[j].x *= sx;
-          stars[j].y *= sy;
-        }
-      }
-    }
   }
-
-  function draw(t) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (var i = 0; i < stars.length; i++) {
-      var s = stars[i];
-      var flicker, a;
-      if (theme === 'yin') {
-        flicker = 0.7 + 0.3 * Math.sin(t * s.speed + s.phase);
-        a = s.alpha * flicker;
-        ctx.fillStyle = 'rgba(0,0,0,' + a + ')';
-      } else {
-        flicker = Math.sin(t * s.speed + s.phase) * 0.3 + 0.7;
-        a = s.alpha * flicker;
-        ctx.fillStyle = 'rgba(180,190,220,' + a + ')';
-      }
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    requestAnimationFrame(draw);
-  }
-
   window.addEventListener('resize', resize);
   resize();
-  requestAnimationFrame(draw);
+
+  var startMs = Date.now();
+
+  function tick() {
+    var elapsed = (Date.now() - startMs) / 1000;
+    // ~600s for one full Y-axis revolution — slow enough to be subliminal
+    var thetaY = (elapsed * Math.PI * 2) / 600;
+    var W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    CosmicStarfield.renderDome(ctx, {
+      cx: W / 2, cy: H / 2, W: W, H: H,
+      scale: Math.min(W, H) * 0.45, // wider spread than planetarium so the
+                                    // page doesn't feel like a vignetted hole
+      thetaY: thetaY, thetaX: 0,
+      theme: theme,
+      time: Date.now() // drives per-star twinkle
+    });
+    setTimeout(tick, 50); // 20fps — ambient is slow; saves cycles for the
+                          // foreground UI while still feeling alive
+  }
+  tick();
 })();

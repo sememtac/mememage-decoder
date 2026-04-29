@@ -73,7 +73,12 @@ var CosmicStarfield = (function() {
         x: x, y: y, z: z,
         azimuth: Math.atan2(x, z),
         elevation: Math.asin(y / R),
-        brightness: brightness, size: size, warm: warm
+        brightness: brightness, size: size, warm: warm,
+        // Per-star twinkle phase + speed, used by render functions
+        // when a `time` opt is passed in. Subtle alpha modulation so
+        // ambient mode reads as a living sky instead of a static dump.
+        twinklePhase: rng() * Math.PI * 2,
+        twinkleSpeed: 0.0008 + rng() * 0.0024
       });
     }
 
@@ -162,12 +167,16 @@ var CosmicStarfield = (function() {
   // uniform sizes, what real stars look like from a fixed viewpoint.
   //
   // opts:
-  //   cx, cy, W, H  — viewport center + dimensions
-  //   scale         — px per world unit (sets pxPerRad for translation)
+  //   cx, cy, W, H   — viewport center + dimensions
+  //   scale          — px per world unit (sets pxPerRad for translation)
   //   thetaY, thetaX — gaze direction
   //   fovLimit       — half-FOV in radians (default π * 0.55, ~100°)
   //   invertPan      — if true, drag right -> sky follows right
   //                    (grab-the-sky direction); else head-turn direction
+  //   theme          — 'yang' (light stars on dark, default) or 'yin'
+  //                    (dark ink on a cream background)
+  //   time           — current ms-ish time for twinkle modulation; if
+  //                    omitted, no twinkle
   function renderDome(ctx, opts) {
     var cx = opts.cx, cy = opts.cy;
     var W = opts.W, H = opts.H;
@@ -175,6 +184,8 @@ var CosmicStarfield = (function() {
     var thetaY = opts.thetaY || 0, thetaX = opts.thetaX || 0;
     var fovLimit = (opts.fovLimit != null) ? opts.fovLimit : Math.PI * 0.55;
     var invertPan = !!opts.invertPan;
+    var theme = opts.theme || 'yang';
+    var time = (opts.time != null) ? opts.time : null;
     var pxPerRad = scale * 0.85;
     var fadeStart = fovLimit * 0.7;
     var fadeRange = fovLimit * 0.3;
@@ -189,10 +200,16 @@ var CosmicStarfield = (function() {
       if (bgX < -8 || bgX > W + 8 || bgY < -8 || bgY > H + 8) continue;
       var aDAzi = dAzi < 0 ? -dAzi : dAzi;
       var fade = aDAzi <= fadeStart ? 1 : Math.max(0, 1 - (aDAzi - fadeStart) / fadeRange);
-      var ba = bs.brightness * fade;
-      ctx.fillStyle = bs.warm
-        ? 'rgba(255,240,210,' + ba + ')'
-        : 'rgba(210,220,240,' + ba + ')';
+      var twinkle = (time != null) ? (0.7 + 0.3 * Math.sin(time * bs.twinkleSpeed + bs.twinklePhase)) : 1;
+      var ba = bs.brightness * fade * twinkle;
+      if (theme === 'yin') {
+        // Dark ink on cream needs more weight per star than light on dark
+        ctx.fillStyle = 'rgba(0,0,0,' + (ba * 0.7) + ')';
+      } else {
+        ctx.fillStyle = bs.warm
+          ? 'rgba(255,240,210,' + ba + ')'
+          : 'rgba(210,220,240,' + ba + ')';
+      }
       var sz = bs.size;
       ctx.fillRect(bgX - sz * 0.5, bgY - sz * 0.5, sz, sz);
     }

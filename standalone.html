@@ -1119,103 +1119,288 @@ async function decodeImageBar(file) {
 </script>
 <script>
 // =====================================================================
-// STAR FIELD — ambient twinkling background, theme-aware.
+// COSMIC STARFIELD — shared 3D starfield engine.
+//
+// Generates a deterministic shell + volume of stars and renders them
+// in two modes:
+//   renderCosmic — full 3D rotation + perspective parallax (planetarium
+//                  3D mode; eventually the page background's "engaged"
+//                  state).
+//   renderDome   — celestial-sphere dome projection (planetarium earth
+//                  mode; stars at infinity, no parallax, gaze rotation
+//                  translates them across the screen).
+//
+// State (the star array) lives inside the module; callers own camera
+// state (thetaY, thetaX, scale, etc.) and pass it in per render call.
+//
+// Designed so the same engine drives:
+//   - The planetarium overlay (engaged, dense, interactive)
+//   - The decoder/validator page background (ambient, slow drift)
+// by the caller varying counts, density, and per-frame state.
+// =====================================================================
+
+var CosmicStarfield = (function() {
+  'use strict';
+
+  var stars = [];
+
+  // ─── Internal helpers (deterministic seeded RNG) ───
+  function _makeRng(seed) {
+    var s = seed | 0; if (!s) s = 1;
+    return function() {
+      s = (s * 1103515245 + 12345) & 0x7FFFFFFF;
+      return s / 0x7FFFFFFF;
+    };
+  }
+  function _strSeed(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0x7FFFFFFF;
+    return h || 1;
+  }
+  function _wrapPi(t) {
+    var w = ((t + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+    return w - Math.PI;
+  }
+
+  // ─── Generation ───
+  // Each star carries its 3D position (cosmic mode), celestial
+  // coordinates (dome mode), and visual props. Generated from a seeded
+  // RNG so reopening the same scene produces the same sky.
+  //
+  // opts:
+  //   outerCount  — distant shell (default 360)
+  //   innerCount  — interior volume (default 380)
+  //   shellRMin   — inner shell radius (default 1.5)
+  //   shellRMax   — outer shell radius (default 2.1)
+  //   volumeRMin  — interior min radius (default 0.7)
+  //   volumeRMax  — interior max radius (default 1.45)
+  //   warmFreq    — share of warm-tinted stars (default 0.25)
+  function generate(seed, opts) {
+    opts = opts || {};
+    var outerCount = (opts.outerCount != null) ? opts.outerCount : 360;
+    var innerCount = (opts.innerCount != null) ? opts.innerCount : 380;
+    var shellRMin  = opts.shellRMin  || 1.5;
+    var shellRMax  = opts.shellRMax  || 2.1;
+    var volMin     = opts.volumeRMin || 0.7;
+    var volMax     = opts.volumeRMax || 1.45;
+    var warmFreq   = (opts.warmFreq != null) ? opts.warmFreq : 0.25;
+
+    stars = [];
+    var rng = _makeRng(_strSeed('cosmos:' + (seed || 'default')));
+
+    function push(x, y, z, R, brightness, size, warm) {
+      stars.push({
+        x: x, y: y, z: z,
+        azimuth: Math.atan2(x, z),
+        elevation: Math.asin(y / R),
+        brightness: brightness, size: size, warm: warm,
+        // Per-star twinkle phase + speed, used by render functions
+        // when a `time` opt is passed in. Subtle alpha modulation so
+        // ambient mode reads as a living sky instead of a static dump.
+        twinklePhase: rng() * Math.PI * 2,
+        twinkleSpeed: 0.0008 + rng() * 0.0024
+      });
+    }
+
+    // Outer shell — distant ambient sky surrounding the scene.
+    for (var i = 0; i < outerCount; i++) {
+      var phi = rng() * Math.PI * 2;
+      var u = rng() * 2 - 1;
+      var theta = Math.acos(u);
+      var R = shellRMin + rng() * (shellRMax - shellRMin);
+      push(
+        R * Math.sin(theta) * Math.cos(phi),
+        R * Math.sin(theta) * Math.sin(phi),
+        R * Math.cos(theta),
+        R,
+        0.2 + rng() * 0.55,
+        0.4 + rng() * 0.9,
+        rng() < warmFreq
+      );
+    }
+
+    // Inner volume — fills the space between any focal subject (e.g.
+    // a constellation) and the outer shell. Cube-rooted radius gives
+    // uniform volume distribution so stars don't pile up at the inner
+    // boundary.
+    var rMinCubed = volMin * volMin * volMin;
+    var rMaxCubed = volMax * volMax * volMax;
+    for (var j = 0; j < innerCount; j++) {
+      var phi2 = rng() * Math.PI * 2;
+      var u2 = rng() * 2 - 1;
+      var theta2 = Math.acos(u2);
+      var R2 = Math.cbrt(rMinCubed + rng() * (rMaxCubed - rMinCubed));
+      push(
+        R2 * Math.sin(theta2) * Math.cos(phi2),
+        R2 * Math.sin(theta2) * Math.sin(phi2),
+        R2 * Math.cos(theta2),
+        R2,
+        0.15 + rng() * 0.45,
+        0.35 + rng() * 0.65,
+        rng() < (warmFreq * 0.8)
+      );
+    }
+  }
+
+  function getStars() { return stars; }
+
+  // ─── Render: cosmic (full 3D rotation + perspective parallax) ───
+  // opts:
+  //   cx, cy, W, H  — viewport center + dimensions
+  //   scale         — px per world unit
+  //   thetaY, thetaX — camera rotation
+  //   perspective   — perspective denominator (default 2.4)
+  function renderCosmic(ctx, opts) {
+    var cx = opts.cx, cy = opts.cy;
+    var W = opts.W, H = opts.H;
+    var scale = opts.scale;
+    var thetaY = opts.thetaY || 0, thetaX = opts.thetaX || 0;
+    var perspective = opts.perspective || 2.4;
+    var cy2 = Math.cos(thetaY), sy = Math.sin(thetaY);
+    var cx2 = Math.cos(thetaX), sx = Math.sin(thetaX);
+    for (var b = 0; b < stars.length; b++) {
+      var bs = stars[b];
+      // rotateY then rotateX, inlined
+      var rx = bs.x * cy2 + bs.z * sy;
+      var ry = bs.y;
+      var rz = -bs.x * sy + bs.z * cy2;
+      var ry2 = ry * cx2 - rz * sx;
+      var rz2 = ry * sx + rz * cx2;
+      var bf = perspective / (perspective - rz2);
+      if (bf <= 0 || bf > 3.5) continue;
+      var bgX = cx + rx * scale * bf;
+      var bgY = cy + ry2 * scale * bf;
+      if (bgX < -8 || bgX > W + 8 || bgY < -8 || bgY > H + 8) continue;
+      var depthMix = rz2 + 0.5;
+      var ba = bs.brightness * (depthMix < 0.215 ? 0.15 : (depthMix > 1.43 ? 1 : depthMix * 0.7));
+      ctx.fillStyle = bs.warm
+        ? 'rgba(255,240,210,' + ba + ')'
+        : 'rgba(210,220,240,' + ba + ')';
+      var sz = bs.size * (bf < 2 ? bf : 2);
+      ctx.fillRect(bgX - sz * 0.5, bgY - sz * 0.5, sz, sz);
+    }
+  }
+
+  // ─── Render: dome (celestial sphere, no parallax) ───
+  // Stars treated as if at infinity. Gaze direction (thetaY, thetaX)
+  // translates the star field across the screen — no perspective,
+  // uniform sizes, what real stars look like from a fixed viewpoint.
+  //
+  // opts:
+  //   cx, cy, W, H   — viewport center + dimensions
+  //   scale          — px per world unit (sets pxPerRad for translation)
+  //   thetaY, thetaX — gaze direction
+  //   fovLimit       — half-FOV in radians (default π * 0.55, ~100°)
+  //   invertPan      — if true, drag right -> sky follows right
+  //                    (grab-the-sky direction); else head-turn direction
+  //   theme          — 'yang' (light stars on dark, default) or 'yin'
+  //                    (dark ink on a cream background)
+  //   time           — current ms-ish time for twinkle modulation; if
+  //                    omitted, no twinkle
+  function renderDome(ctx, opts) {
+    var cx = opts.cx, cy = opts.cy;
+    var W = opts.W, H = opts.H;
+    var scale = opts.scale;
+    var thetaY = opts.thetaY || 0, thetaX = opts.thetaX || 0;
+    var fovLimit = (opts.fovLimit != null) ? opts.fovLimit : Math.PI * 0.55;
+    var invertPan = !!opts.invertPan;
+    var theme = opts.theme || 'yang';
+    var time = (opts.time != null) ? opts.time : null;
+    var pxPerRad = scale * 0.85;
+    var fadeStart = fovLimit * 0.7;
+    var fadeRange = fovLimit * 0.3;
+    var sign = invertPan ? -1 : 1;
+    for (var b = 0; b < stars.length; b++) {
+      var bs = stars[b];
+      var dAzi = _wrapPi(bs.azimuth - thetaY);
+      if (dAzi > fovLimit || dAzi < -fovLimit) continue;
+      var dEle = thetaX - bs.elevation;
+      var bgX = cx + sign * dAzi * pxPerRad;
+      var bgY = cy + sign * dEle * pxPerRad;
+      if (bgX < -8 || bgX > W + 8 || bgY < -8 || bgY > H + 8) continue;
+      var aDAzi = dAzi < 0 ? -dAzi : dAzi;
+      var fade = aDAzi <= fadeStart ? 1 : Math.max(0, 1 - (aDAzi - fadeStart) / fadeRange);
+      var twinkle = (time != null) ? (0.7 + 0.3 * Math.sin(time * bs.twinkleSpeed + bs.twinklePhase)) : 1;
+      var ba = bs.brightness * fade * twinkle;
+      if (theme === 'yin') {
+        // Dark ink on cream needs more weight per star than light on dark
+        ctx.fillStyle = 'rgba(0,0,0,' + (ba * 0.7) + ')';
+      } else {
+        ctx.fillStyle = bs.warm
+          ? 'rgba(255,240,210,' + ba + ')'
+          : 'rgba(210,220,240,' + ba + ')';
+      }
+      var sz = bs.size;
+      ctx.fillRect(bgX - sz * 0.5, bgY - sz * 0.5, sz, sz);
+    }
+  }
+
+  return {
+    generate: generate,
+    getStars: getStars,
+    renderCosmic: renderCosmic,
+    renderDome: renderDome
+  };
+})();
+
+</script>
+<script>
+// =====================================================================
+// STAR FIELD — ambient cosmic backdrop, theme-aware.
 //
 // Auto-initializes on any page with a <canvas id="starfield">. The
 // canvas's data-theme attribute picks the palette:
-//   data-theme="yin"   — dark stars on a light background (validator)
-//   data-theme="yang"  — light stars on a dark background (decoder, default)
+//   data-theme="yin"   — dark ink on a cream background (validator)
+//   data-theme="yang"  — light stars on a dark background (decoder)
+//
+// Backed by js/cosmic-starfield.js — the same 3D engine the planetarium
+// uses. In ambient mode the dome projection runs with very slow drift
+// (~600s per revolution) and per-star twinkle. When a planetarium
+// session opens, it can take over the same engine for full 3D control,
+// then hand back to ambient on close — no engine swap, no flash.
 // =====================================================================
 (function initStarfield() {
   var canvas = document.getElementById('starfield');
-  if (!canvas) return;
+  if (!canvas || typeof CosmicStarfield === 'undefined') return;
   var ctx = canvas.getContext('2d');
   var theme = canvas.getAttribute('data-theme') === 'yin' ? 'yin' : 'yang';
-  // Yang (decoder): soft blue-white stars, 200 of them.
-  // Yin (validator): plain black stars, 160 of them — sparser + deeper
-  // per-star alpha reads like distant punctuation on a cream page.
-  var COUNT = theme === 'yin' ? 160 : 200;
-  var stars = [];
 
-  function buildStars(w, h) {
-    stars = [];
-    for (var i = 0; i < COUNT; i++) {
-      if (theme === 'yin') {
-        // Dark stars on a cream/light background need more ink than
-        // light stars on dark need luminance — the eye reads black at
-        // low alpha as washed-out gray before it reads as "star". Higher
-        // alpha floor + ceiling brings yin stars to the same perceptual
-        // weight as yang's soft-blue dots.
-        stars.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          r: 0.5 + Math.random() * 1.5,
-          alpha: 0.25 + Math.random() * 0.35,
-          phase: Math.random() * Math.PI * 2,
-          speed: 0.003 + Math.random() * 0.008
-        });
-      } else {
-        stars.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          r: Math.random() * 1.2 + 0.2,
-          alpha: Math.random() * 0.5 + 0.1,
-          phase: Math.random() * Math.PI * 2,
-          speed: Math.random() * 0.008 + 0.002
-        });
-      }
-    }
-  }
+  // Sparser than the planetarium's planetary-scale density. Ambient
+  // mode is wallpaper, not subject — fewer stars, dimmer, lots of
+  // breathing room.
+  CosmicStarfield.generate('ambient:' + theme, {
+    outerCount: 220,
+    innerCount: 110,
+    warmFreq: theme === 'yin' ? 0 : 0.2 // yin paints in pure ink, no warm tint
+  });
 
   function resize() {
-    var prevW = canvas.width || window.innerWidth;
-    var prevH = canvas.height || window.innerHeight;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    if (stars.length === 0) {
-      // First run — seed the field to fit the current viewport.
-      buildStars(canvas.width, canvas.height);
-    } else {
-      // iOS Safari / Chrome fire `resize` when the URL bar or bottom
-      // toolbar toggles during scroll — that used to reshuffle every
-      // star on every tick, reading as a visible pattern change. Keep
-      // the existing field; rescale positions proportionally so stars
-      // spread across the new canvas dimensions instead of clumping.
-      var sx = prevW ? canvas.width / prevW : 1;
-      var sy = prevH ? canvas.height / prevH : 1;
-      if (sx !== 1 || sy !== 1) {
-        for (var j = 0; j < stars.length; j++) {
-          stars[j].x *= sx;
-          stars[j].y *= sy;
-        }
-      }
-    }
   }
-
-  function draw(t) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (var i = 0; i < stars.length; i++) {
-      var s = stars[i];
-      var flicker, a;
-      if (theme === 'yin') {
-        flicker = 0.7 + 0.3 * Math.sin(t * s.speed + s.phase);
-        a = s.alpha * flicker;
-        ctx.fillStyle = 'rgba(0,0,0,' + a + ')';
-      } else {
-        flicker = Math.sin(t * s.speed + s.phase) * 0.3 + 0.7;
-        a = s.alpha * flicker;
-        ctx.fillStyle = 'rgba(180,190,220,' + a + ')';
-      }
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    requestAnimationFrame(draw);
-  }
-
   window.addEventListener('resize', resize);
   resize();
-  requestAnimationFrame(draw);
+
+  var startMs = Date.now();
+
+  function tick() {
+    var elapsed = (Date.now() - startMs) / 1000;
+    // ~600s for one full Y-axis revolution — slow enough to be subliminal
+    var thetaY = (elapsed * Math.PI * 2) / 600;
+    var W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    CosmicStarfield.renderDome(ctx, {
+      cx: W / 2, cy: H / 2, W: W, H: H,
+      scale: Math.min(W, H) * 0.45, // wider spread than planetarium so the
+                                    // page doesn't feel like a vignetted hole
+      thetaY: thetaY, thetaX: 0,
+      theme: theme,
+      time: Date.now() // drives per-star twinkle
+    });
+    setTimeout(tick, 50); // 20fps — ambient is slow; saves cycles for the
+                          // foreground UI while still feeling alive
+  }
+  tick();
 })();
 
 </script>
