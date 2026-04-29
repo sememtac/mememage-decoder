@@ -48,7 +48,9 @@
                                     // page doesn't feel like a vignetted hole
       thetaY: thetaY, thetaX: 0,
       theme: theme,
-      time: Date.now() // drives per-star twinkle
+      time: Date.now(),       // drives per-star twinkle
+      brightnessBoost: 1.6    // ambient sits behind UI; needs more weight
+                              // than the planetarium's foreground render
     });
     setTimeout(tick, 50); // 20fps — ambient is slow; saves cycles for the
                           // foreground UI while still feeling alive

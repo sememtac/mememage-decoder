@@ -186,6 +186,7 @@ var CosmicStarfield = (function() {
     var invertPan = !!opts.invertPan;
     var theme = opts.theme || 'yang';
     var time = (opts.time != null) ? opts.time : null;
+    var boost = (opts.brightnessBoost != null) ? opts.brightnessBoost : 1;
     var pxPerRad = scale * 0.85;
     var fadeStart = fovLimit * 0.7;
     var fadeRange = fovLimit * 0.3;
@@ -203,14 +204,14 @@ var CosmicStarfield = (function() {
       var twinkle = (time != null) ? (0.7 + 0.3 * Math.sin(time * bs.twinkleSpeed + bs.twinklePhase)) : 1;
       var ba = bs.brightness * fade * twinkle;
       if (theme === 'yin') {
-        // Dark ink on cream needs more weight per star than light on dark
-        // — bumped up to match the perceptual density of the old 2D
-        // validator starfield (which used alpha 0.25-0.6 directly).
-        ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.85, ba * 1.5) + ')';
+        // Dark ink on cream needs more weight per star than light on
+        // dark to read at the same perceptual density.
+        ctx.fillStyle = 'rgba(0,0,0,' + Math.min(1, ba * 1.5 * boost) + ')';
       } else {
+        var ya = Math.min(1, ba * boost);
         ctx.fillStyle = bs.warm
-          ? 'rgba(255,240,210,' + ba + ')'
-          : 'rgba(210,220,240,' + ba + ')';
+          ? 'rgba(255,240,210,' + ya + ')'
+          : 'rgba(210,220,240,' + ya + ')';
       }
       var sz = bs.size;
       ctx.fillRect(bgX - sz * 0.5, bgY - sz * 0.5, sz, sz);
