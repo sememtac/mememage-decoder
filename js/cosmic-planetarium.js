@@ -768,6 +768,22 @@ var CosmicPlanetarium = (function() {
         });
       }
       destroyDom();
+      // Re-anchor band canvas heights. The cert's gen/machine/sky
+      // bands set inline canvas.style.height at render time
+      // (cssH + 'px') to override the CSS .sky-band-container canvas
+      // { height: auto } rule. If the browser's compositor recycled
+      // the layer during the page-UI opacity transition the inline
+      // height can read as "auto" again, which then computes from
+      // the canvas pixel buffer (cssH * dpr) → canvas displays at
+      // ~2× its expected height with content packed at the top.
+      // canvas.height itself is untouched after init, so we can
+      // recompute the original cssH from canvas.height / dpr.
+      var _dpr = window.devicePixelRatio || 1;
+      var bandCanvases = document.querySelectorAll('.sky-band-container canvas');
+      for (var bi = 0; bi < bandCanvases.length; bi++) {
+        var bc = bandCanvases[bi];
+        if (bc.height > 0) bc.style.height = (bc.height / _dpr) + 'px';
+      }
       document.dispatchEvent(new CustomEvent('cosmic-planetarium-close', { bubbles: true }));
     }, 1100);
   }
