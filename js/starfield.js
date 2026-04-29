@@ -18,13 +18,14 @@
   var ctx = canvas.getContext('2d');
   var theme = canvas.getAttribute('data-theme') === 'yin' ? 'yin' : 'yang';
 
-  // Sparser than the planetarium's planetary-scale density. Ambient
-  // mode is wallpaper, not subject — fewer stars, dimmer, lots of
-  // breathing room.
+  // The decoder/validator pages are a "god view" of the cosmos —
+  // visiting them puts you outside, looking in. Stars are the
+  // primary atmosphere, not faint backdrop. Generous density,
+  // bright per-star alpha (boosted in renderDome below).
   CosmicStarfield.generate('ambient:' + theme, {
-    outerCount: 220,
-    innerCount: 110,
-    warmFreq: theme === 'yin' ? 0 : 0.2 // yin paints in pure ink, no warm tint
+    outerCount: 360,
+    innerCount: 200,
+    warmFreq: theme === 'yin' ? 0 : 0.25 // yin paints in pure ink, no warm tint
   });
 
   function resize() {
@@ -49,8 +50,8 @@
       thetaY: thetaY, thetaX: 0,
       theme: theme,
       time: Date.now(),       // drives per-star twinkle
-      brightnessBoost: 1.6    // ambient sits behind UI; needs more weight
-                              // than the planetarium's foreground render
+      brightnessBoost: 2.4    // god-view framing — the cosmos is the
+                              // subject, not a faint backdrop
     });
     setTimeout(tick, 50); // 20fps — ambient is slow; saves cycles for the
                           // foreground UI while still feeling alive

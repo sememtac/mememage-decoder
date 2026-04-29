@@ -83,6 +83,9 @@ var CosmicStarfield = (function() {
     }
 
     // Outer shell — distant ambient sky surrounding the scene.
+    // Brightness skewed slightly upward so the cosmos reads as
+    // present, not faint. Most stars sit in the mid-bright range
+    // with a handful of clear "hero" stars.
     for (var i = 0; i < outerCount; i++) {
       var phi = rng() * Math.PI * 2;
       var u = rng() * 2 - 1;
@@ -93,8 +96,8 @@ var CosmicStarfield = (function() {
         R * Math.sin(theta) * Math.sin(phi),
         R * Math.cos(theta),
         R,
-        0.2 + rng() * 0.55,
-        0.4 + rng() * 0.9,
+        0.3 + rng() * 0.7,
+        0.5 + rng() * 1.0,
         rng() < warmFreq
       );
     }
@@ -115,8 +118,8 @@ var CosmicStarfield = (function() {
         R2 * Math.sin(theta2) * Math.sin(phi2),
         R2 * Math.cos(theta2),
         R2,
-        0.15 + rng() * 0.45,
-        0.35 + rng() * 0.65,
+        0.25 + rng() * 0.6,
+        0.4 + rng() * 0.7,
         rng() < (warmFreq * 0.8)
       );
     }
