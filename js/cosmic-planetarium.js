@@ -369,9 +369,14 @@ var CosmicPlanetarium = (function() {
     var cx2 = Math.cos(thetaX), sx = Math.sin(thetaX);
 
     if (viewMode === 'earth') {
+      // Full hemisphere FOV (~180°) so the bg starfield covers wherever
+      // the constellation slides to as the user pans their gaze. The
+      // constellation has no FOV cap; if the dome is narrower the
+      // constellation can scroll into empty space.
       CosmicStarfield.renderDome(ctx, {
         cx: cx, cy: cy, W: W, H: H, scale: scale,
-        thetaY: thetaY, thetaX: thetaX, invertPan: true
+        thetaY: thetaY, thetaX: thetaX, invertPan: true,
+        fovLimit: Math.PI
       });
     } else {
       CosmicStarfield.renderCosmic(ctx, {

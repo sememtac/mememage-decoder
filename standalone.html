@@ -1312,8 +1312,10 @@ var CosmicStarfield = (function() {
     var time = (opts.time != null) ? opts.time : null;
     var boost = (opts.brightnessBoost != null) ? opts.brightnessBoost : 1;
     var pxPerRad = scale * 0.85;
-    var fadeStart = fovLimit * 0.7;
-    var fadeRange = fovLimit * 0.3;
+    // Fade only at the very edge of the FOV so bg stars cover the full
+    // visible region. Off-screen culling handles the actual cutoff.
+    var fadeStart = fovLimit * 0.92;
+    var fadeRange = fovLimit - fadeStart;
     var sign = invertPan ? -1 : 1;
     for (var b = 0; b < stars.length; b++) {
       var bs = stars[b];
@@ -1800,9 +1802,14 @@ var CosmicPlanetarium = (function() {
     var cx2 = Math.cos(thetaX), sx = Math.sin(thetaX);
 
     if (viewMode === 'earth') {
+      // Full hemisphere FOV (~180°) so the bg starfield covers wherever
+      // the constellation slides to as the user pans their gaze. The
+      // constellation has no FOV cap; if the dome is narrower the
+      // constellation can scroll into empty space.
       CosmicStarfield.renderDome(ctx, {
         cx: cx, cy: cy, W: W, H: H, scale: scale,
-        thetaY: thetaY, thetaX: thetaX, invertPan: true
+        thetaY: thetaY, thetaX: thetaX, invertPan: true,
+        fovLimit: Math.PI
       });
     } else {
       CosmicStarfield.renderCosmic(ctx, {

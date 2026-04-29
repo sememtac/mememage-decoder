@@ -191,8 +191,10 @@ var CosmicStarfield = (function() {
     var time = (opts.time != null) ? opts.time : null;
     var boost = (opts.brightnessBoost != null) ? opts.brightnessBoost : 1;
     var pxPerRad = scale * 0.85;
-    var fadeStart = fovLimit * 0.7;
-    var fadeRange = fovLimit * 0.3;
+    // Fade only at the very edge of the FOV so bg stars cover the full
+    // visible region. Off-screen culling handles the actual cutoff.
+    var fadeStart = fovLimit * 0.92;
+    var fadeRange = fovLimit - fadeStart;
     var sign = invertPan ? -1 : 1;
     for (var b = 0; b < stars.length; b++) {
       var bs = stars[b];
