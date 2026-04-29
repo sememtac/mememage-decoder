@@ -76,6 +76,21 @@ var CosmicPlayer = (function() {
     var canvas = el('canvas', 'player-eq');
     var controls = el('div', 'player-controls');
 
+    // Minimize/expand toggle — drawer-pull style at top-center.
+    // Default chevron points down (V) to "send to minimal"; CSS
+    // rotates it 180° (^) when player carries .minimal so the same
+    // button signals "expand back up".
+    var toggle = el('button', 'player-toggle');
+    toggle.setAttribute('aria-label', 'Collapse player');
+    toggle.innerHTML = '<svg width="14" height="7" viewBox="0 0 14 7" aria-hidden="true">'
+      + '<path d="M1 1 L7 5.5 L13 1" fill="none" stroke="currentColor" '
+      + 'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    toggle.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isMinimal = player.classList.toggle('minimal');
+      toggle.setAttribute('aria-label', isMinimal ? 'Expand player' : 'Collapse player');
+    });
+
     // Play button
     var btn = el('button', 'player-btn');
     btn.id = 'cosmicPlayBtn';
@@ -123,6 +138,7 @@ var CosmicPlayer = (function() {
     inner.appendChild(canvas);
     inner.appendChild(controls);
     player.appendChild(accent);
+    player.appendChild(toggle);
     player.appendChild(inner);
 
     return {
