@@ -8,6 +8,10 @@
 <link rel="stylesheet" href="css/cosmic-planetarium.css">
 <style>
   html, body { margin: 0; padding: 0; background: #050508; color: #cccccd; font-family: -apple-system, system-ui, sans-serif; min-height: 100vh; }
+  /* Page-level starfield — same canvas the planetarium reuses for its
+     constellation overlay. Sits behind the page chrome at all times. */
+  #starfield { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
+  .page-wrap { position: relative; z-index: 1; }
   .page-wrap { padding: 32px; max-width: 720px; margin: 0 auto; }
   h1 { font-size: 16px; font-weight: 500; margin: 0 0 4px; color: #f0f0f6; letter-spacing: 0.05em; }
   p.intro { color: #888892; font-size: 12px; line-height: 1.5; margin: 0 0 20px; }
@@ -30,6 +34,8 @@
 </style>
 </head>
 <body>
+
+<canvas id="starfield"></canvas>
 
 <div class="page-wrap">
 <h1>Constellation Planetarium &mdash; prototype</h1>
@@ -73,6 +79,7 @@
 </div>
 
 <script src="js/cosmic-starfield.js"></script>
+<script src="js/starfield.js"></script>
 <script src="js/cosmic-audio.js"></script>
 <script src="js/cosmic-player.js"></script>
 <script src="js/cosmic-planetarium.js"></script>

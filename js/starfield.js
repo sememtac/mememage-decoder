@@ -1,74 +1,159 @@
 // =====================================================================
-// STAR FIELD — ambient cosmic backdrop, theme-aware.
+// STAR FIELD — single page-level cosmic backdrop, shared with the
+// planetarium. Auto-initializes on any page with a <canvas id="starfield">.
 //
-// Auto-initializes on any page with a <canvas id="starfield">. The
-// canvas's data-theme attribute picks the palette:
-//   data-theme="yin"   — dark ink on a cream background (validator)
-//   data-theme="yang"  — light stars on a dark background (decoder)
+// Owns one canvas. Owns the camera state (thetaY, thetaX, zoom, mode).
+// Renders the bg starfield every tick. When a planetarium opens, it
+// flips camera.mode to 'cosmic' and registers an overlay callback that
+// gets called after the bg render each frame — the constellation draws
+// onto the same pixels, so the starfield is one continuous backdrop
+// instead of two stacked canvases swapping between modes.
 //
-// Backed by js/cosmic-starfield.js — the same 3D engine the planetarium
-// uses. In ambient mode the dome projection runs with very slow drift
-// (~600s per revolution) and per-star twinkle. When a planetarium
-// session opens, it can take over the same engine for full 3D control,
-// then hand back to ambient on close — no engine swap, no flash.
+// Public API:
+//   Starfield.camera          // { thetaY, thetaX, zoom, zoomTarget,
+//                              //   velY, velX, mode, cyOffsetCss }
+//   Starfield.setOverlay(fn)  // fn(ctx, { camera, W, H, scale, theme,
+//                              //          renderScale, cyOffsetPx })
+//   Starfield.clearOverlay()
+//   Starfield.canvas          // raw <canvas> reference
+//   Starfield.theme           // 'yang' | 'yin'
+//   Starfield.renderScale     // canvas-pixel-to-css-pixel ratio
+//
+// Mode values:
+//   'ambient'  — slow incremental Y drift, dome projection (default).
+//                Increments are additive so flipping into/out of cosmic
+//                mode preserves thetaY without snapping.
+//   'cosmic'   — full 3D rotation (planetarium); driven by user input
+//                via an external ticker (cosmic-planetarium.js).
+//   'earth'    — celestial dome (planetarium); driven by user gaze.
 // =====================================================================
-(function initStarfield() {
-  var canvas = document.getElementById('starfield');
-  if (!canvas || typeof CosmicStarfield === 'undefined') return;
-  var ctx = canvas.getContext('2d');
-  var theme = canvas.getAttribute('data-theme') === 'yin' ? 'yin' : 'yang';
+var Starfield = (function() {
+  'use strict';
 
-  // The decoder/validator pages are a "god view" of the cosmos —
-  // visiting them puts you outside, looking in. Stars are the
-  // primary atmosphere, not faint backdrop. Density tuned for the
-  // god-view feel without flooding fillRects on 4K monitors.
-  CosmicStarfield.generate('ambient:' + theme, {
-    outerCount: 240,
-    innerCount: 130,
-    warmFreq: theme === 'yin' ? 0 : 0.25
-  });
-
-  // Cap actual canvas pixel dimensions. On a 4K monitor without DPR
-  // scaling the canvas would be 3840x2160 — clearRect alone is ~8M
-  // pixels per frame for what is meant to be a quiet ambient
-  // backdrop. Capping the long axis at ~1800 keeps it light. Stars
-  // are dots; the visual difference is invisible at typical viewing
-  // distance.
-  var MAX_CANVAS_LONG = 1800;
+  var canvas = null, ctx = null, theme = 'yang';
+  var overlay = null;
   var renderScale = 1;
+  var MAX_LONG = 1800;
+
+  // Camera state shared with the planetarium. The planetarium reads
+  // this for its constellation overlay AND mutates it on user input.
+  // Ambient mode advances thetaY incrementally so the angle is
+  // preserved when other modules flip mode in/out — no snap on close.
+  var camera = {
+    thetaY: 0, thetaX: 0,
+    zoom: 1.0, zoomTarget: 1.0,
+    velY: 0.00055,
+    velX: 0,
+    mode: 'ambient',
+    // CSS-pixel y offset applied to the projection center. The
+    // planetarium sets this negative to lift the constellation above
+    // the cosmic player; bg render uses it too so bg + overlay share
+    // the same rotation pivot.
+    cyOffsetCss: 0
+  };
+
+  function init() {
+    canvas = document.getElementById('starfield');
+    if (!canvas || typeof CosmicStarfield === 'undefined') return false;
+    ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+    theme = canvas.getAttribute('data-theme') === 'yin' ? 'yin' : 'yang';
+
+    CosmicStarfield.generate('ambient:' + theme, {
+      outerCount: 360, innerCount: 200,
+      warmFreq: theme === 'yin' ? 0 : 0.25
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+    tick();
+    return true;
+  }
+
   function resize() {
+    if (!canvas) return;
     var W = window.innerWidth, H = window.innerHeight;
     var longest = Math.max(W, H);
-    var s = longest > MAX_CANVAS_LONG ? (MAX_CANVAS_LONG / longest) : 1;
+    var s = longest > MAX_LONG ? (MAX_LONG / longest) : 1;
     canvas.width = Math.round(W * s);
     canvas.height = Math.round(H * s);
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     renderScale = s;
   }
-  window.addEventListener('resize', resize);
-  resize();
-
-  var startMs = Date.now();
 
   function tick() {
-    var elapsed = (Date.now() - startMs) / 1000;
-    // ~600s for one full Y-axis revolution — slow enough to be subliminal
-    var thetaY = (elapsed * Math.PI * 2) / 600;
     var W = canvas.width, H = canvas.height;
+
+    if (camera.mode === 'ambient') {
+      // Incremental drift — preserves thetaY across mode flips so the
+      // bg never snaps when the planetarium hands camera back.
+      camera.thetaY += 0.00055;
+      // Ease thetaX back to 0; ambient is conceptually a horizontal
+      // drift only, so any leftover X tilt from a recent planetarium
+      // session relaxes out within a few seconds.
+      camera.thetaX *= 0.95;
+    }
+    // Zoom always eases toward target (works for all modes)
+    camera.zoom += (camera.zoomTarget - camera.zoom) * 0.12;
+
+    var cyOffsetPx = (camera.cyOffsetCss || 0) * renderScale;
+    var cx = W / 2;
+    var cy = H / 2 + cyOffsetPx;
+    var scale = Math.min(W, H) * 0.32 * camera.zoom;
+
     ctx.clearRect(0, 0, W, H);
-    CosmicStarfield.renderDome(ctx, {
-      cx: W / 2, cy: H / 2, W: W, H: H,
-      scale: Math.min(W, H) * 0.45, // wider spread than planetarium so the
-                                    // page doesn't feel like a vignetted hole
-      thetaY: thetaY, thetaX: 0,
-      theme: theme,
-      time: Date.now(),       // drives per-star twinkle
-      brightnessBoost: 2.4    // god-view framing — the cosmos is the
-                              // subject, not a faint backdrop
-    });
-    setTimeout(tick, 50); // 20fps — ambient is slow; saves cycles for the
-                          // foreground UI while still feeling alive
+
+    if (camera.mode === 'earth') {
+      CosmicStarfield.renderDome(ctx, {
+        cx: cx, cy: cy, W: W, H: H, scale: scale,
+        thetaY: camera.thetaY, thetaX: camera.thetaX,
+        invertPan: true, fovLimit: Math.PI,
+        theme: theme, brightnessBoost: 2.0
+      });
+    } else if (camera.mode === 'cosmic') {
+      CosmicStarfield.renderCosmic(ctx, {
+        cx: cx, cy: cy, W: W, H: H, scale: scale,
+        thetaY: camera.thetaY, thetaX: camera.thetaX,
+        perspective: 2.4
+      });
+    } else {
+      // Ambient (default page state) — dome projection, slow drift,
+      // theme-aware colors, twinkle.
+      CosmicStarfield.renderDome(ctx, {
+        cx: cx, cy: cy, W: W, H: H, scale: scale,
+        thetaY: camera.thetaY, thetaX: 0,
+        theme: theme, time: Date.now(),
+        brightnessBoost: 2.4
+      });
+    }
+
+    // Overlay (constellation when planetarium is engaged)
+    if (overlay) {
+      try {
+        overlay(ctx, {
+          camera: camera, W: W, H: H, scale: scale,
+          cx: cx, cy: cy, theme: theme,
+          renderScale: renderScale, cyOffsetPx: cyOffsetPx
+        });
+      } catch (e) {}
+    }
+
+    setTimeout(tick, 50);
   }
-  tick();
+
+  function setOverlay(fn) { overlay = fn; }
+  function clearOverlay() { overlay = null; }
+
+  return {
+    init: init,
+    camera: camera,
+    setOverlay: setOverlay,
+    clearOverlay: clearOverlay,
+    get canvas() { return canvas; },
+    get theme() { return theme; },
+    get renderScale() { return renderScale; }
+  };
 })();
+
+if (document.readyState !== 'loading') Starfield.init();
+else document.addEventListener('DOMContentLoaded', Starfield.init);

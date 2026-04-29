@@ -1,6 +1,12 @@
 // =====================================================================
 // COSMIC PLANETARIUM — modal 3D constellation viewer.
 //
+// Owns the planetarium chrome (name, mode toggle, hint, close, music
+// player) AND the constellation overlay drawn into the page-level
+// Starfield canvas. The starfield is one continuous backdrop —
+// ambient drift becomes 3D cosmic engagement when the planetarium
+// opens, and the constellation reveals itself onto the same pixels.
+//
 // Public API:
 //   CosmicPlanetarium.open({
 //     name: 'Tudemul',                   // constellation_name
@@ -12,12 +18,9 @@
 //   });
 //   CosmicPlanetarium.close();
 //
-// Builds modal DOM on open, removes on close. Same engine the prototype
-// uses (CosmicStarfield for bg, mode toggle between cosmic 3D and earth
-// dome, drag/pinch/wheel input, radio pulse, etc).
-//
-// Depends on: cosmic-starfield.js (CosmicStarfield), cosmic-player.js
-// (optional CosmicPlayer for music).
+// Depends on: starfield.js (Starfield.camera + setOverlay), cosmic-
+// starfield.js (CosmicStarfield.generate), cosmic-player.js (optional
+// CosmicPlayer for music).
 // =====================================================================
 
 var CosmicPlanetarium = (function() {
@@ -38,24 +41,24 @@ var CosmicPlanetarium = (function() {
     [46, '#2a5090'], [35, '#2a7030'], [0, '#606060']
   ];
   var ZOOM_MIN = 0.5, ZOOM_MAX = 8.0;
-  var TRANS_MS = 1500;
+  var TRANS_MS = 1500;     // cross-mode (cosmic ↔ earth)
+  var RESET_MS = 700;      // same-mode "reset to default" gesture
+  var OPEN_MS  = 1500;     // ease ambient camera → centered cosmic on open
+  var FADE_MS  = 600;      // constellation alpha ramp on open/close
 
   // ─── State ───
-  var modal = null, canvas = null, ctx = null;
+  var modal = null;
   var nameEl = null, hintEl = null, modeBtns = null;
-  var W = 0, H = 0, dpr = 1;
   var stars = [], edges = [];
-  var thetaY = 0, thetaX = 0;
   var velY = 0.00055, velX = 0;
-  var zoom = 1.0, zoomTarget = 1.0;
   var viewMode = 'cosmic';
   var transTo = null, transStart = 0, transStartTY = 0, transStartTX = 0;
-  var transDuration = 1500; // overridden in setViewMode per gesture
+  var transDuration = TRANS_MS;
   var dragging = false;
   var dragX0 = 0, dragY0 = 0, theta0Y = 0, theta0X = 0;
   var activePointers = new Map();
   var pinchStartDist = 0, pinchStartZoom = 1;
-  var renderTimer = null;
+  var ticker = null;
   var heartRgbCache = [255, 240, 200];
   var currentRgbCache = [245, 245, 250];
   var pulseRgb = [220, 220, 240];
@@ -63,6 +66,15 @@ var CosmicPlanetarium = (function() {
   var currentStarIndex = -1;
   var openOpts = null;
   var playerMinimal = false;
+  var isOpen = false;
+  // Constellation alpha — ramps on open/close so the overlay fades in
+  // and out alongside the modal chrome's CSS opacity transition.
+  var overlayAlpha = 0;
+  var overlayAlphaStart = 0;
+  var overlayAlphaTarget = 0;
+  var overlayAlphaT0 = 0;
+
+  function cam() { return Starfield.camera; }
 
   // ─── Helpers ───
   function makeRng(seed) {
@@ -289,7 +301,6 @@ var CosmicPlanetarium = (function() {
       + '<div class="planetarium-name">'
       +   '<div class="planetarium-name-text"></div>'
       + '</div>'
-      + '<canvas class="planetarium-canvas"></canvas>'
       + '<div class="planetarium-mode">'
       +   '<button data-mode="cosmic" class="active">Cosmic</button>'
       +   '<button data-mode="earth">Earth</button>'
@@ -297,99 +308,42 @@ var CosmicPlanetarium = (function() {
       + '<div class="planetarium-hint">drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint</div>'
       + '<button class="planetarium-close" aria-label="Close">&times;</button>';
     document.body.appendChild(modal);
-    canvas = modal.querySelector('.planetarium-canvas');
-    // desynchronized: true lets Chrome render canvas updates without
-    // blocking the main thread on compositor sync, big win on 4K.
-    // alpha: true (explicit) keeps the planetarium overlay translucent.
-    ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
     nameEl = modal.querySelector('.planetarium-name-text');
     hintEl = modal.querySelector('.planetarium-hint');
     modeBtns = modal.querySelectorAll('.planetarium-mode button');
     modal.querySelector('.planetarium-close').addEventListener('click', close);
-    modal.addEventListener('click', function(e) { if (e.target === modal) close(); });
     document.addEventListener('keydown', _onKey);
     modeBtns.forEach(function(b) {
       b.addEventListener('click', function() { setViewMode(b.dataset.mode); });
     });
     bindInput();
-    window.addEventListener('resize', resize);
   }
   function _onKey(e) { if (e.key === 'Escape') close(); }
 
   function destroyDom() {
     if (!modal) return;
     document.removeEventListener('keydown', _onKey);
-    window.removeEventListener('resize', resize);
     if (modal.parentElement) modal.parentElement.removeChild(modal);
-    modal = null; canvas = null; ctx = null; nameEl = null; hintEl = null; modeBtns = null;
+    modal = null; nameEl = null; hintEl = null; modeBtns = null;
   }
 
-  // ─── Sizing ───
-  // Cap actual canvas pixel dimensions. Canvas 2D is CPU-bound; on a
-  // 4K monitor (3840x2160) the per-frame trail wash + 740 bg star
-  // fillRects swamps even discrete GPUs (the work happens in the
-  // browser's compositor thread, not on the GPU). Capping the long
-  // axis at ~2000 px keeps the visual effectively identical (stars
-  // are dots, lines are 1-2px wide) while reducing pixel work by
-  // ~3-4x on high-DPI displays.
-  var MAX_CANVAS_LONG = 1600;
-  function resize() {
-    if (!canvas) return;
-    var ratio = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth;
-    H = window.innerHeight;
-    var pixW = W * ratio, pixH = H * ratio;
-    var longest = Math.max(pixW, pixH);
-    var capScale = longest > MAX_CANVAS_LONG ? (MAX_CANVAS_LONG / longest) : 1;
-    dpr = ratio * capScale;
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    buildStarSprites();
-  }
-
-  // ─── Render ───
-  function render() {
-    if (!ctx) return;
-    ctx.fillStyle = 'rgba(2, 2, 4, 0.35)';
-    ctx.fillRect(0, 0, W, H);
-
-    // Center the constellation in the viewport's visible region — the
-    // bottom is occupied by the cosmic player (~90px expanded, ~24px
-    // when collapsed to its drawer pill), so cy shifts up by half the
-    // player's height. Without this offset the constellation drifts
-    // visually low.
-    var playerHeight = playerMinimal ? 24 : 90;
-    var cx = W / 2;
-    var cy = (H - playerHeight) / 2;
-    zoom += (zoomTarget - zoom) * 0.12;
-    var scale = Math.min(W, H) * 0.32 * zoom;
+  // ─── Constellation overlay (drawn onto Starfield's canvas) ───
+  // Called once per Starfield tick after the bg has rendered. Uses
+  // Starfield's coordinate space (canvas pixels, not CSS pixels).
+  function drawConstellation(ctx, info) {
+    if (overlayAlpha <= 0) return;
+    var c = info.camera;
+    var W = info.W, H = info.H;
+    var cx = info.cx, cy = info.cy;
+    var scale = info.scale;
     var perspective = 2.4;
-    var cy2 = Math.cos(thetaY), sy = Math.sin(thetaY);
-    var cx2 = Math.cos(thetaX), sx = Math.sin(thetaX);
-
-    if (viewMode === 'earth') {
-      // Full hemisphere FOV (~180°) so the bg starfield covers wherever
-      // the constellation slides to as the user pans their gaze. The
-      // constellation has no FOV cap; if the dome is narrower the
-      // constellation can scroll into empty space.
-      CosmicStarfield.renderDome(ctx, {
-        cx: cx, cy: cy, W: W, H: H, scale: scale,
-        thetaY: thetaY, thetaX: thetaX, invertPan: true,
-        fovLimit: Math.PI
-      });
-    } else {
-      CosmicStarfield.renderCosmic(ctx, {
-        cx: cx, cy: cy, W: W, H: H, scale: scale,
-        thetaY: thetaY, thetaX: thetaX, perspective: perspective
-      });
-    }
+    var cy2 = Math.cos(c.thetaY), sy = Math.sin(c.thetaY);
+    var cx2 = Math.cos(c.thetaX), sx = Math.sin(c.thetaX);
 
     var projected;
-    if (viewMode === 'earth') {
-      var visibleY = wrapPi(thetaY);
-      var visibleX = thetaX;
+    if (c.mode === 'earth') {
+      var visibleY = wrapPi(c.thetaY);
+      var visibleX = c.thetaX;
       var pxPerRadX = scale * 0.85;
       var pxPerRadY = scale * 0.85;
       var anchorX = cx + visibleY * pxPerRadX;
@@ -410,6 +364,11 @@ var CosmicPlanetarium = (function() {
           z: r2.z, f: f };
       });
     }
+
+    ctx.save();
+    // globalAlpha multiplies all subsequent draws — fade-in/fade-out
+    // hook for the open/close ramp.
+    ctx.globalAlpha = overlayAlpha;
 
     // Edges (back-to-front)
     var sortedEdges = edges.map(function(e) {
@@ -441,9 +400,10 @@ var CosmicPlanetarium = (function() {
         var sprScale = p.f;
         var drawW = spr.canvas.width * sprScale;
         var drawH = spr.canvas.height * sprScale;
-        ctx.globalAlpha = brightness;
+        // Compose per-star brightness with the master fade alpha.
+        ctx.globalAlpha = brightness * overlayAlpha;
         ctx.drawImage(spr.canvas, p.x - drawW * 0.5, p.y - drawH * 0.5, drawW, drawH);
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = overlayAlpha;
         ctx.fillStyle = 'rgba(220,220,235,' + (0.6 + 0.3 * brightness) + ')';
         ctx.fillText(GREEK[p.i], p.x + spr.base * sprScale + 6, p.y + 3);
       } else {
@@ -453,7 +413,7 @@ var CosmicPlanetarium = (function() {
       }
     }
 
-    // Radio pulse around current star
+    // Radio pulse around the current star
     if (currentStarIndex >= 0 && currentStarIndex < projected.length) {
       var me = projected[currentStarIndex];
       if (me) {
@@ -475,73 +435,97 @@ var CosmicPlanetarium = (function() {
       }
     }
 
-    // Camera state update — both 'earth' and 'cosmic' transitions
-    // ease angles. transDuration is set per-gesture (cross-mode is
-    // longer; same-mode "reset" gesture is shorter).
+    ctx.restore();
+  }
+
+  // ─── Camera ticker ───
+  // Starfield's auto-drift only runs in ambient mode. While the
+  // planetarium is engaged (cosmic/earth) this ticker advances camera
+  // angles — auto-rotate, transition easing, velocity decay — and
+  // updates the alpha ramp. Starfield's render tick reads the latest
+  // values each frame.
+  function tickCamera() {
+    if (!isOpen) return;
+    var c = cam();
     if (transTo) {
       var tt = Math.min(1, (Date.now() - transStart) / (transDuration || TRANS_MS));
       var eased = tt * tt * (3 - 2 * tt);
       var ty = wrapPi(transStartTY);
-      thetaY = ty * (1 - eased);
-      thetaX = transStartTX * (1 - eased);
-      if (tt >= 1) { transTo = null; thetaY = 0; thetaX = 0; }
+      c.thetaY = ty * (1 - eased);
+      c.thetaX = transStartTX * (1 - eased);
+      if (tt >= 1) { transTo = null; c.thetaY = 0; c.thetaX = 0; }
     } else if (!dragging) {
-      thetaY += velY;
-      thetaX += velX;
+      c.thetaY += velY;
+      c.thetaX += velX;
       velX *= 0.998;
     }
+    // Alpha ramp
+    if (overlayAlpha !== overlayAlphaTarget) {
+      var at = Math.min(1, (Date.now() - overlayAlphaT0) / FADE_MS);
+      var ae = at * at * (3 - 2 * at);
+      overlayAlpha = overlayAlphaStart + (overlayAlphaTarget - overlayAlphaStart) * ae;
+      if (at >= 1) overlayAlpha = overlayAlphaTarget;
+    }
   }
-
-  function start() {
-    if (renderTimer) return;
-    // 40ms tick (~25fps). Auto-rotate and the radio pulse are slow
-    // enough that 25 reads as smooth; dropping from 30fps frees
-    // ~17% of the per-second compute budget.
-    function tick() { render(); renderTimer = setTimeout(tick, 40); }
-    tick();
+  function startTicker() {
+    if (ticker) return;
+    function go() { tickCamera(); ticker = setTimeout(go, 40); }
+    go();
   }
-  function stop() { if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; } }
+  function stopTicker() { if (ticker) { clearTimeout(ticker); ticker = null; } }
+  function rampAlpha(target) {
+    overlayAlphaStart = overlayAlpha;
+    overlayAlphaTarget = target;
+    overlayAlphaT0 = Date.now();
+  }
 
   // ─── Input ───
+  // Bound to the modal: it covers the viewport when visible, so all
+  // pointer events that aren't on chrome (close / mode toggle) become
+  // drag/pinch input for the camera.
   function bindInput() {
-    canvas.addEventListener('pointerdown', _onPointerDown);
-    canvas.addEventListener('pointermove', _onPointerMove);
-    canvas.addEventListener('pointerup', _onPointerEnd);
-    canvas.addEventListener('pointercancel', _onPointerEnd);
-    canvas.addEventListener('wheel', _onWheel, { passive: false });
+    modal.addEventListener('pointerdown', _onPointerDown);
+    modal.addEventListener('pointermove', _onPointerMove);
+    modal.addEventListener('pointerup', _onPointerEnd);
+    modal.addEventListener('pointercancel', _onPointerEnd);
+    modal.addEventListener('wheel', _onWheel, { passive: false });
   }
   function _onPointerDown(e) {
+    // Let chrome handle its own clicks (button, mode toggle).
+    if (e.target.closest && e.target.closest('.planetarium-close, .planetarium-mode')) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    try { modal.setPointerCapture(e.pointerId); } catch (_) {}
+    var c = cam();
     if (activePointers.size === 1) {
       dragging = true;
-      canvas.classList.add('dragging');
+      modal.classList.add('dragging');
       dragX0 = e.clientX; dragY0 = e.clientY;
-      theta0Y = thetaY; theta0X = thetaX;
+      theta0Y = c.thetaY; theta0X = c.thetaX;
       velY = 0; velX = 0;
     } else if (activePointers.size === 2) {
       dragging = false;
       var pts = []; activePointers.forEach(function(v) { pts.push(v); });
       var dxp = pts[1].x - pts[0].x, dyp = pts[1].y - pts[0].y;
       pinchStartDist = Math.sqrt(dxp * dxp + dyp * dyp);
-      pinchStartZoom = zoomTarget;
+      pinchStartZoom = c.zoomTarget;
     }
   }
   function _onPointerMove(e) {
     if (!activePointers.has(e.pointerId)) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    var c = cam();
     if (activePointers.size === 1 && dragging) {
       var dx = e.clientX - dragX0, dy = e.clientY - dragY0;
-      var sens = 0.005 / (zoom > 0.1 ? zoom : 0.1);
-      thetaY = theta0Y + dx * sens;
-      thetaX = theta0X - dy * sens;
-      thetaX = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, thetaX));
+      var sens = 0.005 / (c.zoom > 0.1 ? c.zoom : 0.1);
+      c.thetaY = theta0Y + dx * sens;
+      c.thetaX = theta0X - dy * sens;
+      c.thetaX = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, c.thetaX));
     } else if (activePointers.size === 2 && pinchStartDist > 0) {
       var pts2 = []; activePointers.forEach(function(v) { pts2.push(v); });
       var dxp2 = pts2[1].x - pts2[0].x, dyp2 = pts2[1].y - pts2[0].y;
       var dist2 = Math.sqrt(dxp2 * dxp2 + dyp2 * dyp2);
       var nz = pinchStartZoom * (dist2 / pinchStartDist);
-      zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
+      c.zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
     }
   }
   function _onPointerEnd(e) {
@@ -550,7 +534,7 @@ var CosmicPlanetarium = (function() {
     if (activePointers.size === 0) {
       if (dragging) {
         dragging = false;
-        canvas.classList.remove('dragging');
+        if (modal) modal.classList.remove('dragging');
         velY = (viewMode === 'earth') ? 0.00028 : 0.00055;
         velX = 0;
       }
@@ -559,16 +543,18 @@ var CosmicPlanetarium = (function() {
       pinchStartDist = 0;
       var arr = []; activePointers.forEach(function(v) { arr.push(v); });
       var rem = arr[0];
+      var c = cam();
       dragX0 = rem.x; dragY0 = rem.y;
-      theta0Y = thetaY; theta0X = thetaX;
+      theta0Y = c.thetaY; theta0X = c.thetaX;
       dragging = true;
-      canvas.classList.add('dragging');
+      if (modal) modal.classList.add('dragging');
     }
   }
   function _onWheel(e) {
     e.preventDefault();
-    zoomTarget *= Math.exp(-e.deltaY * 0.0015);
-    zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomTarget));
+    var c = cam();
+    c.zoomTarget *= Math.exp(-e.deltaY * 0.0015);
+    c.zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, c.zoomTarget));
   }
 
   // ─── View mode ───
@@ -578,25 +564,25 @@ var CosmicPlanetarium = (function() {
   // gesture on top of the mode switch. The reset eases over a
   // shorter window than the cross-mode transition (700ms vs 1500ms)
   // so the response feels snappy rather than slow.
-  var RESET_MS = 700;
   function setViewMode(mode) {
     if (mode !== 'cosmic' && mode !== 'earth') return;
     var sameMode = (mode === viewMode);
     viewMode = mode;
+    var c = cam();
+    c.mode = mode;
     if (modeBtns) modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === mode); });
     transTo = mode;
     transStart = Date.now();
-    transStartTY = thetaY;
-    transStartTX = thetaX;
+    transStartTY = c.thetaY;
+    transStartTX = c.thetaX;
     transDuration = sameMode ? RESET_MS : TRANS_MS;
     velY = 0; velX = 0;
-    // Reset zoom to default for both modes — full "go home" gesture.
-    zoomTarget = 1.0;
+    c.zoomTarget = 1.0;
     if (mode === 'cosmic') {
-      if (canvas) canvas.classList.remove('earth-mode');
+      if (modal) modal.classList.remove('earth-mode');
       if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
     } else {
-      if (canvas) canvas.classList.add('earth-mode');
+      if (modal) modal.classList.add('earth-mode');
       if (hintEl) hintEl.textContent = 'drag to look around · pinch or scroll to zoom · you are standing on Earth';
     }
     setTimeout(function() {
@@ -606,27 +592,30 @@ var CosmicPlanetarium = (function() {
   }
 
   // ─── Cosmic player integration ───
-  // Track the player's resize observer so we can disconnect on close.
   var playerResizeObserver = null;
 
-  // Recompute the hint's bottom value to ride flush with the top of
-  // the music box. Reads the player's actual rendered height and
-  // writes inline bottom on the hint directly — bypasses CSS
-  // variable indirection so the path is unambiguous.
+  function updatePlayerOffset() {
+    // Match the camera's cy offset to the player's visible height in
+    // CSS pixels, halved (so the constellation centers in the area
+    // above the player). Starfield converts CSS → canvas px internally.
+    var p = document.querySelector('.cosmic-player');
+    if (!p) { cam().cyOffsetCss = 0; return; }
+    var rect = p.getBoundingClientRect();
+    if (rect.height < 1) return;
+    cam().cyOffsetCss = -rect.height / 2;
+  }
+
   function updateHintPosition() {
     if (!modal) return;
     var p = document.querySelector('.cosmic-player');
     if (!p) return;
     var hint = modal.querySelector('.planetarium-hint');
     if (!hint) return;
-    // Use getBoundingClientRect.top relative to viewport bottom so we
-    // capture the player's actual upper edge in viewport coords —
-    // robust to any margin/transform/padding the player picks up.
     var rect = p.getBoundingClientRect();
     if (rect.height < 1) return;
     var distFromBottom = Math.round(window.innerHeight - rect.top);
-    // +32 gap for clear breathing room above the music box's top edge.
     hint.style.bottom = (distFromBottom + 32) + 'px';
+    updatePlayerOffset();
   }
 
   function injectPlayer() {
@@ -634,30 +623,19 @@ var CosmicPlanetarium = (function() {
     if (typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
     if (typeof getRarityTier === 'function') {
       var tier = getRarityTier((openOpts.meta && openOpts.meta.rarity_score) || 0);
-      // Player is a body child — set the var on body so it inherits.
       document.body.style.setProperty('--rarity-color', tier.color);
     }
-    // Inject as a direct child of <body> rather than the planetarium
-    // overlay. The planetarium has backdrop-filter, which creates a
-    // containing block for position: fixed descendants — placing the
-    // player inside it caused the player to anchor to the planetarium
-    // rather than the viewport, which clipped it.
+    // Inject as a direct child of <body> so position: fixed anchors
+    // to the viewport rather than the planetarium modal.
     CosmicPlayer.inject(document.body, openOpts.meta);
     var players = document.body.querySelectorAll(':scope > .cosmic-player');
     var p = players[players.length - 1];
     if (p) {
       p.classList.add('in-planetarium');
-      // Keep hint pinned to the music box's top edge. ResizeObserver
-      // catches the slide-up + minimal toggle continuously; the
-      // setTimeout snapshots are belts + suspenders for browsers
-      // where the observer doesn't fire on the display:none → block
-      // first-render transition.
       if (typeof ResizeObserver !== 'undefined') {
         playerResizeObserver = new ResizeObserver(updateHintPosition);
         playerResizeObserver.observe(p);
       }
-      // Multi-stage snapshots across the player's slide-up animation
-      // (CosmicPlayer adds .visible at 800ms, animation runs 0.8s).
       [50, 200, 500, 850, 1200, 1700, 2500].forEach(function(ms) {
         setTimeout(updateHintPosition, ms);
       });
@@ -680,24 +658,45 @@ var CosmicPlanetarium = (function() {
   function open(opts) {
     opts = opts || {};
     openOpts = opts;
+    if (typeof Starfield === 'undefined' || !Starfield.canvas) return;
     var name = opts.name || 'Constellation';
     var hash = opts.hash || '0000000000000000';
     buildDom();
     nameEl.textContent = name;
     stars = generateStars(name, hash);
     edges = buildEdges(stars);
-    // Lower density than the engine default (740). The planetarium
-    // overlay sits in front of the page-level starfield, so we don't
-    // need a dense backdrop in addition. ~360 reads as a present sky
-    // without burning fillRects.
-    CosmicStarfield.generate(name + ':' + hash, {
-      outerCount: 220, innerCount: 140
-    });
-    thetaY = 0; thetaX = 0; velY = 0.00055; velX = 0;
-    zoom = 1.0; zoomTarget = 1.0;
-    viewMode = 'cosmic'; transTo = null;
+
+    // Reseed the page-level starfield with the constellation's seed
+    // so the bg sky is unique to this constellation. Density tuned
+    // for the cosmic mode experience.
+    if (typeof CosmicStarfield !== 'undefined') {
+      CosmicStarfield.generate(name + ':' + hash, {
+        outerCount: 220, innerCount: 140
+      });
+    }
+
+    var c = cam();
+    // Capture current ambient camera state as the start of the open
+    // transition. The constellation eases from wherever ambient drift
+    // had settled into the centered (0,0) view alongside the modal
+    // fade-in. Reads as: starfield was always here, the constellation
+    // emerged.
+    transTo = 'cosmic';
+    transStart = Date.now();
+    transStartTY = c.thetaY;
+    transStartTX = c.thetaX;
+    transDuration = OPEN_MS;
+    velY = 0; velX = 0;
+    c.zoomTarget = 1.0;
+    // Flip bg projection mode immediately. Page UI is still opaque at
+    // t=0 so the dome→cosmic switch is hidden behind it.
+    c.mode = 'cosmic';
+    viewMode = 'cosmic';
+    overlayAlpha = 0;
+    overlayAlphaTarget = 0;
+
     if (modeBtns) modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === 'cosmic'); });
-    if (canvas) canvas.classList.remove('earth-mode');
+    if (modal) modal.classList.remove('earth-mode');
     if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
 
     currentStarIndex = (typeof opts.currentStarIndex === 'number') ? opts.currentStarIndex : -1;
@@ -707,21 +706,30 @@ var CosmicPlanetarium = (function() {
     heartRgbCache = spectralFor(heartRarity).color.slice();
     currentRgbCache = spectralFor(curRarity).color.slice();
     pulseRgb = brightenHex(tierColorFor(curRarity), 0.3);
+    buildStarSprites();
 
-    resize();
     playerMinimal = false;
     modal.classList.remove('player-minimal');
 
-    // Sequence: page UI fades out FIRST against the persistent
-    // starfield, THEN the planetarium modal + constellation fade in.
-    // The cosmic backdrop reads as continuous through the transition.
     document.body.classList.add('planetarium-open');
+    isOpen = true;
+    Starfield.setOverlay(drawConstellation);
+    startTicker();
+
+    // Restore subtle auto-drift after the open transition finishes.
     setTimeout(function() {
-      if (!modal) return; // user might have aborted
+      if (isOpen && viewMode === 'cosmic' && !dragging) velY = 0.00055;
+    }, OPEN_MS);
+
+    // Modal fades in after the page UI fades out — sequence the
+    // chrome (name, mode toggle, hint) to appear with the
+    // constellation, against the now-visible cosmic backdrop.
+    setTimeout(function() {
+      if (!modal) return;
       modal.classList.add('visible');
       modal.setAttribute('aria-hidden', 'false');
       injectPlayer();
-      start();
+      rampAlpha(1);
       document.dispatchEvent(new CustomEvent('cosmic-planetarium-open', { bubbles: true }));
     }, 500);
   }
@@ -729,28 +737,44 @@ var CosmicPlanetarium = (function() {
   function close() {
     if (!modal) return;
 
-    // Sequence: planetarium fades out FIRST, then the page UI fades
-    // back in. Player + render loop torn down across the transition.
     modal.classList.remove('visible');
     modal.setAttribute('aria-hidden', 'true');
+    rampAlpha(0);
     dismissPlayer();
 
+    // Page UI fades back in over the bg starfield (still in cosmic
+    // mode while the modal is fading out).
     setTimeout(function() {
       document.body.classList.remove('planetarium-open');
     }, 500);
 
+    // Once page UI is fully restored (and hides the bg again), flip
+    // the bg back to ambient. Starfield's incremental ambient drift
+    // continues thetaY from wherever cosmic left off — no snap.
     setTimeout(function() {
-      stop();
+      isOpen = false;
+      stopTicker();
+      Starfield.clearOverlay();
+      var c = cam();
+      c.mode = 'ambient';
+      c.zoomTarget = 1.0;
+      c.cyOffsetCss = 0;
+      transTo = null;
+      // Reseed the bg back to the page's default theme variant.
+      if (typeof CosmicStarfield !== 'undefined' && Starfield.theme) {
+        CosmicStarfield.generate('ambient:' + Starfield.theme, {
+          outerCount: 360, innerCount: 200,
+          warmFreq: Starfield.theme === 'yin' ? 0 : 0.25
+        });
+      }
       destroyDom();
       document.dispatchEvent(new CustomEvent('cosmic-planetarium-close', { bubbles: true }));
     }, 1100);
   }
 
   // Listen for player toggle events: mirror minimal class onto modal
-  // (so the hint can ride above the player) and track state so the
-  // constellation re-centers above the new player height. Also nudge
-  // updateHintPosition across the player's transition so the hint
-  // tracks the height change beyond what ResizeObserver provides.
+  // (so the hint can ride above the player), refresh hint position
+  // and camera y-offset to track the player's height change.
   document.addEventListener('cosmic-player-toggle', function(e) {
     var min = !!(e.detail && e.detail.minimal);
     playerMinimal = min;
