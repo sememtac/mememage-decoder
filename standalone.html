@@ -1324,7 +1324,9 @@ var CosmicStarfield = (function() {
       var ba = bs.brightness * fade * twinkle;
       if (theme === 'yin') {
         // Dark ink on cream needs more weight per star than light on dark
-        ctx.fillStyle = 'rgba(0,0,0,' + (ba * 0.7) + ')';
+        // — bumped up to match the perceptual density of the old 2D
+        // validator starfield (which used alpha 0.25-0.6 directly).
+        ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.85, ba * 1.5) + ')';
       } else {
         ctx.fillStyle = bs.warm
           ? 'rgba(255,240,210,' + ba + ')'
