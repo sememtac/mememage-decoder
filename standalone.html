@@ -2028,6 +2028,23 @@ var CosmicPlanetarium = (function() {
   }
 
   // ─── Cosmic player integration ───
+  // Track the player's resize observer so we can disconnect on close.
+  var playerResizeObserver = null;
+
+  // Recompute the hint's bottom value to ride flush with the top of
+  // the music box. Reads the player's actual rendered height so it
+  // tracks expanded ↔ minimal transitions and any future size
+  // changes (e.g. wrapped labels on narrow viewports).
+  function updateHintPosition() {
+    if (!modal) return;
+    var p = document.body.querySelector('.cosmic-player.in-planetarium');
+    var hint = modal.querySelector('.planetarium-hint');
+    if (!p || !hint) return;
+    var h = p.offsetHeight;
+    if (h < 1) return;
+    hint.style.bottom = (h + 6) + 'px';
+  }
+
   function injectPlayer() {
     if (typeof CosmicPlayer === 'undefined' || !openOpts || !openOpts.meta) return;
     if (typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
@@ -2046,9 +2063,25 @@ var CosmicPlanetarium = (function() {
     var p = players[players.length - 1];
     if (p) {
       p.classList.add('in-planetarium');
+      // Keep hint pinned to the music box's top edge as the player
+      // grows/shrinks (slide-in, minimal toggle, etc).
+      if (typeof ResizeObserver !== 'undefined') {
+        playerResizeObserver = new ResizeObserver(updateHintPosition);
+        playerResizeObserver.observe(p);
+      } else {
+        // Fallback for older browsers: snapshot a few times across the
+        // slide-up + toggle animations.
+        setTimeout(updateHintPosition, 50);
+        setTimeout(updateHintPosition, 900);
+        setTimeout(updateHintPosition, 1700);
+      }
     }
   }
   function dismissPlayer() {
+    if (playerResizeObserver) {
+      try { playerResizeObserver.disconnect(); } catch (_) {}
+      playerResizeObserver = null;
+    }
     if (typeof CosmicPlayer !== 'undefined' && typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
     var leftover = document.body.querySelectorAll(':scope > .cosmic-player');
     for (var i = 0; i < leftover.length; i++) {
