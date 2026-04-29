@@ -1989,27 +1989,32 @@ var CosmicPlanetarium = (function() {
 
   // ─── Cosmic player integration ───
   function injectPlayer() {
-    if (!modal || typeof CosmicPlayer === 'undefined' || !openOpts || !openOpts.meta) return;
+    if (typeof CosmicPlayer === 'undefined' || !openOpts || !openOpts.meta) return;
     if (typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
     if (typeof getRarityTier === 'function') {
       var tier = getRarityTier((openOpts.meta && openOpts.meta.rarity_score) || 0);
-      modal.style.setProperty('--rarity-color', tier.color);
+      // Player is a body child — set the var on body so it inherits.
+      document.body.style.setProperty('--rarity-color', tier.color);
     }
-    CosmicPlayer.inject(modal, openOpts.meta);
-    var p = modal.querySelector('.cosmic-player');
+    // Inject as a direct child of <body> rather than the planetarium
+    // overlay. The planetarium has backdrop-filter, which creates a
+    // containing block for position: fixed descendants — placing the
+    // player inside it caused the player to anchor to the planetarium
+    // rather than the viewport, which clipped it.
+    CosmicPlayer.inject(document.body, openOpts.meta);
+    var players = document.body.querySelectorAll(':scope > .cosmic-player');
+    var p = players[players.length - 1];
     if (p) {
-      p.style.position = 'fixed';
-      p.style.left = '0'; p.style.right = '0'; p.style.bottom = '0';
-      p.style.margin = '0';
-      p.style.zIndex = '20';
+      p.classList.add('in-planetarium');
     }
   }
   function dismissPlayer() {
     if (typeof CosmicPlayer !== 'undefined' && typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
-    if (modal) {
-      var p = modal.querySelector('.cosmic-player');
-      if (p && p.parentElement) p.parentElement.removeChild(p);
+    var leftover = document.body.querySelectorAll(':scope > .cosmic-player');
+    for (var i = 0; i < leftover.length; i++) {
+      if (leftover[i].parentElement) leftover[i].parentElement.removeChild(leftover[i]);
     }
+    document.body.style.removeProperty('--rarity-color');
   }
 
   // ─── Public API ───

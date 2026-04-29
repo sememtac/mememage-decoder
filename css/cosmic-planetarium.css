@@ -80,14 +80,18 @@
 }
 .planetarium-mode button:not(.active):hover { color: #b0b0b8; }
 
-/* Cosmic player when hosted by the planetarium — full viewport width,
-   no margins inherited from cert-plate context. JS sets position:
-   fixed bottom: 0 inline; this just locks the dimensions and clears
-   the cert-plate negative margins. */
-.planetarium .cosmic-player {
+/* Cosmic player when hosted by the planetarium — appended directly
+   to <body> (outside .planetarium) so its position: fixed is anchored
+   to the viewport. The planetarium's backdrop-filter would otherwise
+   create a containing block and clip the player. Full viewport width,
+   no margins, sits above the planetarium overlay (z-index 9999). */
+.cosmic-player.in-planetarium {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   margin: 0 !important;
   width: 100vw;
   max-width: none;
-  left: 0 !important;
-  right: 0 !important;
+  z-index: 10000;
 }
