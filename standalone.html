@@ -1908,8 +1908,10 @@ var CosmicPlanetarium = (function() {
       }
     }
 
-    // Camera state update
-    if (transTo === 'earth') {
+    // Camera state update — both 'earth' and 'cosmic' transitions
+    // ease angles (and only 'cosmic' eases zoom; that's handled by
+    // the existing zoom-easing path against zoomTarget).
+    if (transTo) {
       var tt = Math.min(1, (Date.now() - transStart) / TRANS_MS);
       var eased = tt * tt * (3 - 2 * tt);
       var ty = wrapPi(transStartTY);
@@ -2003,24 +2005,28 @@ var CosmicPlanetarium = (function() {
   }
 
   // ─── View mode ───
+  // Clicking Cosmic always re-anchors the constellation to the
+  // canonical default view (thetaY = thetaX = 0, zoom = 1) — even
+  // if the user was already in cosmic mode. Acts as a "reset / go
+  // home" button on top of the mode switch. Same eased reset path
+  // as the earth transition.
   function setViewMode(mode) {
     if (mode !== 'cosmic' && mode !== 'earth') return;
-    if (mode === viewMode) return;
     viewMode = mode;
     if (modeBtns) modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === mode); });
-    if (mode === 'earth') {
-      transTo = 'earth';
-      transStart = Date.now();
-      transStartTY = thetaY;
-      transStartTX = thetaX;
-      velY = 0; velX = 0;
-      if (canvas) canvas.classList.add('earth-mode');
-      if (hintEl) hintEl.textContent = 'drag to look around · pinch or scroll to zoom · you are standing on Earth';
-    } else {
-      transTo = null;
-      velY = 0.00055;
+    transTo = mode;
+    transStart = Date.now();
+    transStartTY = thetaY;
+    transStartTX = thetaX;
+    velY = 0; velX = 0;
+    if (mode === 'cosmic') {
+      // Reset zoom too — full "go home" gesture.
+      zoomTarget = 1.0;
       if (canvas) canvas.classList.remove('earth-mode');
       if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
+    } else {
+      if (canvas) canvas.classList.add('earth-mode');
+      if (hintEl) hintEl.textContent = 'drag to look around · pinch or scroll to zoom · you are standing on Earth';
     }
     setTimeout(function() {
       if (viewMode === 'earth' && !dragging) velY = 0.00028;
@@ -2048,8 +2054,8 @@ var CosmicPlanetarium = (function() {
     var rect = p.getBoundingClientRect();
     if (rect.height < 1) return;
     var distFromBottom = Math.round(window.innerHeight - rect.top);
-    // +20 gap for breathing room above the music box's top edge.
-    hint.style.bottom = (distFromBottom + 20) + 'px';
+    // +32 gap for clear breathing room above the music box's top edge.
+    hint.style.bottom = (distFromBottom + 32) + 'px';
   }
 
   function injectPlayer() {
