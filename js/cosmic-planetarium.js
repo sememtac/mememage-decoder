@@ -321,12 +321,25 @@ var CosmicPlanetarium = (function() {
   }
 
   // ─── Sizing ───
+  // Cap actual canvas pixel dimensions. Canvas 2D is CPU-bound; on a
+  // 4K monitor (3840x2160) the per-frame trail wash + 740 bg star
+  // fillRects swamps even discrete GPUs (the work happens in the
+  // browser's compositor thread, not on the GPU). Capping the long
+  // axis at ~2000 px keeps the visual effectively identical (stars
+  // are dots, lines are 1-2px wide) while reducing pixel work by
+  // ~3-4x on high-DPI displays.
+  var MAX_CANVAS_LONG = 2000;
   function resize() {
     if (!canvas) return;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var ratio = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth;
     H = window.innerHeight;
-    canvas.width = W * dpr; canvas.height = H * dpr;
+    var pixW = W * ratio, pixH = H * ratio;
+    var longest = Math.max(pixW, pixH);
+    var capScale = longest > MAX_CANVAS_LONG ? (MAX_CANVAS_LONG / longest) : 1;
+    dpr = ratio * capScale;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     buildStarSprites();

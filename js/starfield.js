@@ -28,9 +28,23 @@
     warmFreq: theme === 'yin' ? 0 : 0.25 // yin paints in pure ink, no warm tint
   });
 
+  // Cap actual canvas pixel dimensions. On a 4K monitor without DPR
+  // scaling the canvas would be 3840x2160 — clearRect alone is ~8M
+  // pixels per frame for what is meant to be a quiet ambient
+  // backdrop. Capping the long axis at ~1800 keeps it light. Stars
+  // are dots; the visual difference is invisible at typical viewing
+  // distance.
+  var MAX_CANVAS_LONG = 1800;
+  var renderScale = 1;
   function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    var W = window.innerWidth, H = window.innerHeight;
+    var longest = Math.max(W, H);
+    var s = longest > MAX_CANVAS_LONG ? (MAX_CANVAS_LONG / longest) : 1;
+    canvas.width = Math.round(W * s);
+    canvas.height = Math.round(H * s);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    renderScale = s;
   }
   window.addEventListener('resize', resize);
   resize();
