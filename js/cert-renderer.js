@@ -717,25 +717,36 @@ function renderCert(meta, options) {
     plate.appendChild(_divider());
   }
 
-  // Constellation — name is clickable (navigates to heart star)
+  // Constellation — name opens the 3D planetarium for this constellation.
+  // Falls back to heart-star navigation if the planetarium module
+  // isn't loaded (e.g., on minimal pages).
   if (meta.constellation_name) {
     var conDiv = _div('lineage-text');
-    var conNameEl;
-    if (meta.heart_star_id && meta.heart_star_id !== meta._identifier) {
-      // Sibling — constellation name links to heart star
-      conNameEl = document.createElement('a');
-      conNameEl.href = '#';
-      conNameEl.textContent = meta.constellation_name;
-      conNameEl.addEventListener('click', function(e) {
-        e.preventDefault();
+    var conNameEl = document.createElement('a');
+    conNameEl.href = '#';
+    conNameEl.textContent = meta.constellation_name;
+    conNameEl.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof CosmicPlanetarium !== 'undefined') {
+        CosmicPlanetarium.open({
+          name: meta.constellation_name,
+          // Per-star Z depths derive from this seed. constellation_hash is
+          // identical across siblings, so the constellation looks the same
+          // from any star in it.
+          hash: meta.constellation_hash || meta._content_hash || meta.content_hash || '',
+          currentStarIndex: (typeof myChunkIdx === 'number' && myChunkIdx >= 0) ? myChunkIdx : -1,
+          // Heart's rarity drives the heart sprite's spectral class.
+          // Denormalize to meta.heart_rarity in production; until then
+          // default to 0 so the heart glows K-class orange.
+          heartRarity: meta.heart_rarity || 0,
+          currentRarity: meta.rarity_score || 0,
+          meta: meta
+        });
+      } else if (meta.heart_star_id && meta.heart_star_id !== meta._identifier) {
         lookupById(meta.heart_star_id);
         window.scrollTo({top: 0, behavior: 'smooth'});
-      });
-    } else {
-      // Heart star itself, or no heart star — just the name
-      conNameEl = document.createElement('span');
-      conNameEl.textContent = meta.constellation_name;
-    }
+      }
+    });
     // Bayer designation — Greek letters by birth order
     // Letter navigates to parent (one step back), name navigates to heart star
     var BAYER = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
