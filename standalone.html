@@ -2032,17 +2032,18 @@ var CosmicPlanetarium = (function() {
   var playerResizeObserver = null;
 
   // Recompute the hint's bottom value to ride flush with the top of
-  // the music box. Reads the player's actual rendered height so it
-  // tracks expanded ↔ minimal transitions and any future size
-  // changes (e.g. wrapped labels on narrow viewports).
+  // the music box. Reads the player's actual rendered height (via
+  // getBoundingClientRect for fractional accuracy) and writes it as a
+  // CSS variable on the modal so the hint's CSS rule can derive its
+  // position without inline-style fights.
   function updateHintPosition() {
     if (!modal) return;
     var p = document.body.querySelector('.cosmic-player.in-planetarium');
-    var hint = modal.querySelector('.planetarium-hint');
-    if (!p || !hint) return;
-    var h = p.offsetHeight;
+    if (!p) return;
+    var rect = p.getBoundingClientRect();
+    var h = rect.height;
     if (h < 1) return;
-    hint.style.bottom = (h + 6) + 'px';
+    modal.style.setProperty('--player-h', h + 'px');
   }
 
   function injectPlayer() {
@@ -2063,18 +2064,18 @@ var CosmicPlanetarium = (function() {
     var p = players[players.length - 1];
     if (p) {
       p.classList.add('in-planetarium');
-      // Keep hint pinned to the music box's top edge as the player
-      // grows/shrinks (slide-in, minimal toggle, etc).
+      // Keep hint pinned to the music box's top edge. ResizeObserver
+      // catches the slide-up + minimal toggle continuously; the
+      // setTimeout snapshots are belts + suspenders for browsers
+      // where the observer doesn't fire on the display:none → block
+      // first-render transition.
       if (typeof ResizeObserver !== 'undefined') {
         playerResizeObserver = new ResizeObserver(updateHintPosition);
         playerResizeObserver.observe(p);
-      } else {
-        // Fallback for older browsers: snapshot a few times across the
-        // slide-up + toggle animations.
-        setTimeout(updateHintPosition, 50);
-        setTimeout(updateHintPosition, 900);
-        setTimeout(updateHintPosition, 1700);
       }
+      setTimeout(updateHintPosition, 50);
+      setTimeout(updateHintPosition, 850);   // just after .visible adds
+      setTimeout(updateHintPosition, 1700);  // after slide-up settles
     }
   }
   function dismissPlayer() {
@@ -2146,11 +2147,16 @@ var CosmicPlanetarium = (function() {
 
   // Listen for player toggle events: mirror minimal class onto modal
   // (so the hint can ride above the player) and track state so the
-  // constellation re-centers above the new player height.
+  // constellation re-centers above the new player height. Also nudge
+  // updateHintPosition across the player's transition so the hint
+  // tracks the height change beyond what ResizeObserver provides.
   document.addEventListener('cosmic-player-toggle', function(e) {
     var min = !!(e.detail && e.detail.minimal);
     playerMinimal = min;
     if (modal) modal.classList.toggle('player-minimal', min);
+    setTimeout(updateHintPosition, 50);
+    setTimeout(updateHintPosition, 250);
+    setTimeout(updateHintPosition, 600);
   });
 
   return { open: open, close: close };
