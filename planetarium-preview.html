@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Constellation Planetarium &mdash; preview</title>
 <link rel="stylesheet" href="css/mememage.css">
+<link rel="stylesheet" href="css/cosmic-planetarium.css">
 <style>
   html, body { margin: 0; padding: 0; background: #050508; color: #cccccd; font-family: -apple-system, system-ui, sans-serif; min-height: 100vh; }
   .page-wrap { padding: 32px; max-width: 720px; margin: 0 auto; }
@@ -26,86 +27,6 @@
     transition: background 0.4s ease, border-color 0.4s ease;
   }
   .triggers button:hover { background: #26262e; border-color: rgba(255,255,255,0.28); }
-
-  /* === Planetarium modal === */
-  .planetarium {
-    position: fixed; inset: 0; z-index: 9999;
-    background: rgba(2, 2, 4, 0.94);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.6s ease;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .planetarium.visible { opacity: 1; pointer-events: auto; }
-
-  .planetarium-canvas {
-    display: block;
-    max-width: 100vw;
-    max-height: 100vh;
-    cursor: grab;
-    touch-action: none;
-  }
-  .planetarium-canvas.dragging { cursor: grabbing; }
-
-  .planetarium-name {
-    position: absolute; top: 4vh; left: 50%; transform: translateX(-50%);
-    color: #d8d8e0; font-size: 18px; font-weight: 300;
-    letter-spacing: 0.4em; text-transform: uppercase;
-    text-align: center; pointer-events: none;
-    text-shadow: 0 0 16px rgba(255,255,255,0.1);
-  }
-  .planetarium-name .greek {
-    font-size: 11px; color: #909098; letter-spacing: 0.2em;
-    margin-top: 6px; opacity: 0.8;
-  }
-
-  .planetarium-hint {
-    position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
-    color: #707078; font-size: 11px; letter-spacing: 0.05em;
-    text-align: center; pointer-events: none;
-    opacity: 0.7;
-    transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  /* When the cosmic player collapses to its drawer pill, the hint
-     follows down so it rides just above the pill instead of being
-     obscured by the expanded player. Same easing/duration as the
-     player's own collapse so they move together. */
-  .planetarium.player-minimal .planetarium-hint { bottom: 48px; }
-
-  .planetarium-close {
-    position: absolute; top: 16px; right: 20px;
-    background: transparent; border: none;
-    color: #909098; font-size: 26px; line-height: 1; cursor: pointer;
-    width: 36px; height: 36px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.4s ease, color 0.4s ease;
-  }
-  .planetarium-close:hover { background: rgba(255,255,255,0.06); color: #f0f0f6; }
-
-  .planetarium-mode {
-    position: absolute; top: 16px; left: 20px;
-    display: flex;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 5px;
-    overflow: hidden;
-    font-family: inherit;
-  }
-  .planetarium-mode button {
-    background: transparent; border: none; cursor: pointer;
-    color: #707078; padding: 6px 14px;
-    font-size: 10px; font-weight: 500;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    transition: background 0.5s ease, color 0.5s ease;
-    font-family: inherit;
-  }
-  .planetarium-mode button.active {
-    background: rgba(255,255,255,0.08);
-    color: #f0f0f6;
-  }
-  .planetarium-mode button:not(.active):hover { color: #b0b0b8; }
-  .planetarium-canvas.earth-mode { cursor: default; }
 </style>
 </head>
 <body>
@@ -124,7 +45,7 @@
     <input id="chashInput" type="text" value="6903883e84e12184">
   </div>
   <div class="control-row">
-    <label>You are (α β γ δ ε ζ η θ ι κ λ μ &mdash; or blank)</label>
+    <label>You are (&alpha; &beta; &gamma; &delta; &epsilon; &zeta; &eta; &theta; &iota; &kappa; &lambda; &mu; &mdash; or blank)</label>
     <input id="currentStarInput" type="text" value="ε" maxlength="1">
   </div>
   <div class="control-row">
@@ -138,860 +59,78 @@
 </div>
 
 <div class="triggers">
-  <button onclick="openPlanetarium()">Open Constellation</button>
+  <button onclick="openPrototypePlanetarium()">Open Constellation</button>
   <button onclick="randomize()">Randomize seed</button>
 </div>
 
 <p class="intro" style="font-size: 11px; color: #606068;">
   <strong style="color: #909098;">notes</strong><br>
-  &middot; Each star's Z depth is derived from its own per-star seed (here mocked from the heart star's content_hash + index).<br>
-  &middot; The default view (no rotation) is identical to the 2D constellation rendered on the cert.<br>
-  &middot; Auto-rotate cadence is ~120s per revolution &mdash; cosmic pace.<br>
-  &middot; Heart star is brighter and labeled &alpha;. Other stars are &beta; through &mu; in MST connection order.
+  &middot; Planetarium runs through <code>CosmicPlanetarium.open()</code> &mdash; same module the cert pages will use.<br>
+  &middot; Each star's Z depth is derived from its own per-star seed (mocked here from heart's content_hash + index).<br>
+  &middot; Default view = canonical 2D pattern. Auto-rotate ~120s per revolution.<br>
+  &middot; Heart = &alpha; (spectral-tinted). Current star highlighted with radio pulse in rarity-tier color.
 </p>
-</div>
-
-<div class="planetarium" id="planetarium" aria-hidden="true">
-  <div class="planetarium-name">
-    <div id="planetariumName">Gilamul</div>
-    <div class="greek" id="planetariumStars">12 stars · &alpha; through &mu;</div>
-  </div>
-  <div class="planetarium-mode">
-    <button class="active" data-mode="cosmic" onclick="setViewMode('cosmic')">Cosmic</button>
-    <button data-mode="earth" onclick="setViewMode('earth')">Earth</button>
-  </div>
-  <canvas class="planetarium-canvas" id="planetariumCanvas"></canvas>
-  <div class="planetarium-hint" id="planetariumHint">drag to rotate &middot; pinch or scroll to zoom &middot; the destiny shape is one viewpoint</div>
-  <button class="planetarium-close" onclick="closePlanetarium()" aria-label="Close">&times;</button>
 </div>
 
 <script src="js/cosmic-starfield.js"></script>
 <script src="js/cosmic-audio.js"></script>
 <script src="js/cosmic-player.js"></script>
+<script src="js/cosmic-planetarium.js"></script>
 <script>
 // Cosmic-player needs cert-renderer.js's getRarityTier. Stub it from
-// the prototype's tier table so we don't have to import the full cert
-// renderer.
+// a small tier table so the prototype doesn't have to import the full
+// cert renderer.
+var RARITY_TIERS_PROTO = [
+  [80, 'Legendary', '#d44040'],
+  [70, 'Epic', '#8a6210'],
+  [60, 'Very Rare', '#5a2a8a'],
+  [46, 'Rare', '#2a5090'],
+  [35, 'Uncommon', '#2a7030'],
+  [0, 'Common', '#606060']
+];
 function getRarityTier(score) {
-  for (var i = 0; i < RARITY_TIERS.length; i++) {
-    if (score >= RARITY_TIERS[i][0]) {
-      var hex = RARITY_TIERS[i][1];
-      var names = ['Legendary','Epic','Very Rare','Rare','Uncommon','Common'];
-      return { name: names[i], color: hex };
-    }
+  for (var i = 0; i < RARITY_TIERS_PROTO.length; i++) {
+    if (score >= RARITY_TIERS_PROTO[i][0]) return { name: RARITY_TIERS_PROTO[i][1], color: RARITY_TIERS_PROTO[i][2] };
   }
   return { name: 'Common', color: '#606060' };
 }
-</script>
 
-<script>
-// =====================================================================
-// Constellation Planetarium prototype
-//
-// Mocks 12 stars with deterministic 2D positions (mirroring the
-// cert-renderer's MST + RNG approach), assigns each one a Z depth
-// derived from a per-star seed, renders in 3D via vanilla canvas.
-// Drag to rotate; releases into a slow auto-rotate.
-// =====================================================================
+var GREEK_PROTO = ['α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ'];
 
-// --- Seeded RNG ---
-function makeRng(seed) {
-  var s = seed | 0;
-  if (!s) s = 1;
-  return function() {
-    s = (s * 1103515245 + 12345) & 0x7FFFFFFF;
-    return s / 0x7FFFFFFF;
-  };
-}
-function strSeed(str) {
-  var h = 0;
-  for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0x7FFFFFFF;
-  return h || 1;
-}
-
-// --- 12-star generator ---
-// Mirrors cert-renderer's constellation building: heart star seeded
-// from constellation name; subsequent 11 stars cluster around earlier
-// ones via golden-angle scatter.
-function generateStars(constellationName, hashSeed) {
-  var rng = makeRng(strSeed(constellationName));
-  var stars = [];
-  // Heart star — slightly off-center for visual interest
-  stars.push({ x: (0.3 + rng() * 0.4) - 0.5, y: (0.2 + rng() * 0.6) - 0.5, isHeart: true });
-  for (var i = 1; i < 12; i++) {
-    var placed = false;
-    var x = 0, y = 0;
-    for (var attempt = 0; attempt < 50 && !placed; attempt++) {
-      var anchor = stars[Math.floor(rng() * stars.length)];
-      var ang = rng() * Math.PI * 2;
-      var dist = 0.10 + rng() * 0.20;
-      x = anchor.x + Math.cos(ang) * dist;
-      y = anchor.y + Math.sin(ang) * dist;
-      x = Math.max(-0.45, Math.min(0.45, x));
-      y = Math.max(-0.45, Math.min(0.45, y));
-      // Min-separation: don't sit on an existing star
-      var ok = true;
-      for (var j = 0; j < stars.length; j++) {
-        var dx = x - stars[j].x, dy = y - stars[j].y;
-        if (dx*dx + dy*dy < 0.005) { ok = false; break; }
-      }
-      if (ok) placed = true;
-    }
-    stars.push({ x: x, y: y, isHeart: false });
-  }
-  // Assign Z depth — derived from per-star seed (here mocked from
-  // the heart star's content_hash combined with star index, but in
-  // production each record would carry its own content_hash).
-  for (var k = 0; k < 12; k++) {
-    var perSeed = strSeed(hashSeed + ':' + k);
-    var perRng = makeRng(perSeed);
-    var z = (perRng() - 0.5) * 1.2; // ±0.6 — comparable spread to X/Y
-    if (stars[k].isHeart) z = 0;     // heart anchors the viewing axis
-    stars[k].z = z;
-  }
-  return stars;
-}
-
-// --- Constellation edges: MST + RNG closures (production algorithm) ---
-// Faithful port of cert-renderer.js's constellation builder. Operates
-// on 2D positions (x, y) only — Z is purely the planetarium reveal,
-// not part of the canonical pattern. Steps:
-//   1. Prim's MST from heart star, with 35° min angle between edges
-//      sharing a vertex, max degree 3, and edge length capped at 3x
-//      running average (length regularity).
-//   2. Fallbacks: drop angle constraint, then drop length cap, then
-//      always connect (the constellation must be whole).
-//   3. RNG closures: add up to 2 extra edges that form triangles or
-//      quadrilaterals — only RNG-graph edges (no third star closer
-//      to both endpoints), with empty enclosed polygon.
-function buildEdges(cStars) {
-  var n = cStars.length;
-  function cDst(a, b) { var dx = b.x - a.x, dy = b.y - a.y; return Math.sqrt(dx*dx + dy*dy); }
-
-  var cEdges = [], cInTree = [true];
-  for (var i = 1; i < n; i++) cInTree.push(false);
-
-  function cDeg(idx) { var d = 0; for (var i = 0; i < cEdges.length; i++) if (cEdges[i][0] === idx || cEdges[i][1] === idx) d++; return d; }
-  function cAngBtw(ax, ay, bx, by) {
-    var dot = ax*bx + ay*by;
-    var m = Math.sqrt(ax*ax + ay*ay) * Math.sqrt(bx*bx + by*by);
-    if (m < 0.001) return 180;
-    return Math.acos(Math.max(-1, Math.min(1, dot / m))) * 180 / Math.PI;
-  }
-  function cAngOk(a, b) {
-    var abx = cStars[b].x - cStars[a].x, aby = cStars[b].y - cStars[a].y;
-    for (var ei = 0; ei < cEdges.length; ei++) {
-      var e0 = cEdges[ei][0], e1 = cEdges[ei][1];
-      if (e0 === a || e1 === a) { var o = e0 === a ? e1 : e0; if (cAngBtw(abx, aby, cStars[o].x - cStars[a].x, cStars[o].y - cStars[a].y) < 35) return false; }
-      if (e0 === b || e1 === b) { var o = e0 === b ? e1 : e0; if (cAngBtw(-abx, -aby, cStars[o].x - cStars[b].x, cStars[o].y - cStars[b].y) < 35) return false; }
-    }
-    return true;
-  }
-
-  // Prim's with constraints
-  var cELens = [];
-  for (var step = 0; step < n - 1; step++) {
-    var cands = [];
-    for (var ci = 0; ci < n; ci++) {
-      if (!cInTree[ci]) continue;
-      for (var cj = 0; cj < n; cj++) {
-        if (cInTree[cj]) continue;
-        cands.push({ i: ci, j: cj, d: cDst(cStars[ci], cStars[cj]) });
-      }
-    }
-    cands.sort(function(a, b) { return a.d - b.d; });
-    var avg = 0;
-    if (cELens.length > 0) { for (var cl = 0; cl < cELens.length; cl++) avg += cELens[cl]; avg /= cELens.length; }
-    var maxEdge = cELens.length >= 3 ? avg * 3 : Infinity;
-    var added = false;
-    // Pass 1: degree + angle + length all enforced
-    for (var k = 0; k < cands.length; k++) {
-      var c = cands[k];
-      if (cDeg(c.i) >= 3) continue;
-      if (!cAngOk(c.i, c.j)) continue;
-      if (c.d > maxEdge) continue;
-      cInTree[c.j] = true; cEdges.push([c.i, c.j]); cELens.push(c.d); added = true; break;
-    }
-    // Pass 2: drop angle, keep degree + length
-    if (!added) {
-      for (var k2 = 0; k2 < cands.length; k2++) {
-        if (cDeg(cands[k2].i) < 3 && cands[k2].d <= maxEdge) {
-          cInTree[cands[k2].j] = true; cEdges.push([cands[k2].i, cands[k2].j]); cELens.push(cands[k2].d); added = true; break;
-        }
-      }
-    }
-    // Pass 3: always connect — constellation must be whole
-    if (!added && cands.length) {
-      cInTree[cands[0].j] = true; cEdges.push([cands[0].i, cands[0].j]); cELens.push(cands[0].d);
-    }
-  }
-
-  // RNG closures (max 2 extra edges forming triangles or quadrilaterals)
-  var cAdj = []; for (var ci = 0; ci < n; ci++) cAdj.push([]);
-  for (var ei = 0; ei < cEdges.length; ei++) { cAdj[cEdges[ei][0]].push(cEdges[ei][1]); cAdj[cEdges[ei][1]].push(cEdges[ei][0]); }
-
-  // Relative Neighborhood Graph edges: no third star closer to both endpoints
-  var rngE = [];
-  for (var ci = 0; ci < n; ci++) {
-    for (var cj = ci + 1; cj < n; cj++) {
-      var dij = cDst(cStars[ci], cStars[cj]);
-      var blocked = false;
-      for (var ck = 0; ck < n; ck++) {
-        if (ck === ci || ck === cj) continue;
-        if (cDst(cStars[ci], cStars[ck]) < dij && cDst(cStars[cj], cStars[ck]) < dij) { blocked = true; break; }
-      }
-      if (!blocked) rngE.push([ci, cj]);
-    }
-  }
-  // Filter to extras (not already in MST)
-  var extras = [];
-  for (var ri = 0; ri < rngE.length; ri++) {
-    var a = rngE[ri][0], b = rngE[ri][1];
-    var inM = false;
-    for (var mi = 0; mi < cEdges.length; mi++) {
-      if ((cEdges[mi][0] === a && cEdges[mi][1] === b) || (cEdges[mi][0] === b && cEdges[mi][1] === a)) { inM = true; break; }
-    }
-    if (!inM) extras.push([a, b]);
-  }
-
-  function findPath(f, t, mx) {
-    var q = [[f, [f]]]; var v = {}; v[f] = true;
-    while (q.length > 0) {
-      var cur = q.shift(); var node = cur[0], path = cur[1];
-      if (path.length > mx + 1) continue;
-      if (node === t && path.length > 1) return path;
-      for (var ni = 0; ni < cAdj[node].length; ni++) {
-        var nx = cAdj[node][ni];
-        if (!v[nx]) { v[nx] = true; q.push([nx, path.concat([nx])]); }
-      }
-    }
-    return null;
-  }
-  function ptInPoly(px, py, poly) {
-    var s = 0;
-    for (var i = 0; i < poly.length; i++) {
-      var j = (i + 1) % poly.length;
-      var c = (poly[j].x - poly[i].x) * (py - poly[i].y) - (poly[j].y - poly[i].y) * (px - poly[i].x);
-      if (Math.abs(c) < 0.01) continue;
-      if (s === 0) s = c > 0 ? 1 : -1;
-      else if ((c > 0 ? 1 : -1) !== s) return false;
-    }
-    return true;
-  }
-
-  var added = 0;
-  for (var ei2 = 0; ei2 < extras.length && added < 2; ei2++) {
-    var ea = extras[ei2][0], eb = extras[ei2][1];
-    var path = findPath(ea, eb, 3);
-    if (!path || path.length < 3 || path.length > 4) continue;
-    var poly = path.map(function(i) { return cStars[i]; });
-    var enclosed = false;
-    for (var csi = 0; csi < n; csi++) {
-      var inP = false;
-      for (var pi = 0; pi < path.length; pi++) if (path[pi] === csi) { inP = true; break; }
-      if (inP) continue;
-      if (ptInPoly(cStars[csi].x, cStars[csi].y, poly)) { enclosed = true; break; }
-    }
-    if (enclosed) continue;
-    cEdges.push([ea, eb]);
-    cAdj[ea].push(eb); cAdj[eb].push(ea);
-    added++;
-  }
-
-  return cEdges;
-}
-
-// --- 3D math ---
-function rotateX(p, c, s) { return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c }; }
-function rotateY(p, c, s) { return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c }; }
-// Wrap an angle to [-π, π]. Used by Earth mode to compute the constellation's
-// on-screen position from the viewer's gaze direction so panning 360° brings
-// the constellation back into view from the other side.
-function wrapPi(t) {
-  var w = ((t + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-  return w - Math.PI;
-}
-
-// =====================================================================
-// Render
-// =====================================================================
-var canvas = document.getElementById('planetariumCanvas');
-var ctx = canvas.getContext('2d');
-var stars = [];
-var edges = [];
-
-// Background starfield is now driven by CosmicStarfield (shared engine
-// in js/cosmic-starfield.js). The prototype just calls .generate(seed)
-// on open and dispatches to renderCosmic / renderDome inside the per-
-// frame render loop.
-// Camera state. In cosmic mode these rotate the SCENE around the viewer
-// (orbital — user circles the constellation in 3D). In earth mode they
-// rotate the viewer's GAZE direction (head-tilt — user stays fixed at
-// origin and pans across the sky); the constellation stays as its 2D
-// pattern but slides across the screen as you look elsewhere.
-var thetaY = 0;     // yaw   (horizontal drag)
-var thetaX = 0;     // pitch (vertical drag)
-var velY = 0.00055; // baseline auto-rotate (~120s/revolution at 30fps)
-var velX = 0;
-var zoom = 1.0;       // current zoom (eased toward zoomTarget)
-var zoomTarget = 1.0; // wheel sets this; render lerps zoom toward it
-var ZOOM_MIN = 0.5, ZOOM_MAX = 8.0;
-var dragging = false;
-var dragX0 = 0, dragY0 = 0, theta0Y = 0, theta0X = 0;
-
-// View mode: 'cosmic' (default — auto-rotate, drag, full 3D) or 'earth'
-// (locked at θ=0 so the constellation reads as the canonical 2D pattern,
-// the way humans always saw it from Earth). Toggling to earth animates
-// thetaY/thetaX back to 0 over 1.5s.
-var viewMode = 'cosmic';
-var transTo = null;        // 'earth' if we're easing toward θ=0
-var transStart = 0;
-var transStartTY = 0, transStartTX = 0;
-var TRANS_MS = 1500;
-
-var W = 0, H = 0, dpr = 1;
-function resize() {
-  // Cap DPR at 2 — retina iPhones / 4K displays go up to 3, which
-  // multiplies trail-wash + per-star fill cost by 2.25x for visual
-  // gains nobody notices on tiny dots.
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  buildStarSprites();
-}
-window.addEventListener('resize', resize);
-
-// Cached sprites for the 12 constellation stars — heart, current,
-// and the rest. Glow + core baked in. Drawn at runtime via drawImage
-// instead of rebuilding a radial gradient each frame. Re-built on
-// resize and on open so DPR + spectral-color changes are picked up.
-//   spriteHeart   — heart star, sized larger, colored by heart rarity
-//   spriteCurrent — current star, normal size, colored by its rarity
-//   spriteCool    — every other star, neutral white (no per-star
-//                    rarity in the prototype data; production would
-//                    color each per its own rarity_score)
-var spriteHeart = null, spriteCool = null, spriteCurrent = null;
-var heartRgbCache = [255, 240, 200];   // K-class default
-var currentRgbCache = [245, 245, 250]; // neutral white default
-function buildStarSprites() {
-  var hp = 'rgba(' + heartRgbCache[0] + ',' + heartRgbCache[1] + ',' + heartRgbCache[2];
-  spriteHeart = makeSprite(hp, 4.5);
-  spriteCool  = makeSprite('rgba(245,245,250', 3.0);
-  var cp = 'rgba(' + currentRgbCache[0] + ',' + currentRgbCache[1] + ',' + currentRgbCache[2];
-  spriteCurrent = makeSprite(cp, 3.0);
-}
-function makeSprite(rgbPrefix, baseSize) {
-  var pad = baseSize * 4;
-  var s = Math.ceil(pad * 2);
-  var spr = document.createElement('canvas');
-  spr.width = s; spr.height = s;
-  var sx = spr.getContext('2d');
-  var cx_ = s / 2, cy_ = s / 2;
-  // Outer glow
-  var g = sx.createRadialGradient(cx_, cy_, 0, cx_, cy_, baseSize * 4);
-  g.addColorStop(0, rgbPrefix + ',0.25)');
-  g.addColorStop(1, rgbPrefix + ',0)');
-  sx.fillStyle = g;
-  sx.beginPath(); sx.arc(cx_, cy_, baseSize * 4, 0, Math.PI * 2); sx.fill();
-  // Core
-  sx.fillStyle = rgbPrefix + ',1)';
-  sx.beginPath(); sx.arc(cx_, cy_, baseSize, 0, Math.PI * 2); sx.fill();
-  return { canvas: spr, base: baseSize, half: pad };
-}
-
-var GREEK = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
-
-// Index of the "current" star — the one corresponding to the cert
-// being viewed. -1 = no highlight. Production: read from the record's
-// constellation_star field; map Greek letter to index 0..11.
-var currentStarIndex = -1;
-
-// Heart star spectral classification (cool -> hot, K G F A B O).
-// Drives the heart's core color so the planetarium reads its
-// "weight class" at a glance — a Common heart glows orange-K like a
-// modest sun, a Legendary heart blazes blue-O.
-var SPECTRAL = [
-  { cls: 'K', color: [255, 180, 100], min: 0  }, // Common
-  { cls: 'G', color: [255, 240, 180], min: 20 }, // Uncommon
-  { cls: 'F', color: [255, 250, 230], min: 40 }, // Rare (warm white)
-  { cls: 'A', color: [220, 230, 255], min: 52 }, // Very Rare (white)
-  { cls: 'B', color: [170, 190, 255], min: 64 }, // Epic (blue-white)
-  { cls: 'O', color: [130, 160, 255], min: 74 }  // Legendary (blue)
-];
-function spectralFor(score) {
-  for (var i = SPECTRAL.length - 1; i >= 0; i--) {
-    if (score >= SPECTRAL[i].min) return SPECTRAL[i];
-  }
-  return SPECTRAL[0];
-}
-
-// Mememage rarity tier palette — drives the "you are" pulse ring
-// color so each cert pulses in its own tier.
-var RARITY_TIERS = [
-  [80, '#d44040'], // Legendary
-  [70, '#8a6210'], // Epic
-  [60, '#5a2a8a'], // Very Rare
-  [46, '#2a5090'], // Rare
-  [35, '#2a7030'], // Uncommon
-  [0,  '#606060']  // Common
-];
-function tierColorFor(score) {
-  for (var i = 0; i < RARITY_TIERS.length; i++) {
-    if (score >= RARITY_TIERS[i][0]) return RARITY_TIERS[i][1];
-  }
-  return RARITY_TIERS[5][1];
-}
-function brightenHex(hex, amount) {
-  var r = parseInt(hex.slice(1, 3), 16);
-  var g = parseInt(hex.slice(3, 5), 16);
-  var b = parseInt(hex.slice(5, 7), 16);
-  return [
-    Math.round(r + (255 - r) * amount),
-    Math.round(g + (255 - g) * amount),
-    Math.round(b + (255 - b) * amount)
-  ];
-}
-
-// State derived from inputs at openPlanetarium time
-var pulseRgb = [220, 220, 240]; // current star's tier color (brightened)
-
-function render() {
-  // Trail wash for slow motion smear (very subtle — the cosmic pace
-  // is gentle so we don't need a heavy trail).
-  ctx.fillStyle = 'rgba(2, 2, 4, 0.35)';
-  ctx.fillRect(0, 0, W, H);
-
-  var cx = W / 2, cy = H / 2;
-  // Ease zoom toward target so wheel input glides instead of snapping
-  zoom += (zoomTarget - zoom) * 0.12;
-  var scale = Math.min(W, H) * 0.32 * zoom; // pattern fills ~64% of min dimension at zoom=1
-  var perspective = 2.4;
-  var cy2 = Math.cos(thetaY), sy = Math.sin(thetaY);
-  var cx2 = Math.cos(thetaX), sx = Math.sin(thetaX);
-
-  // Background starfield. Cosmic: full 3D rotation, perspective-scaled
-  // (parallax + depth feel — stars swim past as the scene rotates around
-  // the viewer). Earth: stars are pinned to the celestial dome at
-  // infinity, translated together with gaze direction (no parallax,
-  // uniform sizes — the way stars actually look from Earth).
-  // Background starfield — delegated to the shared engine. Cosmic
-  // mode = 3D rotation + perspective parallax. Earth mode = celestial
-  // dome projection (stars at infinity, no parallax). Same star data
-  // either way; the engine picks the projection. Earth mode uses
-  // invertPan: true so drag right -> sky follows right.
-  if (viewMode === 'earth') {
-    CosmicStarfield.renderDome(ctx, {
-      cx: cx, cy: cy, W: W, H: H, scale: scale,
-      thetaY: thetaY, thetaX: thetaX, invertPan: true
-    });
-  } else {
-    CosmicStarfield.renderCosmic(ctx, {
-      cx: cx, cy: cy, W: W, H: H, scale: scale,
-      thetaY: thetaY, thetaX: thetaX, perspective: perspective
-    });
-  }
-
-  // Project the constellation. Cosmic mode: full 3D — each star's
-  // own (x, y, z) rotated through the scene, perspective applied,
-  // depth scatter visible. Earth mode: the constellation is treated
-  // as a flat 2D pattern anchored at a celestial direction (default:
-  // straight ahead). The viewer's gaze (thetaY/thetaX) translates the
-  // pattern across the screen — pan all the way around and it comes
-  // back. The 2D shape itself never distorts; per-star Z is ignored.
-  var projected;
-  if (viewMode === 'earth') {
-    // Wrap so 360° panning loops the sky cleanly.
-    var visibleY = wrapPi(thetaY);
-    var visibleX = thetaX; // already clamped in pointer handler
-    // Pixels per radian of gaze. Tuned so the constellation reaches
-    // the screen edge around ±π/2.
-    var pxPerRadX = scale * 0.85;
-    var pxPerRadY = scale * 0.85;
-    // "Grab the sky": drag right -> sky follows right.
-    var anchorX = cx + visibleY * pxPerRadX;
-    var anchorY = cy - visibleX * pxPerRadY;
-    var fixedScale = scale * 0.75; // constellation pattern size on screen
-    projected = stars.map(function(p, i) {
-      return {
-        i: i,
-        isHeart: p.isHeart,
-        x: anchorX + p.x * fixedScale,
-        y: anchorY + p.y * fixedScale,
-        z: 0,
-        f: 1.0
-      };
-    });
-  } else {
-    projected = stars.map(function(p, i) {
-      var r1 = rotateY(p, cy2, sy);
-      var r2 = rotateX(r1, cx2, sx);
-      var f = perspective / (perspective - r2.z);
-      return {
-        i: i,
-        isHeart: p.isHeart,
-        x: cx + r2.x * scale * f,
-        y: cy + r2.y * scale * f,
-        z: r2.z,
-        f: f
-      };
-    });
-  }
-
-  // Edges first (so stars draw on top). Sort painter's algorithm
-  // approximately — drawing back to front keeps the visual layered.
-  var sortedEdges = edges.map(function(e) {
-    var a = projected[e[0]], b = projected[e[1]];
-    return { a: a, b: b, midZ: (a.z + b.z) * 0.5 };
-  }).sort(function(a, b) { return a.midZ - b.midZ; });
-
-  for (var i = 0; i < sortedEdges.length; i++) {
-    var e = sortedEdges[i];
-    var depthMix = 0.5 + e.midZ * 0.4; // back = dimmer, front = brighter
-    var alpha = Math.max(0.1, Math.min(0.5, 0.35 + e.midZ * 0.25));
-    ctx.strokeStyle = 'rgba(220, 220, 240, ' + alpha + ')';
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.moveTo(e.a.x, e.a.y);
-    ctx.lineTo(e.b.x, e.b.y);
-    ctx.stroke();
-  }
-
-  // Stars — drawn from cached sprites (built once at resize) so we
-  // don't allocate a radial gradient per star per frame.
-  var sortedStars = projected.slice().sort(function(a, b) { return a.z - b.z; });
-  ctx.font = '10px -apple-system, system-ui, sans-serif';
-  ctx.textAlign = 'left';
-  for (var s = 0; s < sortedStars.length; s++) {
-    var p = sortedStars[s];
-    var brightness = 0.7 + p.z * 0.5;
-    if (brightness < 0.4) brightness = 0.4; else if (brightness > 1) brightness = 1;
-    var isKnown = p.isHeart || p.i === currentStarIndex;
-    if (isKnown) {
-      // Known star — full glow sprite + Greek letter label
-      var spr = p.isHeart ? spriteHeart : spriteCurrent;
-      var sprScale = p.f;
-      var drawW = spr.canvas.width * sprScale;
-      var drawH = spr.canvas.height * sprScale;
-      ctx.globalAlpha = brightness;
-      ctx.drawImage(spr.canvas, p.x - drawW * 0.5, p.y - drawH * 0.5, drawW, drawH);
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = 'rgba(220,220,235,' + (0.6 + 0.3 * brightness) + ')';
-      ctx.fillText(GREEK[p.i], p.x + spr.base * sprScale + 6, p.y + 3);
-    } else {
-      // Unobserved star — only its constellation position is known
-      // (positions are deterministic from constellation_name). Render
-      // as a small dim dot, no glow, no Greek letter — we don't know
-      // its identifier, rarity, or birth order from this cert alone.
-      var dotR = 1.7 * p.f;
-      ctx.fillStyle = 'rgba(170,175,195,' + (brightness * 0.55) + ')';
-      ctx.beginPath(); ctx.arc(p.x, p.y, dotR, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  // Radio pulse — rings grow outward from the current star and fade
-  // as they grow, like a sonar ping. Two pulses overlap (offset by
-  // half a cycle) for continuity. Color is the star's rarity tier,
-  // brightened toward white so it reads against dark space.
-  if (currentStarIndex >= 0 && currentStarIndex < projected.length) {
-    var me = projected[currentStarIndex];
-    if (me) {
-      var pulseDur = 3000; // ms — full ping cycle
-      var startR = (me.isHeart ? 4.5 : 3.0) * me.f * 1.6;
-      var maxR = startR + 70;
-      var nowMs = Date.now();
-      var pr = pulseRgb[0], pg = pulseRgb[1], pb = pulseRgb[2];
-      function _pulseAt(offsetMs) {
-        var t = ((nowMs + offsetMs) % pulseDur) / pulseDur;
-        var r = startR + t * (maxR - startR);
-        var alpha = (1 - t) * (1 - t) * 0.65; // ease-out fade
-        if (alpha < 0.01) return;
-        ctx.strokeStyle = 'rgba(' + pr + ',' + pg + ',' + pb + ',' + alpha + ')';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.arc(me.x, me.y, r, 0, Math.PI * 2); ctx.stroke();
-      }
-      _pulseAt(0);
-      _pulseAt(pulseDur * 0.5); // overlapping for continuity
-    }
-  }
-
-  // Earth-view transition: ease thetaY/thetaX toward 0 over TRANS_MS,
-  // re-anchoring the gaze to dead-ahead before earth mode takes over.
-  if (transTo === 'earth') {
-    var t = Math.min(1, (Date.now() - transStart) / TRANS_MS);
-    var eased = t * t * (3 - 2 * t); // smoothstep
-    var ty = wrapPi(transStartTY); // shortest path back
-    thetaY = ty * (1 - eased);
-    thetaX = transStartTX * (1 - eased);
-    if (t >= 1) { transTo = null; thetaY = 0; thetaX = 0; }
-  } else if (!dragging) {
-    // Auto-drift when idle. In cosmic, full 3D auto-rotation. In earth,
-    // a slower yaw drift (Earth's daily rotation feel). Both gated on
-    // not-dragging so user input is sovereign.
-    thetaY += velY;
-    thetaX += velX;
-    velX *= 0.998;
-  }
-}
-
-var renderTimer = null;
-function start() {
-  if (renderTimer) return;
-  function tick() {
-    render();
-    renderTimer = setTimeout(tick, 33); // ~30fps
-  }
-  tick();
-}
-function stop() { if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; } }
-
-// --- Pointer + pinch handling (mouse, touch, stylus) ---
-// Single pointer = drag (rotate or look around). Two pointers = pinch
-// to zoom. Transitioning between modes re-anchors so there's no jump.
-// Cosmic: drag rotates the SCENE around the viewer (orbital).
-// Earth:  drag rotates the viewer's GAZE direction (head-tilt).
-var activePointers = new Map();
-var pinchStartDist = 0;
-var pinchStartZoom = 1;
-
-function _activePts() {
-  var arr = []; activePointers.forEach(function(v) { arr.push(v); }); return arr;
-}
-
-canvas.addEventListener('pointerdown', function(e) {
-  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-
-  if (activePointers.size === 1) {
-    // Drag start
-    dragging = true;
-    canvas.classList.add('dragging');
-    dragX0 = e.clientX; dragY0 = e.clientY;
-    theta0Y = thetaY; theta0X = thetaX;
-    velY = 0; velX = 0;
-  } else if (activePointers.size === 2) {
-    // Pinch start — drop drag, lock initial finger distance + zoom
-    dragging = false;
-    var pts = _activePts();
-    var dxp = pts[1].x - pts[0].x, dyp = pts[1].y - pts[0].y;
-    pinchStartDist = Math.sqrt(dxp * dxp + dyp * dyp);
-    pinchStartZoom = zoomTarget;
-  }
-});
-
-canvas.addEventListener('pointermove', function(e) {
-  if (!activePointers.has(e.pointerId)) return;
-  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-  if (activePointers.size === 1 && dragging) {
-    var dx = e.clientX - dragX0, dy = e.clientY - dragY0;
-    // Scale pan sensitivity by 1/zoom so close-up zooms feel as
-    // controlled as wide views. At zoom=2, the same finger travel
-    // moves the view half as far in angle.
-    var sens = 0.005 / (zoom > 0.1 ? zoom : 0.1);
-    thetaY = theta0Y + dx * sens;
-    thetaX = theta0X - dy * sens;
-    thetaX = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, thetaX));
-  } else if (activePointers.size === 2 && pinchStartDist > 0) {
-    // Pinch zoom: target zoom = initial * (currentDist / initialDist)
-    var pts = _activePts();
-    var dxp = pts[1].x - pts[0].x, dyp = pts[1].y - pts[0].y;
-    var dist = Math.sqrt(dxp * dxp + dyp * dyp);
-    var nz = pinchStartZoom * (dist / pinchStartDist);
-    zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
-  }
-});
-
-function _pointerEnd(e) {
-  if (!activePointers.has(e.pointerId)) return;
-  activePointers.delete(e.pointerId);
-
-  if (activePointers.size === 0) {
-    if (dragging) {
-      dragging = false;
-      canvas.classList.remove('dragging');
-      velY = (viewMode === 'earth') ? 0.00028 : 0.00055;
-      velX = 0;
-    }
-    pinchStartDist = 0;
-  } else if (activePointers.size === 1) {
-    // 2 -> 1: pinch ended, but a finger remains. Re-anchor as a drag
-    // continuation from the remaining pointer's current position so
-    // the view doesn't snap.
-    pinchStartDist = 0;
-    var remaining = _activePts()[0];
-    dragX0 = remaining.x; dragY0 = remaining.y;
-    theta0Y = thetaY; theta0X = thetaX;
-    dragging = true;
-    canvas.classList.add('dragging');
-  }
-}
-
-canvas.addEventListener('pointerup', _pointerEnd);
-canvas.addEventListener('pointercancel', _pointerEnd);
-
-// --- Wheel zoom (desktop trackpad / mouse) ---
-// deltaY < 0 = scroll up = zoom in. Exponential mapping keeps the
-// feel consistent across trackpad (small deltas) and mouse wheel
-// (big deltas). Render eases zoom toward zoomTarget so the response
-// is smooth rather than jumpy.
-canvas.addEventListener('wheel', function(e) {
-  e.preventDefault();
-  zoomTarget *= Math.exp(-e.deltaY * 0.0015);
-  zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomTarget));
-}, { passive: false });
-
-// --- View mode toggle ---
-function setViewMode(mode) {
-  if (mode !== 'cosmic' && mode !== 'earth') return;
-  if (mode === viewMode) return;
-  viewMode = mode;
-  document.querySelectorAll('.planetarium-mode button').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.mode === mode);
-  });
-  var hint = document.getElementById('planetariumHint');
-  if (mode === 'earth') {
-    // Re-anchor gaze to the constellation, then earth's drag/drift kicks in
-    transTo = 'earth';
-    transStart = Date.now();
-    transStartTY = thetaY;
-    transStartTX = thetaX;
-    velY = 0; velX = 0;
-    if (hint) hint.textContent = 'drag to look around · pinch or scroll to zoom · you are standing on Earth';
-  } else {
-    transTo = null;
-    velY = 0.00055;
-    if (hint) hint.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
-  }
-  // After transition completes, auto-drift speed is set by the mode
-  // (handled in pointerup; the velY assignment above seeds the drift
-  // baseline for the time between transition-end and any user input).
-  setTimeout(function() {
-    if (viewMode === 'earth' && !dragging) velY = 0.00028;
-    else if (viewMode === 'cosmic' && !dragging) velY = 0.00055;
-  }, TRANS_MS);
-}
-
-// --- Cosmic player toggle event ---
-// The cosmic-player widget dispatches a 'cosmic-player-toggle' event
-// when its drawer pill is clicked. We mirror that into a class on the
-// planetarium overlay so the hint at the bottom can ride above the
-// player whether it's expanded or minimal.
-document.addEventListener('cosmic-player-toggle', function(e) {
-  var dest = document.getElementById('planetarium');
-  if (!dest) return;
-  dest.classList.toggle('player-minimal', !!(e.detail && e.detail.minimal));
-});
-
-// --- Cosmic player integration ---
-// Builds a mock meta the player can render against, sets the rarity
-// CSS var so the accent picks up the current star's tier color, and
-// overrides the player's sticky positioning so it anchors to the
-// viewport bottom inside the planetarium (rather than being relative
-// to a scrolling cert plate).
-function injectPlanetariumPlayer(name, hash, rarityScore) {
-  if (typeof CosmicPlayer === 'undefined') return;
-  var dest = document.getElementById('planetarium');
-  // Tear down any previous instance first
-  if (typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
-  // Mock a meta record matching the shape the player reads from
+function openPrototypePlanetarium() {
+  var name = document.getElementById('cnameInput').value.trim() || 'Gilamul';
+  var hash = document.getElementById('chashInput').value.trim() || '6903883e84e12184';
+  var curRaw = (document.getElementById('currentStarInput').value || '').trim();
+  var idx = curRaw ? GREEK_PROTO.indexOf(curRaw) : -1;
+  var heartRarity = parseInt(document.getElementById('heartRarityInput').value, 10) || 0;
+  var curRarity = parseInt(document.getElementById('currentRarityInput').value, 10) || 0;
+  // Mock meta for the cosmic player
   var meta = {
     _identifier: 'mememage-' + (hash || '').slice(0, 12),
     content_hash: hash,
     constellation_name: name,
-    rarity_score: rarityScore,
-    decoder_chunk_index: (currentStarIndex >= 0 ? currentStarIndex : 0),
+    rarity_score: curRarity,
+    decoder_chunk_index: (idx >= 0 ? idx : 0),
     born: { sun: 'Taurus 6.0\u00b0', moon_phase: 'Full Moon (100%)' },
     birth_temperament: 'A serene birth'
   };
-  // Set the rarity color CSS var so the player's accent line picks
-  // it up. Player CSS reads var(--rarity-color, #606060).
-  var tier = getRarityTier(rarityScore);
-  dest.style.setProperty('--rarity-color', tier.color);
-  // Inject into the planetarium overlay
-  CosmicPlayer.inject(dest, meta);
-  // Override sticky positioning -> fixed at viewport bottom so it
-  // floats over the canvas regardless of scroll/modal layout
-  var player = dest.querySelector('.cosmic-player');
-  if (player) {
-    player.style.position = 'fixed';
-    player.style.left = '0';
-    player.style.right = '0';
-    player.style.bottom = '0';
-    player.style.margin = '0';
-    player.style.zIndex = '20';
-  }
-}
-
-// --- Modal controls ---
-function openPlanetarium() {
-  var name = document.getElementById('cnameInput').value.trim() || 'Gilamul';
-  var hash = document.getElementById('chashInput').value.trim() || '6903883e84e12184';
-  document.getElementById('planetariumName').textContent = name;
-  stars = generateStars(name, hash);
-  edges = buildEdges(stars);
-  CosmicStarfield.generate(name + ':' + hash);
-  // Pick up the current star from the input
-  var curRaw = (document.getElementById('currentStarInput').value || '').trim();
-  currentStarIndex = curRaw ? GREEK.indexOf(curRaw) : -1;
-  // Heart star spectral color (drives heart sprite)
-  var heartRarity = parseInt(document.getElementById('heartRarityInput').value, 10);
-  if (isNaN(heartRarity)) heartRarity = 0;
-  heartRgbCache = spectralFor(heartRarity).color.slice();
-  // Current star: spectral color drives its sprite core, tier color
-  // drives the radio pulse around it.
-  var curRarity = parseInt(document.getElementById('currentRarityInput').value, 10);
-  if (isNaN(curRarity)) curRarity = 0;
-  currentRgbCache = spectralFor(curRarity).color.slice();
-  pulseRgb = brightenHex(tierColorFor(curRarity), 0.3);
-  // Cosmic player — same widget the cert uses, fixed-anchored to the
-  // viewport bottom inside the planetarium so audio + visuals persist
-  // when the user enters from a cert. Production: detach the player
-  // from the cert plate on planetarium open, reattach on close. Here
-  // we mock a meta record so the player has something to render.
-  document.getElementById('planetarium').classList.remove('player-minimal');
-  injectPlanetariumPlayer(name, hash, curRarity);
-  thetaY = 0; thetaX = 0; velY = 0.00055; velX = 0;
-  zoom = 1.0; zoomTarget = 1.0;
-  // Always open in cosmic mode (default)
-  viewMode = 'cosmic'; transTo = null;
-  document.querySelectorAll('.planetarium-mode button').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.mode === 'cosmic');
+  CosmicPlanetarium.open({
+    name: name,
+    hash: hash,
+    currentStarIndex: idx,
+    heartRarity: heartRarity,
+    currentRarity: curRarity,
+    meta: meta
   });
-  canvas.classList.remove('earth-mode');
-  var hint = document.getElementById('planetariumHint');
-  if (hint) hint.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
-  resize();
-  document.getElementById('planetarium').classList.add('visible');
-  document.getElementById('planetarium').setAttribute('aria-hidden', 'false');
-  start();
 }
-function closePlanetarium() {
-  document.getElementById('planetarium').classList.remove('visible');
-  document.getElementById('planetarium').setAttribute('aria-hidden', 'true');
-  // Tear down the cosmic player + audio
-  if (typeof CosmicPlayer !== 'undefined' && typeof CosmicPlayer.dismiss === 'function') {
-    CosmicPlayer.dismiss();
-  }
-  var leftover = document.getElementById('planetarium').querySelector('.cosmic-player');
-  if (leftover && leftover.parentElement) leftover.parentElement.removeChild(leftover);
-  // Defer stop so the fade-out plays
-  setTimeout(stop, 700);
-}
-document.getElementById('planetarium').addEventListener('click', function(e) {
-  // Click on backdrop (not on canvas/controls) closes
-  if (e.target === this) closePlanetarium();
-});
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closePlanetarium();
-});
 
 function randomize() {
   var rand = Math.random().toString(16).slice(2, 18);
   var nameSyl = ['gila','an','bite','decu','enki','furi','gala','hara','isin','jura','kala','lugal','mash','ningi','pana','quru','ruga','shara','tubu','umbu','virgi','wishi','xamu','yali','zaba'];
-  var rng = makeRng(parseInt(rand.slice(0, 6), 16));
+  var rng = (function(seed) {
+    var s = seed | 0; if (!s) s = 1;
+    return function() { s = (s * 1103515245 + 12345) & 0x7FFFFFFF; return s / 0x7FFFFFFF; };
+  })(parseInt(rand.slice(0, 6), 16));
   var name = nameSyl[Math.floor(rng() * nameSyl.length)] + nameSyl[Math.floor(rng() * nameSyl.length)] + 'mul';
   name = name.charAt(0).toUpperCase() + name.slice(1);
   document.getElementById('cnameInput').value = name;
