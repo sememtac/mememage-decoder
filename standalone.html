@@ -1484,6 +1484,7 @@ var CosmicPlanetarium = (function() {
   var zoom = 1.0, zoomTarget = 1.0;
   var viewMode = 'cosmic';
   var transTo = null, transStart = 0, transStartTY = 0, transStartTX = 0;
+  var transDuration = 1500; // overridden in setViewMode per gesture
   var dragging = false;
   var dragX0 = 0, dragY0 = 0, theta0Y = 0, theta0X = 0;
   var activePointers = new Map();
@@ -1909,10 +1910,10 @@ var CosmicPlanetarium = (function() {
     }
 
     // Camera state update — both 'earth' and 'cosmic' transitions
-    // ease angles (and only 'cosmic' eases zoom; that's handled by
-    // the existing zoom-easing path against zoomTarget).
+    // ease angles. transDuration is set per-gesture (cross-mode is
+    // longer; same-mode "reset" gesture is shorter).
     if (transTo) {
-      var tt = Math.min(1, (Date.now() - transStart) / TRANS_MS);
+      var tt = Math.min(1, (Date.now() - transStart) / (transDuration || TRANS_MS));
       var eased = tt * tt * (3 - 2 * tt);
       var ty = wrapPi(transStartTY);
       thetaY = ty * (1 - eased);
@@ -2005,23 +2006,27 @@ var CosmicPlanetarium = (function() {
   }
 
   // ─── View mode ───
-  // Clicking Cosmic always re-anchors the constellation to the
-  // canonical default view (thetaY = thetaX = 0, zoom = 1) — even
-  // if the user was already in cosmic mode. Acts as a "reset / go
-  // home" button on top of the mode switch. Same eased reset path
-  // as the earth transition.
+  // Clicking either button always re-anchors the constellation to
+  // the canonical default view (thetaY = thetaX = 0, zoom = 1) —
+  // even if already in that mode. Acts as a "reset / go home"
+  // gesture on top of the mode switch. The reset eases over a
+  // shorter window than the cross-mode transition (700ms vs 1500ms)
+  // so the response feels snappy rather than slow.
+  var RESET_MS = 700;
   function setViewMode(mode) {
     if (mode !== 'cosmic' && mode !== 'earth') return;
+    var sameMode = (mode === viewMode);
     viewMode = mode;
     if (modeBtns) modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === mode); });
     transTo = mode;
     transStart = Date.now();
     transStartTY = thetaY;
     transStartTX = thetaX;
+    transDuration = sameMode ? RESET_MS : TRANS_MS;
     velY = 0; velX = 0;
+    // Reset zoom to default for both modes — full "go home" gesture.
+    zoomTarget = 1.0;
     if (mode === 'cosmic') {
-      // Reset zoom too — full "go home" gesture.
-      zoomTarget = 1.0;
       if (canvas) canvas.classList.remove('earth-mode');
       if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
     } else {
@@ -2031,7 +2036,7 @@ var CosmicPlanetarium = (function() {
     setTimeout(function() {
       if (viewMode === 'earth' && !dragging) velY = 0.00028;
       else if (viewMode === 'cosmic' && !dragging) velY = 0.00055;
-    }, TRANS_MS);
+    }, transDuration);
   }
 
   // ─── Cosmic player integration ───
