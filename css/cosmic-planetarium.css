@@ -17,6 +17,12 @@
   display: flex; align-items: center; justify-content: center;
   cursor: grab;
   touch-action: none;
+  /* Drag captures pointer events; without this the constellation
+     name, mode toggle text, and hint get text-selected mid-drag,
+     which the browser treats as a selection gesture and the drag
+     is dropped (camera stops responding to the rest of the move). */
+  user-select: none;
+  -webkit-user-select: none;
 }
 .planetarium.visible { opacity: 1; pointer-events: auto; }
 .planetarium.dragging { cursor: grabbing; }
