@@ -599,18 +599,18 @@ var CosmicPlanetarium = (function() {
   var playerResizeObserver = null;
 
   // Recompute the hint's bottom value to ride flush with the top of
-  // the music box. Reads the player's actual rendered height (via
-  // getBoundingClientRect for fractional accuracy) and writes it as a
-  // CSS variable on the modal so the hint's CSS rule can derive its
-  // position without inline-style fights.
+  // the music box. Reads the player's actual rendered height and
+  // writes inline bottom on the hint directly — bypasses CSS
+  // variable indirection so the path is unambiguous.
   function updateHintPosition() {
     if (!modal) return;
-    var p = document.body.querySelector('.cosmic-player.in-planetarium');
+    var p = document.querySelector('.cosmic-player');
     if (!p) return;
-    var rect = p.getBoundingClientRect();
-    var h = rect.height;
+    var hint = modal.querySelector('.planetarium-hint');
+    if (!hint) return;
+    var h = p.offsetHeight || p.getBoundingClientRect().height;
     if (h < 1) return;
-    modal.style.setProperty('--player-h', h + 'px');
+    hint.style.bottom = (h + 6) + 'px';
   }
 
   function injectPlayer() {
@@ -640,9 +640,11 @@ var CosmicPlanetarium = (function() {
         playerResizeObserver = new ResizeObserver(updateHintPosition);
         playerResizeObserver.observe(p);
       }
-      setTimeout(updateHintPosition, 50);
-      setTimeout(updateHintPosition, 850);   // just after .visible adds
-      setTimeout(updateHintPosition, 1700);  // after slide-up settles
+      // Multi-stage snapshots across the player's slide-up animation
+      // (CosmicPlayer adds .visible at 800ms, animation runs 0.8s).
+      [50, 200, 500, 850, 1200, 1700, 2500].forEach(function(ms) {
+        setTimeout(updateHintPosition, ms);
+      });
     }
   }
   function dismissPlayer() {

@@ -36,12 +36,10 @@
 
 .planetarium-hint {
   position: absolute;
-  /* --player-h is set by JS from the cosmic player's measured height
-     and updates whenever the player resizes (slide-up, minimal
-     toggle, viewport reflow). +6px gap so the hint sits flush above
-     the music box's top edge. Falls back to 90px for the brief moment
-     before the player reports a measurement. */
-  bottom: calc(var(--player-h, 90px) + 6px);
+  /* JS sets bottom inline based on the cosmic player's measured
+     height. This 96px is the initial fallback for the brief moment
+     before the first measurement lands. */
+  bottom: 96px;
   left: 50%; transform: translateX(-50%);
   color: #707078; font-size: 11px; letter-spacing: 0.05em;
   text-align: center; pointer-events: none;
