@@ -37,9 +37,11 @@
 .planetarium-hint {
   position: absolute;
   /* JS sets bottom inline based on the cosmic player's measured
-     height. This 96px is the initial fallback for the brief moment
-     before the first measurement lands. */
-  bottom: 96px;
+     position. This 130px is the initial fallback for the brief
+     moment before the first measurement lands — generous so the
+     hint never gets caught under the player even if measurement
+     stalls. */
+  bottom: 130px;
   left: 50%; transform: translateX(-50%);
   color: #707078; font-size: 11px; letter-spacing: 0.05em;
   text-align: center; pointer-events: none;

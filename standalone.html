@@ -2042,9 +2042,14 @@ var CosmicPlanetarium = (function() {
     if (!p) return;
     var hint = modal.querySelector('.planetarium-hint');
     if (!hint) return;
-    var h = p.offsetHeight || p.getBoundingClientRect().height;
-    if (h < 1) return;
-    hint.style.bottom = (h + 6) + 'px';
+    // Use getBoundingClientRect.top relative to viewport bottom so we
+    // capture the player's actual upper edge in viewport coords —
+    // robust to any margin/transform/padding the player picks up.
+    var rect = p.getBoundingClientRect();
+    if (rect.height < 1) return;
+    var distFromBottom = Math.round(window.innerHeight - rect.top);
+    // +20 gap for breathing room above the music box's top edge.
+    hint.style.bottom = (distFromBottom + 20) + 'px';
   }
 
   function injectPlayer() {
