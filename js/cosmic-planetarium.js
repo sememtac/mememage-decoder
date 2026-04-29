@@ -711,23 +711,39 @@ var CosmicPlanetarium = (function() {
     resize();
     playerMinimal = false;
     modal.classList.remove('player-minimal');
-    modal.classList.add('visible');
-    modal.setAttribute('aria-hidden', 'false');
-    injectPlayer();
-    start();
-    document.dispatchEvent(new CustomEvent('cosmic-planetarium-open', { bubbles: true }));
+
+    // Sequence: page UI fades out FIRST against the persistent
+    // starfield, THEN the planetarium modal + constellation fade in.
+    // The cosmic backdrop reads as continuous through the transition.
+    document.body.classList.add('planetarium-open');
+    setTimeout(function() {
+      if (!modal) return; // user might have aborted
+      modal.classList.add('visible');
+      modal.setAttribute('aria-hidden', 'false');
+      injectPlayer();
+      start();
+      document.dispatchEvent(new CustomEvent('cosmic-planetarium-open', { bubbles: true }));
+    }, 500);
   }
 
   function close() {
     if (!modal) return;
+
+    // Sequence: planetarium fades out FIRST, then the page UI fades
+    // back in. Player + render loop torn down across the transition.
     modal.classList.remove('visible');
     modal.setAttribute('aria-hidden', 'true');
     dismissPlayer();
+
+    setTimeout(function() {
+      document.body.classList.remove('planetarium-open');
+    }, 500);
+
     setTimeout(function() {
       stop();
       destroyDom();
       document.dispatchEvent(new CustomEvent('cosmic-planetarium-close', { bubbles: true }));
-    }, 700);
+    }, 1100);
   }
 
   // Listen for player toggle events: mirror minimal class onto modal
