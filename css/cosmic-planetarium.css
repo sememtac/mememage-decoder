@@ -55,7 +55,10 @@
 .planetarium-close:hover { background: rgba(255,255,255,0.06); color: #f0f0f6; }
 
 .planetarium-mode {
-  position: absolute; top: 16px; left: 20px;
+  position: absolute;
+  top: calc(4vh + 38px); /* sits just below the constellation name */
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
@@ -76,3 +79,15 @@
   color: #f0f0f6;
 }
 .planetarium-mode button:not(.active):hover { color: #b0b0b8; }
+
+/* Cosmic player when hosted by the planetarium — full viewport width,
+   no margins inherited from cert-plate context. JS sets position:
+   fixed bottom: 0 inline; this just locks the dimensions and clears
+   the cert-plate negative margins. */
+.planetarium .cosmic-player {
+  margin: 0 !important;
+  width: 100vw;
+  max-width: none;
+  left: 0 !important;
+  right: 0 !important;
+}

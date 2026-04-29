@@ -61,6 +61,7 @@ var CosmicPlanetarium = (function() {
   var spriteHeart = null, spriteCool = null, spriteCurrent = null;
   var currentStarIndex = -1;
   var openOpts = null;
+  var playerMinimal = false;
 
   // ─── Helpers ───
   function makeRng(seed) {
@@ -337,7 +338,14 @@ var CosmicPlanetarium = (function() {
     ctx.fillStyle = 'rgba(2, 2, 4, 0.35)';
     ctx.fillRect(0, 0, W, H);
 
-    var cx = W / 2, cy = H / 2;
+    // Center the constellation in the viewport's visible region — the
+    // bottom is occupied by the cosmic player (~90px expanded, ~24px
+    // when collapsed to its drawer pill), so cy shifts up by half the
+    // player's height. Without this offset the constellation drifts
+    // visually low.
+    var playerHeight = playerMinimal ? 24 : 90;
+    var cx = W / 2;
+    var cy = (H - playerHeight) / 2;
     zoom += (zoomTarget - zoom) * 0.12;
     var scale = Math.min(W, H) * 0.32 * zoom;
     var perspective = 2.4;
@@ -614,6 +622,7 @@ var CosmicPlanetarium = (function() {
     pulseRgb = brightenHex(tierColorFor(curRarity), 0.3);
 
     resize();
+    playerMinimal = false;
     modal.classList.remove('player-minimal');
     modal.classList.add('visible');
     modal.setAttribute('aria-hidden', 'false');
@@ -634,10 +643,13 @@ var CosmicPlanetarium = (function() {
     }, 700);
   }
 
-  // Listen for player toggle events to mirror minimal class onto modal
-  // (so the hint can ride above the player).
+  // Listen for player toggle events: mirror minimal class onto modal
+  // (so the hint can ride above the player) and track state so the
+  // constellation re-centers above the new player height.
   document.addEventListener('cosmic-player-toggle', function(e) {
-    if (modal) modal.classList.toggle('player-minimal', !!(e.detail && e.detail.minimal));
+    var min = !!(e.detail && e.detail.minimal);
+    playerMinimal = min;
+    if (modal) modal.classList.toggle('player-minimal', min);
   });
 
   return { open: open, close: close };
