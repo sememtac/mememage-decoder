@@ -61,11 +61,17 @@
   }
 
   .planetarium-hint {
-    position: absolute; bottom: 4vh; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
     color: #707078; font-size: 11px; letter-spacing: 0.05em;
     text-align: center; pointer-events: none;
     opacity: 0.7;
+    transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  /* When the cosmic player collapses to its drawer pill, the hint
+     follows down so it rides just above the pill instead of being
+     obscured by the expanded player. Same easing/duration as the
+     player's own collapse so they move together. */
+  .planetarium.player-minimal .planetarium-hint { bottom: 48px; }
 
   .planetarium-close {
     position: absolute; top: 16px; right: 20px;
@@ -957,6 +963,17 @@ function setViewMode(mode) {
   }, TRANS_MS);
 }
 
+// --- Cosmic player toggle event ---
+// The cosmic-player widget dispatches a 'cosmic-player-toggle' event
+// when its drawer pill is clicked. We mirror that into a class on the
+// planetarium overlay so the hint at the bottom can ride above the
+// player whether it's expanded or minimal.
+document.addEventListener('cosmic-player-toggle', function(e) {
+  var dest = document.getElementById('planetarium');
+  if (!dest) return;
+  dest.classList.toggle('player-minimal', !!(e.detail && e.detail.minimal));
+});
+
 // --- Cosmic player integration ---
 // Builds a mock meta the player can render against, sets the rarity
 // CSS var so the accent picks up the current star's tier color, and
@@ -1023,6 +1040,7 @@ function openPlanetarium() {
   // when the user enters from a cert. Production: detach the player
   // from the cert plate on planetarium open, reattach on close. Here
   // we mock a meta record so the player has something to render.
+  document.getElementById('planetarium').classList.remove('player-minimal');
   injectPlanetariumPlayer(name, hash, curRarity);
   thetaY = 0; thetaX = 0; velY = 0.00055; velX = 0;
   zoom = 1.0; zoomTarget = 1.0;

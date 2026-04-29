@@ -89,6 +89,13 @@ var CosmicPlayer = (function() {
       e.stopPropagation();
       var isMinimal = player.classList.toggle('minimal');
       toggle.setAttribute('aria-label', isMinimal ? 'Expand player' : 'Collapse player');
+      // Surfaces hosting the player (cert plate, planetarium overlay)
+      // can listen for this to reposition their own bottom-anchored
+      // chrome (hints, fades, etc) so they ride above the player as
+      // it collapses/expands.
+      player.dispatchEvent(new CustomEvent('cosmic-player-toggle', {
+        detail: { minimal: isMinimal }, bubbles: true
+      }));
     });
 
     // Play button
