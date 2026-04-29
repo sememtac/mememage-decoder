@@ -20,12 +20,12 @@
 
   // The decoder/validator pages are a "god view" of the cosmos —
   // visiting them puts you outside, looking in. Stars are the
-  // primary atmosphere, not faint backdrop. Generous density,
-  // bright per-star alpha (boosted in renderDome below).
+  // primary atmosphere, not faint backdrop. Density tuned for the
+  // god-view feel without flooding fillRects on 4K monitors.
   CosmicStarfield.generate('ambient:' + theme, {
-    outerCount: 360,
-    innerCount: 200,
-    warmFreq: theme === 'yin' ? 0 : 0.25 // yin paints in pure ink, no warm tint
+    outerCount: 240,
+    innerCount: 130,
+    warmFreq: theme === 'yin' ? 0 : 0.25
   });
 
   // Cap actual canvas pixel dimensions. On a 4K monitor without DPR

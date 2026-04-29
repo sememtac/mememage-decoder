@@ -297,7 +297,10 @@ var CosmicPlanetarium = (function() {
       + '<button class="planetarium-close" aria-label="Close">&times;</button>';
     document.body.appendChild(modal);
     canvas = modal.querySelector('.planetarium-canvas');
-    ctx = canvas.getContext('2d');
+    // desynchronized: true lets Chrome render canvas updates without
+    // blocking the main thread on compositor sync, big win on 4K.
+    // alpha: true (explicit) keeps the planetarium overlay translucent.
+    ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
     nameEl = modal.querySelector('.planetarium-name-text');
     hintEl = modal.querySelector('.planetarium-hint');
     modeBtns = modal.querySelectorAll('.planetarium-mode button');
@@ -328,7 +331,7 @@ var CosmicPlanetarium = (function() {
   // axis at ~2000 px keeps the visual effectively identical (stars
   // are dots, lines are 1-2px wide) while reducing pixel work by
   // ~3-4x on high-DPI displays.
-  var MAX_CANVAS_LONG = 2000;
+  var MAX_CANVAS_LONG = 1600;
   function resize() {
     if (!canvas) return;
     var ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -483,7 +486,10 @@ var CosmicPlanetarium = (function() {
 
   function start() {
     if (renderTimer) return;
-    function tick() { render(); renderTimer = setTimeout(tick, 33); }
+    // 40ms tick (~25fps). Auto-rotate and the radio pulse are slow
+    // enough that 25 reads as smooth; dropping from 30fps frees
+    // ~17% of the per-second compute budget.
+    function tick() { render(); renderTimer = setTimeout(tick, 40); }
     tick();
   }
   function stop() { if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; } }
@@ -623,7 +629,13 @@ var CosmicPlanetarium = (function() {
     nameEl.textContent = name;
     stars = generateStars(name, hash);
     edges = buildEdges(stars);
-    CosmicStarfield.generate(name + ':' + hash);
+    // Lower density than the engine default (740). The planetarium
+    // overlay sits in front of the page-level starfield, so we don't
+    // need a dense backdrop in addition. ~360 reads as a present sky
+    // without burning fillRects.
+    CosmicStarfield.generate(name + ':' + hash, {
+      outerCount: 220, innerCount: 140
+    });
     thetaY = 0; thetaX = 0; velY = 0.00055; velX = 0;
     zoom = 1.0; zoomTarget = 1.0;
     viewMode = 'cosmic'; transTo = null;
