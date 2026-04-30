@@ -1043,18 +1043,28 @@
       border-radius: 14px 14px 0 0;
       scrollbar-width: none;
       -ms-overflow-style: none;
-      /* Plate visual stays full viewport height. Only the scroll
-         content (last-item buffer below cert content) shrinks when
-         the player collapses, via padding-bottom transition. */
-      transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      /* Animate plate height + scroll-buffer in step with the
+         player's max-height transition (0.5s cubic-bezier). */
+      transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                  padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed → reclaim the player-reserved scroll buffer.
-       100px reserves space for the 240px expanded player; 36px
-       clears the 24px minimal pill + small gap. Plate height is
-       unchanged; only the scrollable content area shrinks so the
-       cert reads tighter against the bottom. */
+    /* Player collapsed: shrink the plate (and its panel-right host)
+       by 216px — the player's max-height delta (240 expanded -
+       24 minimal). The plate's bottom rides up with the player as it
+       collapses, so the cert sits just above the pill instead of
+       leaving a tall band of empty silver. Padding-bottom also
+       drops from 100 (room for the 240px overlay) to 36 (clears
+       the 24px pill). Cert content itself is untouched — only the
+       scrollable area + plate visual track the player. */
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate {
+      height: calc(100vh - 3.5rem - 216px);
       padding-bottom: 36px;
+    }
+    .panel-layout.layout-active .panel-right.panel-right-has-player {
+      transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .panel-layout.layout-active .panel-right.panel-right-has-player:has(.cosmic-player.minimal) {
+      height: calc(var(--panel-height) - 216px);
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
