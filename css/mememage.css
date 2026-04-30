@@ -1043,16 +1043,26 @@
       border-radius: 14px 14px 0 0;
       scrollbar-width: none;
       -ms-overflow-style: none;
-      /* Animate reservation when the player collapses/expands so the
-         cert content reclaims the freed space in step with the player
-         height transition (max-height 0.5s cubic-bezier(0.4,0,0.2,1)). */
-      transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      /* Animate plate height in step with the player's max-height
+         transition so the collapse/expand reads as one motion. */
+      transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed → reclaim reserved space. 36px clears the 24px
-       pill + a small gap; safe-area padding on the player itself
-       handles iOS home-indicator clearance. */
+    /* Player collapsed → shrink plate AND its panel-right host by the
+       player height delta (240 expanded - 24 minimal = 216). The cert
+       region (plate + player overlay) compacts as the player pulls
+       down; expanding restores full height. The 216 number matches
+       cosmic-player.css's max-height delta and stays correct on iOS
+       (the safe-area padding scales the player visually but the
+       max-height-defined delta is unchanged thanks to box-sizing:
+       border-box on the global reset). */
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate {
-      padding-bottom: 36px;
+      height: calc(100vh - 3.5rem - 216px);
+    }
+    .panel-layout.layout-active .panel-right.panel-right-has-player {
+      transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .panel-layout.layout-active .panel-right.panel-right-has-player:has(.cosmic-player.minimal) {
+      height: calc(var(--panel-height) - 216px);
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
