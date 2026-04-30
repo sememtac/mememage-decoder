@@ -1043,6 +1043,16 @@
       border-radius: 14px 14px 0 0;
       scrollbar-width: none;
       -ms-overflow-style: none;
+      /* Animate reservation when the player collapses/expands so the
+         cert content reclaims the freed space in step with the player
+         height transition (max-height 0.5s cubic-bezier(0.4,0,0.2,1)). */
+      transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* Player collapsed → reclaim reserved space. 36px clears the 24px
+       pill + a small gap; safe-area padding on the player itself
+       handles iOS home-indicator clearance. */
+    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate {
+      padding-bottom: 36px;
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
