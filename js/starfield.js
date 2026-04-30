@@ -41,7 +41,10 @@ var Starfield = (function() {
   // preserved when other modules flip mode in/out — no snap on close.
   var camera = {
     thetaY: 0, thetaX: 0,
-    zoom: 1.0, zoomTarget: 1.0,
+    // Ambient default zoom > 1 — page-level starfield reads as a
+    // bigger, more present sky on the decoder/validator. Planetarium
+    // overrides to 1.0 on open and resets back to 1.5 on close.
+    zoom: 1.5, zoomTarget: 1.5,
     velY: 0.00055,
     velX: 0,
     mode: 'ambient',

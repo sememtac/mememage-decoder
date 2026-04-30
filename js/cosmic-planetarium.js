@@ -757,7 +757,8 @@ var CosmicPlanetarium = (function() {
       Starfield.clearOverlay();
       var c = cam();
       c.mode = 'ambient';
-      c.zoomTarget = 1.0;
+      // Match Starfield's ambient default — bigger zoom for page bg.
+      c.zoomTarget = 1.5;
       c.cyOffsetCss = 0;
       transTo = null;
       // Reseed the bg back to the page's default theme variant.
