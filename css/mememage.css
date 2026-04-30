@@ -1028,16 +1028,24 @@
       background: linear-gradient(180deg, #14141a 0%, #08080c 100%);
     }
 
-    /* Plate fills the right panel — full viewport height, never
-       resizes when the player collapses. */
+    /* Plate fills the right panel by default. When the player goes
+       minimal, the plate auto-fits its content so its bottom edge
+       rides up to where the cert ends — no empty silver between
+       the save button and the player pill. Cert content itself is
+       untouched (no spacing changes); only the plate's outer height
+       contracts to wrap the content. min-height transitions from
+       full viewport to 0; max-height keeps the upper cap so tall
+       certs still scroll. */
     .panel-layout.layout-active .panel-right-has-player .plate {
-      height: calc(100vh - 3.5rem);
+      height: auto;
+      min-height: calc(100vh - 3.5rem);
+      max-height: calc(100vh - 3.5rem);
       padding-bottom: 100px;
       overflow-y: auto;
       overflow-x: hidden;
       /* Disable browser scroll-anchoring — cosmic-player.js pins
-         scrollTop across the cert-spread transition manually, and
-         native anchoring fights the JS pin during the animation. */
+         scrollTop across the transition manually, and native
+         anchoring can fight the JS pin during the animation. */
       overflow-anchor: none;
       /* Match border-radius so the shine sweep (200%×200% absolute
          overlay) stays inside the plate's rounded top corners. Without
@@ -1048,29 +1056,27 @@
       border-radius: 14px 14px 0 0;
       scrollbar-width: none;
       -ms-overflow-style: none;
-      transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: min-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                  padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed: trim only the BOTTOM portion of the cert —
-       the scroll buffer (padding-bottom) and the trailing footer +
-       save button margins. Cert section labels and band wraps keep
-       their original spacing so the cert's body shape is untouched.
-       Net effect: cert content above is unchanged; only the tail
-       below the last band tightens against the smaller player. */
-    .panel-layout.layout-active .panel-right-has-player .plate .plate-footer,
-    .panel-layout.layout-active .panel-right-has-player .plate .save-cert-btn {
-      transition: margin 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-                  padding 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+    /* Player collapsed: drop min-height to 0 so the plate shrinks
+       to its content height. Pair with smaller padding-bottom so
+       the trailing buffer below the save button matches the small
+       pill instead of reserving the 100px expanded-player space. */
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate {
+      min-height: 0;
       padding-bottom: 36px;
     }
-    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-footer {
-      margin-top: 2px;
-      padding-top: 2px;
+    /* Panel-right also contracts so its bottom (and the absolutely-
+       positioned player at bottom: 0) follows the plate up. */
+    .panel-layout.layout-active .panel-right.panel-right-has-player {
+      height: auto;
+      min-height: var(--panel-height);
+      max-height: var(--panel-height);
+      transition: min-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .save-cert-btn {
-      margin-top: 6px;
-      margin-bottom: 2px;
+    .panel-layout.layout-active .panel-right.panel-right-has-player:has(.cosmic-player.minimal) {
+      min-height: 0;
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
