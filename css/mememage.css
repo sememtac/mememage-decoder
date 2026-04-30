@@ -1050,17 +1050,17 @@
       -ms-overflow-style: none;
       transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed: spread cert content's internal spacing so
-       the cert grows vertically and fills the freed plate area
-       (where the expanded player used to overlay). Section labels,
-       band wraps, footer, and save button all enlarge their vertical
-       margins/padding so the trailing save button ends up closer to
-       the pill instead of leaving a tall band of empty silver below
-       a compact cert. Cert sections themselves keep their original
-       heights — only the gaps between them grow.
+    /* Player collapsed: trim cert content's internal spacing so
+       the cert visually compacts. Section labels, band wraps,
+       footer, and save button all reduce their vertical margins/
+       padding so trailing items pack tighter. Cert sections keep
+       their content heights — only the inter-section gaps shrink.
 
-       Transition cert-internal margins so the spread animates in
-       step with the player's max-height transition (0.5s). */
+       Transition cert-internal margins so the trim animates in
+       step with the player's max-height transition (0.5s). The
+       toggle handler in cosmic-player.js pins the plate's scroll
+       position across the transition so the user's view doesn't
+       jump as scroll content shrinks. */
     .panel-layout.layout-active .panel-right-has-player .plate .plate-section-label,
     .panel-layout.layout-active .panel-right-has-player .plate .sky-band-wrap,
     .panel-layout.layout-active .panel-right-has-player .plate .plate-footer,
@@ -1072,20 +1072,20 @@
       padding-bottom: 36px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-section-label {
-      margin-top: 28px;
-      margin-bottom: 28px;
-      padding-top: 12px;
+      margin-top: 2px;
+      margin-bottom: 2px;
+      padding-top: 0;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .sky-band-wrap {
-      margin: 32px 0 40px;
+      margin: 4px 0 6px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-footer {
-      margin-top: 28px;
-      padding-top: 24px;
+      margin-top: 2px;
+      padding-top: 2px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .save-cert-btn {
-      margin-top: 40px;
-      margin-bottom: 16px;
+      margin-top: 6px;
+      margin-bottom: 2px;
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
