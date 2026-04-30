@@ -1050,19 +1050,12 @@
       -ms-overflow-style: none;
       transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed: trim cert content's internal spacing so
-       the cert visually compacts. Section labels, band wraps,
-       footer, and save button all reduce their vertical margins/
-       padding so trailing items pack tighter. Cert sections keep
-       their content heights — only the inter-section gaps shrink.
-
-       Transition cert-internal margins so the trim animates in
-       step with the player's max-height transition (0.5s). The
-       toggle handler in cosmic-player.js pins the plate's scroll
-       position across the transition so the user's view doesn't
-       jump as scroll content shrinks. */
-    .panel-layout.layout-active .panel-right-has-player .plate .plate-section-label,
-    .panel-layout.layout-active .panel-right-has-player .plate .sky-band-wrap,
+    /* Player collapsed: trim only the BOTTOM portion of the cert —
+       the scroll buffer (padding-bottom) and the trailing footer +
+       save button margins. Cert section labels and band wraps keep
+       their original spacing so the cert's body shape is untouched.
+       Net effect: cert content above is unchanged; only the tail
+       below the last band tightens against the smaller player. */
     .panel-layout.layout-active .panel-right-has-player .plate .plate-footer,
     .panel-layout.layout-active .panel-right-has-player .plate .save-cert-btn {
       transition: margin 0.5s cubic-bezier(0.4, 0, 0.2, 1),
@@ -1070,14 +1063,6 @@
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate {
       padding-bottom: 36px;
-    }
-    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-section-label {
-      margin-top: 2px;
-      margin-bottom: 2px;
-      padding-top: 0;
-    }
-    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .sky-band-wrap {
-      margin: 4px 0 6px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-footer {
       margin-top: 2px;
