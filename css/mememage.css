@@ -1029,12 +1029,8 @@
     }
 
     /* Plate fills the right panel — full viewport height, never
-       resizes when the player collapses. Flex column so the footer +
-       save button can be pushed to the bottom via margin-top: auto
-       when the player goes minimal (see :has rule below). */
+       resizes when the player collapses. */
     .panel-layout.layout-active .panel-right-has-player .plate {
-      display: flex;
-      flex-direction: column;
       height: calc(100vh - 3.5rem);
       padding-bottom: 100px;
       overflow-y: auto;
@@ -1050,19 +1046,42 @@
       -ms-overflow-style: none;
       transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed: tighten the cert against the bottom by
-       pushing .plate-footer (and .save-cert-btn that follows it in
-       DOM order) to the plate's bottom via margin-top: auto. The
-       cert sections above flow normally; only the trailing footer +
-       save button ride down with the collapsing player. Plate visual
-       size is unchanged — only the content layout shifts. Pair with
-       padding-bottom: 36px so saveBtn sits ~12px above the pill
-       (vs 76px with the 100px expanded buffer). */
+    /* Player collapsed: tighten cert content's internal spacing so
+       the cert visually compacts. Section labels, band wraps, footer,
+       and save button all reduce their vertical margins/padding so
+       the trailing items end up closer to the plate bottom (and the
+       pill). Cert sections themselves keep their original heights —
+       only the gaps between them shrink. Pairs with padding-bottom
+       100→36 so the cert's overall scroll content ends just above
+       the pill instead of behind a tall buffer.
+
+       Transition cert-internal margins so the compaction animates
+       in step with the player's max-height transition (0.5s). */
+    .panel-layout.layout-active .panel-right-has-player .plate .plate-section-label,
+    .panel-layout.layout-active .panel-right-has-player .plate .sky-band-wrap,
+    .panel-layout.layout-active .panel-right-has-player .plate .plate-footer,
+    .panel-layout.layout-active .panel-right-has-player .plate .save-cert-btn {
+      transition: margin 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                  padding 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate {
       padding-bottom: 36px;
     }
-    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate > .plate-footer {
-      margin-top: auto;
+    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-section-label {
+      margin-top: 2px;
+      margin-bottom: 2px;
+      padding-top: 0;
+    }
+    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .sky-band-wrap {
+      margin: 4px 0 6px;
+    }
+    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-footer {
+      margin-top: 2px;
+      padding-top: 2px;
+    }
+    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .save-cert-btn {
+      margin-top: 6px;
+      margin-bottom: 2px;
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
