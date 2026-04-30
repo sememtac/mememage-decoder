@@ -87,6 +87,19 @@ var CosmicPlayer = (function() {
       + 'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     toggle.addEventListener('click', function(e) {
       e.stopPropagation();
+      // Capture cert plate scroll state BEFORE the layout shifts.
+      // Collapse spreads cert section margins to fill the freed plate
+      // area, which grows scroll content by ~440px on tall certs;
+      // browsers preserve scrollTop, which visually scrolls the user
+      // away from where they were looking. We pin the distance from
+      // the scroll bottom across the transition instead so the user's
+      // viewing position (relative to the cert's end) stays put.
+      var plate = document.querySelector('.panel-right-has-player .plate');
+      var distFromBottom = null;
+      if (plate && plate.scrollHeight > plate.clientHeight) {
+        distFromBottom = plate.scrollHeight - plate.scrollTop - plate.clientHeight;
+      }
+
       var isMinimal = player.classList.toggle('minimal');
       toggle.setAttribute('aria-label', isMinimal ? 'Expand player' : 'Collapse player');
       // Surfaces hosting the player (cert plate, planetarium overlay)
@@ -96,6 +109,14 @@ var CosmicPlayer = (function() {
       player.dispatchEvent(new CustomEvent('cosmic-player-toggle', {
         detail: { minimal: isMinimal }, bubbles: true
       }));
+
+      // Restore scroll position after the cert-spread transition
+      // settles (matches plate's 0.5s transition).
+      if (plate && distFromBottom !== null) {
+        setTimeout(function() {
+          plate.scrollTop = Math.max(0, plate.scrollHeight - plate.clientHeight - distFromBottom);
+        }, 520);
+      }
     });
 
     // Play button
