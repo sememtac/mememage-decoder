@@ -1035,6 +1035,10 @@
       padding-bottom: 100px;
       overflow-y: auto;
       overflow-x: hidden;
+      /* Disable browser scroll-anchoring — cosmic-player.js pins
+         scrollTop across the cert-spread transition manually, and
+         native anchoring fights the JS pin during the animation. */
+      overflow-anchor: none;
       /* Match border-radius so the shine sweep (200%×200% absolute
          overlay) stays inside the plate's rounded top corners. Without
          this, the shine bleeds into the gap between plate edge and the

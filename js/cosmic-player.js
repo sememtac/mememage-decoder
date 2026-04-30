@@ -91,9 +91,10 @@ var CosmicPlayer = (function() {
       // Collapse spreads cert section margins to fill the freed plate
       // area, which grows scroll content by ~440px on tall certs;
       // browsers preserve scrollTop, which visually scrolls the user
-      // away from where they were looking. We pin the distance from
-      // the scroll bottom across the transition instead so the user's
-      // viewing position (relative to the cert's end) stays put.
+      // away from where they were looking. Pin the distance from the
+      // scroll bottom continuously across the transition so the
+      // viewport tracks the cert's tail throughout the animation
+      // instead of jumping mid-way.
       var plate = document.querySelector('.panel-right-has-player .plate');
       var distFromBottom = null;
       if (plate && plate.scrollHeight > plate.clientHeight) {
@@ -110,12 +111,17 @@ var CosmicPlayer = (function() {
         detail: { minimal: isMinimal }, bubbles: true
       }));
 
-      // Restore scroll position after the cert-spread transition
-      // settles (matches plate's 0.5s transition).
+      // Continuously re-pin scrollTop through the cert-spread
+      // transition (plate's 0.5s ease + small buffer for the final
+      // layout settle). Single setTimeout at end-of-transition was
+      // too late — the user already saw the scroll-up mid-animation.
       if (plate && distFromBottom !== null) {
-        setTimeout(function() {
+        var deadline = Date.now() + 600;
+        var pin = function() {
           plate.scrollTop = Math.max(0, plate.scrollHeight - plate.clientHeight - distFromBottom);
-        }, 520);
+          if (Date.now() < deadline) requestAnimationFrame(pin);
+        };
+        requestAnimationFrame(pin);
       }
     });
 
