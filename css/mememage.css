@@ -2153,6 +2153,12 @@
     margin: 24px -30px -30px;
     overflow: hidden;
     display: none;
+    /* Lift content above the iOS home-indicator zone. The blur
+       background still extends to the screen edge (the padding fills
+       it), but the toggle pill, EQ, and controls all sit above the
+       gesture area so swipes don't fight the OS. env() returns 0 on
+       non-iOS so layout is unchanged elsewhere. */
+    padding-bottom: env(safe-area-inset-bottom);
   }
   @media (max-width: 679px) {
     /* Player spans the plate's full width + flushes with plate bottom.
