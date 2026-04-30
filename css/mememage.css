@@ -1046,17 +1046,17 @@
       -ms-overflow-style: none;
       transition: padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed: tighten cert content's internal spacing so
-       the cert visually compacts. Section labels, band wraps, footer,
-       and save button all reduce their vertical margins/padding so
-       the trailing items end up closer to the plate bottom (and the
-       pill). Cert sections themselves keep their original heights —
-       only the gaps between them shrink. Pairs with padding-bottom
-       100→36 so the cert's overall scroll content ends just above
-       the pill instead of behind a tall buffer.
+    /* Player collapsed: spread cert content's internal spacing so
+       the cert grows vertically and fills the freed plate area
+       (where the expanded player used to overlay). Section labels,
+       band wraps, footer, and save button all enlarge their vertical
+       margins/padding so the trailing save button ends up closer to
+       the pill instead of leaving a tall band of empty silver below
+       a compact cert. Cert sections themselves keep their original
+       heights — only the gaps between them grow.
 
-       Transition cert-internal margins so the compaction animates
-       in step with the player's max-height transition (0.5s). */
+       Transition cert-internal margins so the spread animates in
+       step with the player's max-height transition (0.5s). */
     .panel-layout.layout-active .panel-right-has-player .plate .plate-section-label,
     .panel-layout.layout-active .panel-right-has-player .plate .sky-band-wrap,
     .panel-layout.layout-active .panel-right-has-player .plate .plate-footer,
@@ -1068,20 +1068,20 @@
       padding-bottom: 36px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-section-label {
-      margin-top: 2px;
-      margin-bottom: 2px;
-      padding-top: 0;
+      margin-top: 28px;
+      margin-bottom: 28px;
+      padding-top: 12px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .sky-band-wrap {
-      margin: 4px 0 6px;
+      margin: 32px 0 40px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .plate-footer {
-      margin-top: 2px;
-      padding-top: 2px;
+      margin-top: 28px;
+      padding-top: 24px;
     }
     .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate .save-cert-btn {
-      margin-top: 6px;
-      margin-bottom: 2px;
+      margin-top: 40px;
+      margin-bottom: 16px;
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
