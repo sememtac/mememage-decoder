@@ -2241,8 +2241,13 @@
     border-color: var(--rarity-color, rgba(255,255,255,0.2));
     color: rgba(245,245,250,0.9);
   }
-  .player-toggle svg { display: block; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-  .cosmic-player.minimal .player-toggle svg { transform: rotate(180deg); }
+  /* Chevron flip is driven by .flipped on the toggle button itself
+     (not the player's .minimal class) so JS can play the rotation
+     animation FIRST and then apply the panel collapse on
+     transitionend — clean two-phase sequence instead of running
+     simultaneously. */
+  .player-toggle svg { display: block; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  .player-toggle.flipped svg { transform: rotate(180deg); }
   .player-inner { width: 100%; }
   .player-eq {
     width: 100%; height: 40px; display: block; opacity: 0.9;

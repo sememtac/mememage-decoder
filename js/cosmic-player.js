@@ -87,42 +87,68 @@ var CosmicPlayer = (function() {
       + 'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     toggle.addEventListener('click', function(e) {
       e.stopPropagation();
-      // Capture cert plate scroll state BEFORE the layout shifts.
-      // Collapse spreads cert section margins to fill the freed plate
-      // area, which grows scroll content by ~440px on tall certs;
-      // browsers preserve scrollTop, which visually scrolls the user
-      // away from where they were looking. Pin the distance from the
-      // scroll bottom continuously across the transition so the
-      // viewport tracks the cert's tail throughout the animation
-      // instead of jumping mid-way.
-      var plate = document.querySelector('.panel-right-has-player .plate');
-      var distFromBottom = null;
-      if (plate && plate.scrollHeight > plate.clientHeight) {
-        distFromBottom = plate.scrollHeight - plate.scrollTop - plate.clientHeight;
-      }
+      // Lock during the two-phase animation so rapid clicks don't
+      // queue a tangle of half-fired sequences.
+      if (toggle._animating) return;
+      toggle._animating = true;
 
-      var isMinimal = player.classList.toggle('minimal');
-      toggle.setAttribute('aria-label', isMinimal ? 'Expand player' : 'Collapse player');
-      // Surfaces hosting the player (cert plate, planetarium overlay)
-      // can listen for this to reposition their own bottom-anchored
-      // chrome (hints, fades, etc) so they ride above the player as
-      // it collapses/expands.
-      player.dispatchEvent(new CustomEvent('cosmic-player-toggle', {
-        detail: { minimal: isMinimal }, bubbles: true
-      }));
+      var willBeMinimal = !player.classList.contains('minimal');
+      var svg = toggle.querySelector('svg');
 
-      // Continuously re-pin scrollTop through the cert-spread
-      // transition (plate's 0.5s ease + small buffer for the final
-      // layout settle). Single setTimeout at end-of-transition was
-      // too late — the user already saw the scroll-up mid-animation.
-      if (plate && distFromBottom !== null) {
-        var deadline = Date.now() + 600;
-        var pin = function() {
-          plate.scrollTop = Math.max(0, plate.scrollHeight - plate.clientHeight - distFromBottom);
-          if (Date.now() < deadline) requestAnimationFrame(pin);
-        };
-        requestAnimationFrame(pin);
-      }
+      // Phase 1: flip the chevron now. The CSS transition (0.3s)
+      // plays a clean rotation before any panel layout starts.
+      toggle.classList.toggle('flipped', willBeMinimal);
+
+      var applyPanelChange = function(ev) {
+        // transitionend fires per property; only react to the
+        // chevron's transform.
+        if (ev && ev.propertyName !== 'transform') return;
+        if (svg) svg.removeEventListener('transitionend', applyPanelChange);
+
+        // Capture cert plate scroll state BEFORE the layout shifts.
+        // Pin distance-from-bottom continuously through the cert
+        // collapse/expand transition so the viewport tracks the
+        // cert tail (browsers preserve scrollTop by default, which
+        // would visibly scroll the user away as scroll content
+        // changes).
+        var plate = document.querySelector('.panel-right-has-player .plate');
+        var distFromBottom = null;
+        if (plate && plate.scrollHeight > plate.clientHeight) {
+          distFromBottom = plate.scrollHeight - plate.scrollTop - plate.clientHeight;
+        }
+
+        // Phase 2: apply the panel collapse/expand.
+        var isMinimal = player.classList.toggle('minimal');
+        toggle.setAttribute('aria-label', isMinimal ? 'Expand player' : 'Collapse player');
+        // Surfaces hosting the player (cert plate, planetarium overlay)
+        // can listen for this to reposition their own bottom-anchored
+        // chrome (hints, fades, etc) so they ride above the player as
+        // it collapses/expands.
+        player.dispatchEvent(new CustomEvent('cosmic-player-toggle', {
+          detail: { minimal: isMinimal }, bubbles: true
+        }));
+
+        if (plate && distFromBottom !== null) {
+          var deadline = Date.now() + 600;
+          var pin = function() {
+            plate.scrollTop = Math.max(0, plate.scrollHeight - plate.clientHeight - distFromBottom);
+            if (Date.now() < deadline) requestAnimationFrame(pin);
+          };
+          requestAnimationFrame(pin);
+        }
+
+        // Release the animation lock after the panel's own 0.5s
+        // collapse transition settles.
+        setTimeout(function() { toggle._animating = false; }, 550);
+      };
+
+      // Listen for the chevron rotation to finish. Fallback timer
+      // covers browsers/states where transitionend doesn't fire
+      // (e.g. reduced motion, transform interrupted).
+      if (svg) svg.addEventListener('transitionend', applyPanelChange);
+      setTimeout(function() {
+        if (toggle._animating) applyPanelChange({ propertyName: 'transform' });
+      }, 350);
     });
 
     // Play button
