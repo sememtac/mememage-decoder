@@ -1268,9 +1268,50 @@ function renderCert(meta, options) {
       // Identifier
       c.font='600 '+(13*S)+'px '+MONO; _etch(barId,W/2,y+13*S,pg.text); y+=22*S;
 
-      // Badges
-      var _vf=meta._verification;
-      if(_vf){var _bs=[];if(_vf.status==='verified'||_vf.status==='bar_verified')_bs.push({t:'\u2713 WITNESSED',c:'#a0e8d4'});else if(_vf.status==='tampered')_bs.push({t:'\u2717 ALTERED',c:'#f06040'});if(_vf.signature===true)_bs.push({t:'\uD83D\uDD11 AUTHENTICATED',c:'#b8d4ff'});if(_vf.portrait&&_vf.portrait.match===true)_bs.push({t:'\u2B22 EMBODIED',c:'#dcc0f0'});if(_bs.length){var bw=116*S,bh=16*S,bg3=5*S,tbw2=_bs.length*bw+(_bs.length-1)*bg3,bx2=(W-tbw2)/2;for(var bi2=0;bi2<_bs.length;bi2++){c.globalAlpha=0.12;c.fillStyle=_bs[bi2].c;c.beginPath();c.roundRect(bx2,y,bw,bh,3*S);c.fill();c.globalAlpha=0.3;c.strokeStyle=_bs[bi2].c;c.lineWidth=S;c.stroke();c.globalAlpha=1;c.font='700 '+(7*S)+'px '+FONT;c.fillStyle=_bs[bi2].c;c.fillText(_bs[bi2].t,bx2+bw/2,y+11.5*S);bx2+=bw+bg3;}y+=bh+8*S;}}
+      // Badges — colors mirror the live cert's CSS exactly:
+      // dark rgba bg (~0.75 alpha) + colored rgba border (~0.4) +
+      // saturated text. Previous version used the text color for
+      // bg with globalAlpha 0.12 / 0.3 which made the badges read
+      // as washed-out rectangles in the saved PNG (no silver plate
+      // behind them to add weight like in the live cert).
+      var _vf = meta._verification;
+      if (_vf) {
+        var _bs = [];
+        if (_vf.status === 'verified' || _vf.status === 'bar_verified') {
+          _bs.push({ t: '\u2713 WITNESSED', text: '#4ec8a0', bg: 'rgba(10,30,22,0.75)', border: 'rgba(78,200,160,0.4)' });
+        } else if (_vf.status === 'tampered') {
+          _bs.push({ t: '\u2717 ALTERED', text: '#f06040', bg: 'rgba(35,10,8,0.75)', border: 'rgba(240,96,64,0.4)' });
+        }
+        if (_vf.signature === true) {
+          _bs.push({ t: '\uD83D\uDD11 AUTHENTICATED', text: '#5ea8e8', bg: 'rgba(10,20,35,0.75)', border: 'rgba(94,168,232,0.4)' });
+        } else if (_vf.signature === false) {
+          _bs.push({ t: '\u2717 FORGED', text: '#f06040', bg: 'rgba(35,10,8,0.75)', border: 'rgba(240,96,64,0.4)' });
+        }
+        if (_vf.portrait && _vf.portrait.match === true) {
+          _bs.push({ t: '\u2B22 EMBODIED', text: '#a878d8', bg: 'rgba(22,12,32,0.75)', border: 'rgba(168,120,216,0.4)' });
+        } else if (_vf.portrait && _vf.portrait.match === false) {
+          _bs.push({ t: '\u2B21 DISEMBODIED', text: '#a07860', bg: 'rgba(20,12,8,0.75)', border: 'rgba(160,120,96,0.4)' });
+        }
+        if (_bs.length) {
+          var bw = 116 * S, bh = 16 * S, bg3 = 5 * S;
+          var tbw2 = _bs.length * bw + (_bs.length - 1) * bg3;
+          var bx2 = (W - tbw2) / 2;
+          for (var bi2 = 0; bi2 < _bs.length; bi2++) {
+            c.fillStyle = _bs[bi2].bg;
+            c.beginPath();
+            c.roundRect(bx2, y, bw, bh, 3 * S);
+            c.fill();
+            c.strokeStyle = _bs[bi2].border;
+            c.lineWidth = S;
+            c.stroke();
+            c.font = '700 ' + (7 * S) + 'px ' + FONT;
+            c.fillStyle = _bs[bi2].text;
+            c.fillText(_bs[bi2].t, bx2 + bw / 2, y + 11.5 * S);
+            bx2 += bw + bg3;
+          }
+          y += bh + 8 * S;
+        }
+      }
 
       _div2();
 
