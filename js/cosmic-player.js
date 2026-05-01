@@ -99,10 +99,18 @@ var CosmicPlayer = (function() {
       // plays a clean rotation before any panel layout starts.
       toggle.classList.toggle('flipped', willBeMinimal);
 
+      var applied = false;
       var applyPanelChange = function(ev) {
         // transitionend fires per property; only react to the
         // chevron's transform.
         if (ev && ev.propertyName !== 'transform') return;
+        // Guard against double-fire: transitionend AND the fallback
+        // timeout both race to call this; whichever wins toggles
+        // .minimal once and the other becomes a no-op (otherwise
+        // the second call would toggle .minimal back to the
+        // original state and cancel the panel transition).
+        if (applied) return;
+        applied = true;
         if (svg) svg.removeEventListener('transitionend', applyPanelChange);
 
         // Capture cert plate scroll state BEFORE the layout shifts.
