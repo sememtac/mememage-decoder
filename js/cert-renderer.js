@@ -314,11 +314,15 @@ function renderCert(meta, options) {
     var GH = Math.round(totalH * dpr);
     _grainCanvas.width = GW;
     _grainCanvas.height = GH;
-    // Override the CSS height: 100% !important (which clamps to visible
-    // viewport) with an explicit pixel value matching the full scrollable
-    // area. Must use setProperty with priority='important' to beat the
-    // CSS !important.
-    _grainCanvas.style.setProperty('height', totalH + 'px', 'important');
+    // Leave canvas display height alone (CSS .plate-grain { height: 100%
+    // !important } takes care of it). Setting an explicit pixel height
+    // here used to force the canvas to scrollHeight, which made the
+    // canvas overflow the plate's content area whenever the plate later
+    // shrank (player-collapse layout) — the absolutely-positioned canvas
+    // then re-inflated plate.scrollHeight back to the full viewport,
+    // defeating the auto-fit. CSS 100% height tracks the plate's current
+    // size, and the pixel buffer (canvas.height = totalH * dpr) keeps
+    // the brushed-metal pattern detailed when stretched to a tall plate.
     var gc = _grainCanvas.getContext('2d');
 
     // Draw horizontal hairlines
