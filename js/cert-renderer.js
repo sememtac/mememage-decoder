@@ -74,6 +74,160 @@ function rarityCellColors(tierColor) {
 // coordinates — this wrapper pre-scales the context so they stay
 // agnostic to DPR. Call AFTER the canvas is attached to the DOM so
 // clientWidth is accurate.
+// =====================================================================
+// Save live certificate plate as PNG.
+// Captures the plate exactly as rendered in the browser via SVG
+// foreignObject — clone → swap canvases for image data URLs →
+// inline same-origin CSS → render → trim → embed bar → download.
+// Replaces the long hand-rolled canvas renderer that used to drift
+// from the live cert every time the live cert was updated.
+// =====================================================================
+function _saveLivePlate(plate, barId, barHash) {
+  var SCALE = 2; // 2x for retina output
+
+  return new Promise(function(resolve, reject) {
+    var rect = plate.getBoundingClientRect();
+    var W = Math.round(rect.width);
+    var H = Math.round(plate.scrollHeight);
+    if (!W || !H) { reject(new Error('plate has no dimensions')); return; }
+
+    // Clone the plate so we can mutate it (strip save button, swap
+    // canvases) without disturbing the live DOM the user is viewing.
+    var clone = plate.cloneNode(true);
+
+    // Force the clone to render its full scrollable content. The
+    // live plate may be a fixed-height scroll container; for the
+    // screenshot we want every row stitched into one tall image.
+    clone.style.height = H + 'px';
+    clone.style.maxHeight = 'none';
+    clone.style.minHeight = '0';
+    clone.style.overflow = 'visible';
+
+    // Remove elements that don't belong in the saved image.
+    var stripSelectors = ['.save-cert-btn', '.cosmic-player'];
+    stripSelectors.forEach(function(sel) {
+      var nodes = clone.querySelectorAll(sel);
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+      }
+    });
+
+    // SVG foreignObject can't render <canvas>, so swap each canvas
+    // for an <img> data URL of the canvas's current pixels. We pull
+    // the image from the LIVE canvas (origCanvases) because the
+    // clone's canvases are blank (cloneNode doesn't copy bitmap data).
+    var origCanvases = Array.from(plate.querySelectorAll('canvas'));
+    var cloneCanvases = Array.from(clone.querySelectorAll('canvas'));
+    for (var i = 0; i < Math.min(origCanvases.length, cloneCanvases.length); i++) {
+      var src = origCanvases[i];
+      var dst = cloneCanvases[i];
+      if (!dst.parentNode || !src.width || !src.height) continue;
+      var dataUrl = '';
+      try { dataUrl = src.toDataURL('image/png'); } catch (e) { continue; }
+      var img = document.createElement('img');
+      img.src = dataUrl;
+      img.className = src.className || '';
+      // Mirror the live canvas's positioning + sizing so the swap is
+      // a visual no-op (absolute insets, dimensions, z-index, etc).
+      var srcCS = window.getComputedStyle(src);
+      img.style.cssText = dst.getAttribute('style') || '';
+      img.style.display = 'block';
+      img.style.width = srcCS.width;
+      img.style.height = srcCS.height;
+      img.style.position = srcCS.position;
+      img.style.top = srcCS.top;
+      img.style.left = srcCS.left;
+      img.style.right = srcCS.right;
+      img.style.bottom = srcCS.bottom;
+      img.style.zIndex = srcCS.zIndex;
+      img.style.opacity = srcCS.opacity;
+      img.style.transform = srcCS.transform;
+      img.style.filter = srcCS.filter;
+      dst.parentNode.replaceChild(img, dst);
+    }
+
+    // Inline every same-origin stylesheet rule so foreignObject has
+    // the cert's full CSS context. Cross-origin sheets (Google Fonts
+    // CSS) are skipped via try/catch — fonts fall back to the rest of
+    // the system stack listed in the cert's font-family declarations.
+    var styles = '';
+    Array.from(document.styleSheets).forEach(function(sheet) {
+      try {
+        var rules = sheet.cssRules;
+        if (!rules) return;
+        for (var r = 0; r < rules.length; r++) styles += rules[r].cssText + '\n';
+      } catch (e) { /* cross-origin */ }
+    });
+
+    var html = new XMLSerializer().serializeToString(clone);
+    var svgStr =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' +
+      '<foreignObject width="100%" height="100%">' +
+      '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + W + 'px;height:' + H + 'px;background:transparent;">' +
+      '<style>' + styles + '</style>' +
+      html +
+      '</div>' +
+      '</foreignObject>' +
+      '</svg>';
+
+    var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+
+    var img = new Image();
+    img.onload = function() {
+      try {
+        // Compose the final canvas: scaled plate render + 2 rows for
+        // the steganographic bar at the bottom. embedBits modifies
+        // those bottom rows in place to encode identifier + hash.
+        var BAR_H = 2;
+        var fW = W * SCALE;
+        var fH = H * SCALE + BAR_H;
+        var out = document.createElement('canvas');
+        out.width = fW;
+        out.height = fH;
+        var o = out.getContext('2d');
+        o.fillStyle = '#0d0d14';
+        o.fillRect(0, 0, fW, fH);
+        o.drawImage(img, 0, 0, fW, H * SCALE);
+        URL.revokeObjectURL(url);
+
+        if (typeof encodeFrame === 'function' && typeof embedBits === 'function') {
+          var ps = barId + '\x00' + barHash;
+          var pb = new TextEncoder().encode(ps);
+          var fb = encodeFrame(pb);
+          if (fb) {
+            var pp = out.width >= 1024 ? 3 : 2;
+            var px = o.getImageData(0, 0, out.width, out.height);
+            embedBits(px.data, out.width, out.height, fb, pp);
+            o.putImageData(px, 0, 0);
+          }
+        }
+
+        out.toBlob(function(blob2) {
+          if (!blob2) { reject(new Error('toBlob returned null')); return; }
+          var u = URL.createObjectURL(blob2);
+          var a = document.createElement('a');
+          a.href = u;
+          a.download = barId + '.certificate.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function() { URL.revokeObjectURL(u); }, 1000);
+          resolve();
+        }, 'image/png');
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = function(err) {
+      URL.revokeObjectURL(url);
+      reject(err || new Error('SVG image failed to load'));
+    };
+    img.src = url;
+  });
+}
+
 function _setupHiDpi(canvas, fallbackW, heightForWidth) {
   var dpr = window.devicePixelRatio || 1;
   var cssW = canvas.clientWidth || fallbackW;
@@ -1188,182 +1342,17 @@ function renderCert(meta, options) {
     });
 
     saveBtn.addEventListener('click', function() {
-      // Only the three intended band canvases (gen / machine / sky)
-      // belong in the saved composite. plate.querySelectorAll('canvas')
-      // also picks up the brushed-metal-grain canvas (now sized to the
-      // full scrollHeight, which is huge), the constellation overlay,
-      // the save button's sparkle canvas, and any cosmic-player nodes.
-      // Drawing those as sequential "bands" blows the layout apart.
-      var canvases = plate.querySelectorAll('.sky-band-container > canvas');
-      var S = 3; // Resolution scale (3x retina)
-      var W = 604*S, M = 8*S, PAD = 20*S, GAP = 8*S, INNER = 40*S;
-      var FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-      var MONO = '"SF Mono", Monaco, Menlo, monospace';
-
-      // Rarity theme
-      var _pgDefs = {
-        common:    {stops:[['#b8b8bc',0],['#a0a0a4',.3],['#909094',.7],['#808084',1]], border:'rgba(0,0,0,0.1)', text:'#1a1a22', dim:'#4a4a60', lbl:'#5a5a70', div:'rgba(0,0,0,0.06)'},
-        uncommon:  {stops:[['#b8c0b6',0],['#98a892',.2],['#849880',.5],['#748872',1]], border:'rgba(74,158,74,0.25)', text:'#1a1a22', dim:'#3a5a3a', lbl:'#4a6a4a', div:'rgba(0,0,0,0.06)'},
-        rare:      {stops:[['#b8bcc8',0],['#98a0b4',.2],['#838aa0',.5],['#707894',1]], border:'rgba(74,122,190,0.3)', text:'#1a1a22', dim:'#3a4a6a', lbl:'#4a5a7a', div:'rgba(0,0,0,0.06)'},
-        veryrare:  {stops:[['#bcb8c6',0],['#a098b0',.2],['#8a80a0',.5],['#787094',1]], border:'rgba(138,74,190,0.3)', text:'#1a1a22', dim:'#4a3a5a', lbl:'#5a4a6a', div:'rgba(0,0,0,0.06)'},
-        epic:      {stops:[['#c2bca8',0],['#a69c86',.2],['#908670',.5],['#807460',1]], border:'rgba(190,138,26,0.35)', text:'#1a1a22', dim:'#5a4a30', lbl:'#6a5a40', div:'rgba(0,0,0,0.06)'},
-        legendary: {stops:[['#2a2228',0],['#1e181e',.3],['#181018',.7],['#120a12',1]], border:'rgba(190,42,42,0.4)', text:'#e8d8d8', dim:'#c0a0a0', lbl:'#b09090', div:'rgba(255,255,255,0.06)'}
-      };
-      var _t2 = getRarityTier(meta.rarity_score||0);
-      var tK = _t2.name.toLowerCase().replace(' ','');
-      var pg = _pgDefs[tK] || _pgDefs.common;
-
-      // Draw on oversized canvas, trim later. Plate gradient painted first as background.
-      var tmpC = document.createElement('canvas'); tmpC.width = W; tmpC.height = 6000;
-      var c = tmpC.getContext('2d');
-      c.fillStyle = '#0d0d14'; c.fillRect(0, 0, W, 6000);
-      var preGr = c.createLinearGradient(0, M, 0, 5000);
-      for (var si3 = 0; si3 < pg.stops.length; si3++) preGr.addColorStop(pg.stops[si3][1], pg.stops[si3][0]);
-      c.fillStyle = preGr; c.beginPath(); c.roundRect(M, M, W-M*2, 5980, 10*S); c.fill();
-
-      // Constellation overlay — drawn before text so the header reads
-      // on top, matching the live cert's z-order. conCanvas is the
-      // hoisted reference from the constellation block at the top of
-      // renderCert; absent if there's no constellation seed.
-      if (typeof conCanvas !== 'undefined' && conCanvas && conCanvas.width) {
-        var _consW = (W - M * 2) * 1.10;            // 110% of plate width (matches CSS left:-5%)
-        var _consX = M + (W - M * 2 - _consW) / 2;  // centered (negative offset)
-        var _consY = M + 10 * S;                    // matches CSS top:10px (scaled)
-        var _consH = _consW * (conCanvas.height / conCanvas.width);
-        c.save();
-        c.beginPath(); c.roundRect(M, M, W - M * 2, 5980, 10 * S); c.clip();
-        c.globalAlpha = 0.35;
-        c.drawImage(conCanvas, _consX, _consY, _consW, _consH);
-        c.restore();
-      }
-
-      c.textAlign = 'center';
-      var y = PAD + M;
-
-      function _div2() { c.strokeStyle=pg.div; c.beginPath(); c.moveTo(INNER,y); c.lineTo(W-INNER,y); c.stroke(); y+=6*S; }
-      // Etched text: dark inset shadow above + light highlight below (engraved plate look)
-      var _etchHi = tK==='legendary' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.5)';
-      var _etchLo = tK==='legendary' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.15)';
-      function _etch(text, x, yPos, color) {
-        c.fillStyle = _etchLo; c.fillText(text, x, yPos - S);  // dark shadow above (inset top)
-        c.fillStyle = _etchHi; c.fillText(text, x, yPos + S);  // light highlight below (catch light)
-        c.fillStyle = color; c.fillText(text, x, yPos);         // actual text
-      }
-      function _etchWrap(text, mw, lh, color) {
-        var ws=text.split(' '),ln='';
-        for(var i=0;i<ws.length;i++){var tt=ln+(ln?' ':'')+ws[i];if(c.measureText(tt).width>mw&&ln){_etch(ln,W/2,y,color);y+=lh;ln=ws[i];}else ln=tt;}
-        if(ln){_etch(ln,W/2,y,color);y+=lh;}
-      }
-      function _lbl(t) { c.font='600 '+(7*S)+'px '+FONT; c.letterSpacing=(1*S)+'px'; c.textAlign='center'; _etch(t,W/2,y+9*S,pg.lbl); c.letterSpacing='0px'; y+=16*S; }
-      function _wrap(t,mw,lh) { var ws=t.split(' '),ln=''; for(var i=0;i<ws.length;i++){var tt=ln+(ln?' ':'')+ws[i];if(c.measureText(tt).width>mw&&ln){c.fillText(ln,W/2,y);y+=lh;ln=ws[i];}else ln=tt;} if(ln){c.fillText(ln,W/2,y);y+=lh;} }
-
-      // Portrait
-      var _safeThumb = _safeThumbnail(meta.thumbnail);
-      var _hp = _safeThumb && meta._verification && (meta._verification.status==='verified'||meta._verification.status==='bar_verified');
-      if (_hp) { try { var _ti=new Image();_ti.src=_safeThumb;var cx=W/2,cy=y+32*S,r=30*S;c.save();c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.clip();c.drawImage(_ti,cx-r,cy-r,r*2,r*2);c.restore();c.strokeStyle=pg.div;c.lineWidth=1.5*S;c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.stroke();y+=70*S;} catch(e){} }
-
-      // Constellation
-      if (meta.constellation_name) { c.font='600 '+(9*S)+'px '+FONT; c.letterSpacing=(2*S)+'px'; c.textAlign='center'; _etch(meta.constellation_name.toUpperCase(),W/2,y+10*S,tK==='legendary'?'rgba(200,180,180,0.4)':'rgba(60,60,80,0.35)'); c.letterSpacing='0px'; y+=16*S; }
-
-      // Identifier
-      c.font='600 '+(13*S)+'px '+MONO; _etch(barId,W/2,y+13*S,pg.text); y+=22*S;
-
-      // Badges — colors mirror the live cert's CSS exactly:
-      // dark rgba bg (~0.75 alpha) + colored rgba border (~0.4) +
-      // saturated text. Previous version used the text color for
-      // bg with globalAlpha 0.12 / 0.3 which made the badges read
-      // as washed-out rectangles in the saved PNG (no silver plate
-      // behind them to add weight like in the live cert).
-      var _vf = meta._verification;
-      if (_vf) {
-        var _bs = [];
-        if (_vf.status === 'verified' || _vf.status === 'bar_verified') {
-          _bs.push({ t: '\u2713 WITNESSED', text: '#4ec8a0', bg: 'rgba(10,30,22,0.75)', border: 'rgba(78,200,160,0.4)' });
-        } else if (_vf.status === 'tampered') {
-          _bs.push({ t: '\u2717 ALTERED', text: '#f06040', bg: 'rgba(35,10,8,0.75)', border: 'rgba(240,96,64,0.4)' });
-        }
-        if (_vf.signature === true) {
-          _bs.push({ t: '\uD83D\uDD11 AUTHENTICATED', text: '#5ea8e8', bg: 'rgba(10,20,35,0.75)', border: 'rgba(94,168,232,0.4)' });
-        } else if (_vf.signature === false) {
-          _bs.push({ t: '\u2717 FORGED', text: '#f06040', bg: 'rgba(35,10,8,0.75)', border: 'rgba(240,96,64,0.4)' });
-        }
-        if (_vf.portrait && _vf.portrait.match === true) {
-          _bs.push({ t: '\u2B22 EMBODIED', text: '#a878d8', bg: 'rgba(22,12,32,0.75)', border: 'rgba(168,120,216,0.4)' });
-        } else if (_vf.portrait && _vf.portrait.match === false) {
-          _bs.push({ t: '\u2B21 DISEMBODIED', text: '#a07860', bg: 'rgba(20,12,8,0.75)', border: 'rgba(160,120,96,0.4)' });
-        }
-        if (_bs.length) {
-          var bw = 116 * S, bh = 16 * S, bg3 = 5 * S;
-          var tbw2 = _bs.length * bw + (_bs.length - 1) * bg3;
-          var bx2 = (W - tbw2) / 2;
-          for (var bi2 = 0; bi2 < _bs.length; bi2++) {
-            c.fillStyle = _bs[bi2].bg;
-            c.beginPath();
-            c.roundRect(bx2, y, bw, bh, 3 * S);
-            c.fill();
-            c.strokeStyle = _bs[bi2].border;
-            c.lineWidth = S;
-            c.stroke();
-            c.font = '700 ' + (7 * S) + 'px ' + FONT;
-            c.fillStyle = _bs[bi2].text;
-            c.fillText(_bs[bi2].t, bx2 + bw / 2, y + 11.5 * S);
-            bx2 += bw + bg3;
-          }
-          y += bh + 8 * S;
-        }
-      }
-
-      _div2();
-
-      // Timestamp
-      var _ts=meta.conceived||meta.timestamp||'';
-      if(_ts){c.font='300 '+(10*S)+'px '+FONT;_etch(_ts,W/2,y+10*S,pg.dim);y+=16*S;}
-
-      // Prompt
-      var _pr=meta.prompt||'';
-      if(_pr){_div2();c.font='italic 300 '+(10*S)+'px '+FONT;var _pCol=tK==='legendary'?'#d8c0c0':pg.text;y+=2*S;_etchWrap('\u201C'+_pr+'\u201D',W-INNER*2,14*S,_pCol);y+=2*S;_div2();}
-
-      // Rarity
-      if(meta.rarity_score!==undefined){c.font='600 '+(9*S)+'px '+FONT;_etch(_t2.name.toUpperCase()+' ('+meta.rarity_score+')',W/2,y+10*S,_t2.color);y+=18*S;}
-
-      // Birth Temperament
-      if(meta.birth_temperament){_lbl('BIRTH TEMPERAMENT');c.font='500 '+(10*S)+'px '+FONT;_etch(meta.birth_temperament,W/2,y+10*S,pg.text);y+=14*S;if(meta.birth_summary){c.font='italic 300 '+(9*S)+'px '+FONT;_etch(meta.birth_summary,W/2,y+10*S,pg.dim);y+=14*S;}if(meta.birth_traits&&meta.birth_traits.length){c.font='300 '+(8*S)+'px '+FONT;_etch(meta.birth_traits.join(' \u00b7 '),W/2,y+10*S,pg.dim);y+=14*S;}y+=6*S;}
-
-      // Canvas bands — inset with rounded clip so plate gradient shows as margin
-      var bandInset = 12*S;
-      for(var ci2=0;ci2<canvases.length;ci2++){
-        var src=canvases[ci2];
-        var bx3=bandInset, bw2=W-bandInset*2;
-        var scale=bw2/src.width, bh2=Math.round(src.height*scale);
-        c.save();
-        c.beginPath();c.roundRect(bx3,y,bw2,bh2,6*S);c.clip();
-        c.drawImage(src,bx3,y,bw2,bh2);
-        c.restore();
-        y+=bh2+GAP;
-      }
-
-      // GPS
-      var _gps='';if(born&&born.gps_locked)_gps=born.gps_locked.ct||born.gps_locked.ciphertext||'';
-      if(_gps){_lbl('BIRTHPLACE \u2014 TIME-LOCKED');c.font='300 '+(6*S)+'px '+MONO;c.fillStyle=pg.dim;_wrap(_gps,W-INNER*2,9*S);y+=4*S;if(born.gps_locked.t){c.font='italic 300 '+(7*S)+'px '+FONT;c.fillStyle=pg.dim;var _te=typeof born.gps_locked.t.toExponential==='function'?born.gps_locked.t.toExponential(0):born.gps_locked.t;c.fillText('* '+_te+' sequential squarings to unlock',W/2,y+8*S);y+=14*S;}}
-
-      // Footer
-      y+=4*S;c.font='300 '+(8*S)+'px '+FONT;_etch('Celestial positions via Meeus algorithms (J2000.0)',W/2,y+9*S,pg.dim);y+=12*S;
-      c.font='italic 300 '+(8*S)+'px '+FONT;_etch('The cosmos does not care, but it was watching.',W/2,y+9*S,pg.dim);y+=14*S;y+=M;
-
-      // === Trim to final height + add border + bar ===
-      var fH=y+2;var out=document.createElement('canvas');out.width=W;out.height=fH;
-      var o=out.getContext('2d');
-      o.fillStyle='#0d0d14';o.fillRect(0,0,W,fH);
-      o.save();o.beginPath();o.roundRect(M,M,W-M*2,y-M*2,10*S);o.clip();
-      o.drawImage(tmpC,0,0,W,fH,0,0,W,fH);
-      o.restore();
-      o.strokeStyle=pg.border;o.lineWidth=S;o.beginPath();o.roundRect(M,M,W-M*2,y-M*2,10*S);o.stroke();
-
-      // Bar
-      if(typeof encodeFrame==='function'&&typeof embedBits==='function'){var ps=barId+'\x00'+barHash;var pb=new TextEncoder().encode(ps);var fb=encodeFrame(pb);if(fb){var pp=out.width>=1024?3:2;var px=o.getImageData(0,0,out.width,out.height);embedBits(px.data,out.width,out.height,fb,pp);o.putImageData(px,0,0);}}
-
-      out.toBlob(function(blob){var u=URL.createObjectURL(blob);var a=document.createElement('a');a.href=u;a.download=barId+'.certificate.png';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u);},1000);
-      }, 'image/png');
+      // Capture the live cert plate via SVG foreignObject so the
+      // saved PNG matches whatever the user sees in the browser —
+      // same plate gradient, brushed-metal grain, constellation
+      // overlay, badges, bands, footer. The previous hand-rolled
+      // canvas renderer was a parallel rendering path that drifted
+      // every time the live cert was tweaked; this approach makes
+      // the two paths the same render.
+      _saveLivePlate(plate, barId, barHash).catch(function(err) {
+        console.error('Save certificate failed:', err);
+        alert('Save failed — see console for details.');
+      });
     });
     plate.appendChild(saveBtn);
   }
