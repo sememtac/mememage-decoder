@@ -150,21 +150,33 @@ function _saveLivePlate(plate, barId, barHash) {
     // the cert's full CSS context. Cross-origin sheets (Google Fonts
     // CSS) are skipped via try/catch — fonts fall back to the rest of
     // the system stack listed in the cert's font-family declarations.
+    // @font-face and @import rules are stripped because they trigger
+    // cross-origin font fetches inside the SVG sandbox, which some
+    // browsers treat as unsafe and reject the entire SVG.
     var styles = '';
     Array.from(document.styleSheets).forEach(function(sheet) {
       try {
         var rules = sheet.cssRules;
         if (!rules) return;
-        for (var r = 0; r < rules.length; r++) styles += rules[r].cssText + '\n';
+        for (var r = 0; r < rules.length; r++) {
+          var rule = rules[r];
+          if (rule.type === CSSRule.FONT_FACE_RULE ||
+              rule.type === CSSRule.IMPORT_RULE) continue;
+          styles += rule.cssText + '\n';
+        }
       } catch (e) { /* cross-origin */ }
     });
 
     var html = new XMLSerializer().serializeToString(clone);
+    // Wrap CSS in CDATA — raw CSS contains `>` (descendant
+    // combinator), `<` (rare but possible in attribute selectors), and
+    // `&` characters that are special in XML and would break the SVG
+    // parse.
     var svgStr =
       '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' +
       '<foreignObject width="100%" height="100%">' +
       '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + W + 'px;height:' + H + 'px;background:transparent;">' +
-      '<style>' + styles + '</style>' +
+      '<style><![CDATA[' + styles + ']]></style>' +
       html +
       '</div>' +
       '</foreignObject>' +
@@ -220,9 +232,13 @@ function _saveLivePlate(plate, barId, barHash) {
         reject(err);
       }
     };
-    img.onerror = function(err) {
-      URL.revokeObjectURL(url);
-      reject(err || new Error('SVG image failed to load'));
+    img.onerror = function() {
+      // Browsers don't surface why an SVG image failed (security).
+      // Log the SVG payload size + a head snippet so the user can
+      // copy the blob URL into a new tab to see the actual error.
+      console.error('SVG payload (' + svgStr.length + ' chars) failed to load. Blob URL:', url);
+      console.error('SVG head:', svgStr.slice(0, 600));
+      reject(new Error('SVG image failed to load (see blob URL in console for details)'));
     };
     img.src = url;
   });
