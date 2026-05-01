@@ -637,6 +637,11 @@ var CosmicPlayer = (function() {
   function checkReparent() {
     var player = document.querySelector('.cosmic-player');
     if (!player) return;
+    // Planetarium owns the player while it's body-level
+    // (.in-planetarium). Don't fight its positioning — the
+    // planetarium puts the player back to its original parent on
+    // close, at which point this re-homing logic runs again.
+    if (player.classList.contains('in-planetarium')) return;
     var slot = document.querySelector('.panel-right-has-player');
     if (!slot) return;
     var layout = document.querySelector('.panel-layout');

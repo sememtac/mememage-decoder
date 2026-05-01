@@ -618,39 +618,87 @@ var CosmicPlanetarium = (function() {
     updatePlayerOffset();
   }
 
+  // Track an existing cert-page player that we MOVED (vs created
+  // fresh) so dismiss can return it to its original parent without
+  // tearing down the audio context — music keeps playing seamlessly
+  // through the planetarium open/close.
+  var _movedPlayer = null;
+  var _movedPlayerOriginalParent = null;
+
   function injectPlayer() {
-    if (typeof CosmicPlayer === 'undefined' || !openOpts || !openOpts.meta) return;
-    if (typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
+    if (!openOpts || !openOpts.meta) return;
+
+    // Prefer to MOVE an existing player (cert page) rather than
+    // dismiss + recreate. Dismissal would close the AudioContext and
+    // stop playback; appendChild relocates the same DOM node so the
+    // <audio>, AudioContext, and EQ analyser all keep going.
+    var existing = document.querySelector('.cosmic-player');
+    if (existing) {
+      _movedPlayer = existing;
+      _movedPlayerOriginalParent = existing.parentElement;
+      document.body.appendChild(existing);
+      existing.classList.add('in-planetarium');
+    } else if (typeof CosmicPlayer !== 'undefined') {
+      // No existing player (e.g., planetarium-preview page) — create
+      // one fresh. dismissPlayer will tear it down on close.
+      CosmicPlayer.inject(document.body, openOpts.meta);
+      var fresh = document.body.querySelector(':scope > .cosmic-player');
+      if (!fresh) return;
+      fresh.classList.add('in-planetarium');
+      _movedPlayer = null;
+      _movedPlayerOriginalParent = null;
+    } else {
+      return;
+    }
+
     if (typeof getRarityTier === 'function') {
       var tier = getRarityTier((openOpts.meta && openOpts.meta.rarity_score) || 0);
       document.body.style.setProperty('--rarity-color', tier.color);
     }
-    // Inject as a direct child of <body> so position: fixed anchors
-    // to the viewport rather than the planetarium modal.
-    CosmicPlayer.inject(document.body, openOpts.meta);
-    var players = document.body.querySelectorAll(':scope > .cosmic-player');
-    var p = players[players.length - 1];
-    if (p) {
-      p.classList.add('in-planetarium');
-      if (typeof ResizeObserver !== 'undefined') {
-        playerResizeObserver = new ResizeObserver(updateHintPosition);
-        playerResizeObserver.observe(p);
-      }
-      [50, 200, 500, 850, 1200, 1700, 2500].forEach(function(ms) {
-        setTimeout(updateHintPosition, ms);
-      });
+
+    var p = document.body.querySelector(':scope > .cosmic-player');
+    if (p && typeof ResizeObserver !== 'undefined') {
+      playerResizeObserver = new ResizeObserver(updateHintPosition);
+      playerResizeObserver.observe(p);
     }
+    [50, 200, 500, 850, 1200, 1700, 2500].forEach(function(ms) {
+      setTimeout(updateHintPosition, ms);
+    });
   }
   function dismissPlayer() {
     if (playerResizeObserver) {
       try { playerResizeObserver.disconnect(); } catch (_) {}
       playerResizeObserver = null;
     }
-    if (typeof CosmicPlayer !== 'undefined' && typeof CosmicPlayer.dismiss === 'function') CosmicPlayer.dismiss();
-    var leftover = document.body.querySelectorAll(':scope > .cosmic-player');
-    for (var i = 0; i < leftover.length; i++) {
-      if (leftover[i].parentElement) leftover[i].parentElement.removeChild(leftover[i]);
+
+    if (_movedPlayer) {
+      // Return the player to its original parent. Removing the
+      // .in-planetarium class flips its CSS positioning back to the
+      // host context (sticky inside .plate, or absolute inside the
+      // .panel-right-has-player slot) — same DOM node, no audio
+      // context teardown, music continues uninterrupted.
+      _movedPlayer.classList.remove('in-planetarium');
+      if (_movedPlayerOriginalParent && _movedPlayerOriginalParent.isConnected) {
+        _movedPlayerOriginalParent.appendChild(_movedPlayer);
+      }
+      // If the original parent has been torn down (e.g., a fresh
+      // cert was loaded under us), leave the player in body and
+      // let cosmic-player.js's MutationObserver re-home it on the
+      // next class/childList change.
+      _movedPlayer = null;
+      _movedPlayerOriginalParent = null;
+    } else {
+      // Player was created for the planetarium (no cert host) —
+      // dismiss it.
+      if (typeof CosmicPlayer !== 'undefined' && typeof CosmicPlayer.dismiss === 'function') {
+        CosmicPlayer.dismiss();
+      }
+      var leftover = document.body.querySelectorAll(':scope > .cosmic-player');
+      for (var i = 0; i < leftover.length; i++) {
+        if (leftover[i].parentElement) leftover[i].parentElement.removeChild(leftover[i]);
+      }
     }
+
     document.body.style.removeProperty('--rarity-color');
   }
 
