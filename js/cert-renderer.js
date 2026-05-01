@@ -78,10 +78,23 @@ function rarityCellColors(tierColor) {
 // Save live certificate plate as PNG.
 // Captures the plate exactly as rendered in the browser via SVG
 // foreignObject — clone → swap canvases for image data URLs →
-// inline same-origin CSS → render → trim → embed bar → download.
-// Replaces the long hand-rolled canvas renderer that used to drift
-// from the live cert every time the live cert was updated.
+// inline non-data <img> srcs as data URLs (avoid cross-origin canvas
+// taint when SVG is drawn back) → inline same-origin CSS → render →
+// trim → embed bar → download.
 // =====================================================================
+function _inlineImageAsDataUrl(src) {
+  return fetch(src, { mode: 'cors' })
+    .then(function(r) { return r.blob(); })
+    .then(function(blob) {
+      return new Promise(function(resolve, reject) {
+        var fr = new FileReader();
+        fr.onload = function() { resolve(fr.result); };
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+      });
+    });
+}
+
 function _saveLivePlate(plate, barId, barHash) {
   var SCALE = 2; // 2x for retina output
 
@@ -145,6 +158,32 @@ function _saveLivePlate(plate, barId, barHash) {
       img.style.filter = srcCS.filter;
       dst.parentNode.replaceChild(img, dst);
     }
+
+    // Inline every <img> src that isn't already a data URL. Inside
+    // the SVG sandbox, relative-URL fetches are treated as
+    // cross-origin by some browsers (Chrome/Safari) and taint the
+    // canvas the SVG is drawn to, which then blocks getImageData
+    // (needed for the bar embed). Pre-fetching everything as data
+    // URLs makes the SVG fully self-contained and clean.
+    var imgPromises = [];
+    var imgs = Array.from(clone.querySelectorAll('img'));
+    imgs.forEach(function(imgEl) {
+      var src = imgEl.getAttribute('src');
+      if (!src || src.indexOf('data:') === 0) return;
+      imgPromises.push(
+        _inlineImageAsDataUrl(src)
+          .then(function(dataUrl) { imgEl.setAttribute('src', dataUrl); })
+          .catch(function(err) {
+            // Strip the offending img rather than poison the SVG.
+            console.warn('save-cert: could not inline', src, err);
+            if (imgEl.parentNode) imgEl.parentNode.removeChild(imgEl);
+          })
+      );
+    });
+
+    Promise.all(imgPromises).then(_continueSave).catch(reject);
+
+    function _continueSave() {
 
     // Inline every same-origin stylesheet rule so foreignObject has
     // the cert's full CSS context. Cross-origin sheets (Google Fonts
@@ -241,6 +280,8 @@ function _saveLivePlate(plate, barId, barHash) {
       reject(new Error('SVG image failed to load (see blob URL in console for details)'));
     };
     img.src = url;
+
+    } // end _continueSave
   });
 }
 
