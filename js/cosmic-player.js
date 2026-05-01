@@ -93,26 +93,18 @@ var CosmicPlayer = (function() {
       toggle._animating = true;
 
       var willBeMinimal = !player.classList.contains('minimal');
-      var svg = toggle.querySelector('svg');
 
       // Phase 1: flip the chevron now. The CSS transition (0.3s)
       // plays a clean rotation before any panel layout starts.
       toggle.classList.toggle('flipped', willBeMinimal);
 
-      var applied = false;
-      var applyPanelChange = function(ev) {
-        // transitionend fires per property; only react to the
-        // chevron's transform.
-        if (ev && ev.propertyName !== 'transform') return;
-        // Guard against double-fire: transitionend AND the fallback
-        // timeout both race to call this; whichever wins toggles
-        // .minimal once and the other becomes a no-op (otherwise
-        // the second call would toggle .minimal back to the
-        // original state and cancel the panel transition).
-        if (applied) return;
-        applied = true;
-        if (svg) svg.removeEventListener('transitionend', applyPanelChange);
-
+      // Phase 2: after the chevron rotation has fully settled, kick
+      // off the panel collapse/expand. Fixed wait of 380ms (chevron
+      // 0.3s + ~80ms breathing room) gives the rotation a clean
+      // finish before the panel starts moving — no race with
+      // transitionend, no overlap, the two animations read as
+      // distinct beats.
+      setTimeout(function() {
         // Capture cert plate scroll state BEFORE the layout shifts.
         // Pin distance-from-bottom continuously through the cert
         // collapse/expand transition so the viewport tracks the
@@ -131,7 +123,6 @@ var CosmicPlayer = (function() {
           distFromBottom = plate.scrollHeight - plate.scrollTop - plate.clientHeight;
         }
 
-        // Phase 2: apply the panel collapse/expand.
         var isMinimal = player.classList.toggle('minimal');
         toggle.setAttribute('aria-label', isMinimal ? 'Expand player' : 'Collapse player');
         // Surfaces hosting the player (cert plate, planetarium overlay)
@@ -154,15 +145,7 @@ var CosmicPlayer = (function() {
         // Release the animation lock after the panel's own 0.5s
         // collapse transition settles.
         setTimeout(function() { toggle._animating = false; }, 550);
-      };
-
-      // Listen for the chevron rotation to finish. Fallback timer
-      // covers browsers/states where transitionend doesn't fire
-      // (e.g. reduced motion, transform interrupted).
-      if (svg) svg.addEventListener('transitionend', applyPanelChange);
-      setTimeout(function() {
-        if (toggle._animating) applyPanelChange({ propertyName: 'transform' });
-      }, 350);
+      }, 380);
     });
 
     // Play button
