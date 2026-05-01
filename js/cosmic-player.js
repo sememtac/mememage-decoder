@@ -119,7 +119,13 @@ var CosmicPlayer = (function() {
         // cert tail (browsers preserve scrollTop by default, which
         // would visibly scroll the user away as scroll content
         // changes).
-        var plate = document.querySelector('.panel-right-has-player .plate');
+        //
+        // Scoped to the player's actual host slot — in planetarium
+        // mode the player is a body-level overlay (.in-planetarium)
+        // and there's no cert plate to pin. closest() returns null
+        // there, so the scroll-pin block is a clean skip.
+        var hostSlot = player.closest('.panel-right-has-player');
+        var plate = hostSlot ? hostSlot.querySelector('.plate') : null;
         var distFromBottom = null;
         if (plate && plate.scrollHeight > plate.clientHeight) {
           distFromBottom = plate.scrollHeight - plate.scrollTop - plate.clientHeight;
