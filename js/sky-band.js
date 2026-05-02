@@ -180,6 +180,13 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
     for (var i = 0; i < total; i++) {
       (function(idx) {
         var img = new Image();
+        // crossOrigin must be set BEFORE src so the request is made
+        // with the CORS preflight. Without it, the image (even if
+        // same-origin) marks any canvas it's drawn to as tainted —
+        // breaking the save-cert PNG pipeline that needs to read
+        // pixels back via getImageData. GitHub Pages + mememage.art
+        // both send Access-Control-Allow-Origin: * for static assets.
+        img.crossOrigin = 'anonymous';
         img.onload = function() {
           zodiacImgs[idx] = img;
           loaded++;
@@ -216,6 +223,9 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
     for (var i = 0; i < planetDefs.length; i++) {
       (function(pd) {
         var img = new Image();
+        // crossOrigin before src — keeps the sky-band canvas
+        // un-tainted so save-cert can read pixels back.
+        img.crossOrigin = 'anonymous';
         img.onload = function() {
           pd.img = img;
           loaded++;
