@@ -638,6 +638,10 @@ var CosmicPlanetarium = (function() {
       _movedPlayerOriginalParent = existing.parentElement;
       document.body.appendChild(existing);
       existing.classList.add('in-planetarium');
+      // EQ canvas reads its parent's width on window-resize only;
+      // moving to body changes the effective width without firing a
+      // resize. Fire one manually so the visualization re-centers.
+      window.dispatchEvent(new Event('resize'));
     } else if (typeof CosmicPlayer !== 'undefined') {
       // No existing player (e.g., planetarium-preview page) — create
       // one fresh. dismissPlayer will tear it down on close.
@@ -687,6 +691,9 @@ var CosmicPlanetarium = (function() {
       // next class/childList change.
       _movedPlayer = null;
       _movedPlayerOriginalParent = null;
+      // Re-fire resize so the EQ canvas reads its new (smaller)
+      // host width and re-centers.
+      window.dispatchEvent(new Event('resize'));
     } else {
       // Player was created for the planetarium (no cert host) —
       // dismiss it.
