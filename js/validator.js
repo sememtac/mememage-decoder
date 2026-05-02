@@ -1523,6 +1523,9 @@ function buildOrbitInspector(records, collected) {
 document.getElementById('auditInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') runAudit();
 });
+// Wire the Audit button (was onclick="runAudit()" in validator.html;
+// inline handler removed to keep all event wiring in JS).
+document.getElementById('auditBtn').addEventListener('click', runAudit);
 // Audit source config — shared impl in SourceConfig (portal.js) so
 // the decoder's By Word mirrors this exactly with prefix='lookup'.
 (function() {
