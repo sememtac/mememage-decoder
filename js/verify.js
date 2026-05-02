@@ -75,16 +75,35 @@ async function verifySignature(identifier, contentHash, signatureHex, publicKeyH
     var sigBytes = hexToBytes(signatureHex);
     var message = new TextEncoder().encode(identifier + '\x00' + contentHash);
 
-    // Try SubtleCrypto Ed25519 (modern browsers)
+    // Path 1 — native SubtleCrypto Ed25519. Fastest where supported
+    // (Chrome 137+, Safari 17+, Firefox 128+).
     try {
       var key = await crypto.subtle.importKey(
         'raw', pubBytes, {name: 'Ed25519'}, false, ['verify']
       );
       return await crypto.subtle.verify('Ed25519', key, sigBytes, message);
     } catch (e) {
-      // Ed25519 not supported in this browser's SubtleCrypto
-      return null;
+      // Ed25519 not in this browser's SubtleCrypto — fall through.
     }
+
+    // Path 2 — bundled pure-JS Ed25519 (tweetnacl). Keeps the chain
+    // self-contained: the decoder reassembled from chunks centuries
+    // from now can still verify signatures without depending on
+    // whatever crypto API a future browser ships. nacl global is
+    // loaded by the script tag in index.html / validator.html
+    // before verify.js.
+    if (typeof nacl !== 'undefined' && nacl.sign && nacl.sign.detached &&
+        typeof nacl.sign.detached.verify === 'function') {
+      try {
+        return nacl.sign.detached.verify(message, sigBytes, pubBytes);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // No verifier available at all — caller distinguishes this from
+    // "no signature data" via record.signature presence.
+    return null;
   } catch (e) {
     return false;
   }
