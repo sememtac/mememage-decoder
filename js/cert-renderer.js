@@ -265,7 +265,25 @@ function _saveLivePlate(plate, barId, barHash) {
           var fb = encodeFrame(pb);
           if (fb) {
             var pp = out.width >= 1024 ? 3 : 2;
-            var px = o.getImageData(0, 0, out.width, out.height);
+            var px;
+            try {
+              px = o.getImageData(0, 0, out.width, out.height);
+            } catch (taintErr) {
+              // Diagnostic dump: tell us exactly what's in the SVG
+              // payload so we can see what's tainting the canvas.
+              // Most common culprits at this point: external <img>
+              // src that escaped inlining, SVG <image> with
+              // xlink:href, CSS url() in a rule we didn't strip.
+              console.error('save-cert: canvas tainted at getImageData', taintErr);
+              console.error('save-cert: SVG length=' + svgStr.length + ', img count=' + (clone.querySelectorAll('img').length) + ', non-data img srcs:');
+              clone.querySelectorAll('img').forEach(function(im, i) {
+                var s = im.getAttribute('src') || '';
+                if (s && s.indexOf('data:') !== 0) console.error('  [' + i + '] ' + s.slice(0, 200));
+              });
+              // Also dump first 800 chars of inlined CSS for inspection
+              console.error('save-cert: CSS head:', styles.slice(0, 800));
+              throw taintErr;
+            }
             embedBits(px.data, out.width, out.height, fb, pp);
             o.putImageData(px, 0, 0);
           }
