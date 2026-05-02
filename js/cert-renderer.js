@@ -187,11 +187,18 @@ function _saveLivePlate(plate, barId, barHash) {
 
     // Inline every same-origin stylesheet rule so foreignObject has
     // the cert's full CSS context. Cross-origin sheets (Google Fonts
-    // CSS) are skipped via try/catch — fonts fall back to the rest of
-    // the system stack listed in the cert's font-family declarations.
-    // @font-face and @import rules are stripped because they trigger
-    // cross-origin font fetches inside the SVG sandbox, which some
-    // browsers treat as unsafe and reject the entire SVG.
+    // CSS) are skipped via try/catch. @font-face and @import rules
+    // are stripped because they trigger cross-origin font fetches
+    // inside the SVG sandbox.
+    //
+    // Then a defensive scrub: remove every reference to the Google-
+    // hosted webfont 'JetBrains Mono'. Some browsers (including
+    // current Chrome/Safari on both desktop and mobile) attempt to
+    // resolve that font through the cross-origin CDN when it appears
+    // in font-family inside foreignObject, which taints the canvas
+    // even though we already inlined-and-stripped the @font-face
+    // rule. Falling back to the system monospace stack gives the
+    // saved PNG slightly different glyphs but lets getImageData run.
     var styles = '';
     Array.from(document.styleSheets).forEach(function(sheet) {
       try {
@@ -205,6 +212,11 @@ function _saveLivePlate(plate, barId, barHash) {
         }
       } catch (e) { /* cross-origin */ }
     });
+    // Strip the cross-origin webfont names from font-family stacks
+    // so the SVG renderer doesn't try to fetch them through the
+    // cross-origin CDN. The remaining stack (system fonts) renders
+    // without leaving the document origin.
+    styles = styles.replace(/['"]JetBrains Mono['"]\s*,?\s*/g, '');
 
     var html = new XMLSerializer().serializeToString(clone);
     // Wrap CSS in CDATA — raw CSS contains `>` (descendant
@@ -225,6 +237,11 @@ function _saveLivePlate(plate, barId, barHash) {
     var url = URL.createObjectURL(blob);
 
     var img = new Image();
+    // crossOrigin='anonymous' marks the SVG image as CORS-clean once
+    // loaded. Some browsers require this before drawImage will
+    // produce a non-tainted destination canvas, even when the SVG
+    // itself is from a same-origin blob URL.
+    img.crossOrigin = 'anonymous';
     img.onload = function() {
       try {
         // Compose the final canvas: scaled plate render + 2 rows for
