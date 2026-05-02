@@ -628,13 +628,17 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
         console.error('Save soul failed:', e);
       }
     });
-    // Place inside the active input panel (above the example link
-    // and the VALIDATOR portal) instead of replacing them — both
-    // can coexist now.
-    var activePanel = document.querySelector('.input-section .input-panel.active .input-panel-wrap')
-                   || document.querySelector('.input-section .input-panel.active');
-    if (activePanel) {
-      activePanel.appendChild(soulBtn);
+    // Sit between "Recovered from …" (last child of #status) and
+    // the "see an example" link — slotted directly before
+    // #tryExample at input-section level so both the source line
+    // above and the example/portal links below stay in their
+    // native positions.
+    var inputSection = document.querySelector('.input-section');
+    var tryEx = document.getElementById('tryExample');
+    if (inputSection && tryEx && tryEx.parentElement === inputSection) {
+      inputSection.insertBefore(soulBtn, tryEx);
+    } else if (inputSection) {
+      inputSection.appendChild(soulBtn);
     }
   }
 
