@@ -1033,19 +1033,16 @@
       background: linear-gradient(180deg, #14141a 0%, #08080c 100%);
     }
 
-    /* Plate fills the right panel by default. When the player goes
-       minimal, the plate auto-fits its content so its bottom edge
-       rides up to where the cert ends — no empty silver between
-       the save button and the player pill. Cert content itself is
-       untouched (no spacing changes); only the plate's outer height
-       contracts to wrap the content. min-height transitions from
-       full viewport to 0; max-height keeps the upper cap so tall
-       certs still scroll. */
+    /* Plate auto-fits its content by default — soul-only fetches
+       (no audio, no body) and minimal-player states both want the
+       silver to wrap the cert exactly. Only an EXPANDED cosmic-
+       player promotes the plate back to full viewport, so the
+       240px overlay has a tall canvas to glass over. */
     .panel-layout.layout-active .panel-right-has-player .plate {
       height: auto;
-      min-height: calc(100vh - 3.5rem);
+      min-height: 0;
       max-height: calc(100vh - 3.5rem);
-      padding-bottom: 100px;
+      padding-bottom: 36px;
       overflow-y: auto;
       overflow-x: hidden;
       /* Disable browser scroll-anchoring — cosmic-player.js pins
@@ -1064,24 +1061,25 @@
       transition: min-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
                   padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* Player collapsed: drop min-height to 0 so the plate shrinks
-       to its content height. Pair with smaller padding-bottom so
-       the trailing buffer below the save button matches the small
-       pill instead of reserving the 100px expanded-player space. */
-    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player.minimal) .plate {
-      min-height: 0;
-      padding-bottom: 36px;
+    /* Expanded player → fill the viewport so the 240px overlay
+       has full height to glass over. Selector matches when a
+       .cosmic-player exists inside the host AND it isn't carrying
+       .minimal. Soul-only fetches (no player at all) and minimal
+       state both fall through to the auto-fit default above. */
+    .panel-layout.layout-active .panel-right-has-player:has(.cosmic-player:not(.minimal)) .plate {
+      min-height: calc(100vh - 3.5rem);
+      padding-bottom: 100px;
     }
-    /* Panel-right also contracts so its bottom (and the absolutely-
-       positioned player at bottom: 0) follows the plate up. */
+    /* Panel-right tracks the plate so its bottom (and the
+       absolutely-positioned player at bottom: 0) follows. */
     .panel-layout.layout-active .panel-right.panel-right-has-player {
       height: auto;
-      min-height: var(--panel-height);
+      min-height: 0;
       max-height: var(--panel-height);
       transition: min-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .panel-layout.layout-active .panel-right.panel-right-has-player:has(.cosmic-player.minimal) {
-      min-height: 0;
+    .panel-layout.layout-active .panel-right.panel-right-has-player:has(.cosmic-player:not(.minimal)) {
+      min-height: var(--panel-height);
     }
     .panel-layout.layout-active .panel-right-has-player .plate::-webkit-scrollbar {
       display: none;
