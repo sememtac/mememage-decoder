@@ -329,6 +329,8 @@ function resetAll(){
   // By Sight's processImage reassigns it after calling resetAll, so
   // the image-drop path still gets EMBODIED evaluated.
   window._lastDecodedCanvas = null;
+  var oldSoulBtn = document.getElementById('downloadSoulBtn');
+  if (oldSoulBtn) oldSoulBtn.remove();
 
   barCard.querySelectorAll('.bar-field').forEach(function(f){f.remove();});
   barCard.classList.remove('visible');
@@ -592,6 +594,47 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
         srcDiv.textContent = 'Recovered from ' + src.name;
       }
       statusEl.appendChild(srcDiv);
+    }
+  }
+
+  // Download Soul button — saves the in-memory soul JSON without
+  // re-fetching (source may be unreachable due to CORS, or use a
+  // different file extension). Skipped in the example flow — the
+  // example cert is read-only.
+  var existingSoulBtn = document.getElementById('downloadSoulBtn');
+  if (existingSoulBtn) existingSoulBtn.remove();
+  var _inExampleFlow = document.querySelector('.input-section').classList.contains('example-active');
+  if (!_inExampleFlow && identifier && meta.content_hash) {
+    var soulFile = soulFilename(identifier, meta.content_hash);
+    var soulBtn = document.createElement('button');
+    soulBtn.id = 'downloadSoulBtn';
+    soulBtn.textContent = 'Download Soul';
+    soulBtn.className = 'download-soul-btn';
+    soulBtn.addEventListener('click', function() {
+      try {
+        var clean = {};
+        Object.keys(meta).forEach(function(k) {
+          if (k.charAt(0) !== '_') clean[k] = meta[k];
+        });
+        var blob = new Blob([JSON.stringify(clean, null, 2)], {type: 'application/json'});
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = soulFile;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+      } catch (e) {
+        console.error('Save soul failed:', e);
+      }
+    });
+    // Place inside the active input panel (above the example link
+    // and the VALIDATOR portal) instead of replacing them — both
+    // can coexist now.
+    var activePanel = document.querySelector('.input-section .input-panel.active .input-panel-wrap')
+                   || document.querySelector('.input-section .input-panel.active');
+    if (activePanel) {
+      activePanel.appendChild(soulBtn);
     }
   }
 
