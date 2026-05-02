@@ -269,19 +269,34 @@ function _saveLivePlate(plate, barId, barHash) {
             try {
               px = o.getImageData(0, 0, out.width, out.height);
             } catch (taintErr) {
-              // Diagnostic dump: tell us exactly what's in the SVG
-              // payload so we can see what's tainting the canvas.
-              // Most common culprits at this point: external <img>
-              // src that escaped inlining, SVG <image> with
-              // xlink:href, CSS url() in a rule we didn't strip.
               console.error('save-cert: canvas tainted at getImageData', taintErr);
-              console.error('save-cert: SVG length=' + svgStr.length + ', img count=' + (clone.querySelectorAll('img').length) + ', non-data img srcs:');
-              clone.querySelectorAll('img').forEach(function(im, i) {
+              // All non-data img refs (any of these is a smoking gun)
+              var imgs = clone.querySelectorAll('img');
+              var nonDataImgs = [];
+              imgs.forEach(function(im) {
                 var s = im.getAttribute('src') || '';
-                if (s && s.indexOf('data:') !== 0) console.error('  [' + i + '] ' + s.slice(0, 200));
+                if (s && s.indexOf('data:') !== 0) nonDataImgs.push(s.slice(0, 200));
               });
-              // Also dump first 800 chars of inlined CSS for inspection
-              console.error('save-cert: CSS head:', styles.slice(0, 800));
+              console.error('save-cert: ' + imgs.length + ' imgs, ' + nonDataImgs.length + ' non-data:', nonDataImgs);
+              // All <canvas> elements left in the clone (we replace
+              // them with <img>; any remaining means toDataURL failed
+              // — that canvas was likely tainted on its own).
+              var canvases = clone.querySelectorAll('canvas');
+              console.error('save-cert: ' + canvases.length + ' <canvas> elements still in clone (each = a toDataURL failure, likely tainted)');
+              // url() refs in the inlined CSS that aren't data: URLs
+              var urlMatches = (styles.match(/url\([^)]*\)/g) || []).filter(function(u) {
+                return u.indexOf('data:') === -1;
+              });
+              console.error('save-cert: ' + urlMatches.length + ' non-data url() refs in inlined CSS:', urlMatches);
+              // Inline style attrs on clone elements that contain url()
+              var inlineUrls = [];
+              clone.querySelectorAll('[style]').forEach(function(el) {
+                var s = el.getAttribute('style') || '';
+                if (s.indexOf('url(') >= 0 && s.indexOf('data:') === -1) {
+                  inlineUrls.push(el.tagName + ': ' + s.slice(0, 200));
+                }
+              });
+              console.error('save-cert: ' + inlineUrls.length + ' inline-style url() refs:', inlineUrls);
               throw taintErr;
             }
             embedBits(px.data, out.width, out.height, fb, pp);
