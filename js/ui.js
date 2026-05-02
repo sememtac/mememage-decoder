@@ -329,8 +329,6 @@ function resetAll(){
   // By Sight's processImage reassigns it after calling resetAll, so
   // the image-drop path still gets EMBODIED evaluated.
   window._lastDecodedCanvas = null;
-  var oldSoulBtn = document.getElementById('downloadSoulBtn');
-  if (oldSoulBtn) oldSoulBtn.remove();
 
   barCard.querySelectorAll('.bar-field').forEach(function(f){f.remove();});
   barCard.classList.remove('visible');
@@ -574,13 +572,6 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
 
   renderCert(meta);
 
-  // Hide the example link — a real certificate is now displayed. Skip
-  // when we're in the example flow itself: the link stays visible but
-  // now reads "dismiss example" so the user can close it.
-  var tryEx = document.getElementById('tryExample');
-  var inExample = document.querySelector('.input-section').classList.contains('example-active');
-  if (tryEx) tryEx.style.display = inExample ? '' : 'none';
-
   if (v.status === 'verified') {
     showStatus('Full metadata recovered. The body and soul are joined.', 'success');
   } else if (v.status === 'tampered') {
@@ -601,52 +592,6 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
         srcDiv.textContent = 'Recovered from ' + src.name;
       }
       statusEl.appendChild(srcDiv);
-    }
-  }
-
-  // Download Soul button — in the input section, not the certificate.
-  // Skipped in the example flow so the system box shows only the
-  // description + dismiss link, matching the validator's attack lab.
-  var existingSoulBtn = document.getElementById('downloadSoulBtn');
-  if (existingSoulBtn) existingSoulBtn.remove();
-  var _inExampleFlow = document.querySelector('.input-section').classList.contains('example-active');
-  if (!_inExampleFlow && identifier && meta.content_hash) {
-    var soulFile = soulFilename(identifier, meta.content_hash);
-    var soulUrl = meta._source || ('https://archive.org/download/' + identifier + '/' + soulFile);
-    var soulBtn = document.createElement('button');
-    soulBtn.id = 'downloadSoulBtn';
-    soulBtn.textContent = 'Download Soul';
-    soulBtn.className = 'download-soul-btn';
-    soulBtn.addEventListener('click', function() {
-      // Save the in-memory record directly as .soul. No re-fetch —
-      // source origin may be unreachable (CORS, mixed content) or
-      // use a different extension (self-hosted .json). Since .soul is
-      // just canonical JSON with a different extension, we strip
-      // decoder-internal fields (prefixed with _) and serialize.
-      try {
-        var clean = {};
-        Object.keys(meta).forEach(function(k) {
-          if (k.charAt(0) !== '_') clean[k] = meta[k];
-        });
-        var blob = new Blob([JSON.stringify(clean, null, 2)], {type: 'application/json'});
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = soulFile;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
-      } catch (e) {
-        console.error('Save soul failed:', e);
-      }
-    });
-    // Insert before the portal link (evidence-wrap) so it sits above VALIDATOR
-    var inputSection = document.querySelector('.input-section');
-    var portalWrap = inputSection ? inputSection.querySelector('.evidence-wrap') : null;
-    if (portalWrap) {
-      inputSection.insertBefore(soulBtn, portalWrap);
-    } else if (inputSection) {
-      inputSection.appendChild(soulBtn);
     }
   }
 

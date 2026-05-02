@@ -2166,29 +2166,6 @@
     }
   }
 
-  /* Download Soul button — dark system silver */
-  .download-soul-btn {
-    display: block;
-    margin: 10px auto;
-    padding: 7px 24px;
-    background: linear-gradient(180deg, rgba(55,55,60,0.9) 0%, rgba(30,30,34,0.85) 40%, rgba(22,22,26,0.9) 100%);
-    border: 1px solid rgba(140,140,150,0.2);
-    color: #8a8a94;
-    border-radius: 5px;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.5);
-    box-shadow: 0 2px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
-    transition: color 0.8s ease, border-color 0.8s ease, box-shadow 0.8s ease;
-  }
-  .download-soul-btn:hover {
-    color: #c8c8d0;
-    border-color: rgba(170,170,180,0.3);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
-  }
 
   /* --- Page footer --- */
   .page-footer {
