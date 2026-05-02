@@ -159,18 +159,21 @@ function _saveLivePlate(plate, barId, barHash) {
       dst.parentNode.replaceChild(img, dst);
     }
 
-    // Inline every <img> src that isn't already a data URL. Inside
-    // the SVG sandbox, relative-URL fetches are treated as
-    // cross-origin by some browsers (Chrome/Safari) and taint the
-    // canvas the SVG is drawn to, which then blocks getImageData
-    // (needed for the bar embed). Pre-fetching everything as data
-    // URLs makes the SVG fully self-contained and clean.
-    var imgPromises = [];
+    // Inline every <img> src AND every inline-style url() reference
+    // (e.g. CSS custom properties like --trait-mask: url(img/...))
+    // that isn't already a data URL. Inside the SVG sandbox,
+    // relative-URL fetches are treated as cross-origin by browsers
+    // and taint the canvas the SVG is drawn to, which blocks
+    // getImageData (needed for the bar embed). Pre-fetching
+    // everything as data URLs makes the SVG fully self-contained.
+    var inlinePromises = [];
+
+    // 1) <img src="...">
     var imgs = Array.from(clone.querySelectorAll('img'));
     imgs.forEach(function(imgEl) {
       var src = imgEl.getAttribute('src');
       if (!src || src.indexOf('data:') === 0) return;
-      imgPromises.push(
+      inlinePromises.push(
         _inlineImageAsDataUrl(src)
           .then(function(dataUrl) { imgEl.setAttribute('src', dataUrl); })
           .catch(function(err) {
@@ -181,7 +184,37 @@ function _saveLivePlate(plate, barId, barHash) {
       );
     });
 
-    Promise.all(imgPromises).then(_continueSave).catch(reject);
+    // 2) Inline style="… url(…) …" (mask images, background images,
+    //    custom properties like --trait-mask). Cache fetches per
+    //    unique URL so repeated trait masks don't refetch.
+    var urlCache = {};
+    var styledEls = Array.from(clone.querySelectorAll('[style]'));
+    styledEls.forEach(function(el) {
+      var s = el.getAttribute('style') || '';
+      var matches = s.match(/url\(([^)]+)\)/g);
+      if (!matches) return;
+      matches.forEach(function(m) {
+        var inner = m.slice(4, -1).replace(/^['"]|['"]$/g, '').trim();
+        if (!inner || inner.indexOf('data:') === 0) return;
+        if (!urlCache[inner]) {
+          urlCache[inner] = _inlineImageAsDataUrl(inner).catch(function(err) {
+            console.warn('save-cert: could not inline url() ref', inner, err);
+            return null;
+          });
+        }
+        inlinePromises.push(urlCache[inner].then(function(dataUrl) {
+          if (!dataUrl) return;
+          var current = el.getAttribute('style') || '';
+          // Replace every occurrence of this URL (with or without
+          // quotes) in the inline style with the data URL.
+          var escaped = inner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var re = new RegExp('url\\(\\s*[\'"]?' + escaped + '[\'"]?\\s*\\)', 'g');
+          el.setAttribute('style', current.replace(re, 'url(' + dataUrl + ')'));
+        }));
+      });
+    });
+
+    Promise.all(inlinePromises).then(_continueSave).catch(reject);
 
     function _continueSave() {
 
