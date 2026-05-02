@@ -112,8 +112,15 @@ var CosmicPlanetarium = (function() {
   }
 
   // ─── Constellation generation ───
-  function generateStars(constellationName, hashSeed) {
-    var rng = makeRng(strSeed(constellationName));
+  // generateLayout(seed) — canonical 2D layout for a constellation,
+  // shared by the cert backdrop pattern and the planetarium overlay.
+  // Returns 12 stars in [-0.5, 0.5]² space (heart at index 0) plus
+  // the edge list (MST + RNG closures). Both surfaces seed off the
+  // SAME string (constellation_hash) so the backdrop the user sees
+  // on the cert matches the constellation they navigate inside the
+  // planetarium.
+  function generateLayout(seed) {
+    var rng = makeRng(strSeed(seed));
     var st = [];
     st.push({ x: (0.3 + rng() * 0.4) - 0.5, y: (0.2 + rng() * 0.6) - 0.5, isHeart: true });
     for (var i = 1; i < 12; i++) {
@@ -135,8 +142,34 @@ var CosmicPlanetarium = (function() {
       }
       st.push({ x: x, y: y, isHeart: false });
     }
+    // Center the constellation around (0, 0) so it sits in the middle
+    // of whatever surface renders it, regardless of where the random
+    // walk happened to drift.
+    var minX = st[0].x, maxX = st[0].x, minY = st[0].y, maxY = st[0].y;
+    for (var c = 1; c < st.length; c++) {
+      if (st[c].x < minX) minX = st[c].x;
+      if (st[c].x > maxX) maxX = st[c].x;
+      if (st[c].y < minY) minY = st[c].y;
+      if (st[c].y > maxY) maxY = st[c].y;
+    }
+    var shiftX = -(minX + maxX) / 2;
+    var shiftY = -(minY + maxY) / 2;
+    for (var c2 = 0; c2 < st.length; c2++) {
+      st[c2].x += shiftX;
+      st[c2].y += shiftY;
+    }
+    return { stars: st, edges: buildEdges(st) };
+  }
+
+  function generateStars(constellationName, hashSeed) {
+    // 2D layout keyed by the hash (was constellationName) so the cert
+    // backdrop and planetarium are guaranteed to match — they both
+    // seed generateLayout from the same string.
+    var seed = hashSeed || constellationName;
+    var layout = generateLayout(seed);
+    var st = layout.stars;
     for (var k = 0; k < 12; k++) {
-      var perRng = makeRng(strSeed(hashSeed + ':' + k));
+      var perRng = makeRng(strSeed(seed + ':' + k));
       var z = (perRng() - 0.5) * 1.2;
       if (st[k].isHeart) z = 0;
       st[k].z = z;
@@ -718,8 +751,16 @@ var CosmicPlanetarium = (function() {
     var hash = opts.hash || '0000000000000000';
     buildDom();
     nameEl.textContent = name;
-    stars = generateStars(name, hash);
-    edges = buildEdges(stars);
+    // Single source of truth: generateLayout drives both 2D positions
+    // and edges (cert backdrop also calls this with the same seed,
+    // so the patterns match). Z is added per-star from the same hash.
+    var layout = generateLayout(hash);
+    stars = layout.stars;
+    edges = layout.edges;
+    for (var zk = 0; zk < stars.length; zk++) {
+      var perRng = makeRng(strSeed(hash + ':' + zk));
+      stars[zk].z = stars[zk].isHeart ? 0 : (perRng() - 0.5) * 1.2;
+    }
 
     // Reseed the page-level starfield with the constellation's seed
     // so the bg sky is unique to this constellation. Density tuned
@@ -856,5 +897,5 @@ var CosmicPlanetarium = (function() {
     setTimeout(updateHintPosition, 600);
   });
 
-  return { open: open, close: close };
+  return { open: open, close: close, generateLayout: generateLayout };
 })();

@@ -580,7 +580,7 @@ function renderCert(meta, options) {
   var isHeartStar = meta.heart_star_id && meta.heart_star_id === meta._identifier;
   if (isHeartStar) myChunkIdx = 0;
 
-  if (conSeed) {
+  if (conSeed && typeof CosmicPlanetarium !== 'undefined' && CosmicPlanetarium.generateLayout) {
     var CON_W = 500, CON_H = 180;
     var conCanvas = document.createElement('canvas');
     conCanvas.width = CON_W; conCanvas.height = CON_H;
@@ -588,87 +588,15 @@ function renderCert(meta, options) {
     conCanvas.style.cssText = 'position:absolute;top:10px;left:-5%;width:110%;height:auto;opacity:0.35;pointer-events:none;z-index:1';
     var conCtx = conCanvas.getContext('2d');
 
-    // Seeded PRNG from constellation_hash — the sky shapes the pattern
-    var cSeed = 0;
-    for (var ci = 0; ci < conSeed.length; ci++) cSeed = (cSeed * 31 + conSeed.charCodeAt(ci)) & 0x7FFFFFFF;
-    function cRng() { cSeed = (cSeed * 1103515245 + 12345) & 0x7FFFFFFF; return cSeed / 0x7FFFFFFF; }
-    function cDst(a, b) { var dx = b.x - a.x, dy = b.y - a.y; return Math.sqrt(dx * dx + dy * dy); }
-
-    // Place 12 stars in normalized [0,1]×[0,1] space, then scale to canvas
-    var cPad = 0.08, cMinSep = 0.08;
-    var cNorm = []; // normalized positions
-    cNorm.push({ x: 0.3 + cRng() * 0.4, y: 0.2 + cRng() * 0.6 });
-    for (var csi = 1; csi < 12; csi++) {
-      var cnx, cny, cPlaced = false;
-      for (var cAtt = 0; cAtt < 60; cAtt++) {
-        if (cRng() < 0.55) {
-          var cAnc = cNorm[Math.floor(cRng() * cNorm.length)];
-          var cAng = cRng() * 6.2832, cDi = 0.12 + cRng() * 0.22;
-          cnx = cAnc.x + Math.cos(cAng) * cDi; cny = cAnc.y + Math.sin(cAng) * cDi;
-        } else { cnx = cPad + cRng() * (1 - cPad * 2); cny = cPad + cRng() * (1 - cPad * 2); }
-        if (cnx < cPad || cnx > 1 - cPad || cny < cPad || cny > 1 - cPad) continue;
-        var cOk = true;
-        for (var cci = 0; cci < cNorm.length; cci++) if (cDst(cNorm[cci], {x:cnx,y:cny}) < cMinSep) { cOk = false; break; }
-        if (cOk) { cPlaced = true; break; }
-      }
-      if (!cPlaced) { cnx = cPad + cRng() * (1 - cPad * 2); cny = cPad + cRng() * (1 - cPad * 2); }
-      cNorm.push({ x: cnx, y: cny });
-    }
-    // Center the constellation — compute bounding box midpoint and shift to (0.5, 0.5)
-    var cMinX = 1, cMaxX = 0, cMinY = 1, cMaxY = 0;
-    for (var csi = 0; csi < cNorm.length; csi++) {
-      if (cNorm[csi].x < cMinX) cMinX = cNorm[csi].x;
-      if (cNorm[csi].x > cMaxX) cMaxX = cNorm[csi].x;
-      if (cNorm[csi].y < cMinY) cMinY = cNorm[csi].y;
-      if (cNorm[csi].y > cMaxY) cMaxY = cNorm[csi].y;
-    }
-    var cShiftX = 0.5 - (cMinX + cMaxX) / 2;
-    var cShiftY = 0.5 - (cMinY + cMaxY) / 2;
-    for (var csi = 0; csi < cNorm.length; csi++) {
-      cNorm[csi].x += cShiftX;
-      cNorm[csi].y += cShiftY;
-    }
-
-    var cStars = [];
-    for (var csi = 0; csi < cNorm.length; csi++) cStars.push({ x: cNorm[csi].x * CON_W, y: cNorm[csi].y * CON_H });
-
-    // MST from heart star (Prim's, 35° min angle, max degree 3, length regularity)
-    var cEdges = [], cInTree = [true];
-    for (var ci = 1; ci < 12; ci++) cInTree.push(false);
-    function cDeg(idx) { var d = 0; for (var i = 0; i < cEdges.length; i++) if (cEdges[i][0] === idx || cEdges[i][1] === idx) d++; return d; }
-    function cAngBtw(ax, ay, bx, by) { var dot = ax*bx+ay*by, m = Math.sqrt(ax*ax+ay*ay)*Math.sqrt(bx*bx+by*by); if (m < 0.001) return 180; return Math.acos(Math.max(-1, Math.min(1, dot/m))) * 180 / Math.PI; }
-    function cAngOk(a, b) {
-      var abx = cStars[b].x-cStars[a].x, aby = cStars[b].y-cStars[a].y;
-      for (var ei = 0; ei < cEdges.length; ei++) {
-        var e0 = cEdges[ei][0], e1 = cEdges[ei][1];
-        if (e0===a||e1===a) { var o=e0===a?e1:e0; if (cAngBtw(abx,aby,cStars[o].x-cStars[a].x,cStars[o].y-cStars[a].y)<35) return false; }
-        if (e0===b||e1===b) { var o=e0===b?e1:e0; if (cAngBtw(-abx,-aby,cStars[o].x-cStars[b].x,cStars[o].y-cStars[b].y)<35) return false; }
-      }
-      return true;
-    }
-    var cELens = [];
-    for (var cStep = 0; cStep < 11; cStep++) {
-      var cCands = [];
-      for (var ci = 0; ci < 12; ci++) { if (!cInTree[ci]) continue; for (var cj = 0; cj < 12; cj++) { if (cInTree[cj]) continue; cCands.push({i:ci,j:cj,d:cDst(cStars[ci],cStars[cj])}); }}
-      cCands.sort(function(a,b) { return a.d - b.d; });
-      var cAvg = 0; if (cELens.length > 0) { for (var cl = 0; cl < cELens.length; cl++) cAvg += cELens[cl]; cAvg /= cELens.length; }
-      var cAdded = false;
-      var cMaxEdge = cELens.length >= 3 ? cAvg * 3 : 9999;
-      for (var cci = 0; cci < cCands.length; cci++) { var cc = cCands[cci]; if (cDeg(cc.i)>=3) continue; if (!cAngOk(cc.i,cc.j)) continue; if (cc.d>cMaxEdge) continue; cInTree[cc.j]=true; cEdges.push([cc.i,cc.j]); cELens.push(cc.d); cAdded=true; break; }
-      if (!cAdded) { for (var cci=0;cci<cCands.length;cci++) { if(cDeg(cCands[cci].i)<3&&cCands[cci].d<=cMaxEdge){cInTree[cCands[cci].j]=true;cEdges.push([cCands[cci].i,cCands[cci].j]);cELens.push(cCands[cci].d);cAdded=true;break;} } }
-      if (!cAdded && cCands.length) { cInTree[cCands[0].j]=true; cEdges.push([cCands[0].i,cCands[0].j]); cELens.push(cCands[0].d); } // always connect — constellation must be whole
-    }
-
-    // RNG closures (tri/quad, max 2)
-    var cAdj = []; for (var ci=0;ci<12;ci++) cAdj.push([]); for (var ci=0;ci<cEdges.length;ci++){cAdj[cEdges[ci][0]].push(cEdges[ci][1]);cAdj[cEdges[ci][1]].push(cEdges[ci][0]);}
-    var cRngE = [];
-    for (var ci=0;ci<12;ci++) for(var cj=ci+1;cj<12;cj++){var dij=cDst(cStars[ci],cStars[cj]);var bl=false;for(var ck=0;ck<12;ck++){if(ck===ci||ck===cj)continue;if(cDst(cStars[ci],cStars[ck])<dij&&cDst(cStars[cj],cStars[ck])<dij){bl=true;break;}}if(!bl)cRngE.push([ci,cj]);}
-    var cExtras=[];
-    for(var cri=0;cri<cRngE.length;cri++){var ca=cRngE[cri][0],cb=cRngE[cri][1];var inM=false;for(var cmi=0;cmi<cEdges.length;cmi++)if((cEdges[cmi][0]===ca&&cEdges[cmi][1]===cb)||(cEdges[cmi][0]===cb&&cEdges[cmi][1]===ca)){inM=true;break;}if(!inM)cExtras.push([ca,cb]);}
-    function cFindPath(f,t,mx){var q=[[f,[f]]],v={};v[f]=true;while(q.length>0){var cur=q.shift(),n=cur[0],p=cur[1];if(p.length>mx+1)continue;if(n===t&&p.length>1)return p;for(var ni=0;ni<cAdj[n].length;ni++){var nx=cAdj[n][ni];if(!v[nx]){v[nx]=true;q.push([nx,p.concat([nx])]);}}}return null;}
-    function cPtInPoly(px,py,poly){var s=0;for(var i=0;i<poly.length;i++){var j=(i+1)%poly.length;var c=(poly[j].x-poly[i].x)*(py-poly[i].y)-(poly[j].y-poly[i].y)*(px-poly[i].x);if(Math.abs(c)<.01)continue;if(s===0)s=c>0?1:-1;else if((c>0?1:-1)!==s)return false;}return true;}
-    var cAC=0;
-    for(var cei=0;cei<cExtras.length&&cAC<2;cei++){var ca=cExtras[cei][0],cb=cExtras[cei][1];var path=cFindPath(ca,cb,3);if(!path||path.length<3||path.length>4)continue;var poly=path.map(function(i){return cStars[i];});var enc=false;for(var csi=0;csi<12;csi++){var inP=false;for(var pi=0;pi<path.length;pi++)if(path[pi]===csi){inP=true;break;}if(inP)continue;if(cPtInPoly(cStars[csi].x,cStars[csi].y,poly)){enc=true;break;}}if(enc)continue;cEdges.push([ca,cb]);cAdj[ca].push(cb);cAdj[cb].push(ca);cAC++;}
+    // Same generator the planetarium uses — keyed off constellation_hash
+    // so the cert backdrop pattern and the planetarium overlay
+    // produce the IDENTICAL constellation shape. Layout returns
+    // stars in [-0.5, 0.5]² centered space + edge list.
+    var conLayout = CosmicPlanetarium.generateLayout(conSeed);
+    var cStars = conLayout.stars.map(function(s) {
+      return { x: (s.x + 0.5) * CON_W, y: (s.y + 0.5) * CON_H };
+    });
+    var cEdges = conLayout.edges;
 
     // Draw order: etched groove lines, then stars on top
     // Three passes: dark shadow (shifted down), main groove (center), light edge (shifted up)
