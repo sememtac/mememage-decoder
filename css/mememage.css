@@ -1537,6 +1537,23 @@
     border: 1px solid rgba(160, 120, 96, 0.4);
     text-shadow: 0 -1px 0 rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.3);
   }
+  /* Cert carries an Ed25519 signature but the browser couldn't run
+     the verification (Chrome <137 on Windows, etc). Neutral grey
+     palette so it reads as "we know this is signed, but we couldn't
+     check it here" — distinct from AUTHENTICATED (verified) and
+     FORGED (failed). */
+  .verify-signed-unverified {
+    color: #9090a0;
+    background: rgba(18, 18, 24, 0.75);
+    border: 1px solid rgba(120, 120, 140, 0.4);
+    text-shadow: 0 -1px 0 rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.3);
+  }
+  .verify-signed-unverified:hover {
+    background: rgba(35, 35, 45, 0.75);
+    border-color: rgba(160, 160, 180, 0.5);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .verify-signed-unverified::after { background: linear-gradient(105deg, transparent 30%, rgba(120,120,140,0.4) 48%, rgba(180,180,200,0.6) 50%, rgba(120,120,140,0.4) 52%, transparent 70%); }
   .verify-disembodied:hover {
     background: rgba(45, 28, 18, 0.75);
     border-color: rgba(160, 120, 96, 0.5);

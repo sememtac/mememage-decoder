@@ -821,8 +821,20 @@ function renderCert(meta, options) {
       sigBadge2.innerHTML = '<span class="verify-icon">&#x2717;</span> FORGED';
       sigBadge2.title = vf.signatureDetail || 'Signature invalid \u2014 possible forgery';
       badgeWrap.appendChild(sigBadge2);
+    } else if (vf.signature === null && meta.signature && meta.public_key) {
+      // Record carries Ed25519 signature data but the browser couldn't
+      // verify it (older Chrome on Windows is the common case — Ed25519
+      // in SubtleCrypto only enabled by default in Chrome 137+, May
+      // 2025). Surface a distinct badge so the user sees the cert IS
+      // signed instead of getting silent absence — same identity weight
+      // as AUTHENTICATED, just acknowledges the verification was
+      // skipped on this browser.
+      var sigBadge3 = _div('verify-badge verify-signed-unverified');
+      sigBadge3.innerHTML = '<span class="verify-icon">&#x1F511;</span> SIGNED';
+      sigBadge3.title = 'Ed25519 signature present but this browser could not verify it. Open in Safari 17+, Chrome 137+, or Firefox 128+ for cryptographic verification.';
+      badgeWrap.appendChild(sigBadge3);
     }
-    // signature === null means no signature or can't verify — no badge shown
+    // signature === null AND no signature data on record means truly unsigned — no badge shown
 
     // EMBODIED badge (portrait/dHash match)
     if (vf.portrait) {
