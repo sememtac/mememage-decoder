@@ -55,7 +55,7 @@
   </div>
   <div class="reconstruct-status" id="reconstructStatus"></div>
   <button class="reconstruct-btn" id="reconstructBtn" disabled>Reform the spirit</button>
-  <input type="file" id="reconstructInput" accept="image/png" multiple style="display:none">
+  <input type="file" id="reconstructInput" class="json-input-hidden" accept="image/png" multiple>
 </div>
 </div>
 </div>
@@ -66,8 +66,8 @@
     <input class="audit-input" id="auditInput" type="text" placeholder="mememage-identifier">
     <button class="audit-btn" id="auditBtn" onclick="runAudit()">Audit</button>
   </div>
-  <details class="lookup-source" style="margin-top:0.5rem;font-size:0.62rem;color:#707078;" open data-source-mode="online">
-    <summary style="cursor:pointer;color:#808088;letter-spacing:0.05em;">Source</summary>
+  <details class="lookup-source" open data-source-mode="online">
+    <summary>Source</summary>
     <div class="lookup-source-mode-row">
       <select class="lookup-source-mode" data-source-mode-select>
         <option value="online">Online</option>
@@ -82,7 +82,7 @@
     <div class="offline-row" data-mode-scope="offline">
       <button type="button" class="offline-pick-btn" data-offline-pick>Load local folder</button>
       <span class="offline-count" data-offline-count>0 records offline</span>
-      <input type="file" class="offline-input" webkitdirectory directory multiple style="display:none">
+      <input type="file" class="offline-input" webkitdirectory directory multiple>
     </div>
     <p class="lookup-source-hint" data-mode-scope="offline">Pick a directory of <em>.soul</em> files for offline verification. Records are kept in memory until the page reloads.</p>
   </details>
@@ -92,11 +92,11 @@
 <div class="panel-error-body" id="auditErrorBody"></div>
 </div>
 
-<div class="input-panel" id="tab-meta" style="overflow:hidden;">
+<div class="input-panel meta-panel" id="tab-meta">
 <div class="input-panel-wrap">
-<div class="drop-zone" id="jsonDrop" style="padding:2rem;min-height:0;">
-<span class="drop-icon" style="opacity:0.3">{}</span>
-<p style="color:#8a8a94;font-size:0.82rem;"><strong style="color:#c8c8d0;">Drop .soul files</strong></p>
+<div class="drop-zone meta-drop" id="jsonDrop">
+<span class="drop-icon meta-drop-icon">{}</span>
+<p class="meta-drop-text"><strong>Drop .soul files</strong></p>
 <p class="drop-hint">the chain remembers everything</p>
 </div>
 <div class="folder-btn-wrap">
@@ -144,7 +144,7 @@
 </div>
 </div>
 
-<div class="evidence-wrap" style="border-top:1px dashed rgba(255,255,255,0.06);"><a href="index.html" class="portal-link portal-yang" id="portalLink">Decoder</a></div>
+<div class="evidence-wrap evidence-wrap-divided"><a href="index.html" class="portal-link portal-yang" id="portalLink">Decoder</a></div>
 
 </div><!-- input-section -->
 

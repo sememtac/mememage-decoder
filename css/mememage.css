@@ -836,6 +836,11 @@
   }
   .ia-link-banner a:hover { color: var(--accent-purple); text-decoration: underline; }
 
+  /* Offline mode picker — hidden file input clicked programmatically
+     by the .offline-pick-btn handler. (Used to be inline
+     style="display:none" on every instance.) */
+  .offline-input { display: none; }
+
   /* --- Bar Signature Card --- */
   .bar-card {
     width: 100%; max-width: 640px; margin-top: 1.5rem;

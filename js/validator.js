@@ -191,9 +191,6 @@ function _readFragmentFile(file) {
     var reader = new FileReader();
     reader.onload = function() {
       var chunks = (typeof readPngTextChunks === 'function') ? readPngTextChunks(reader.result) : {};
-      // Diagnostic: log what the file actually carries so we can see
-      // whether the writer landed the chunks or the reader missed them.
-      try { console.log('[reconstruct]', file.name, 'chunks:', chunks); } catch (e) {}
       var fid = chunks.fragment_id;
       var pid = chunks.parent_id;
       var phash = chunks.parent_hash;

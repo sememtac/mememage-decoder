@@ -89,6 +89,24 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 .input-section.attack-active .input-tabs,
 .input-section.attack-active .input-panel.active { display: none; }
 .input-section.attack-active #tab-attack { display: block; }
+/* Observatory tab — drop zone for .soul files. Was a chain of
+   inline style attrs (overflow, padding, min-height, opacity,
+   text colors). All parked here as classes now. */
+#tab-meta.meta-panel { overflow: hidden; }
+.meta-drop { padding: 2rem; min-height: 0; }
+.meta-drop-icon { opacity: 0.3; }
+.meta-drop-text { color: #8a8a94; font-size: 0.82rem; }
+.meta-drop-text > strong { color: #c8c8d0; }
+
+/* Audit-tab Source picker (lookup-source <details>) — was three
+   inline style attrs scattered across validator.html. Single class
+   target now. */
+.lookup-source { margin-top: 0.5rem; font-size: 0.62rem; color: #707078; }
+.lookup-source > summary { cursor: pointer; color: #808088; letter-spacing: 0.05em; }
+/* Evidence wrap variant: top hairline divider for the page-foot
+   portal link. */
+.evidence-wrap-divided { border-top: 1px dashed rgba(255,255,255,0.06); }
+
 .atk-sec { font-size: 0.6rem; color: #808088; text-transform: uppercase; letter-spacing: 0.12em; margin: 0.5rem 0 0.25rem; }
 .atk-sec:first-child { margin-top: 0; }
 .atk-field { width: 100%; background: rgba(255,255,255,0.02); color: #c0c0c8; border: 1px solid rgba(255,255,255,0.06); border-radius: 5px; padding: 0.4rem; font-family: inherit; font-size: 0.62rem; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
