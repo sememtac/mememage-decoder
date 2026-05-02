@@ -1339,13 +1339,6 @@ function renderCert(meta, options) {
     });
 
     saveBtn.addEventListener('click', function() {
-      // Capture the live cert plate via SVG foreignObject so the
-      // saved PNG matches whatever the user sees in the browser —
-      // same plate gradient, brushed-metal grain, constellation
-      // overlay, badges, bands, footer. The previous hand-rolled
-      // canvas renderer was a parallel rendering path that drifted
-      // every time the live cert was tweaked; this approach makes
-      // the two paths the same render.
       _saveLivePlate(plate, barId, barHash).catch(function(err) {
         console.error('Save certificate failed:', err);
         alert('Save failed — see console for details.');

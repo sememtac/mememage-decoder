@@ -62,10 +62,9 @@ var CosmicPlanetarium = (function() {
   var heartRgbCache = [255, 240, 200];
   var currentRgbCache = [245, 245, 250];
   var pulseRgb = [220, 220, 240];
-  var spriteHeart = null, spriteCool = null, spriteCurrent = null;
+  var spriteHeart = null, spriteCurrent = null;
   var currentStarIndex = -1;
   var openOpts = null;
-  var playerMinimal = false;
   var isOpen = false;
   // Constellation alpha — ramps on open/close so the overlay fades in
   // and out alongside the modal chrome's CSS opacity transition.
@@ -77,15 +76,9 @@ var CosmicPlanetarium = (function() {
   function cam() { return Starfield.camera; }
 
   // ─── Helpers ───
-  function makeRng(seed) {
-    var s = seed | 0; if (!s) s = 1;
-    return function() { s = (s * 1103515245 + 12345) & 0x7FFFFFFF; return s / 0x7FFFFFFF; };
-  }
-  function strSeed(str) {
-    var h = 0;
-    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0x7FFFFFFF;
-    return h || 1;
-  }
+  // Seed/RNG are MMRng (rng.js); local aliases keep call sites short.
+  var makeRng = MMRng.make;
+  var strSeed = MMRng.strSeed;
   function wrapPi(t) {
     var w = ((t + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
     return w - Math.PI;
@@ -159,22 +152,6 @@ var CosmicPlanetarium = (function() {
       st[c2].y += shiftY;
     }
     return { stars: st, edges: buildEdges(st) };
-  }
-
-  function generateStars(constellationName, hashSeed) {
-    // 2D layout keyed by the hash (was constellationName) so the cert
-    // backdrop and planetarium are guaranteed to match — they both
-    // seed generateLayout from the same string.
-    var seed = hashSeed || constellationName;
-    var layout = generateLayout(seed);
-    var st = layout.stars;
-    for (var k = 0; k < 12; k++) {
-      var perRng = makeRng(strSeed(seed + ':' + k));
-      var z = (perRng() - 0.5) * 1.2;
-      if (st[k].isHeart) z = 0;
-      st[k].z = z;
-    }
-    return st;
   }
 
   function buildEdges(cStars) {
@@ -319,7 +296,6 @@ var CosmicPlanetarium = (function() {
   }
   function buildStarSprites() {
     spriteHeart = makeSprite('rgba(' + heartRgbCache.join(','), 4.5);
-    spriteCool  = makeSprite('rgba(245,245,250', 3.0);
     spriteCurrent = makeSprite('rgba(' + currentRgbCache.join(','), 3.0);
   }
 
@@ -804,7 +780,6 @@ var CosmicPlanetarium = (function() {
     pulseRgb = brightenHex(tierColorFor(curRarity), 0.3);
     buildStarSprites();
 
-    playerMinimal = false;
     modal.classList.remove('player-minimal');
 
     document.body.classList.add('planetarium-open');
@@ -890,7 +865,6 @@ var CosmicPlanetarium = (function() {
   // and camera y-offset to track the player's height change.
   document.addEventListener('cosmic-player-toggle', function(e) {
     var min = !!(e.detail && e.detail.minimal);
-    playerMinimal = min;
     if (modal) modal.classList.toggle('player-minimal', min);
     setTimeout(updateHintPosition, 50);
     setTimeout(updateHintPosition, 250);

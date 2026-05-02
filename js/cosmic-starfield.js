@@ -24,19 +24,12 @@ var CosmicStarfield = (function() {
 
   var stars = [];
 
-  // ─── Internal helpers (deterministic seeded RNG) ───
-  function _makeRng(seed) {
-    var s = seed | 0; if (!s) s = 1;
-    return function() {
-      s = (s * 1103515245 + 12345) & 0x7FFFFFFF;
-      return s / 0x7FFFFFFF;
-    };
-  }
-  function _strSeed(str) {
-    var h = 0;
-    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0x7FFFFFFF;
-    return h || 1;
-  }
+  // ─── Internal helpers ───
+  // Seed/RNG come from MMRng (rng.js) — single source of truth so a
+  // fix to seeding behavior propagates to every module that needs
+  // reproducible randomness.
+  var _makeRng = MMRng.make;
+  var _strSeed = MMRng.strSeed;
   function _wrapPi(t) {
     var w = ((t + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
     return w - Math.PI;

@@ -96,13 +96,9 @@ var CosmicAudio = (function() {
     return 0.5;
   }
 
-  function makeRng(seed) {
-    var s = seed & 0x7FFFFFFF;
-    return function() {
-      s = (s * 1103515245 + 12345) & 0x7FFFFFFF;
-      return s / 0x7FFFFFFF;
-    };
-  }
+  // Seed/RNG come from MMRng (rng.js) — shared across audio,
+  // starfield, planetarium, etc.
+  var makeRng = MMRng.make;
 
   function hashParams(sign, phase, temp, rarity) {
     var str = sign + '|' + phase + '|' + temp + '|' + rarity;
