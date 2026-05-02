@@ -99,11 +99,11 @@
 <p style="color:#8a8a94;font-size:0.82rem;"><strong style="color:#c8c8d0;">Drop .soul files</strong></p>
 <p class="drop-hint">the chain remembers everything</p>
 </div>
-<div style="text-align:center;padding:0.3rem 0 0.8rem;">
-<button id="folderBtn" style="padding:0.35rem 1rem;border-radius:5px;font-size:0.72rem;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#8a8a9a;font-family:inherit;transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(74,158,74,0.4)';this.style.color='#b0b0c0'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='#8a8a9a'">&#x1F4C2; Load folder</button>
+<div class="folder-btn-wrap">
+<button id="folderBtn" class="folder-btn">&#x1F4C2; Load folder</button>
 </div>
-<input type="file" id="jsonInput" multiple style="display:none"/>
-<input type="file" id="folderInput" webkitdirectory style="display:none"/>
+<input type="file" id="jsonInput" class="json-input-hidden" multiple/>
+<input type="file" id="folderInput" class="json-input-hidden" webkitdirectory/>
 <div class="tab-error" id="metaError"></div>
 <div id="metaResults"></div>
 </div>
@@ -112,22 +112,22 @@
 <div class="console-example" id="attackToggle"><a href="#" id="attackToggleLink">test an attack</a></div>
 <div id="tab-attack">
 <div>
-<p style="color:#6a6a74;font-size:0.62rem;margin:0 0 0.4rem;"><span style="color:#a0a0b0;">You are the attacker.</span> Edit, forge, swap. Watch the cert.</p>
+<p class="atk-intro"><span class="atk-intro-em">You are the attacker.</span> Edit, forge, swap. Watch the cert.</p>
 
 <div class="atk-sec">Tamper Record</div>
-<textarea id="atk-record" class="atk-field" style="height:120px;resize:none;" spellcheck="false"></textarea>
+<textarea id="atk-record" class="atk-field atk-record" spellcheck="false"></textarea>
 
 <div class="atk-sec">Forge Signature</div>
-<textarea id="atk-sig" class="atk-field hex" placeholder="signature (128 hex)" spellcheck="false"></textarea>
-<textarea id="atk-pub" class="atk-field hex" placeholder="public key (64 hex)" spellcheck="false" style="margin-top:4px;"></textarea>
+<textarea id="atk-sig" class="atk-field atk-sig hex" placeholder="signature (128 hex)" spellcheck="false"></textarea>
+<textarea id="atk-pub" class="atk-field atk-pub hex" placeholder="public key (64 hex)" spellcheck="false"></textarea>
 
 <div class="atk-sec">Swap Body</div>
-<div style="display:flex;gap:0.5rem;align-items:stretch;">
-  <label id="atk-drop" style="flex:1;border:1px dashed rgba(255,255,255,0.1);border-radius:5px;padding:0.4rem 0.6rem;text-align:center;cursor:pointer;color:#707078;font-size:0.62rem;transition:all 0.2s;">
-    <input type="file" id="atk-file" accept="image/*" style="display:none;">
+<div class="atk-row">
+  <label id="atk-drop" class="atk-drop">
+    <input type="file" id="atk-file" class="json-input-hidden" accept="image/*">
     <span id="atk-drop-label">drop or click to swap image</span>
   </label>
-  <button id="atk-reset" style="padding:0.4rem 0.8rem;background:rgba(90,90,104,0.1);border:1px solid rgba(90,90,104,0.25);color:#8a8a94;border-radius:5px;cursor:pointer;font-family:inherit;font-size:0.6rem;letter-spacing:0.08em;">RESET</button>
+  <button id="atk-reset" class="atk-reset">RESET</button>
 </div>
 
 <div class="atk-status" id="atk-status">initializing&hellip;</div>

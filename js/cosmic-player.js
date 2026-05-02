@@ -94,16 +94,17 @@ var CosmicPlayer = (function() {
 
       var willBeMinimal = !player.classList.contains('minimal');
 
-      // Phase 1: flip the chevron now. The CSS transition (0.3s)
-      // plays a clean rotation before any panel layout starts.
+      // Phase 1: flip the chevron now. CSS transition plays a clean
+      // rotation before any panel layout starts.
       toggle.classList.toggle('flipped', willBeMinimal);
 
-      // Phase 2: after the chevron rotation has fully settled, kick
-      // off the panel collapse/expand. Fixed wait of 380ms (chevron
-      // 0.3s + ~80ms breathing room) gives the rotation a clean
-      // finish before the panel starts moving — no race with
-      // transitionend, no overlap, the two animations read as
-      // distinct beats.
+      // Phase 2: after the chevron rotation settles, kick off the
+      // panel collapse/expand. Wait derived from CSS custom property
+      // --player-toggle-phase-ms (defaults via root style; covers
+      // chevron transition + small breathing buffer) so JS and CSS
+      // can't drift.
+      var rootCS = getComputedStyle(document.documentElement);
+      var phaseMs = parseInt(rootCS.getPropertyValue('--player-toggle-phase-ms'), 10) || 380;
       setTimeout(function() {
         // Capture cert plate scroll state BEFORE the layout shifts.
         // Pin distance-from-bottom continuously through the cert
@@ -142,10 +143,10 @@ var CosmicPlayer = (function() {
           requestAnimationFrame(pin);
         }
 
-        // Release the animation lock after the panel's own 0.5s
-        // collapse transition settles.
+        // Release the animation lock after the panel's own collapse
+        // transition settles.
         setTimeout(function() { toggle._animating = false; }, 550);
-      }, 380);
+      }, phaseMs);
     });
 
     // Play button

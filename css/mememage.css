@@ -1537,6 +1537,31 @@
     border: 1px solid rgba(160, 120, 96, 0.4);
     text-shadow: 0 -1px 0 rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.3);
   }
+  /* Lightweight toast for non-blocking user feedback (save-cert
+     errors, etc). Fixed at top, fades in/out via opacity. Above
+     planetarium (z-index 9999) so it's always reachable. */
+  .mm-toast {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10001;
+    padding: 10px 18px;
+    background: rgba(20, 20, 28, 0.92);
+    color: #e8e8ee;
+    border: 1px solid rgba(220, 80, 80, 0.4);
+    border-radius: 6px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .mm-toast-visible { opacity: 1; }
+
   /* Cert carries an Ed25519 signature but the browser couldn't run
      the verification (Chrome <137 on Windows, etc). Neutral grey
      palette so it reads as "we know this is signed, but we couldn't
@@ -2260,9 +2285,17 @@
   }
   /* Chevron flip is driven by .flipped on the toggle button itself
      (not the player's .minimal class) so JS can play the rotation
-     animation FIRST and then apply the panel collapse on
-     transitionend — clean two-phase sequence instead of running
-     simultaneously. */
+     animation FIRST and then apply the panel collapse — clean
+     two-phase sequence instead of running simultaneously.
+
+     --player-toggle-phase-ms is the JS-side delay between phase 1
+     (chevron flip) and phase 2 (panel collapse). cosmic-player.js
+     reads it via getComputedStyle so the timing here is the single
+     source of truth: chevron transition (0.3s) + breathing buffer
+     (~80ms) = 380ms. */
+  :root {
+    --player-toggle-phase-ms: 380;
+  }
   .player-toggle svg { display: block; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
   .player-toggle.flipped svg { transform: rotate(180deg); }
   .player-inner { width: 100%; }

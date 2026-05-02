@@ -285,6 +285,25 @@ function _saveLivePlate(plate, barId, barHash) {
   });
 }
 
+// Lightweight non-blocking toast. Used for save-cert failures and any
+// other "user did a thing, here's quick feedback" surface. Auto-fades
+// after ~3.5s; alert()'s synchronous block was unnecessary friction.
+function _showToast(text) {
+  var t = document.createElement('div');
+  t.className = 'mm-toast';
+  t.textContent = text;
+  document.body.appendChild(t);
+  // Force layout so the transition animates from opacity 0.
+  t.offsetHeight;
+  t.classList.add('mm-toast-visible');
+  setTimeout(function() {
+    t.classList.remove('mm-toast-visible');
+    setTimeout(function() {
+      if (t.parentNode) t.parentNode.removeChild(t);
+    }, 400);
+  }, 3500);
+}
+
 function _setupHiDpi(canvas, fallbackW, heightForWidth) {
   var dpr = window.devicePixelRatio || 1;
   var cssW = canvas.clientWidth || fallbackW;
@@ -1341,7 +1360,7 @@ function renderCert(meta, options) {
     saveBtn.addEventListener('click', function() {
       _saveLivePlate(plate, barId, barHash).catch(function(err) {
         console.error('Save certificate failed:', err);
-        alert('Save failed — see console for details.');
+        _showToast('Save failed — see console for details.');
       });
     });
     plate.appendChild(saveBtn);

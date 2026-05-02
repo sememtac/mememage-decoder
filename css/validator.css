@@ -92,6 +92,33 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 .atk-sec { font-size: 0.6rem; color: #808088; text-transform: uppercase; letter-spacing: 0.12em; margin: 0.5rem 0 0.25rem; }
 .atk-sec:first-child { margin-top: 0; }
 .atk-field { width: 100%; background: rgba(255,255,255,0.02); color: #c0c0c8; border: 1px solid rgba(255,255,255,0.06); border-radius: 5px; padding: 0.4rem; font-family: inherit; font-size: 0.62rem; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
+.atk-field.atk-record { height: 120px; resize: none; }
+.atk-field.atk-sig + .atk-field.atk-pub { margin-top: 4px; }
+.atk-row { display: flex; gap: 0.5rem; align-items: stretch; }
+.atk-drop { flex: 1; border: 1px dashed rgba(255,255,255,0.1); border-radius: 5px; padding: 0.4rem 0.6rem; text-align: center; cursor: pointer; color: #707078; font-size: 0.62rem; transition: all 0.2s; }
+.atk-reset { padding: 0.4rem 0.8rem; background: rgba(90,90,104,0.1); border: 1px solid rgba(90,90,104,0.25); color: #8a8a94; border-radius: 5px; cursor: pointer; font-family: inherit; font-size: 0.6rem; letter-spacing: 0.08em; }
+.atk-intro { color: #6a6a74; font-size: 0.62rem; margin: 0 0 0.4rem; }
+.atk-intro-em { color: #a0a0b0; }
+/* Generic file-load button used by Observatory tab. The hover state
+   was previously inline JS (onmouseover); now driven by :hover. */
+.folder-btn {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #8a8a9a;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.folder-btn:hover {
+  border-color: rgba(74,158,74,0.4);
+  color: #b0b0c0;
+}
+.folder-btn-wrap { text-align: center; padding: 0.3rem 0 0.8rem; }
+.json-input-hidden { display: none; }
 .atk-field::-webkit-scrollbar { width: 5px; }
 .atk-field::-webkit-scrollbar-track { background: transparent; }
 .atk-field::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
