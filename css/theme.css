@@ -83,6 +83,17 @@
    * frame, especially when the body is mostly transparent. */
   --system-box-shadow: none;
 
+  /* --- System box text colors (yang side only) ---
+   * Yang has hardcoded dark text because its default plate is silver.
+   * For aero themes where the plate becomes translucent and a busy
+   * starfield bleeds through, dark text needs to go darker AND grow a
+   * halo shadow so it reads on any underlying pixel. Yin doesn't need
+   * tokens here — its text is already light on dark, contrast is fine
+   * regardless of how transparent the yin plate gets. */
+  --system-box-text-yang:        #5a5a64;
+  --system-box-text-yang-strong: #2a2a32;
+  --system-box-text-shadow-yang: 0 1px 0 rgba(255,255,255,0.4);
+
   /* --- Radii --- */
   --radius: 14px;
   --radius-sm: 8px;

@@ -134,14 +134,14 @@
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #5a5a64;
+    color: var(--system-box-text-yang);
     background: transparent;
     cursor: pointer;
     border: none;
     font-family: inherit;
     transition: all 0.3s ease;
     position: relative;
-    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+    text-shadow: var(--system-box-text-shadow-yang);
   }
   .input-tab:not(:last-child) { border-right: 1px solid rgba(0,0,0,0.08); }
   .input-tab.active {
@@ -290,8 +290,8 @@
     display: block;
     color: #3a3a44;
   }
-  .drop-zone p { color: #5a5a64; font-size: 0.82rem; font-weight: 300; text-shadow: 0 1px 0 rgba(255,255,255,0.3); }
-  .drop-zone p strong { color: #2a2a32; font-weight: 500; }
+  .drop-zone p { color: var(--system-box-text-yang); font-size: 0.82rem; font-weight: 300; text-shadow: var(--system-box-text-shadow-yang); }
+  .drop-zone p strong { color: var(--system-box-text-yang-strong); font-weight: 500; }
   .drop-zone .drop-hint {
     margin-top: 0.6rem;
     font-size: 0.68rem;
