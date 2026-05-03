@@ -91,26 +91,6 @@ function _saveLivePlate(plate, barId, barHash) {
       return;
     }
 
-    // Two prep steps before capture, undone in `_cleanup`:
-    //
-    //  1. Expand the live plate to its full scrollHeight. The cert is
-    //     normally a viewport-clipped scroll container; html2canvas
-    //     captures rendered layout, so we'd get only what's on screen.
-    //
-    //  2. Inject a stylesheet that disables `.plate::before` /
-    //     `::after`. The ::before rim uses `mask-composite: exclude`
-    //     which html2canvas-pro doesn't honor — the unmasked gradient
-    //     (white at top, dark at bottom) ends up washing out the
-    //     entire plate area instead of rendering as a 2px border ring.
-    var prevHeight = plate.style.height;
-    var prevMaxHeight = plate.style.maxHeight;
-    var prevMinHeight = plate.style.minHeight;
-    var prevOverflow = plate.style.overflow;
-    plate.style.height = plate.scrollHeight + 'px';
-    plate.style.maxHeight = 'none';
-    plate.style.minHeight = '0';
-    plate.style.overflow = 'visible';
-
     // The override sheet patches three rendering gaps in html2canvas-
     // pro that make the saved cert diverge from the live one:
     //   - .plate::before rim — `mask-composite: exclude` not honored
@@ -119,6 +99,10 @@ function _saveLivePlate(plate, barId, barHash) {
     //   - .gps-unlock — interactive input + button: placeholder
     //     metrics misrender (text clips), and the UI isn't useful
     //     in a static PNG anyway
+    //
+    // Inject this BEFORE reading scrollHeight so the plate measures
+    // its post-override layout (otherwise the hidden .gps-unlock
+    // leaves a strip of empty space at the bottom of the capture).
     var overrideStyle = document.createElement('style');
     overrideStyle.id = 'save-cert-overrides';
     overrideStyle.textContent =
@@ -126,6 +110,19 @@ function _saveLivePlate(plate, barId, barHash) {
       '.verify-badge { box-shadow: none !important; }' +
       '.gps-unlock { display: none !important; }';
     document.head.appendChild(overrideStyle);
+
+    // Expand the live plate to its full (post-override) scrollHeight.
+    // The cert is normally a viewport-clipped scroll container;
+    // html2canvas captures rendered layout, so without this we'd get
+    // only what's currently on screen.
+    var prevHeight = plate.style.height;
+    var prevMaxHeight = plate.style.maxHeight;
+    var prevMinHeight = plate.style.minHeight;
+    var prevOverflow = plate.style.overflow;
+    plate.style.height = plate.scrollHeight + 'px';
+    plate.style.maxHeight = 'none';
+    plate.style.minHeight = '0';
+    plate.style.overflow = 'visible';
 
     function _cleanup() {
       plate.style.height = prevHeight;
