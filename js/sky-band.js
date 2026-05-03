@@ -810,8 +810,19 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
       var trail = met.trail;
       if (trail.length < 2) continue;
       var lp = met.head / MS;
-      var lf = lp < 0.15 ? lp / 0.15 : lp > 0.85 ? Math.max(0, (1 - lp) / 0.15) : 1;
-      if (met.head >= MS) lf = Math.max(0, met.trail.length / met.tailLen);
+      // Lifecycle fade in three stages:
+      //   - lp < 0.15: fade in (0 → 1)
+      //   - 0.15 ≤ lp ≤ 1: full brightness while traveling
+      //   - head ≥ MS: fade out via the trail-shrink in tick() —
+      //     trail.length / tailLen drops smoothly from 1 → 0 as
+      //     splice(0, 3) eats the tail. Two mechanisms running in
+      //     sequence (lp-based then trail-based) caused a flash at
+      //     head = MS because the trail-based factor jumped back to
+      //     ~1 right after lp-based reached 0. One mechanism = clean.
+      var lf;
+      if (lp < 0.15) lf = lp / 0.15;
+      else if (met.head >= MS) lf = Math.max(0, met.trail.length / met.tailLen);
+      else lf = 1;
       for (var ti = 0; ti < trail.length; ti++) {
         var tp = ti / trail.length;
         var a = tp * met.maxAlpha * lf * 1.5;
