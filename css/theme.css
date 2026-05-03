@@ -55,11 +55,19 @@
   --glass-border: rgba(180, 180, 190, 0.1);
   --glass-shine: rgba(200, 200, 210, 0.04);
 
-  /* --- Plate material (the brushed-metal cert face) ---
-   * Vanilla = silver gradient. Inaugural-skin example: replace with
-   * a gold gradient (e.g. linear-gradient(180deg, #e8d090 0%, ...))
-   * for an "Age of Aries" warmth. */
-  --plate-bg: linear-gradient(180deg, #b8b8bc 0%, #969698 20%, #808084 50%, #6e6e72 100%);
+  /* --- System box material (the brushed-metal input panel) ---
+   * The chrome around the verification — tabs, drop zone. THIS is
+   * what a future Age skins (gold instead of silver, etc.). Two
+   * variants because the decoder runs yang (light) and the validator
+   * runs yin (dark); both belong to the same theme so a manifest can
+   * coordinate them.
+   *
+   * NOTE on cert plates: the .plate's silver gradient is NOT a theme
+   * token — it's the Common rarity baseline (other rarity tiers
+   * override with their own tinted gradients in mememage.css). Cert
+   * appearance stays bound to its mint-time rarity across all themes. */
+  --system-box-bg-yang: linear-gradient(180deg, #b8b8bc 0%, #a0a0a4 30%, #909094 70%, #808084 100%);
+  --system-box-bg-yin:  linear-gradient(180deg, #3a3a3e 0%, #2a2a2e 30%, #222226 70%, #1c1c20 100%);
 
   /* --- Radii --- */
   --radius: 14px;

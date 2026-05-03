@@ -41,7 +41,7 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
    ======================================================================== */
 
 .input-section {
-  background: linear-gradient(180deg, #3a3a3e 0%, #2a2a2e 30%, #222226 70%, #1c1c20 100%);
+  background: var(--system-box-bg-yin);
   border-color: rgba(255,255,255,0.06);
 }
 

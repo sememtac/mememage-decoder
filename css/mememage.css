@@ -110,7 +110,7 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    background: linear-gradient(180deg, #b8b8bc 0%, #a0a0a4 30%, #909094 70%, #808084 100%);
+    background: var(--system-box-bg-yang);
     border-radius: var(--radius);
     border: 1px solid rgba(0,0,0,0.1);
     overflow: hidden;
@@ -1144,7 +1144,10 @@
      coverage but kept for the existing z-index/grain layering. */
   .plate {
     position: relative;
-    background: var(--plate-bg);
+    /* Default = Common rarity silver. Other rarities override this
+       background in their .plate-rarity-* rules below. NOT a theme
+       token — cert appearance is rarity-driven, not Age-driven. */
+    background: linear-gradient(180deg, #b8b8bc 0%, #969698 20%, #808084 50%, #6e6e72 100%);
     border-radius: 16px;
     padding: 36px 28px 28px;
     border: none;
