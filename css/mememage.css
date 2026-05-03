@@ -111,6 +111,8 @@
     flex-direction: column;
     gap: 0;
     background: var(--system-box-bg-yang);
+    backdrop-filter: var(--system-box-blur);
+    -webkit-backdrop-filter: var(--system-box-blur);
     border-radius: var(--radius);
     border: 1px solid rgba(0,0,0,0.1);
     overflow: hidden;

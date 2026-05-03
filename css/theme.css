@@ -69,6 +69,13 @@
   --system-box-bg-yang: linear-gradient(180deg, #b8b8bc 0%, #a0a0a4 30%, #909094 70%, #808084 100%);
   --system-box-bg-yin:  linear-gradient(180deg, #3a3a3e 0%, #2a2a2e 30%, #222226 70%, #1c1c20 100%);
 
+  /* --- System box backdrop blur ---
+   * Default `none` means no blur (zero GPU cost). Themes that opt in
+   * to a translucent system-box gradient (e.g. Glass / Aero) set
+   * this to e.g. `blur(10px) saturate(1.1)` so the starfield behind
+   * shows through with the glass effect. */
+  --system-box-blur: none;
+
   /* --- Radii --- */
   --radius: 14px;
   --radius-sm: 8px;
