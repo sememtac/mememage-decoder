@@ -111,10 +111,20 @@ function _saveLivePlate(plate, barId, barHash) {
     plate.style.minHeight = '0';
     plate.style.overflow = 'visible';
 
+    // The override sheet patches three rendering gaps in html2canvas-
+    // pro that make the saved cert diverge from the live one:
+    //   - .plate::before rim — `mask-composite: exclude` not honored
+    //   - .verify-badge box-shadow — drop-shadow approximation
+    //     leaks past the rounded clip and looks like a boxy outline
+    //   - .gps-unlock — interactive input + button: placeholder
+    //     metrics misrender (text clips), and the UI isn't useful
+    //     in a static PNG anyway
     var overrideStyle = document.createElement('style');
     overrideStyle.id = 'save-cert-overrides';
     overrideStyle.textContent =
-      '.plate::before, .plate::after { display: none !important; }';
+      '.plate::before, .plate::after { display: none !important; }' +
+      '.verify-badge { box-shadow: none !important; }' +
+      '.gps-unlock { display: none !important; }';
     document.head.appendChild(overrideStyle);
 
     function _cleanup() {
