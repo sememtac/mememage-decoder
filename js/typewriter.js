@@ -113,7 +113,16 @@
   };
 
   // --- Scheduler ---
+  // Animation probability weights are themable via docs/js/theme.js
+  // (Theme.typewriterWeights). The weights baked into ANIMS above are
+  // the vanilla skin defaults; theme.js can override per Age.
   var keys = Object.keys(ANIMS);
+  var twWeights = (typeof Theme !== 'undefined') && Theme.typewriterWeights;
+  if (twWeights) {
+    keys.forEach(function(k) {
+      if (typeof twWeights[k] === 'number') ANIMS[k].weight = twWeights[k];
+    });
+  }
   var totalWeight = keys.reduce(function(s, k) { return s + ANIMS[k].weight; }, 0);
 
   function pick() {

@@ -2,39 +2,15 @@
 // off the #starfield canvas (yin = dark stars on light bg).
 
 // =====================================================================
-// SUBTITLE ROTATION — yin twin of the decoder's trove. Validator voice
-// leans forensic/judicial: weighing, testifying, cross-examining. The
-// default stays in rotation as one entry, so it shows ~1/N visits.
+// SUBTITLE ROTATION
+// Trove lives in docs/js/theme.js (Theme.taglines.validator) so the
+// L1 voice can be reskinned per Age without touching this file.
 // =====================================================================
-var _TAGLINES = [
-  'validate the living memory of the cosmic chain',
-  'the chain remembers, the bar testifies',
-  'weigh the heart against the feather',
-  'every record shall be tried by hash',
-  'the witnesses are three: body, soul, signature',
-  'judge not by sight, but by hash',
-  'every record holds its place in the orbit',
-  'the chain breathes; the records remember',
-  'where the soul meets the witness',
-  'the universe keeps its receipts',
-  'validate, then trust',
-  'trust by hash, not by hearsay',
-  'the math remembers what the eye forgets',
-  'tamper detection, in three colors',
-  'every pixel under oath',
-  'every record cross-examined',
-  'auditor of the cosmic chain',
-  'where the body meets its soul',
-  'three witnesses, one truth',
-  'forge nothing \u2014 the chain is watching',
-  'ai forgeries get found here',
-  'audit hour for the silicon',
-  'every forgery shall be made known'
-];
 (function _rotateSubtitle() {
   var sub = document.querySelector('.page-header .subtitle');
-  if (!sub) return;
-  sub.textContent = _TAGLINES[Math.floor(Math.random() * _TAGLINES.length)];
+  var trove = (typeof Theme !== 'undefined') && Theme.taglines && Theme.taglines.validator;
+  if (!sub || !trove || !trove.length) return;
+  sub.textContent = trove[Math.floor(Math.random() * trove.length)];
 })();
 
 // === Constants ===

@@ -21,36 +21,9 @@
   }
 
 
-  :root {
-    --bg-deep: #000000;
-    --bg-card: rgba(180, 180, 185, 0.08);
-    --bg-card-solid: rgba(160, 160, 168, 0.1);
-    --bg-cell: rgba(180, 180, 185, 0.06);
-    --border-subtle: rgba(180, 180, 190, 0.12);
-    --border-glow: rgba(200, 200, 210, 0.15);
-    --text-primary: #d0d0d4;
-    --text-secondary: #a0a0a8;
-    --text-muted: #606060;
-    --text-dim: #404048;
-    --accent-purple: #9b8cd4;
-    --accent-blue: #8898b8;
-    --accent-gold: #d4b87b;
-    --accent-green: #7bc4a0;
-    --accent-green-dim: #3a5e4a;
-    --accent-red: #a62828;
-    --accent-red-dim: #5e3a3a;
-    --glass-bg: rgba(140, 140, 150, 0.06);
-    --glass-border: rgba(180, 180, 190, 0.1);
-    --glass-shine: rgba(200, 200, 210, 0.04);
-    --radius: 14px;
-    --radius-sm: 8px;
-    /* Unified timing for the system box going into compact mode (and
-       back out). A slow, smooth curve so the shrink feels intentional
-       rather than snappy. Both pages reference these same tokens so the
-       motion is identical across decoder and validator. */
-    --compact-duration: 0.9s;
-    --compact-ease: cubic-bezier(0.45, 0, 0.2, 1);
-  }
+  /* L1 theme tokens (palette, plate material, motion tempo) live in
+     docs/css/theme.css — load that first so these var(...) refs
+     resolve. Only L0 / structural rules stay in this file. */
 
   /* =================================================================
      Button loading spinner — shared by Fetch (decoder) + Audit
@@ -290,7 +263,7 @@
     inset: -2px;
     border-radius: var(--radius-sm);
     background: radial-gradient(ellipse at center, rgba(255,255,255,0.06) 0%, transparent 70%);
-    animation: dropPulse 3s ease-in-out infinite;
+    animation: dropPulse var(--pulse-duration) ease-in-out infinite;
     pointer-events: none;
   }
   @keyframes dropPulse {
@@ -1171,7 +1144,7 @@
      coverage but kept for the existing z-index/grain layering. */
   .plate {
     position: relative;
-    background: linear-gradient(180deg, #b8b8bc 0%, #969698 20%, #808084 50%, #6e6e72 100%);
+    background: var(--plate-bg);
     border-radius: 16px;
     padding: 36px 28px 28px;
     border: none;

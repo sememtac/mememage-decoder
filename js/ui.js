@@ -1,39 +1,14 @@
 // =====================================================================
 // SUBTITLE ROTATION
-// The decoder's tagline is one of many. On each visit the visitor
-// gets the canonical one or a different shade — biblical, cosmic,
-// witty, dry. Equal weighting; the default is just one line in the
-// trove, so it shows ~1/N of the time.
+// Trove lives in docs/js/theme.js (Theme.taglines.decoder) so the
+// L1 voice can be reskinned per Age without touching this file.
+// Default tagline is one entry in the trove → surfaces ~1/N visits.
 // =====================================================================
-var _TAGLINES = [
-  'decode the origin story of an AI-generated image',
-  'every image is a star with a birth certificate',
-  'the sky at the moment of conception, in two pixels',
-  'every image was conceived; few were witnessed',
-  'by their hashes ye shall know them',
-  'in the beginning was the prompt',
-  'the body remembers; the soul testifies',
-  'between the prompt and the world, a certificate',
-  'every pixel has a lineage',
-  'the bar in the pixels never lies',
-  'the ghost in the GAN, signed and dated',
-  'two pixels, one truth',
-  'the silicon remembers what the prompt forgot',
-  'every image is a witness to its own birth',
-  'what the machine made, the bar remembered',
-  'the soul beneath the body of the image',
-  'every conception leaves a record',
-  'the spirit moved over the pixels',
-  'for when "trust me bro" isn\u2019t enough',
-  'ai images come with receipts now',
-  'yes, this was \u201cinspired by\u201d something \u2014 let\u2019s see what',
-  'every image has a back side',
-  'ai images go to confession here'
-];
 (function _rotateSubtitle() {
   var sub = document.querySelector('.page-header .subtitle');
-  if (!sub) return;
-  sub.textContent = _TAGLINES[Math.floor(Math.random() * _TAGLINES.length)];
+  var trove = (typeof Theme !== 'undefined') && Theme.taglines && Theme.taglines.decoder;
+  if (!sub || !trove || !trove.length) return;
+  sub.textContent = trove[Math.floor(Math.random() * trove.length)];
 })();
 
 // =====================================================================

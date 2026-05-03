@@ -61,9 +61,16 @@ var Starfield = (function() {
     ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
     theme = canvas.getAttribute('data-theme') === 'yin' ? 'yin' : 'yang';
 
+    // Warmth per page theme is exposed in docs/js/theme.js so the
+    // atmosphere can be reskinned per Age. Fallback values match the
+    // vanilla skin in case theme.js is unavailable for any reason.
+    var twf = (typeof Theme !== 'undefined' && Theme.starfield) || {};
+    var warmFreq = theme === 'yin'
+      ? (typeof twf.yinWarmFreq === 'number' ? twf.yinWarmFreq : 0)
+      : (typeof twf.yangWarmFreq === 'number' ? twf.yangWarmFreq : 0.25);
     CosmicStarfield.generate('ambient:' + theme, {
       outerCount: 360, innerCount: 200,
-      warmFreq: theme === 'yin' ? 0 : 0.25
+      warmFreq: warmFreq
     });
 
     window.addEventListener('resize', resize);
