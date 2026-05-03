@@ -424,8 +424,6 @@ function resetAll(){
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
-function div(cls) { const d = document.createElement('div'); d.className = cls; return d; }
-
 function displaySource(sourceUrl, identifier, contentHash) {
   var name = 'Unknown';
   if (!sourceUrl) name = '';
@@ -453,10 +451,6 @@ function renderBar(data) {
     }
     barInfo.innerHTML = html;
   }
-}
-
-function showIALink(identifier, contentHash) {
-  // No longer shown — "Recovered from Internet Archive" in the status is sufficient
 }
 
 async function fetchFromSource(baseUrl, identifier, contentHash) {

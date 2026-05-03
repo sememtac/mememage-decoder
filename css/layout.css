@@ -387,3 +387,15 @@
 .portal-arriving  { animation: portalArrive 0.5s ease-out forwards; }
 html.portal-animating,
 html.portal-animating body { overflow: hidden !important; }
+
+/* Pre-flip starting state. The arriving page sets html.portal-transit
+   from a tiny inline <head> script (?from= check in the URL) before
+   first paint, so the input-section starts off-screen and slides in
+   via the .portal-arriving animation rather than flashing the live
+   layout. The class is removed once the arrival animation completes. */
+html { overflow-x: clip; }
+html.portal-transit .input-section {
+  opacity: 0;
+  transform: perspective(1200px) rotateY(-90deg);
+}
+html.portal-transit .panel-footer { opacity: 0; }
