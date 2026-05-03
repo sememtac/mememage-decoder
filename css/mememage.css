@@ -111,6 +111,7 @@
     flex-direction: column;
     gap: 0;
     background: var(--system-box-bg-yang);
+    background-blend-mode: var(--system-box-blend-mode, normal);
     backdrop-filter: var(--system-box-blur);
     -webkit-backdrop-filter: var(--system-box-blur);
     box-shadow: var(--system-box-shadow);

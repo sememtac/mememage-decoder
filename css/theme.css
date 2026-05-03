@@ -76,6 +76,14 @@
    * shows through with the glass effect. */
   --system-box-blur: none;
 
+  /* --- System box blend mode ---
+   * Default `normal` means each background layer alpha-blends with
+   * the next. Texture-based themes (e.g. Ruby) can set this to
+   * `multiply` so a cream/tint gradient layer multiplies with the
+   * texture image beneath it, preserving the texture's brightness
+   * structure instead of washing over it. */
+  --system-box-blend-mode: normal;
+
   /* --- System box edge glow ---
    * Inset box-shadow forming a per-edge frame highlight. Default
    * `none`. Aero-style themes set a 4-edge inset (brighter top) so
