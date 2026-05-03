@@ -91,24 +91,29 @@ function _saveLivePlate(plate, barId, barHash) {
       return;
     }
 
-    // The override sheet patches three rendering gaps in html2canvas-
-    // pro that make the saved cert diverge from the live one:
-    //   - .plate::before rim — `mask-composite: exclude` not honored
-    //   - .verify-badge box-shadow — drop-shadow approximation
-    //     leaks past the rounded clip and looks like a boxy outline
-    //   - .gps-unlock — interactive input + button: placeholder
-    //     metrics misrender (text clips), and the UI isn't useful
-    //     in a static PNG anyway
+    // The override sheet patches rendering gaps in html2canvas-pro
+    // that make the saved cert diverge from the live one, AND removes
+    // elements that would leave layout-allocated whitespace in the
+    // capture even with `ignoreElements` (which skips drawing but
+    // doesn't collapse the element's box):
+    //   - .plate::before rim — `mask-composite: exclude` not honored;
+    //     unmasked gradient washes the plate top→bottom
+    //   - .verify-badge box-shadow — drop-shadow approximation leaks
+    //     past the rounded clip and looks like a boxy outline
+    //   - .gps-unlock — interactive input + button; placeholder text
+    //     clips and a static PNG can't be unlocked anyway
+    //   - .save-cert-btn — would leave a button-shaped void at the
+    //     bottom of the capture
     //
     // Inject this BEFORE reading scrollHeight so the plate measures
-    // its post-override layout (otherwise the hidden .gps-unlock
-    // leaves a strip of empty space at the bottom of the capture).
+    // its post-override layout.
     var overrideStyle = document.createElement('style');
     overrideStyle.id = 'save-cert-overrides';
     overrideStyle.textContent =
       '.plate::before, .plate::after { display: none !important; }' +
       '.verify-badge { box-shadow: none !important; }' +
-      '.gps-unlock { display: none !important; }';
+      '.gps-unlock { display: none !important; }' +
+      '.save-cert-btn { display: none !important; }';
     document.head.appendChild(overrideStyle);
 
     // Expand the live plate to its full (post-override) scrollHeight.
@@ -141,8 +146,12 @@ function _saveLivePlate(plate, barId, barHash) {
       logging: false,
       ignoreElements: function(el) {
         if (!el.classList) return false;
-        return el.classList.contains('save-cert-btn') ||
-               el.classList.contains('cosmic-player');
+        // .cosmic-player is a sibling of the plate, not a child, so
+        // it normally won't be in the capture tree — but during the
+        // planetarium handoff it can be reparented onto the body, so
+        // skip it defensively. .save-cert-btn is hidden via the
+        // override sheet (display: none) so it doesn't reach here.
+        return el.classList.contains('cosmic-player');
       }
     }).then(function(rendered) {
       _cleanup();
