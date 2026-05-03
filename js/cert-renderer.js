@@ -91,6 +91,42 @@ function _saveLivePlate(plate, barId, barHash) {
       return;
     }
 
+    // Two prep steps before capture, undone in `_cleanup`:
+    //
+    //  1. Expand the live plate to its full scrollHeight. The cert is
+    //     normally a viewport-clipped scroll container; html2canvas
+    //     captures rendered layout, so we'd get only what's on screen.
+    //
+    //  2. Inject a stylesheet that disables `.plate::before` /
+    //     `::after`. The ::before rim uses `mask-composite: exclude`
+    //     which html2canvas-pro doesn't honor — the unmasked gradient
+    //     (white at top, dark at bottom) ends up washing out the
+    //     entire plate area instead of rendering as a 2px border ring.
+    var prevHeight = plate.style.height;
+    var prevMaxHeight = plate.style.maxHeight;
+    var prevMinHeight = plate.style.minHeight;
+    var prevOverflow = plate.style.overflow;
+    plate.style.height = plate.scrollHeight + 'px';
+    plate.style.maxHeight = 'none';
+    plate.style.minHeight = '0';
+    plate.style.overflow = 'visible';
+
+    var overrideStyle = document.createElement('style');
+    overrideStyle.id = 'save-cert-overrides';
+    overrideStyle.textContent =
+      '.plate::before, .plate::after { display: none !important; }';
+    document.head.appendChild(overrideStyle);
+
+    function _cleanup() {
+      plate.style.height = prevHeight;
+      plate.style.maxHeight = prevMaxHeight;
+      plate.style.minHeight = prevMinHeight;
+      plate.style.overflow = prevOverflow;
+      if (overrideStyle.parentNode) {
+        overrideStyle.parentNode.removeChild(overrideStyle);
+      }
+    }
+
     html2canvas(plate, {
       scale: SCALE,
       backgroundColor: '#0d0d14',
@@ -102,6 +138,7 @@ function _saveLivePlate(plate, barId, barHash) {
                el.classList.contains('cosmic-player');
       }
     }).then(function(rendered) {
+      _cleanup();
       try {
         // Extend by 2 rows so the bar lives at the bottom of the
         // final image, exactly like a freshly-minted file.
@@ -143,7 +180,10 @@ function _saveLivePlate(plate, barId, barHash) {
       } catch (err) {
         reject(err);
       }
-    }).catch(reject);
+    }).catch(function(err) {
+      _cleanup();
+      reject(err);
+    });
   });
 }
 
