@@ -84,6 +84,16 @@
    * structure instead of washing over it. */
   --system-box-blend-mode: normal;
 
+  /* --- System box background-color fallback ---
+   * Sits behind the background-image stack. Catches any alpha holes
+   * in a texture image so transparent pixels render in-theme instead
+   * of exposing the page body bg. Yang gets a light fallback, yin
+   * gets a dark fallback, matching each side's palette. Default
+   * transparent for non-textured themes (their gradient is opaque so
+   * this is irrelevant). */
+  --system-box-bg-color-yang: transparent;
+  --system-box-bg-color-yin:  transparent;
+
   /* --- System box edge glow ---
    * Inset box-shadow forming a per-edge frame highlight. Default
    * `none`. Aero-style themes set a 4-edge inset (brighter top) so

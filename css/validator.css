@@ -42,6 +42,7 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 
 .input-section {
   background: var(--system-box-bg-yin);
+  background-color: var(--system-box-bg-color-yin);
   border-color: rgba(255,255,255,0.06);
 }
 

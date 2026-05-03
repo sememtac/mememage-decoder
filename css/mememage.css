@@ -111,6 +111,11 @@
     flex-direction: column;
     gap: 0;
     background: var(--system-box-bg-yang);
+    /* Fallback solid color rendered behind the bg-image stack. Catches
+       any alpha holes in a texture so transparent pixels render in-theme
+       instead of exposing the page bg. Must come AFTER the background
+       shorthand, which would otherwise reset bg-color to transparent. */
+    background-color: var(--system-box-bg-color-yang);
     background-blend-mode: var(--system-box-blend-mode, normal);
     backdrop-filter: var(--system-box-blur);
     -webkit-backdrop-filter: var(--system-box-blur);
