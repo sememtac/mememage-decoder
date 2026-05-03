@@ -76,270 +76,61 @@ function rarityCellColors(tierColor) {
 // clientWidth is accurate.
 // =====================================================================
 // Save live certificate plate as PNG.
-// Captures the plate exactly as rendered in the browser via SVG
-// foreignObject — clone → swap canvases for image data URLs →
-// inline non-data <img> srcs as data URLs (avoid cross-origin canvas
-// taint when SVG is drawn back) → inline same-origin CSS → render →
-// trim → embed bar → download.
+// Uses html2canvas-pro to walk the live DOM with canvas primitives —
+// no SVG foreignObject (which Chromium taints defensively regardless
+// of payload). Output canvas is extended by 2 rows so the bar embed
+// (encodeFrame + embedBits) makes the saved PNG independently
+// verifiable.
 // =====================================================================
-function _inlineImageAsDataUrl(src) {
-  return fetch(src, { mode: 'cors' })
-    .then(function(r) { return r.blob(); })
-    .then(function(blob) {
-      return new Promise(function(resolve, reject) {
-        var fr = new FileReader();
-        fr.onload = function() { resolve(fr.result); };
-        fr.onerror = reject;
-        fr.readAsDataURL(blob);
-      });
-    });
-}
-
 function _saveLivePlate(plate, barId, barHash) {
   var SCALE = 2; // 2x for retina output
 
   return new Promise(function(resolve, reject) {
-    var rect = plate.getBoundingClientRect();
-    var W = Math.round(rect.width);
-    var H = Math.round(plate.scrollHeight);
-    if (!W || !H) { reject(new Error('plate has no dimensions')); return; }
-
-    // Clone the plate so we can mutate it (strip save button, swap
-    // canvases) without disturbing the live DOM the user is viewing.
-    var clone = plate.cloneNode(true);
-
-    // Force the clone to render its full scrollable content. The
-    // live plate may be a fixed-height scroll container; for the
-    // screenshot we want every row stitched into one tall image.
-    clone.style.height = H + 'px';
-    clone.style.maxHeight = 'none';
-    clone.style.minHeight = '0';
-    clone.style.overflow = 'visible';
-
-    // Remove elements that don't belong in the saved image.
-    var stripSelectors = ['.save-cert-btn', '.cosmic-player'];
-    stripSelectors.forEach(function(sel) {
-      var nodes = clone.querySelectorAll(sel);
-      for (var i = 0; i < nodes.length; i++) {
-        if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
-      }
-    });
-
-    // SVG foreignObject can't render <canvas>, so swap each canvas
-    // for an <img> data URL of the canvas's current pixels. We pull
-    // the image from the LIVE canvas (origCanvases) because the
-    // clone's canvases are blank (cloneNode doesn't copy bitmap data).
-    var origCanvases = Array.from(plate.querySelectorAll('canvas'));
-    var cloneCanvases = Array.from(clone.querySelectorAll('canvas'));
-    for (var i = 0; i < Math.min(origCanvases.length, cloneCanvases.length); i++) {
-      var src = origCanvases[i];
-      var dst = cloneCanvases[i];
-      if (!dst.parentNode || !src.width || !src.height) continue;
-      var dataUrl = '';
-      try { dataUrl = src.toDataURL('image/png'); } catch (e) { continue; }
-      var img = document.createElement('img');
-      img.src = dataUrl;
-      img.className = src.className || '';
-      // Mirror the live canvas's positioning + sizing so the swap is
-      // a visual no-op (absolute insets, dimensions, z-index, etc).
-      var srcCS = window.getComputedStyle(src);
-      img.style.cssText = dst.getAttribute('style') || '';
-      img.style.display = 'block';
-      img.style.width = srcCS.width;
-      img.style.height = srcCS.height;
-      img.style.position = srcCS.position;
-      img.style.top = srcCS.top;
-      img.style.left = srcCS.left;
-      img.style.right = srcCS.right;
-      img.style.bottom = srcCS.bottom;
-      img.style.zIndex = srcCS.zIndex;
-      img.style.opacity = srcCS.opacity;
-      img.style.transform = srcCS.transform;
-      img.style.filter = srcCS.filter;
-      dst.parentNode.replaceChild(img, dst);
+    if (typeof html2canvas !== 'function') {
+      reject(new Error('html2canvas not loaded'));
+      return;
     }
 
-    // Inline every <img> src AND every inline-style url() reference
-    // (e.g. CSS custom properties like --trait-mask: url(img/...))
-    // that isn't already a data URL. Inside the SVG sandbox,
-    // relative-URL fetches are treated as cross-origin by browsers
-    // and taint the canvas the SVG is drawn to, which blocks
-    // getImageData (needed for the bar embed). Pre-fetching
-    // everything as data URLs makes the SVG fully self-contained.
-    var inlinePromises = [];
-
-    // 1) <img src="...">
-    var imgs = Array.from(clone.querySelectorAll('img'));
-    imgs.forEach(function(imgEl) {
-      var src = imgEl.getAttribute('src');
-      if (!src || src.indexOf('data:') === 0) return;
-      inlinePromises.push(
-        _inlineImageAsDataUrl(src)
-          .then(function(dataUrl) { imgEl.setAttribute('src', dataUrl); })
-          .catch(function(err) {
-            // Strip the offending img rather than poison the SVG.
-            console.warn('save-cert: could not inline', src, err);
-            if (imgEl.parentNode) imgEl.parentNode.removeChild(imgEl);
-          })
-      );
-    });
-
-    // 2) Inline style="… url(…) …" (mask images, background images,
-    //    custom properties like --trait-mask). Cache fetches per
-    //    unique URL so repeated trait masks don't refetch.
-    var urlCache = {};
-    var styledEls = Array.from(clone.querySelectorAll('[style]'));
-    styledEls.forEach(function(el) {
-      var s = el.getAttribute('style') || '';
-      var matches = s.match(/url\(([^)]+)\)/g);
-      if (!matches) return;
-      matches.forEach(function(m) {
-        var inner = m.slice(4, -1).replace(/^['"]|['"]$/g, '').trim();
-        if (!inner || inner.indexOf('data:') === 0) return;
-        if (!urlCache[inner]) {
-          urlCache[inner] = _inlineImageAsDataUrl(inner).catch(function(err) {
-            console.warn('save-cert: could not inline url() ref', inner, err);
-            return null;
-          });
-        }
-        inlinePromises.push(urlCache[inner].then(function(dataUrl) {
-          if (!dataUrl) return;
-          var current = el.getAttribute('style') || '';
-          // Replace every occurrence of this URL (with or without
-          // quotes) in the inline style with the data URL.
-          var escaped = inner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          var re = new RegExp('url\\(\\s*[\'"]?' + escaped + '[\'"]?\\s*\\)', 'g');
-          el.setAttribute('style', current.replace(re, 'url(' + dataUrl + ')'));
-        }));
-      });
-    });
-
-    Promise.all(inlinePromises).then(_continueSave).catch(reject);
-
-    function _continueSave() {
-
-    // Inline every same-origin stylesheet rule so foreignObject has
-    // the cert's full CSS context. Cross-origin sheets (Google Fonts
-    // CSS) are skipped via try/catch. @font-face and @import rules
-    // are stripped because they trigger cross-origin font fetches
-    // inside the SVG sandbox.
-    //
-    // Then a defensive scrub: remove every reference to the Google-
-    // hosted webfont 'JetBrains Mono'. Some browsers (including
-    // current Chrome/Safari on both desktop and mobile) attempt to
-    // resolve that font through the cross-origin CDN when it appears
-    // in font-family inside foreignObject, which taints the canvas
-    // even though we already inlined-and-stripped the @font-face
-    // rule. Falling back to the system monospace stack gives the
-    // saved PNG slightly different glyphs but lets getImageData run.
-    var styles = '';
-    Array.from(document.styleSheets).forEach(function(sheet) {
+    html2canvas(plate, {
+      scale: SCALE,
+      backgroundColor: '#0d0d14',
+      useCORS: true,
+      logging: false,
+      ignoreElements: function(el) {
+        if (!el.classList) return false;
+        return el.classList.contains('save-cert-btn') ||
+               el.classList.contains('cosmic-player');
+      }
+    }).then(function(rendered) {
       try {
-        var rules = sheet.cssRules;
-        if (!rules) return;
-        for (var r = 0; r < rules.length; r++) {
-          var rule = rules[r];
-          if (rule.type === CSSRule.FONT_FACE_RULE ||
-              rule.type === CSSRule.IMPORT_RULE) continue;
-          styles += rule.cssText + '\n';
-        }
-      } catch (e) { /* cross-origin */ }
-    });
-    // Strip the cross-origin webfont names from font-family stacks
-    // so the SVG renderer doesn't try to fetch them through the
-    // cross-origin CDN. The remaining stack (system fonts) renders
-    // without leaving the document origin.
-    styles = styles.replace(/['"]JetBrains Mono['"]\s*,?\s*/g, '');
-
-    var html = new XMLSerializer().serializeToString(clone);
-    // Wrap CSS in CDATA — raw CSS contains `>` (descendant
-    // combinator), `<` (rare but possible in attribute selectors), and
-    // `&` characters that are special in XML and would break the SVG
-    // parse.
-    var svgStr =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' +
-      '<foreignObject width="100%" height="100%">' +
-      '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + W + 'px;height:' + H + 'px;background:transparent;">' +
-      '<style><![CDATA[' + styles + ']]></style>' +
-      html +
-      '</div>' +
-      '</foreignObject>' +
-      '</svg>';
-
-    var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-
-    var img = new Image();
-    // crossOrigin='anonymous' marks the SVG image as CORS-clean once
-    // loaded. Some browsers require this before drawImage will
-    // produce a non-tainted destination canvas, even when the SVG
-    // itself is from a same-origin blob URL.
-    img.crossOrigin = 'anonymous';
-    img.onload = function() {
-      try {
-        // Compose the final canvas: scaled plate render + 2 rows for
-        // the steganographic bar at the bottom. embedBits modifies
-        // those bottom rows in place to encode identifier + hash.
+        // Extend by 2 rows so the bar lives at the bottom of the
+        // final image, exactly like a freshly-minted file.
         var BAR_H = 2;
-        var fW = W * SCALE;
-        var fH = H * SCALE + BAR_H;
+        var fW = rendered.width;
+        var fH = rendered.height + BAR_H;
         var out = document.createElement('canvas');
         out.width = fW;
         out.height = fH;
-        var o = out.getContext('2d');
+        var o = out.getContext('2d', { willReadFrequently: true });
         o.fillStyle = '#0d0d14';
         o.fillRect(0, 0, fW, fH);
-        o.drawImage(img, 0, 0, fW, H * SCALE);
-        URL.revokeObjectURL(url);
+        o.drawImage(rendered, 0, 0);
 
         if (typeof encodeFrame === 'function' && typeof embedBits === 'function') {
           var ps = barId + '\x00' + barHash;
           var pb = new TextEncoder().encode(ps);
           var fb = encodeFrame(pb);
           if (fb) {
-            var pp = out.width >= 1024 ? 3 : 2;
-            var px;
-            try {
-              px = o.getImageData(0, 0, out.width, out.height);
-            } catch (taintErr) {
-              console.error('save-cert: canvas tainted at getImageData', taintErr);
-              // All non-data img refs (any of these is a smoking gun)
-              var imgs = clone.querySelectorAll('img');
-              var nonDataImgs = [];
-              imgs.forEach(function(im) {
-                var s = im.getAttribute('src') || '';
-                if (s && s.indexOf('data:') !== 0) nonDataImgs.push(s.slice(0, 200));
-              });
-              console.error('save-cert: ' + imgs.length + ' imgs, ' + nonDataImgs.length + ' non-data:', nonDataImgs);
-              // All <canvas> elements left in the clone (we replace
-              // them with <img>; any remaining means toDataURL failed
-              // — that canvas was likely tainted on its own).
-              var canvases = clone.querySelectorAll('canvas');
-              console.error('save-cert: ' + canvases.length + ' <canvas> elements still in clone (each = a toDataURL failure, likely tainted)');
-              // url() refs in the inlined CSS that aren't data: URLs
-              var urlMatches = (styles.match(/url\([^)]*\)/g) || []).filter(function(u) {
-                return u.indexOf('data:') === -1;
-              });
-              console.error('save-cert: ' + urlMatches.length + ' non-data url() refs in inlined CSS:', urlMatches);
-              // Inline style attrs on clone elements that contain url()
-              var inlineUrls = [];
-              clone.querySelectorAll('[style]').forEach(function(el) {
-                var s = el.getAttribute('style') || '';
-                if (s.indexOf('url(') >= 0 && s.indexOf('data:') === -1) {
-                  inlineUrls.push(el.tagName + ': ' + s.slice(0, 200));
-                }
-              });
-              console.error('save-cert: ' + inlineUrls.length + ' inline-style url() refs:', inlineUrls);
-              throw taintErr;
-            }
-            embedBits(px.data, out.width, out.height, fb, pp);
+            var pp = fW >= 1024 ? 3 : 2;
+            var px = o.getImageData(0, 0, fW, fH);
+            embedBits(px.data, fW, fH, fb, pp);
             o.putImageData(px, 0, 0);
           }
         }
 
-        out.toBlob(function(blob2) {
-          if (!blob2) { reject(new Error('toBlob returned null')); return; }
-          var u = URL.createObjectURL(blob2);
+        out.toBlob(function(blob) {
+          if (!blob) { reject(new Error('toBlob returned null')); return; }
+          var u = URL.createObjectURL(blob);
           var a = document.createElement('a');
           a.href = u;
           a.download = barId + '.certificate.png';
@@ -350,21 +141,9 @@ function _saveLivePlate(plate, barId, barHash) {
           resolve();
         }, 'image/png');
       } catch (err) {
-        URL.revokeObjectURL(url);
         reject(err);
       }
-    };
-    img.onerror = function() {
-      // Browsers don't surface why an SVG image failed (security).
-      // Log the SVG payload size + a head snippet so the user can
-      // copy the blob URL into a new tab to see the actual error.
-      console.error('SVG payload (' + svgStr.length + ' chars) failed to load. Blob URL:', url);
-      console.error('SVG head:', svgStr.slice(0, 600));
-      reject(new Error('SVG image failed to load (see blob URL in console for details)'));
-    };
-    img.src = url;
-
-    } // end _continueSave
+    }).catch(reject);
   });
 }
 
