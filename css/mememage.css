@@ -113,6 +113,7 @@
     background: var(--system-box-bg-yang);
     backdrop-filter: var(--system-box-blur);
     -webkit-backdrop-filter: var(--system-box-blur);
+    box-shadow: var(--system-box-shadow);
     border-radius: var(--radius);
     border: 1px solid rgba(0,0,0,0.1);
     overflow: hidden;

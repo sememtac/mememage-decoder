@@ -76,6 +76,13 @@
    * shows through with the glass effect. */
   --system-box-blur: none;
 
+  /* --- System box edge glow ---
+   * Inset box-shadow forming a per-edge frame highlight. Default
+   * `none`. Aero-style themes set a 4-edge inset (brighter top) so
+   * the system-box reads as a glass pane with light catching the
+   * frame, especially when the body is mostly transparent. */
+  --system-box-shadow: none;
+
   /* --- Radii --- */
   --radius: 14px;
   --radius-sm: 8px;
