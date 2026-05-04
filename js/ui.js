@@ -426,6 +426,10 @@ function renderBar(data) {
     }
     barInfo.innerHTML = html;
   }
+  // Re-stamp tab ownership — barInfo may have been freshly created
+  // after the calling tab's setTabOwner ran, so the original stamp
+  // missed it. refresh() re-runs with the cached last-owner.
+  TabScope.refresh();
 }
 
 async function fetchFromSource(baseUrl, identifier, contentHash) {
@@ -648,6 +652,10 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
       inputSection.appendChild(soulBtn);
     }
   }
+
+  // Re-stamp tab ownership — soulBtn was just created after the
+  // calling tab's setTabOwner ran. refresh() picks it up.
+  TabScope.refresh();
 
   return true;
 }

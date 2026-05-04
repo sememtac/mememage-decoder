@@ -689,10 +689,16 @@ var PanelError = (function() {
 // =====================================================================
 var TabScope = (function() {
   var ids = [];
+  // Cache the last setOwner() call so refresh() can re-stamp after
+  // elements are created mid-flow (e.g. consoleBarInfo + downloadSoulBtn
+  // are inserted by renderBar / fetchAndRender, AFTER processImage's
+  // setTabOwner — so the original setOwner() couldn't stamp them).
+  var lastOwner = null;
 
   function configure(elementIds) { ids = (elementIds || []).slice(); }
 
   function setOwner(tabId) {
+    lastOwner = tabId;
     ids.forEach(function(id) {
       var el = document.getElementById(id);
       if (!el) return;
@@ -701,7 +707,15 @@ var TabScope = (function() {
     });
   }
 
+  // Re-run setOwner with the most recent owner. Use after creating
+  // any element that may not have existed at the original setOwner()
+  // call, so it picks up the data-owner stamp.
+  function refresh() {
+    if (lastOwner !== null) setOwner(lastOwner);
+  }
+
   function clear() {
+    lastOwner = null;
     ids.forEach(function(id) {
       var el = document.getElementById(id);
       if (!el) return;
@@ -716,7 +730,7 @@ var TabScope = (function() {
     });
   }
 
-  return { configure: configure, setOwner: setOwner, clear: clear, apply: apply };
+  return { configure: configure, setOwner: setOwner, refresh: refresh, clear: clear, apply: apply };
 })();
 
 function buildProbeLinks(base, identifier, contentHash) {
