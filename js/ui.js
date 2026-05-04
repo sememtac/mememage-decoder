@@ -272,7 +272,7 @@ function showPanelError(head, body) {
 // produced it — switching to a tab without its own cert collapses
 // the layout back to default. Mirrors the validator's per-tab slot
 // behavior in syncResultsVisibility.
-TabScope.configure(['preview', 'barCard', 'status', 'iaLinkBanner', 'certWrap']);
+TabScope.configure(['preview', 'barCard', 'status', 'iaLinkBanner', 'certWrap', 'consoleBarInfo', 'downloadSoulBtn']);
 function setTabOwner(tabId) { TabScope.setOwner(tabId); }
 function clearTabOwners() { TabScope.clear(); }
 // Tracks any in-flight cert-leaving fade so a rapid second tab click
