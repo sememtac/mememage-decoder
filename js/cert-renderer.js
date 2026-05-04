@@ -121,12 +121,13 @@ function _saveLivePlate(plate, barId, barHash) {
       '.cosmic-player { display: none !important; }' +
       // Live plate has 28px bottom padding to breathe with the player
       // sticky-snapped above it. With the player hidden in the saved
-      // PNG, that breathing room reads as wasted space — tighten so
-      // the footer sits closer to the edge.
-      '.plate { padding-bottom: 12px !important; }' +
-      // Footer's own top margin is also tuned to the live spacing —
-      // collapse it for the static capture.
-      '.plate-footer { margin-top: 4px !important; padding-top: 4px !important; }';
+      // PNG, that breathing room reads as wasted space — tighten
+      // hard so the footer text sits flush against the lower edge.
+      '.plate { padding-bottom: 2px !important; }' +
+      // Footer top margin/padding + line-height descender area
+      // contribute another ~15px below the text — collapse them.
+      '.plate-footer { margin-top: 2px !important; padding-top: 2px !important; }' +
+      '.plate-footer-line, .plate-footer-italic { line-height: 1.2 !important; }';
     document.head.appendChild(overrideStyle);
 
     // Expand the live plate to its full (post-override) scrollHeight.
