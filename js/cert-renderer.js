@@ -104,6 +104,10 @@ function _saveLivePlate(plate, barId, barHash) {
     //     clips and a static PNG can't be unlocked anyway
     //   - .save-cert-btn — would leave a button-shaped void at the
     //     bottom of the capture
+    //   - .cosmic-player — injected as a child of .plate (sticky to
+    //     the bottom of the scroll). ignoreElements skips drawing it
+    //     but its height stayed in the layout, leaving empty black
+    //     space at the bottom of the saved PNG.
     //
     // Inject this BEFORE reading scrollHeight so the plate measures
     // its post-override layout.
@@ -113,7 +117,8 @@ function _saveLivePlate(plate, barId, barHash) {
       '.plate::before, .plate::after { display: none !important; }' +
       '.verify-badge { box-shadow: none !important; }' +
       '.gps-unlock { display: none !important; }' +
-      '.save-cert-btn { display: none !important; }';
+      '.save-cert-btn { display: none !important; }' +
+      '.cosmic-player { display: none !important; }';
     document.head.appendChild(overrideStyle);
 
     // Expand the live plate to its full (post-override) scrollHeight.
@@ -143,16 +148,10 @@ function _saveLivePlate(plate, barId, barHash) {
       scale: SCALE,
       backgroundColor: '#0d0d14',
       useCORS: true,
-      logging: false,
-      ignoreElements: function(el) {
-        if (!el.classList) return false;
-        // .cosmic-player is a sibling of the plate, not a child, so
-        // it normally won't be in the capture tree — but during the
-        // planetarium handoff it can be reparented onto the body, so
-        // skip it defensively. .save-cert-btn is hidden via the
-        // override sheet (display: none) so it doesn't reach here.
-        return el.classList.contains('cosmic-player');
-      }
+      logging: false
+      // No ignoreElements callback needed — every element that should
+      // be excluded from the capture is already display:none via the
+      // override sheet, which collapses both layout AND drawing.
     }).then(function(rendered) {
       _cleanup();
       try {

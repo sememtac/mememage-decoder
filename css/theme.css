@@ -77,12 +77,13 @@
   --system-box-blur: none;
 
   /* --- System box blend mode ---
-   * Default `normal` means each background layer alpha-blends with
-   * the next. Texture-based themes (e.g. Ruby) can set this to
-   * `multiply` so a cream/tint gradient layer multiplies with the
-   * texture image beneath it, preserving the texture's brightness
-   * structure instead of washing over it. */
-  --system-box-blend-mode: normal;
+   * Per-side because yang and yin can want different blends (yang
+   * might want `multiply` to tint a texture pink, yin usually wants
+   * `normal` because its dark overlay would crush textures with
+   * multiply). The yang token doubles as the legacy/default
+   * --system-box-blend-mode for any rule still reading that name. */
+  --system-box-blend-mode:     normal;
+  --system-box-blend-mode-yin: normal;
 
   /* --- System box background-color fallback ---
    * Sits behind the background-image stack. Catches any alpha holes
