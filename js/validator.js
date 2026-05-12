@@ -1097,13 +1097,51 @@ async function analyzeMeta(files){
         }
         html+='</div></div>';}}
 
-    // Age
-    var ages=new Set();valid.forEach(function(r2){
-      var d2=getChunk(r2,'decoder');
-      var an=(d2&&d2.age_name)||r2.decoder_age_name;
-      if(an)ages.add(an);
+    // Age — broken out per chain so a mixed-chain drop shows each chain's
+    // age separately. "(consistent)" means all records from THIS chain
+    // agree on one age_name. Records that don't declare an age (custom
+    // chains without a decoder layer) fall back to the chain's display
+    // name with "(no age_name declared)". The chain discriminator
+    // prefix (first 10 chars) tags which chain each line belongs to.
+    var chainAgeMap = {};
+    var chainOrder = [];
+    valid.forEach(function(r2) {
+      var ck = r2._ageKey ? r2._ageKey.split('#')[0] : chainDiscriminator(r2);
+      if (!chainAgeMap[ck]) {
+        chainAgeMap[ck] = { displayName: r2._ageName || '_', ageNames: {} };
+        chainOrder.push(ck);
+      }
+      var d2 = getChunk(r2, 'decoder');
+      var an = (d2 && d2.age_name) || r2.decoder_age_name;
+      if (an) chainAgeMap[ck].ageNames[an] = true;
     });
-    if(ages.size>0)html+='<div class="ev-sec">Age</div><div style="font-size:0.72rem;color:'+(ages.size===1?'#4ade80':'#f87171')+';">'+escapeHtml(Array.from(ages).join(', '))+(ages.size===1?' (consistent)':' (mixed)')+'</div>';
+    if (chainOrder.length > 0) {
+      html += '<div class="ev-sec">Age</div>';
+      chainOrder.forEach(function(ck) {
+        var info = chainAgeMap[ck];
+        var names = Object.keys(info.ageNames);
+        var color, suffix, label;
+        if (names.length === 0) {
+          color = '#8a8a9a';
+          suffix = ' (no age_name declared)';
+          label = info.displayName === '_' ? 'Age I' : info.displayName;
+        } else if (names.length === 1) {
+          color = '#4ade80';
+          suffix = ' (consistent)';
+          label = names[0];
+        } else {
+          color = '#f87171';
+          suffix = ' (mixed)';
+          label = names.join(', ');
+        }
+        html += '<div style="font-size:0.7rem;color:' + color + ';margin:0.2rem 0;">';
+        if (chainOrder.length > 1) {
+          html += '<span style="color:#8888a0;font-family:monospace;font-size:0.55rem;">' + escapeHtml(ck.slice(0, 14)) + '\u2192</span> ';
+        }
+        html += escapeHtml(label) + '<span style="opacity:0.6">' + suffix + '</span>';
+        html += '</div>';
+      });
+    }
 
     html+='</div></div>';
   }
