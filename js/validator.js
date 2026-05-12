@@ -569,6 +569,31 @@ function getRoleColor(name) {
   return Math.round((r1 + m) * 255) + ',' + Math.round((g1 + m) * 255) + ',' + Math.round((b1 + m) * 255);
 }
 
+// Group records by their chain identity. Two independently sealed
+// chains can both call their first Age "Age of Aries"; without a
+// discriminator they collide. Prefers decoder_hash when present;
+// otherwise derives a stable signature from the record's layer layout
+// (role names + totals).
+function chainDiscriminator(r) {
+  if (r.decoder_hash) return r.decoder_hash.slice(0, 12);
+  var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+  if (!ch) return '_no_chunks';
+  return Object.keys(ch).sort().map(function(k) {
+    var e = ch[k];
+    var t = e && typeof e.total === 'number' ? e.total : '?';
+    return k + ':' + t;
+  }).join('|');
+}
+
+// Assign _ageKey / _ageName to a record. Called once for every parsed
+// soul before row HTML is generated, so filter/grid lookups match.
+function assignAgeKey(r) {
+  var rDec = (typeof getChunk === 'function') ? getChunk(r, 'decoder') : null;
+  var displayName = (rDec && rDec.age_name) || r.decoder_age_name || '_';
+  r._ageName = displayName;
+  r._ageKey = chainDiscriminator(r) + '#' + displayName;
+}
+
 function sortRoles(roles) {
   // Canonical roles first in ROLE_ORDER, then unknowns in observation order.
   var canonical = ROLE_ORDER.filter(function(r) { return roles.indexOf(r) >= 0; });
@@ -699,6 +724,9 @@ async function analyzeMeta(files){
     _seenIds[id] = true;
     return true;
   });
+  // Stamp every record with its (chain, age) key BEFORE building row
+  // HTML so data-age-key matches the curAge filterRecords compares against.
+  valid.forEach(assignAgeKey);
   valid.sort(function(a,b){
     var ad=getChunk(a,'decoder')||{}, bd=getChunk(b,'decoder')||{};
     var aa=ad.age||ad.age_name||'', ba=bd.age||bd.age_name||'';
@@ -1117,39 +1145,27 @@ function buildOrbitInspector(records, collected) {
   // first Age "Age of Aries" would collide into one bucket and the
   // grid would silently overwrite cells. The carousel still displays
   // human-readable age_name; the key is internal.
-  function chainDiscriminator(r) {
-    if (r.decoder_hash) return r.decoder_hash.slice(0, 12);
-    var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
-    if (!ch) return '_no_chunks';
-    // Layer-signature: role names + their totals. Two records from the
-    // same chain produce the same signature; different layouts diverge.
-    return Object.keys(ch).sort().map(function(k) {
-      var e = ch[k];
-      var t = e && typeof e.total === 'number' ? e.total : '?';
-      return k + ':' + t;
-    }).join('|');
-  }
+  // (chainDiscriminator is hoisted to module scope so analyzeMeta can
+  // precompute r._ageKey before building row HTML — that HTML needs the
+  // key for filterRecords to match rows to the current Age.)
   var ages = {}, ageOrder = [];
   records.forEach(function(r) {
-    // Read chunk metadata via shared helper (handles nested + legacy flat).
-    var rDec = getChunk(r, 'decoder');
-    var rTruth = getChunk(r, 'truth');
-    var displayName = (rDec && rDec.age_name) || r.decoder_age_name || '_';
-    var key = chainDiscriminator(r) + '#' + displayName;
+    // r._ageKey / r._ageName already assigned by analyzeMeta.
+    var key = r._ageKey || (chainDiscriminator(r) + '#' + (r._ageName || '_'));
+    var displayName = r._ageName || '_';
     if (!ages[key]) {
       ages[key] = { byPos: {}, recs: [], displayName: displayName };
       ageOrder.push(key);
     }
     ages[key].recs.push(r);
+    var rDec = getChunk(r, 'decoder');
+    var rTruth = getChunk(r, 'truth');
     var ti = r.outer_position != null ? r.outer_position
            : (rTruth && rTruth.index != null ? rTruth.index
            : (rDec && rDec.index != null ? rDec.index
               : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index)));
     if (ti != null) ages[key].byPos[ti] = r;
-    // Cache for downstream rendering loops
     r._gridPos = ti;
-    r._ageName = displayName;
-    r._ageKey = key;
   });
 
   var curAge = ageOrder[0], curSector = 0, mode = 'orbit', curFilter = 'all';
