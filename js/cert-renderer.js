@@ -517,11 +517,23 @@ function renderCert(meta, options) {
   // produces a different celestial snapshot, so every constellation is unique.
   // Fallback chain: constellation_hash → constellation_name → content_hash (legacy)
   var conSeed = meta.constellation_hash || meta.constellation_name || meta.content_hash || meta._content_hash || '';
-  // Read decoder chunk index from new nested shape, fall back to flat
-  // (legacy records pre-chunks-spec migration).
+  // Record's position within its constellation cycle ("which Bayer
+  // letter is this record"). Prefer the canonical decoder layer's index
+  // when present; for chains without a decoder, fall back to any
+  // non-schematic layer's index (any layer K-cycle works as a
+  // constellation indexer).
   var _dec = (meta.chunks && meta.chunks.decoder) || null;
   var myChunkIdx = _dec && _dec.index !== undefined ? _dec.index
                  : (meta.decoder_chunk_index !== undefined ? meta.decoder_chunk_index : -1);
+  if (myChunkIdx < 0 && meta.chunks && typeof meta.chunks === 'object') {
+    var _roles = Object.keys(meta.chunks);
+    for (var _ri = 0; _ri < _roles.length; _ri++) {
+      var _role = _roles[_ri];
+      if (_role === 'schematic') continue;
+      var _e = meta.chunks[_role];
+      if (_e && typeof _e.index === 'number') { myChunkIdx = _e.index; break; }
+    }
+  }
   var isHeartStar = meta.heart_star_id && meta.heart_star_id === meta._identifier;
   if (isHeartStar) myChunkIdx = 0;
 
@@ -581,9 +593,11 @@ function renderCert(meta, options) {
     // Save the line canvas state (lines don't change)
     var lineSnapshot = conCtx.getImageData(0, 0, CON_W, CON_H);
 
-    // Star twinkle parameters — each star gets a random phase and period
+    // Star twinkle parameters — each star gets a random phase and period.
+    // Drives off cStars.length so a layout function that returns fewer
+    // or more stars still animates correctly.
     var twinklePhase = [], twinklePeriod = [];
-    for (var tsi = 0; tsi < 12; tsi++) {
+    for (var tsi = 0; tsi < cStars.length; tsi++) {
       twinklePhase.push(Math.random() * 6.2832);
       twinklePeriod.push(2000 + Math.random() * 4000); // 2-6 second cycle
     }
@@ -593,7 +607,7 @@ function renderCert(meta, options) {
       conCtx.putImageData(lineSnapshot, 0, 0);
 
       var now = Date.now();
-      for (var csi = 0; csi < 12; csi++) {
+      for (var csi = 0; csi < cStars.length; csi++) {
         var cs = cStars[csi];
         var twinkle = 0.85 + 0.15 * Math.sin(now / twinklePeriod[csi] * 6.2832 + twinklePhase[csi]); // 0.85-1.0
 
@@ -855,10 +869,13 @@ function renderCert(meta, options) {
         }
       });
     }
-    // Bayer designation — Greek letters by birth order
-    // Letter navigates to parent (one step back), name navigates to heart star
-    var BAYER = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
-    if (myChunkIdx >= 0 && myChunkIdx < 12) {
+    // Bayer designation — Greek letters by birth order.
+    // Letter navigates to parent (one step back), name navigates to
+    // heart star. Full 24-letter Greek alphabet covers K up to 24;
+    // beyond that, no letter is drawn (rare for any practical chain).
+    var BAYER = ('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
+               + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
+    if (myChunkIdx >= 0 && myChunkIdx < BAYER.length) {
       if (meta.parent_id && !isHeartStar) {
         // Greek letter links to parent (previous star in chain)
         var bayerLink = document.createElement('a');
