@@ -558,6 +558,42 @@ async function assembleChunks(store,count){
   return await gunzip(parts.join(''));
 }
 
+// Binary-safe variant: returns Uint8Array. Use this for non-text layer
+// payloads (images, PDFs, anything that isn't valid UTF-8) — gunzip()
+// would TextDecoder-mangle bytes and bloat the result.
+async function assembleChunksBytes(store, count) {
+  var parts = [];
+  for (var i = 0; i < count; i++) {
+    if (!store[i]) return null;
+    parts.push(store[i].data);
+  }
+  return await gunzipBytes(parts.join(''));
+}
+
+// Sniff file type from the first bytes so an unknown-role chain payload
+// downloads with a sensible extension + mime. Falls back to .bin /
+// application/octet-stream for genuinely opaque data.
+function sniffBinaryType(bytes) {
+  if (!bytes || bytes.length < 4) return null;
+  var b0 = bytes[0], b1 = bytes[1], b2 = bytes[2], b3 = bytes[3];
+  if (b0 === 0x89 && b1 === 0x50 && b2 === 0x4E && b3 === 0x47) return {mime: 'image/png',  ext: 'png'};
+  if (b0 === 0xFF && b1 === 0xD8 && b2 === 0xFF)               return {mime: 'image/jpeg', ext: 'jpg'};
+  if (b0 === 0x47 && b1 === 0x49 && b2 === 0x46 && b3 === 0x38) return {mime: 'image/gif',  ext: 'gif'};
+  if (b0 === 0x25 && b1 === 0x50 && b2 === 0x44 && b3 === 0x46) return {mime: 'application/pdf', ext: 'pdf'};
+  if (b0 === 0x52 && b1 === 0x49 && b2 === 0x46 && b3 === 0x46 &&
+      bytes.length >= 12 && bytes[8] === 0x57 && bytes[9] === 0x45 &&
+      bytes[10] === 0x42 && bytes[11] === 0x50)                 return {mime: 'image/webp', ext: 'webp'};
+  // Text-likely (UTF-8 BOM, ASCII prefix that looks like text)
+  if (b0 === 0xEF && b1 === 0xBB && b2 === 0xBF)               return {mime: 'text/plain', ext: 'txt'};
+  // SVG / HTML / XML
+  try {
+    var head = new TextDecoder('utf-8', {fatal: false}).decode(bytes.slice(0, Math.min(128, bytes.length))).trim().toLowerCase();
+    if (head.indexOf('<?xml') === 0 || head.indexOf('<svg') === 0) return {mime: 'image/svg+xml', ext: 'svg'};
+    if (head.indexOf('<!doctype html') === 0 || head.indexOf('<html') === 0) return {mime: 'text/html', ext: 'html'};
+  } catch (e) {}
+  return null;
+}
+
 // HASH_INCLUDED, sortKeysDeep, sha256_16 — loaded from js/verify.js
 
 async function analyzeMeta(files){
@@ -1112,7 +1148,26 @@ function buildOrbitInspector(records, collected) {
     ctl.appendChild(sb);
 
     var sel = mk('select', 'orbit-filter');
+    // Build the dropdown from canonical filter names + any extra layer
+    // roles observed in this Age's records. Canonical filters tie into
+    // the cell-type classification ("decoder", "truth", "proof",
+    // "epag", "egg"); extra layer roles also light their cells once we
+    // tag them at cell-creation time below.
     var opts = {all:'All',decoder:'Decoder',truth:'Truth',proof:'Proof',epag:'Epag',egg:'Egg'};
+    var extraRoleSet = {};
+    ad.recs.forEach(function(r) {
+      var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+      if (!ch) return;
+      Object.keys(ch).forEach(function(role) {
+        if (role === 'decoder' || role === 'truth' || role === 'proof' ||
+            role === 'easter_egg' || role === 'claim' || role === 'schematic') return;
+        extraRoleSet[role] = true;
+      });
+    });
+    Object.keys(extraRoleSet).sort().forEach(function(role) {
+      var meta = (typeof roleMeta === 'function') ? roleMeta(role) : {label: role};
+      opts[role] = meta.label || role;
+    });
     for (var k in opts) { var o = document.createElement('option'); o.value = k; o.textContent = opts[k]; sel.appendChild(o); }
     sel.value = curFilter;
     ctl.appendChild(sel);
@@ -1250,12 +1305,23 @@ function buildOrbitInspector(records, collected) {
         if (isDk) cell.classList.add('dark');
         if (isEp) cell.classList.add('epag');
 
-        // Cycle membership for filter
+        // Cycle membership for filter. Position-based defaults match the
+        // canonical chain layout; in addition, tag with any custom layer
+        // roles observed in this cell's record so filters like "Fox"
+        // (or whatever a chain author chose to name a layer) highlight
+        // the cells that actually carry that chunk.
         var types = 'truth';
         if (pos < 360) types += ' decoder';
         if (pos < 364) types += ' proof';
         if (pos >= 360) types += ' epag';
         if (pos === 364) types += ' egg';
+        if (rec && rec.chunks && typeof rec.chunks === 'object') {
+          Object.keys(rec.chunks).forEach(function(role) {
+            if (role === 'decoder' || role === 'truth' || role === 'proof' ||
+                role === 'easter_egg' || role === 'claim' || role === 'schematic') return;
+            types += ' ' + role;
+          });
+        }
         cell.dataset.types = types;
 
         td.appendChild(cell);
@@ -1348,12 +1414,32 @@ function buildOrbitInspector(records, collected) {
           });
         } else {
           dlBtnColored(meta.label, meta.color, async function() {
-            var h = await assembleChunks(globalBucket.chunks, bucket.total);
-            if (!h) return;
-            var b = new Blob([h], {type: meta.mime});
+            // Canonical text layers (decoder/proof/truth) → assemble as
+            // string so the result is human-readable HTML/text.
+            // Unknown / binary roles → assemble as bytes and sniff the
+            // file type so the download lands with the right extension
+            // (PNG, JPG, PDF, SVG…) instead of a generic .bin.
+            var isCanonicalText = meta.mime === 'text/html' || meta.mime === 'text/plain';
+            if (isCanonicalText) {
+              var h = await assembleChunks(globalBucket.chunks, bucket.total);
+              if (!h) return;
+              var b = new Blob([h], {type: meta.mime});
+              var a = document.createElement('a');
+              a.href = URL.createObjectURL(b);
+              a.download = meta.filename;
+              a.click();
+              return;
+            }
+            var bytes = await assembleChunksBytes(globalBucket.chunks, bucket.total);
+            if (!bytes) return;
+            var sniffed = sniffBinaryType(bytes);
+            var mime = (sniffed && sniffed.mime) || meta.mime;
+            var ext = (sniffed && sniffed.ext) || 'bin';
+            var filename = role + '.' + ext;
+            var b = new Blob([bytes], {type: mime});
             var a = document.createElement('a');
             a.href = URL.createObjectURL(b);
-            a.download = meta.filename;
+            a.download = filename;
             a.click();
           });
         }
