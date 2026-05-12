@@ -992,7 +992,35 @@ function buildOrbitInspector(records, collected) {
   if (!el || !records.length) return;
 
   var BAYER = '\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'.split('');
-  var TOTAL_ROWS = Math.ceil(365 / 12); // 31
+  // Infer the chain's outer-cycle length (M) from the records. Prefer an
+  // explicit ``outer_cycle`` field if any record carries one, then fall
+  // back to the largest observed ``total`` from layer chunks (truth's
+  // total maps cleanly to M for canonical chains), then to the highest
+  // observed position + 1. Default to 365 so canonical chains render
+  // exactly as they always have.
+  var chainM = 0;
+  records.forEach(function(r) {
+    if (typeof r.outer_cycle === 'number') chainM = Math.max(chainM, r.outer_cycle);
+    var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+    if (ch) Object.keys(ch).forEach(function(role) {
+      var entry = ch[role];
+      if (entry && typeof entry.total === 'number') {
+        // truth-like layers (K == M) reflect M directly. Other layers
+        // (K=12 decoder, K=7 proof) are smaller, so just take the max.
+        chainM = Math.max(chainM, entry.total);
+      }
+    });
+    if (typeof r.outer_position === 'number') chainM = Math.max(chainM, r.outer_position + 1);
+    if (typeof r.truth_chunk_index === 'number' && typeof r.truth_total_chunks === 'number') {
+      chainM = Math.max(chainM, r.truth_total_chunks);
+    }
+  });
+  if (!chainM) chainM = 365;
+  // Canonical calendar dark days (positions 360-363) + epagomenal day
+  // (364) only apply to M=365 chains. For other Ms, drop those slots.
+  var USE_CALENDAR = (chainM === 365);
+  var TOTAL_ROWS = USE_CALENDAR ? Math.ceil(365 / 12) // 31
+                                : Math.max(1, Math.ceil(chainM / 12));
 
   // Group by age. Position on the 365-grid prefers an explicit
   // outer_position (set by minters that want a canonical position),
@@ -1207,7 +1235,7 @@ function buildOrbitInspector(records, collected) {
     var supplied = Object.keys(ad.byPos).length;
     var stIn = mk('span', '');
     stIn.style.cssText = 'font-size:0.46rem;color:#5a5a6a;';
-    stIn.textContent = supplied + '/365';
+    stIn.textContent = supplied + '/' + chainM;
     ctl.appendChild(stIn);
 
     el.appendChild(ctl);
@@ -1236,7 +1264,9 @@ function buildOrbitInspector(records, collected) {
       var base = ri * 12;
       var cn = rowCon[ri];
       if (cn && selectedCons.has(cn)) tr.classList.add('row-selected');
-      var special = base >= 360;
+      // "Special" rows (dark days / epagomenal) only exist on the
+      // canonical 365-day calendar. Smaller chains skip them entirely.
+      var special = USE_CALENDAR && base >= 360;
 
       // Label cell
       var lbl = mk('td', 'orbit-lbl');
@@ -1278,15 +1308,15 @@ function buildOrbitInspector(records, collected) {
       for (var ci = 0; ci < 12; ci++) {
         var pos = base + ci;
         var td = document.createElement('td');
-        if (pos >= 365) { tr.appendChild(td); continue; }
+        if (pos >= chainM) { tr.appendChild(td); continue; }
 
         var cell = mk('div', 'orbit-c');
         cell.dataset.pos = pos;
         cell.dataset.row = ri;
 
         var rec = ad.byPos[pos];
-        var isDk = pos >= 360 && pos <= 363;
-        var isEp = pos === 364;
+        var isDk = USE_CALENDAR && pos >= 360 && pos <= 363;
+        var isEp = USE_CALENDAR && pos === 364;
 
         if (rec) {
           cell.classList.add('supplied');
