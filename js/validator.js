@@ -600,6 +600,9 @@ async function gunzip(base64){
 }
 
 async function assembleChunks(store,count){
+  // Defensive: a layer can declare total=0 (malformed or empty). Bail
+  // before constructing an empty string and feeding it to gunzip.
+  if (!count || count <= 0) return null;
   var parts=[];for(var i=0;i<count;i++){if(!store[i])return null;parts.push(store[i].data);}
   // Every layer's chunks are gzip+base64 encoded — concat → atob → gunzip.
   return await gunzip(parts.join(''));
@@ -686,6 +689,16 @@ async function analyzeMeta(files){
   // the transient "Analyzing..." note from the error slot.
   if (metaErr) { metaErr.textContent = ''; metaErr.style.color = ''; }
   showResultsSidebar();
+  // De-duplicate by identifier so dropping the same soul twice doesn't
+  // double-count chunks or double-render rows. Keep first occurrence.
+  var _seenIds = {};
+  valid = valid.filter(function(r) {
+    var id = r.identifier;
+    if (!id) return true; // no identifier — pass through (we can't dedupe what we can't key)
+    if (_seenIds[id]) return false;
+    _seenIds[id] = true;
+    return true;
+  });
   valid.sort(function(a,b){
     var ad=getChunk(a,'decoder')||{}, bd=getChunk(b,'decoder')||{};
     var aa=ad.age||ad.age_name||'', ba=bd.age||bd.age_name||'';
@@ -812,7 +825,7 @@ async function analyzeMeta(files){
     // tab — every field is attacker-controllable. Escape on every
     // interpolation. _h is a local alias for portal.js's escapeHtml.
     var _h = escapeHtml;
-    html+='<div id="rec-'+(ti!=null?ti:ri)+'" data-identifier="'+_h(r.identifier||'')+'" data-age="'+_h(ageName)+'" data-con="'+_h(r.constellation_name||'')+'" data-chunk="'+(di_!=null?+di_:'')+'" style="border-bottom:1px solid #1a1a2a;">';
+    html+='<div id="rec-'+(ti!=null?ti:ri)+'" data-identifier="'+_h(r.identifier||'')+'" data-age="'+_h(ageName)+'" data-age-key="'+_h(r._ageKey||'')+'" data-con="'+_h(r.constellation_name||'')+'" data-chunk="'+(di_!=null?+di_:'')+'" style="border-bottom:1px solid #1a1a2a;">';
     html+='<div class="meta-row" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="padding:0.35rem 0.8rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'none\'">';
     html+='<span style="font-size:0.72rem;color:'+rBadgeCol+';min-width:1rem;">'+rBadge+'</span>';
     html+='<span style="font-size:0.7rem;font-family:monospace;min-width:10rem;color:#d0d0d8;">'+_h(r.identifier?r.identifier.slice(-16):(r._fn||'').slice(-16))+'</span>';
@@ -1097,28 +1110,46 @@ function buildOrbitInspector(records, collected) {
     return { M: m, K: k, COLS: k, ROWS: rows, USE_CALENDAR: useCalendar };
   }
 
-  // Group by age. Position on the 365-grid prefers an explicit
-  // outer_position (set by minters that want a canonical position),
-  // then truth_chunk_index (the natural source for canonical chains),
-  // then decoder_chunk_index (fallback for pre-truth-cycle records).
-  // Arbitrary-layer chains carry outer_position directly so the grid
-  // still places records even when there's no decoder/truth/proof.
+  // Group by (chain, age). The grouping key combines a chain
+  // discriminator (decoder_hash if present, else a signature derived
+  // from the record's layer layout) with the age_name. Without this,
+  // two independently sealed chains that both happen to call their
+  // first Age "Age of Aries" would collide into one bucket and the
+  // grid would silently overwrite cells. The carousel still displays
+  // human-readable age_name; the key is internal.
+  function chainDiscriminator(r) {
+    if (r.decoder_hash) return r.decoder_hash.slice(0, 12);
+    var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+    if (!ch) return '_no_chunks';
+    // Layer-signature: role names + their totals. Two records from the
+    // same chain produce the same signature; different layouts diverge.
+    return Object.keys(ch).sort().map(function(k) {
+      var e = ch[k];
+      var t = e && typeof e.total === 'number' ? e.total : '?';
+      return k + ':' + t;
+    }).join('|');
+  }
   var ages = {}, ageOrder = [];
   records.forEach(function(r) {
     // Read chunk metadata via shared helper (handles nested + legacy flat).
     var rDec = getChunk(r, 'decoder');
     var rTruth = getChunk(r, 'truth');
-    var a = (rDec && rDec.age_name) || r.decoder_age_name || '_';
-    if (!ages[a]) { ages[a] = { byPos: {}, recs: [] }; ageOrder.push(a); }
-    ages[a].recs.push(r);
+    var displayName = (rDec && rDec.age_name) || r.decoder_age_name || '_';
+    var key = chainDiscriminator(r) + '#' + displayName;
+    if (!ages[key]) {
+      ages[key] = { byPos: {}, recs: [], displayName: displayName };
+      ageOrder.push(key);
+    }
+    ages[key].recs.push(r);
     var ti = r.outer_position != null ? r.outer_position
            : (rTruth && rTruth.index != null ? rTruth.index
            : (rDec && rDec.index != null ? rDec.index
               : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index)));
-    if (ti != null) ages[a].byPos[ti] = r;
+    if (ti != null) ages[key].byPos[ti] = r;
     // Cache for downstream rendering loops
     r._gridPos = ti;
-    r._ageName = a;
+    r._ageName = displayName;
+    r._ageKey = key;
   });
 
   var curAge = ageOrder[0], curSector = 0, mode = 'orbit', curFilter = 'all';
@@ -1178,12 +1209,21 @@ function buildOrbitInspector(records, collected) {
       }
     });
 
+    // Resolve a grouping key back to its human-readable display name.
+    // Multi-chain drops use (chainSig, age_name) as the key; the user
+    // sees the age_name only.
+    function ageLabel(k) {
+      var info = ages[k];
+      var nm = info ? info.displayName : '_';
+      return nm === '_' ? 'Age I' : nm;
+    }
+
     // === Age label — single-age drops show a static centered label;
     // multi-age drops get the full carousel with ◀ ▶ for navigation. ===
     if (ageOrder.length === 1) {
       var single = mk('div', 'orbit-ages');
       var lbl = mk('div', 'orbit-age center');
-      lbl.textContent = curAge === '_' ? 'Age I' : curAge;
+      lbl.textContent = ageLabel(curAge);
       single.appendChild(lbl);
       el.appendChild(single);
     } else if (ageOrder.length > 1) {
@@ -1208,7 +1248,7 @@ function buildOrbitInspector(records, collected) {
         var absOff = Math.abs(offset);
         var p = mk('div', 'orbit-age');
         if (ai >= 0 && ai < n) {
-          p.textContent = ageOrder[ai] === '_' ? 'Age I' : ageOrder[ai];
+          p.textContent = ageLabel(ageOrder[ai]);
           if (absOff === 0) p.classList.add('center');
           else if (absOff === 1) {
             p.classList.add('near-1');
@@ -1560,6 +1600,9 @@ function buildOrbitInspector(records, collected) {
       // Indexed-role downloads — reassemble chunks 0..total-1.
       indexedRoles.forEach(function(role) {
         var bucket = ageIndexed[role];
+        // Defensive: layers with total=0 (malformed seal, empty layer)
+        // shouldn't surface a download button.
+        if (!bucket || !bucket.total || bucket.total <= 0) return;
         var have = Object.keys(bucket.indices).length;
         if (have !== bucket.total) return;
         var meta = roleMeta(role);
@@ -1826,12 +1869,14 @@ function buildOrbitInspector(records, collected) {
   }
 
   function filterRecords() {
-    var ageLabel = curAge === '_' ? '' : curAge;
+    // Match on the chain-discriminated grouping key (data-age-key), not
+    // the human-readable display name, so two chains that share a
+    // displayName don't filter into each other's bucket.
     var useCon = selectedCons.size > 0;
     var recRows = document.querySelectorAll('[data-age]');
     var visCount = 0;
     recRows.forEach(function(row) {
-      var ageMatch = row.dataset.age === ageLabel;
+      var ageMatch = row.dataset.ageKey === curAge;
       var conMatch = !useCon || selectedCons.has(row.dataset.con);
       if (ageMatch && conMatch) {
         row.style.display = '';
