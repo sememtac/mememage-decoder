@@ -78,6 +78,22 @@ var Theme = {
       'ai forgeries get found here',
       'audit hour for the silicon',
       'every forgery shall be made known'
+    ],
+    dashboard: [
+      'configure, stage, and conceive',
+      'the lock, the key, and the word \u2014 in one place',
+      'where the creator setteth the seal',
+      'mint, payload, identity \u2014 your control room',
+      'the architecture, made plain',
+      'stage the payload, sign the soul, send the body',
+      'the chain begins where you stand',
+      'every conception starts at this desk',
+      'the workshop beneath the witness',
+      'drop the body, the soul follows',
+      'one click from prompt to provenance',
+      'the workbench of the creator',
+      'where presence becomes record',
+      'the loom of the chain'
     ]
   },
 

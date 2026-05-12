@@ -481,8 +481,53 @@ folderInp.addEventListener('change',function(){
   folderInp.value='';
 });
 
-// Persistent chunk collection (survives across multiple drops)
-var collected={decoder:{},proof:{},truth:{},schematic:{},claim:null,egg:null};
+// Persistent chunk collection (survives across multiple drops).
+//
+// Two flavors of stored chunk:
+//   - indexed   — chunks that carry {index, total} (decoder, truth, proof,
+//                 schematic). Stored as {[role]: {total, chunks: {idx: entry}}}.
+//   - single    — frozen chunks with no index (claim, easter_egg, custom).
+//                 Stored as {[role]: entry}.
+//
+// Validator UI keys off the chunk *role name* (the key inside record.chunks),
+// not on a hardcoded list. Whatever a chain decides to emit is collected
+// and rendered.
+var collected = { indexed: {}, single: {} };
+
+// Canonical render order for known role names. Anything else falls to the
+// end in observation order so unknown roles don't disappear.
+var ROLE_ORDER = ['decoder', 'proof', 'truth', 'schematic', 'claim', 'easter_egg'];
+
+// Per-role display metadata — used by the download-button renderer to
+// choose label, filter color, file mime + extension. Unknown roles get
+// sensible generic defaults.
+var ROLE_META = {
+  decoder:    { label: 'Decoder',    color: 'decoder', mime: 'text/html',  filename: 'mememage-decoder.html'  },
+  proof:      { label: 'Proof',      color: 'proof',   mime: 'text/html',  filename: 'mememage-proof.html'    },
+  truth:      { label: 'Truth',      color: 'truth',   mime: 'text/plain', filename: 'mememage-truth.txt'     },
+  schematic:  { label: 'Schematics', color: 'epag',    mime: 'image/svg+xml', filename: 'schematic.svg'      },
+  claim:      { label: 'Claim',      color: 'epag',    mime: 'text/html',  filename: 'mememage-claim.html'    },
+  easter_egg: { label: 'Easter Egg', color: 'egg',     mime: 'text/html',  filename: 'easter-egg.html'        },
+};
+
+function roleMeta(role) {
+  if (ROLE_META[role]) return ROLE_META[role];
+  // Generic fallback: title-case the role name, generic color, binary
+  // download. Lets a chain emit any role and have it show up.
+  return {
+    label: role.replace(/[-_]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();}),
+    color: 'truth',
+    mime: 'application/octet-stream',
+    filename: role + '.bin',
+  };
+}
+
+function sortRoles(roles) {
+  // Canonical roles first in ROLE_ORDER, then unknowns in observation order.
+  var canonical = ROLE_ORDER.filter(function(r) { return roles.indexOf(r) >= 0; });
+  var extras = roles.filter(function(r) { return ROLE_ORDER.indexOf(r) < 0; });
+  return canonical.concat(extras);
+}
 
 async function verifyChunkHash(data,expectedHash){
   if(!expectedHash||!data)return null;
@@ -491,7 +536,7 @@ async function verifyChunkHash(data,expectedHash){
     return hex===expectedHash;}catch(e){return null;}
 }
 
-async function gunzip(base64){
+async function gunzipBytes(base64){
   var bytes=Uint8Array.from(atob(base64),function(c){return c.charCodeAt(0);});
   var ds=new DecompressionStream('gzip');
   var writer=ds.writable.getWriter();writer.write(bytes);writer.close();
@@ -500,13 +545,17 @@ async function gunzip(base64){
   var total=chunks.reduce(function(a,c){return a+c.length;},0);
   var out=new Uint8Array(total);var off=0;
   for(var i=0;i<chunks.length;i++){out.set(chunks[i],off);off+=chunks[i].length;}
-  return new TextDecoder().decode(out);
+  return out;
+}
+
+async function gunzip(base64){
+  return new TextDecoder().decode(await gunzipBytes(base64));
 }
 
 async function assembleChunks(store,count){
   var parts=[];for(var i=0;i<count;i++){if(!store[i])return null;parts.push(store[i].data);}
-  var joined=parts.join('');
-  try{return await gunzip(joined);}catch(e){return joined;} // fallback: raw join if not gzipped
+  // Every layer's chunks are gzip+base64 encoded — concat → atob → gunzip.
+  return await gunzip(parts.join(''));
 }
 
 // HASH_INCLUDED, sortKeysDeep, sha256_16 — loaded from js/verify.js
@@ -571,57 +620,63 @@ async function analyzeMeta(files){
     r._match=stored&&r._computed&&stored===r._computed;
   }
 
-  // Accumulate chunks from these records (handles both nested + flat shapes)
-  for(var ci=0;ci<valid.length;ci++){
-    var cr=valid[ci];
-    var d_=getChunk(cr,'decoder');
-    if(d_ && d_.index!==undefined && d_.data){
-      collected.decoder[d_.index]={data:d_.data,hash:d_.hash||null,verified:null};
+  // Accumulate chunks from these records — generic walk over each record's
+  // chunks dict. Indexed chunks (have index+total) go into collected.indexed,
+  // single frozen chunks go into collected.single. The role name is the
+  // chunk key from record.chunks (decoder, proof, truth, schematic,
+  // easter_egg, claim, anything else the chain emits).
+  for (var ci = 0; ci < valid.length; ci++) {
+    var cr = valid[ci];
+    var chDict = cr.chunks && typeof cr.chunks === 'object' ? cr.chunks : null;
+    // Iterate the nested chunks dict if present.
+    if (chDict) {
+      Object.keys(chDict).forEach(function(role) {
+        var entry = chDict[role];
+        if (!entry || entry.data === undefined) return;
+        if (entry.index !== undefined && entry.total !== undefined) {
+          if (!collected.indexed[role]) {
+            collected.indexed[role] = { total: entry.total, chunks: {} };
+          }
+          // Trust the newest record's total in case earlier was stale.
+          collected.indexed[role].total = entry.total;
+          collected.indexed[role].chunks[entry.index] = {
+            data: entry.data, hash: entry.hash || null, verified: null,
+          };
+        } else {
+          collected.single[role] = {
+            data: entry.data, hash: entry.hash || null,
+            text: entry.text || null, image: entry.image || null,
+            verified: null,
+          };
+        }
+      });
     }
-    var p_=getChunk(cr,'proof');
-    if(p_ && p_.index!==undefined && p_.data){
-      collected.proof[p_.index]={data:p_.data,hash:p_.hash||null,verified:null};
-    }
-    var t_=getChunk(cr,'truth');
-    if(t_ && t_.index!==undefined && t_.data){
-      collected.truth[t_.index]={data:t_.data,hash:t_.hash||null,verified:null};
-    }
-    var s_=getChunk(cr,'schematic');
-    if(s_ && s_.index!==undefined && s_.data){
-      collected.schematic[s_.index]={data:s_.data,hash:s_.hash||null,verified:null};
-    }
-    var c_=getChunk(cr,'claim');
-    if(c_ && c_.data){
-      collected.claim={data:c_.data,hash:c_.hash||null,verified:null};
-    }
-    // Easter egg has a legacy flag-style fallback in addition to nested.
-    var e_=getChunk(cr,'easter_egg');
-    if(e_ && e_.data){
-      collected.egg={
-        text: e_.text || e_.data,
-        image: e_.image || null,
-        data: e_.data,
-        hash: e_.hash || null,
-        verified: null
-      };
-    } else if(cr.easter_egg && cr.easter_egg_chunk){
-      // Legacy fallback (boolean flag + flat content)
-      collected.egg={
-        text: cr.easter_egg_text || cr.easter_egg_chunk || '',
-        image: cr.easter_egg_image || null,
-        data: cr.easter_egg_chunk || cr.easter_egg_text || '',
-        hash: cr.easter_egg_hash || null,
-        verified: null
-      };
+    // Legacy flat-shape fallback for older records that predate the
+    // nested chunks dict — only easter_egg is observed in the wild.
+    if (!chDict || !chDict.easter_egg) {
+      if (cr.easter_egg && cr.easter_egg_chunk) {
+        collected.single.easter_egg = {
+          text: cr.easter_egg_text || cr.easter_egg_chunk || '',
+          image: cr.easter_egg_image || null,
+          data: cr.easter_egg_chunk || cr.easter_egg_text || '',
+          hash: cr.easter_egg_hash || null,
+          verified: null,
+        };
+      }
     }
   }
-  // Verify chunk hashes asynchronously
-  for(var dk in collected.decoder){var d=collected.decoder[dk];if(d.hash&&d.verified===null)d.verified=await verifyChunkHash(d.data,d.hash);}
-  for(var pk in collected.proof){var p=collected.proof[pk];if(p.hash&&p.verified===null)p.verified=await verifyChunkHash(p.data,p.hash);}
-  for(var tk in collected.truth){var tt=collected.truth[tk];if(tt.hash&&tt.verified===null)tt.verified=await verifyChunkHash(tt.data,tt.hash);}
-  for(var sk in collected.schematic){var ss=collected.schematic[sk];if(ss.hash&&ss.verified===null)ss.verified=await verifyChunkHash(ss.data,ss.hash);}
-  if(collected.claim&&collected.claim.hash&&collected.claim.verified===null)collected.claim.verified=await verifyChunkHash(collected.claim.data,collected.claim.hash);
-  if(collected.egg&&collected.egg.hash&&collected.egg.verified===null)collected.egg.verified=await verifyChunkHash(collected.egg.data,collected.egg.hash);
+  // Verify chunk hashes asynchronously. Walk every collected role.
+  for (var ir in collected.indexed) {
+    var store = collected.indexed[ir].chunks;
+    for (var idx in store) {
+      var c = store[idx];
+      if (c.hash && c.verified === null) c.verified = await verifyChunkHash(c.data, c.hash);
+    }
+  }
+  for (var sr in collected.single) {
+    var sg = collected.single[sr];
+    if (sg.hash && sg.verified === null) sg.verified = await verifyChunkHash(sg.data, sg.hash);
+  }
 
   var html='';
 
@@ -1214,44 +1269,52 @@ function buildOrbitInspector(records, collected) {
     el.appendChild(gridWrap);
 
     // === Stats line (per-age counts) ===
+    // Per-Age rollup. We walk ad.recs and bucket every observed chunk role
+    // — no hardcoded list. The same generic loop the global collector
+    // uses, scoped to this Age's records.
     var stats = mk('div', 'orbit-stats');
-    var ageDecChunks = {}, ageProofChunks = {}, ageTruthChunks = {}, ageSchemChunks = {};
-    var ageHasClaim = false, ageHasEgg = false;
+    var ageIndexed = {};  // role → {total, indices: Set}
+    var ageSingle  = {};  // role → true
     ad.recs.forEach(function(r) {
-      var rD=getChunk(r,'decoder'); if(rD && rD.index!==undefined && rD.data) ageDecChunks[rD.index]=true;
-      var rP=getChunk(r,'proof');   if(rP && rP.index!==undefined && rP.data) ageProofChunks[rP.index]=true;
-      var rT=getChunk(r,'truth');   if(rT && rT.index!==undefined && rT.data) ageTruthChunks[rT.index]=true;
-      var rS=getChunk(r,'schematic'); if(rS && rS.index!==undefined && rS.data) ageSchemChunks[rS.index]=true;
-      if(getChunk(r,'claim')) ageHasClaim = true;
-      if(getChunk(r,'easter_egg') || r.easter_egg) ageHasEgg = true;
+      var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+      if (!ch) return;
+      Object.keys(ch).forEach(function(role) {
+        var entry = ch[role];
+        if (!entry || entry.data === undefined) return;
+        if (entry.index !== undefined && entry.total !== undefined) {
+          if (!ageIndexed[role]) ageIndexed[role] = { total: entry.total, indices: {} };
+          ageIndexed[role].total = entry.total;
+          ageIndexed[role].indices[entry.index] = true;
+        } else {
+          ageSingle[role] = true;
+        }
+      });
     });
-    var decCount = Object.keys(ageDecChunks).length;
-    var proofCount = Object.keys(ageProofChunks).length;
-    var truthCount = Object.keys(ageTruthChunks).length;
-    var schemCount = Object.keys(ageSchemChunks).length;
-    var hasClaim = ageHasClaim;
-    var hasEgg = ageHasEgg;
     stats.innerHTML =
       '<span>' + ad.recs.length + ' stars</span>' +
       '<span class="' + (hashOk === ad.recs.length ? 'pass' : 'warn') + '">' + hashOk + '/' + ad.recs.length + ' verified</span>';
     el.appendChild(stats);
 
     // === Reassembly downloads ===
-    var hasAssembly = decCount === 12 || proofCount >= 6 || truthCount === 365 || schemCount === 4 || hasClaim || hasEgg;
-    if (hasAssembly) {
+    // The button bar is driven entirely by what's observed in this Age's
+    // records. Canonical roles (decoder/proof/truth/schematic/claim/
+    // easter_egg) keep their special labels + colors via ROLE_META;
+    // anything else gets a generic "Download <role>" button. Indexed
+    // roles only appear when the count matches the chunk-declared total;
+    // single roles appear as soon as one is present.
+    var indexedRoles = sortRoles(Object.keys(ageIndexed));
+    var singleRoles  = sortRoles(Object.keys(ageSingle));
+    var hasComplete  = indexedRoles.some(function(r) {
+      return Object.keys(ageIndexed[r].indices).length === ageIndexed[r].total;
+    }) || singleRoles.length > 0;
+    if (hasComplete) {
       var ra = mk('div', 'orbit-assembly');
-      function dlBtn(label, onclick) {
-        var b = mk('button', 'orbit-vbtn');
-        b.textContent = '\u2913 ' + label;
-        b.onclick = onclick;
-        ra.appendChild(b);
-      }
       // Filter colors: decoder=green, truth=blue, proof=purple, epag=gold, egg=pink
       var FC = {decoder:'123,196,160', truth:'136,152,184', proof:'184,152,216', epag:'212,184,123', egg:'196,123,187'};
-      function dlBtnColored(label, type, onclick) {
+      function dlBtnColored(label, color, onclick) {
         var b = mk('button', 'orbit-vbtn');
         b.textContent = '\u2913 ' + label;
-        var c = FC[type] || '255,255,255';
+        var c = FC[color] || '255,255,255';
         b.style.borderColor = 'rgba(' + c + ',0.4)';
         b.style.color = 'rgb(' + c + ')';
         b.style.background = 'rgba(' + c + ',0.08)';
@@ -1260,63 +1323,70 @@ function buildOrbitInspector(records, collected) {
         b.onclick = onclick;
         ra.appendChild(b);
       }
-      if (decCount === 12) dlBtnColored('Decoder', 'decoder', async function() {
-        var h = await assembleChunks(collected.decoder, 12);
-        if (h) { var b = new Blob([h], {type:'text/html'}); var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mememage-decoder.html'; a.click(); }
-      });
-      if (proofCount >= 6) dlBtnColored('Proof', 'proof', async function() {
-        var h = await assembleChunks(collected.proof, 6);
-        if (h) { var b = new Blob([h], {type:'text/html'}); var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mememage-proof.html'; a.click(); }
-      });
-      if (truthCount === 365) dlBtnColored('Truth', 'truth', async function() {
-        var h = await assembleChunks(collected.truth, 365);
-        if (h) { var b = new Blob([h], {type:'text/plain'}); var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mememage-truth.txt'; a.click(); }
-      });
-      if (schemCount === 4) dlBtnColored('Schematics', 'epag', function() {
-        var names = ['fig1_system_overview.pdf','fig2_bar_format.pdf','fig3_watermark_derivation.pdf','fig4_nested_cycles.pdf'];
-        for (var si = 0; si < 4; si++) {
-          if (!collected.schematic[si]) continue;
-          var data = collected.schematic[si].data;
-          if (data.indexOf('data:application/pdf;base64,') === 0) {
-            var raw = atob(data.split(',')[1]); var arr = new Uint8Array(raw.length);
-            for (var bi = 0; bi < raw.length; bi++) arr[bi] = raw.charCodeAt(bi);
-            var b = new Blob([arr], {type:'application/pdf'}); var a = document.createElement('a');
-            a.href = URL.createObjectURL(b); a.download = names[si]; a.click();
-          } else {
-            var b = new Blob([data], {type:'text/plain'}); var a = document.createElement('a');
-            a.href = URL.createObjectURL(b); a.download = names[si].replace('.pdf','.txt'); a.click();
-          }
+      // Indexed-role downloads — reassemble chunks 0..total-1.
+      indexedRoles.forEach(function(role) {
+        var bucket = ageIndexed[role];
+        var have = Object.keys(bucket.indices).length;
+        if (have !== bucket.total) return;
+        var meta = roleMeta(role);
+        var globalBucket = collected.indexed[role];
+        if (!globalBucket) return;
+        if (role === 'schematic') {
+          // Multiple files — one .svg per chunk.
+          dlBtnColored(meta.label, meta.color, async function() {
+            for (var i = 0; i < bucket.total; i++) {
+              var c = globalBucket.chunks[i];
+              if (!c) continue;
+              var bytes = await gunzipBytes(c.data);
+              var b = new Blob([bytes], {type:'image/svg+xml'});
+              var a = document.createElement('a');
+              a.href = URL.createObjectURL(b);
+              a.download = 'schematic-' + (i + 1) + '.svg';
+              a.click();
+            }
+          });
+        } else {
+          dlBtnColored(meta.label, meta.color, async function() {
+            var h = await assembleChunks(globalBucket.chunks, bucket.total);
+            if (!h) return;
+            var b = new Blob([h], {type: meta.mime});
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(b);
+            a.download = meta.filename;
+            a.click();
+          });
         }
       });
-      if (hasClaim) dlBtnColored('Claim', 'epag', function() {
-        var data = collected.claim.data;
-        var isHtml = data.indexOf('<!DOCTYPE') >= 0 || data.indexOf('<html') >= 0;
-        var b = new Blob([data], {type: isHtml ? 'text/html' : 'text/plain'}); var a = document.createElement('a');
-        a.href = URL.createObjectURL(b); a.download = isHtml ? 'mememage-specification.html' : 'mememage-claim.txt'; a.click();
-      });
-      if (hasEgg) dlBtnColored('Easter Egg', 'egg', function() {
-        var egg = collected.egg;
-        // egg fields come from a .soul record (potentially user-supplied
-        // and hostile). The egg image must be a data: URL — anything
-        // else is rejected so a malicious record can't smuggle a remote
-        // URL into a downloaded HTML file. Text is HTML-escaped before
-        // interpolation.
-        var safeImg = (egg.image && /^data:image\//.test(egg.image)) ? egg.image : '';
-        var safeText = escapeHtml(egg.text || '').replace(/\u2014/g, '&mdash;');
-        var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Madeline</title>' +
-          '<style>body{margin:0;background:#000;color:#c0c0c8;font-family:Georgia,serif;' +
-          'display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;}' +
-          'img{max-width:480px;width:100%;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5);}' +
-          'p{margin-top:1.5rem;font-size:0.9rem;color:#909098;text-align:center;max-width:400px;line-height:1.6;}' +
-          '.name{font-size:1.8rem;margin-top:1.2rem;letter-spacing:0.1em;color:#d0d0d8;}' +
-          '.note{font-size:0.7rem;color:#505058;margin-top:2rem;font-style:italic;}</style></head><body>' +
-          (safeImg ? '<img src="' + escapeHtml(safeImg) + '" alt="Madeline">' : '') +
-          '<div class="name">Madeline</div>' +
-          '<p>' + safeText + '</p>' +
-          '<p class="note">The real cat who started it all.<br>Sealed into the epagomenal day &mdash; the day outside all cycles.</p>' +
-          '</body></html>';
-        var b = new Blob([h], {type:'text/html'}); var a = document.createElement('a');
-        a.href = URL.createObjectURL(b); a.download = 'madeline.html'; a.click();
+      // Single-role downloads — one frozen chunk per role.
+      singleRoles.forEach(function(role) {
+        var meta = roleMeta(role);
+        var entry = collected.single[role];
+        if (!entry) return;
+        dlBtnColored(meta.label, meta.color, async function() {
+          if (meta.mime === 'text/html' || meta.mime === 'text/plain') {
+            var data = await gunzip(entry.data);
+            // Auto-correct mime if a "claim"-style entry is plain text vs HTML.
+            var isHtml = data.indexOf('<!DOCTYPE') >= 0 || data.indexOf('<html') >= 0;
+            var mime = meta.mime;
+            var filename = meta.filename;
+            if (role === 'claim' && !isHtml) {
+              mime = 'text/plain';
+              filename = 'mememage-claim.txt';
+            }
+            var b = new Blob([data], {type: mime});
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(b);
+            a.download = filename;
+            a.click();
+          } else {
+            var bytes = await gunzipBytes(entry.data);
+            var b = new Blob([bytes], {type: meta.mime});
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(b);
+            a.download = meta.filename;
+            a.click();
+          }
+        });
       });
       el.appendChild(ra);
     }
