@@ -1148,28 +1148,38 @@ function buildOrbitInspector(records, collected) {
     ctl.appendChild(sb);
 
     var sel = mk('select', 'orbit-filter');
-    // Build the dropdown from canonical filter names + any extra layer
-    // roles observed in this Age's records. Canonical filters tie into
-    // the cell-type classification ("decoder", "truth", "proof",
-    // "epag", "egg"); extra layer roles also light their cells once we
-    // tag them at cell-creation time below.
-    var opts = {all:'All',decoder:'Decoder',truth:'Truth',proof:'Proof',epag:'Epag',egg:'Egg'};
-    var extraRoleSet = {};
+    // Build the dropdown from what's actually present in this Age's
+    // records — canonical filter names appear only when their role is
+    // observed (or, for Epag, when any record sits in the 360-364 dark
+    // days / epagomenal range). Custom layer roles each get their own
+    // filter option with the role's display label.
+    var observedRoles = {};
+    var hasEpagPos = false;
     ad.recs.forEach(function(r) {
+      if (r._gridPos != null && r._gridPos >= 360 && r._gridPos <= 364) hasEpagPos = true;
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
       if (!ch) return;
-      Object.keys(ch).forEach(function(role) {
-        if (role === 'decoder' || role === 'truth' || role === 'proof' ||
-            role === 'easter_egg' || role === 'claim' || role === 'schematic') return;
-        extraRoleSet[role] = true;
-      });
+      Object.keys(ch).forEach(function(role) { observedRoles[role] = true; });
     });
-    Object.keys(extraRoleSet).sort().forEach(function(role) {
+    // Canonical role → filter key mapping. Determines whether the
+    // canonical filter option appears in the dropdown.
+    var opts = {all: 'All'};
+    if (observedRoles.decoder)    opts.decoder = 'Decoder';
+    if (observedRoles.truth)      opts.truth   = 'Truth';
+    if (observedRoles.proof)      opts.proof   = 'Proof';
+    if (hasEpagPos || observedRoles.claim || observedRoles.schematic) opts.epag = 'Epag';
+    if (observedRoles.easter_egg) opts.egg     = 'Egg';
+    // Everything else — custom layer roles. Sorted for determinism.
+    Object.keys(observedRoles).sort().forEach(function(role) {
+      if (role === 'decoder' || role === 'truth' || role === 'proof' ||
+          role === 'easter_egg' || role === 'claim' || role === 'schematic') return;
       var meta = (typeof roleMeta === 'function') ? roleMeta(role) : {label: role};
       opts[role] = meta.label || role;
     });
     for (var k in opts) { var o = document.createElement('option'); o.value = k; o.textContent = opts[k]; sel.appendChild(o); }
-    sel.value = curFilter;
+    // If the previously-selected filter is gone from this set, fall back to "all".
+    sel.value = opts[curFilter] ? curFilter : 'all';
+    if (sel.value !== curFilter) curFilter = sel.value;
     ctl.appendChild(sel);
 
     var hashOk = ad.recs.filter(function(r) { return r._match; }).length;
