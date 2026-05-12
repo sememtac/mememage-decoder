@@ -1500,24 +1500,30 @@ function buildOrbitInspector(records, collected) {
         if (isDk) cell.classList.add('dark');
         if (isEp) cell.classList.add('epag');
 
-        // Cycle membership for filter. Position-based defaults match the
-        // canonical chain layout; in addition, tag with any custom layer
-        // roles observed in this cell's record so filters like "Fox"
-        // (or whatever a chain author chose to name a layer) highlight
-        // the cells that actually carry that chunk.
-        var types = 'truth';
-        if (pos < 360) types += ' decoder';
-        if (pos < 364) types += ' proof';
-        if (pos >= 360) types += ' epag';
-        if (pos === 364) types += ' egg';
+        // Cycle membership for filter. The position-based defaults
+        // (decoder at 0-359, proof at 0-363, dark days at 360-363,
+        // epag at 364) belong to the canonical 365-day calendar — only
+        // apply them when this Age IS that calendar. For other chains,
+        // tag cells only with the roles their records actually carry.
+        var types = '';
+        if (USE_CALENDAR) {
+          types = 'truth';
+          if (pos < 360) types += ' decoder';
+          if (pos < 364) types += ' proof';
+          if (pos >= 360) types += ' epag';
+          if (pos === 364) types += ' egg';
+        }
         if (rec && rec.chunks && typeof rec.chunks === 'object') {
           Object.keys(rec.chunks).forEach(function(role) {
-            if (role === 'decoder' || role === 'truth' || role === 'proof' ||
-                role === 'easter_egg' || role === 'claim' || role === 'schematic') return;
-            types += ' ' + role;
+            // Map canonical role names to their filter-key alias so the
+            // canonical filters keep highlighting their cells.
+            var key = role;
+            if (role === 'easter_egg') key = 'egg';
+            else if (role === 'claim' || role === 'schematic') key = 'epag';
+            if ((' ' + types + ' ').indexOf(' ' + key + ' ') < 0) types += ' ' + key;
           });
         }
-        cell.dataset.types = types;
+        cell.dataset.types = types.trim();
 
         td.appendChild(cell);
         tr.appendChild(td);
@@ -1777,7 +1783,9 @@ function buildOrbitInspector(records, collected) {
           }
           var sup = c.classList.contains('supplied');
           var p = parseInt(c.dataset.pos);
-          var dk = p >= 360 && p <= 363, ep = p === 364;
+          // Canonical-calendar special days only apply for M=365 chains.
+          var dk = USE_CALENDAR && p >= 360 && p <= 363;
+          var ep = USE_CALENDAR && p === 364;
           c.style.opacity = '1';
           c.style.background = sup ? (ep ? 'rgba(200,176,128,0.35)' : dk ? 'rgba(180,152,112,0.35)' : 'rgba(255,255,255,0.1)') :
             (ep ? 'rgba(200,176,128,0.08)' : dk ? 'rgba(138,112,80,0.1)' : 'rgba(255,255,255,0.02)');
