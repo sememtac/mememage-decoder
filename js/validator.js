@@ -1082,9 +1082,19 @@ async function analyzeMeta(files){
         html+='<div style="margin:0.3rem 0;padding:0.25rem 0.4rem;background:rgba(60,60,80,0.08);border-left:2px solid '+(cc?'rgba(74,158,74,0.4)':'rgba(180,160,60,0.3)')+';border-radius:3px;">';
         html+='<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">'+escapeHtml(cn2)+'</span><span style="font-size:0.55rem;color:'+(cc?'#4ade80':'#facc15')+';">'+present+'/'+conK+'</span></div>';
         html+='<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:0.15rem;">';
-        for(var cri=0;cri<cd.recs.length&&cri<conK;cri++){var cr2=cd.recs[cri];var isH=cr2.identifier&&cr2.identifier===cd.heart;
-          var starLetter=cr2.constellation_star||_label(cri);
-          html+='<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:'+(isH?'#d4b87b':'#4a4a60')+';">'+escapeHtml(starLetter)+'</span>';}
+        for(var cri=0;cri<cd.recs.length;cri++){
+          var cr2=cd.recs[cri];
+          var isH=cr2.identifier&&cr2.identifier===cd.heart;
+          // Real Bayer letter = record's position within its K-cycle.
+          // (outer_position % K). Production records may not set
+          // constellation_star; this derives it deterministically.
+          var pos2 = (cr2.outer_position != null) ? cr2.outer_position
+                   : (cr2._gridPos != null ? cr2._gridPos
+                   : (typeof cr2.decoder_chunk_index === 'number' ? cr2.decoder_chunk_index : cri));
+          var letterIdx = ((pos2 % conK) + conK) % conK; // handle negatives
+          var starLetter = cr2.constellation_star || _label(letterIdx);
+          html+='<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:'+(isH?'#d4b87b':'#4a4a60')+';">'+escapeHtml(starLetter)+'</span>';
+        }
         html+='</div></div>';}}
 
     // Age
