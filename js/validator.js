@@ -1199,6 +1199,27 @@ function buildOrbitInspector(records, collected) {
     var TOTAL_ROWS = dims.ROWS;
     var USE_CALENDAR = dims.USE_CALENDAR;
 
+    // Indexed-role set for this Age. Used during cell tagging so every
+    // cell — including empty ones — is marked as "in" each observed
+    // layer's cycle. Without this, custom-layer filters only highlight
+    // cells where a record happens to sit, breaking the dashed-cycle
+    // boundary cadence the canonical filters get for free.
+    var ageRoleKeys = {};
+    ad.recs.forEach(function(r) {
+      var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+      if (ch) Object.keys(ch).forEach(function(role) {
+        var e = ch[role];
+        if (!e || e.index === undefined || typeof e.total !== 'number' || e.total <= 0) return;
+        // Canonical role → filter key alias (egg/epag) so the existing
+        // filter dropdown keys match the cell tags.
+        var key = role;
+        if (role === 'easter_egg') key = 'egg';
+        else if (role === 'claim' || role === 'schematic') key = 'epag';
+        ageRoleKeys[key] = true;
+      });
+      if (typeof r.decoder_chunk_index === 'number') ageRoleKeys.decoder = true;
+    });
+
     // Row → constellation name map (uses cached _gridPos from above)
     var rowCon = {}, rowHeart = {};
     ad.recs.forEach(function(r) {
@@ -1500,11 +1521,14 @@ function buildOrbitInspector(records, collected) {
         if (isDk) cell.classList.add('dark');
         if (isEp) cell.classList.add('epag');
 
-        // Cycle membership for filter. The position-based defaults
-        // (decoder at 0-359, proof at 0-363, dark days at 360-363,
-        // epag at 364) belong to the canonical 365-day calendar — only
-        // apply them when this Age IS that calendar. For other chains,
-        // tag cells only with the roles their records actually carry.
+        // Cycle membership for filter. Two sources of truth:
+        //   1. Canonical 365-day calendar positions (decoder at 0-359,
+        //      proof at 0-363, dark days at 360-363, epag at 364) when
+        //      USE_CALENDAR. These tag empty cells based on position
+        //      alone so the canonical dashed-cadence pattern works.
+        //   2. Every layer role observed in this Age — applied to ALL
+        //      cells, not just cells with records. A layer cycle covers
+        //      every outer position, so every cell is "in" that filter.
         var types = '';
         if (USE_CALENDAR) {
           types = 'truth';
@@ -1513,16 +1537,12 @@ function buildOrbitInspector(records, collected) {
           if (pos >= 360) types += ' epag';
           if (pos === 364) types += ' egg';
         }
-        if (rec && rec.chunks && typeof rec.chunks === 'object') {
-          Object.keys(rec.chunks).forEach(function(role) {
-            // Map canonical role names to their filter-key alias so the
-            // canonical filters keep highlighting their cells.
-            var key = role;
-            if (role === 'easter_egg') key = 'egg';
-            else if (role === 'claim' || role === 'schematic') key = 'epag';
-            if ((' ' + types + ' ').indexOf(' ' + key + ' ') < 0) types += ' ' + key;
-          });
-        }
+        Object.keys(ageRoleKeys).forEach(function(key) {
+          // Skip canonical keys already applied by the calendar branch
+          // (avoid double-tagging in canonical chains).
+          if (USE_CALENDAR && {decoder:1, truth:1, proof:1, epag:1, egg:1}[key]) return;
+          if ((' ' + types + ' ').indexOf(' ' + key + ' ') < 0) types += ' ' + key;
+        });
         cell.dataset.types = types.trim();
 
         td.appendChild(cell);
