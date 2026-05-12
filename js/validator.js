@@ -1734,20 +1734,46 @@ function buildOrbitInspector(records, collected) {
     }
 
     // === Filter handler — with cadence boundary outlines ===
-    // Cycle lengths and offsets for boundary computation
+    // Canonical filter cycle lengths + offsets. Custom layer filters
+    // derive their (length, offset) from the observed chunks at
+    // render time — see resolveFilterCycle() below.
     var CL = {decoder:12, truth:365, proof:7, epag:5, egg:1};
     var CO = {decoder:0, truth:0, proof:0, epag:360, egg:364};
+    // Canonical filter colors. Custom filters fall through to
+    // getRoleColor(filter_name) which hashes the name to a hue.
+    var CC = {decoder:'#7bc4a0', truth:'#8898b8', proof:'#b898d8', epag:'#d4b87b', egg:'#c47bbb'};
 
-    // Compute which edges of a cell are group boundaries
+    function resolveFilterCycle(filterKey) {
+      if (CL[filterKey] != null) return { len: CL[filterKey], off: CO[filterKey] || 0 };
+      // Custom layer filter — read the total from observed chunks. Custom
+      // layers start at outer position 0 and cycle every K positions.
+      var bucket = ageIndexed[filterKey];
+      var len = (bucket && bucket.total > 0) ? bucket.total : chainM;
+      return { len: len, off: 0 };
+    }
+
+    function resolveFilterColor(filterKey) {
+      if (CC[filterKey]) return CC[filterKey];
+      // Custom filter — convert getRoleColor's "R,G,B" to "#RRGGBB" so
+      // the existing hx() helper keeps working.
+      var rgb = getRoleColor(filterKey).split(',');
+      function h(n) { var s = parseInt(n, 10).toString(16); return s.length < 2 ? '0' + s : s; }
+      return '#' + h(rgb[0]) + h(rgb[1]) + h(rgb[2]);
+    }
+
+    // Compute which edges of a cell are group boundaries. cols and
+    // wrap come from the per-Age dimensions so non-canonical chains
+    // (M ≠ 365 or K_inner ≠ 12) get correct cadence borders.
     function gEdge(p, groupLen) {
-      var g = Math.floor(p / groupLen), c = p % 12;
+      if (!groupLen || groupLen <= 0) return {t:false,b:false,l:false,r:false};
+      var g = Math.floor(p / groupLen), c = p % TOTAL_COLS;
       var t = false, b = false, l = false, r = false;
       if (p % groupLen === 0) l = true; else if (c === 0) l = true;
-      if (p % groupLen === groupLen - 1) r = true; else if (c === 11) r = true;
-      var above = p - 12;
+      if (p % groupLen === groupLen - 1) r = true; else if (c === TOTAL_COLS - 1) r = true;
+      var above = p - TOTAL_COLS;
       if (above < 0 || Math.floor(above / groupLen) !== g) t = true;
-      var below = p + 12;
-      if (below >= 366 || Math.floor(below / groupLen) !== g) b = true;
+      var below = p + TOTAL_COLS;
+      if (below >= chainM || Math.floor(below / groupLen) !== g) b = true;
       return {t:t, b:b, l:l, r:r};
     }
 
@@ -1797,9 +1823,9 @@ function buildOrbitInspector(records, collected) {
         applySelectionHighlight();
         return;
       }
-      var CC = {decoder:'#7bc4a0', truth:'#8898b8', proof:'#b898d8', epag:'#d4b87b', egg:'#c47bbb'};
-      var col = CC[curFilter];
-      var cn = CL[curFilter], co = CO[curFilter];
+      var col = resolveFilterColor(curFilter);
+      var cyc = resolveFilterCycle(curFilter);
+      var cn = cyc.len, co = cyc.off;
       cells.forEach(function(c) {
         // Skip cells in collapsed rows (sector mode)
         var row = c.closest('.orbit-row');

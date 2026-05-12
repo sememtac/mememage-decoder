@@ -597,6 +597,15 @@ if (typeof TabBar !== 'undefined') {
       msgs.push({severity: 'error',
                  text: 'M=' + cfg.M + ' is smaller than the longest layer cycle K=' + maxK + '.'});
     }
+    // Soft cap on M. Beyond ~10k, the validator's grid renders sluggishly
+    // (no virtualization yet) and per-Age completion takes generations
+    // at one mint per day. Warn — don't block — so a sophisticated user
+    // who really wants M=50000 can override.
+    if (typeof cfg.M === 'number' && cfg.M > 10000) {
+      var years = Math.round(cfg.M / 365);
+      msgs.push({severity: 'warning',
+                 text: 'M=' + cfg.M + ' is large. At one mint per day, completing an Age would take \u2248' + years + ' years; the validator\u2019s orbit grid will also render slowly. Most chains keep M \u2264 1000.'});
+    }
     // Entry references
     var entries = cfg.entries || {};
     (cfg.layers || []).forEach(function(ly, i) {
