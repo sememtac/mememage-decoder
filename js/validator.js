@@ -991,23 +991,31 @@ function buildOrbitInspector(records, collected) {
   var el = document.getElementById('orbitInspector');
   if (!el || !records.length) return;
 
-  var BAYER = '\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'.split('');
-  // Infer the chain's outer-cycle length (M) from the records. Prefer an
-  // explicit ``outer_cycle`` field if any record carries one, then fall
-  // back to the largest observed ``total`` from layer chunks (truth's
-  // total maps cleanly to M for canonical chains), then to the highest
-  // observed position + 1. Default to 365 so canonical chains render
-  // exactly as they always have.
+  // Greek letters for column labels (Bayer designation). Cover up to
+  // 24 columns; fall back to "c0/c1/…" for K > 24.
+  var GREEK = ('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
+             + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
+  function colLabel(i) { return i < GREEK.length ? GREEK[i] : ('c' + i); }
+
+  // Infer the chain's outer-cycle length (M) and the "constellation"
+  // cycle length (the smallest layer K — naturally groups records into
+  // rows on the grid). Both come from the records: explicit fields
+  // first, then chunk totals + observed positions as fallbacks. Defaults
+  // to canonical M=365 K=12 so a stock chain renders exactly as before.
   var chainM = 0;
+  var chainKInner = 0;
   records.forEach(function(r) {
     if (typeof r.outer_cycle === 'number') chainM = Math.max(chainM, r.outer_cycle);
     var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
     if (ch) Object.keys(ch).forEach(function(role) {
       var entry = ch[role];
       if (entry && typeof entry.total === 'number') {
-        // truth-like layers (K == M) reflect M directly. Other layers
-        // (K=12 decoder, K=7 proof) are smaller, so just take the max.
         chainM = Math.max(chainM, entry.total);
+        // Schematic is a frozen group (count of dark-day slots), not a
+        // layer cycle — don't let it shrink chainKInner.
+        if (role !== 'schematic' && entry.total > 0) {
+          chainKInner = chainKInner === 0 ? entry.total : Math.min(chainKInner, entry.total);
+        }
       }
     });
     if (typeof r.outer_position === 'number') chainM = Math.max(chainM, r.outer_position + 1);
@@ -1016,11 +1024,16 @@ function buildOrbitInspector(records, collected) {
     }
   });
   if (!chainM) chainM = 365;
+  if (!chainKInner) chainKInner = 12;
+  // Don't let K_inner exceed M — for a tiny chain (M=3, K=3) the row
+  // is just K_inner=3 long, and that IS one row covering the Age.
+  if (chainKInner > chainM) chainKInner = chainM;
+  var TOTAL_COLS = chainKInner;
   // Canonical calendar dark days (positions 360-363) + epagomenal day
   // (364) only apply to M=365 chains. For other Ms, drop those slots.
   var USE_CALENDAR = (chainM === 365);
-  var TOTAL_ROWS = USE_CALENDAR ? Math.ceil(365 / 12) // 31
-                                : Math.max(1, Math.ceil(chainM / 12));
+  var TOTAL_ROWS = USE_CALENDAR ? Math.ceil(365 / TOTAL_COLS)
+                                : Math.max(1, Math.ceil(chainM / TOTAL_COLS));
 
   // Group by age. Position on the 365-grid prefers an explicit
   // outer_position (set by minters that want a canonical position),
@@ -1087,7 +1100,7 @@ function buildOrbitInspector(records, collected) {
     var rowCon = {}, rowHeart = {};
     ad.recs.forEach(function(r) {
       if (r._gridPos != null) {
-        var row = Math.floor(r._gridPos / 12);
+        var row = Math.floor(r._gridPos / TOTAL_COLS);
         if (r.constellation_name) rowCon[row] = r.constellation_name;
         if (r.heart_star_id && r.identifier === r.heart_star_id) rowHeart[row] = true;
       }
@@ -1249,9 +1262,9 @@ function buildOrbitInspector(records, collected) {
     var th0 = document.createElement('td');
     th0.style.cssText = 'max-width:68px;';
     hdr.appendChild(th0);
-    for (var c = 0; c < 12; c++) {
+    for (var c = 0; c < TOTAL_COLS; c++) {
       var th = mk('td', 'orbit-hdr');
-      th.textContent = BAYER[c];
+      th.textContent = colLabel(c);
       hdr.appendChild(th);
     }
     tbl.appendChild(hdr);
@@ -1261,7 +1274,7 @@ function buildOrbitInspector(records, collected) {
     for (var ri = 0; ri < TOTAL_ROWS; ri++) {
       var tr = document.createElement('tr');
       tr.className = 'orbit-row';
-      var base = ri * 12;
+      var base = ri * TOTAL_COLS;
       var cn = rowCon[ri];
       if (cn && selectedCons.has(cn)) tr.classList.add('row-selected');
       // "Special" rows (dark days / epagomenal) only exist on the
@@ -1304,8 +1317,8 @@ function buildOrbitInspector(records, collected) {
       }
       tr.appendChild(lbl);
 
-      // 12 cells
-      for (var ci = 0; ci < 12; ci++) {
+      // K_inner cells per row — the "constellation" cycle.
+      for (var ci = 0; ci < TOTAL_COLS; ci++) {
         var pos = base + ci;
         var td = document.createElement('td');
         if (pos >= chainM) { tr.appendChild(td); continue; }
@@ -1321,7 +1334,7 @@ function buildOrbitInspector(records, collected) {
         if (rec) {
           cell.classList.add('supplied');
           if (rec._match === false) cell.classList.add('tampered');
-          cell.textContent = BAYER[ci];
+          cell.textContent = colLabel(ci);
           if (ci === 0 && rowHeart[ri]) cell.classList.add('heart');
           (function(record, row, cellEl) {
             var _savedBg = '';
@@ -1558,11 +1571,11 @@ function buildOrbitInspector(records, collected) {
       rowEls.forEach(function(tr, i) {
         tr.classList.remove('collapsed', 'near');
         if (mode !== 'sector') return;
-        var base = i * 12;
+        var base = i * TOTAL_COLS;
         var isCon = !!rowCon[i];
-        var isSpecial = base >= 360; // dark days (360-363) or epagomenal (364)
+        var isSpecial = USE_CALENDAR && base >= 360;
         var hasRec = false;
-        for (var ci = 0; ci < 12 && base + ci < 365; ci++) {
+        for (var ci = 0; ci < TOTAL_COLS && base + ci < chainM; ci++) {
           if (ad.byPos[base + ci]) { hasRec = true; break; }
         }
 
