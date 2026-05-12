@@ -942,26 +942,47 @@ async function analyzeMeta(files){
     html+='</div></details>';
     html+='<div style="font-size:0.62rem;color:#8a8a9a;margin-top:0.2rem;"><span style="color:#4ade80;">'+chainOk+' valid</span>'+(chainExt?' <span style="color:#facc15;">'+chainExt+' external</span>':'')+'</div>';
 
-    // Constellation Map
+    // Constellation Map. K (constellation cycle length) is derived per
+    // constellation from the records in that constellation: decoder
+    // chunk's total when present, else smallest non-schematic layer K,
+    // else 12 as a final fallback. So a fox K=3 chain reads as "3/3"
+    // and a canonical K=12 chain still reads as "12/12".
     var conMap={};valid.forEach(function(r2){
       var cn=r2.constellation_name||'_none';
-      if(!conMap[cn])conMap[cn]={recs:[],heart:null,chunks:new Set()};
+      if(!conMap[cn])conMap[cn]={recs:[],heart:null,chunks:new Set(),decoderK:0,smallestLayerK:0};
       conMap[cn].recs.push(r2);
       var d2=getChunk(r2,'decoder');
       var dIdx = d2 ? d2.index : (r2.decoder_chunk_index !== undefined ? r2.decoder_chunk_index : undefined);
       if(dIdx!==undefined)conMap[cn].chunks.add(dIdx);
+      if(d2 && typeof d2.total === 'number') conMap[cn].decoderK = d2.total;
+      else if(typeof r2.decoder_total_chunks === 'number') conMap[cn].decoderK = r2.decoder_total_chunks;
+      // Smallest non-schematic layer K (fallback for chains with no decoder)
+      var ch2 = r2.chunks && typeof r2.chunks === 'object' ? r2.chunks : null;
+      if (ch2) Object.keys(ch2).forEach(function(role){
+        var ent = ch2[role];
+        if (!ent || typeof ent.total !== 'number' || ent.total <= 0) return;
+        if (role === 'schematic') return;
+        conMap[cn].smallestLayerK = conMap[cn].smallestLayerK === 0
+          ? ent.total : Math.min(conMap[cn].smallestLayerK, ent.total);
+      });
       if(r2.heart_star_id)conMap[cn].heart=r2.heart_star_id;
     });
     var conNames=Object.keys(conMap).filter(function(n){return n!=='_none';});
     if(conNames.length>0){
-      var BAYER=['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
+      var GREEK=('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
+               +'\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
+      function _label(i){return i<GREEK.length?GREEK[i]:('c'+i);}
       html+='<div class="ev-sec">Constellations ('+conNames.length+')</div>';
-      for(var cni=0;cni<conNames.length;cni++){var cn2=conNames[cni],cd=conMap[cn2],cc=cd.chunks.size===12;
+      for(var cni=0;cni<conNames.length;cni++){
+        var cn2=conNames[cni],cd=conMap[cn2];
+        var conK = cd.decoderK || cd.smallestLayerK || 12;
+        var present = cd.chunks.size || cd.recs.length;
+        var cc = present===conK;
         html+='<div style="margin:0.3rem 0;padding:0.25rem 0.4rem;background:rgba(60,60,80,0.08);border-left:2px solid '+(cc?'rgba(74,158,74,0.4)':'rgba(180,160,60,0.3)')+';border-radius:3px;">';
-        html+='<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">'+escapeHtml(cn2)+'</span><span style="font-size:0.55rem;color:'+(cc?'#4ade80':'#facc15')+';">'+cd.chunks.size+'/12</span></div>';
+        html+='<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">'+escapeHtml(cn2)+'</span><span style="font-size:0.55rem;color:'+(cc?'#4ade80':'#facc15')+';">'+present+'/'+conK+'</span></div>';
         html+='<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:0.15rem;">';
-        for(var cri=0;cri<cd.recs.length&&cri<12;cri++){var cr2=cd.recs[cri];var isH=cr2.identifier&&cr2.identifier===cd.heart;
-          var starLetter=cr2.constellation_star||BAYER[cri];
+        for(var cri=0;cri<cd.recs.length&&cri<conK;cri++){var cr2=cd.recs[cri];var isH=cr2.identifier&&cr2.identifier===cd.heart;
+          var starLetter=cr2.constellation_star||_label(cri);
           html+='<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:'+(isH?'#d4b87b':'#4a4a60')+';">'+escapeHtml(starLetter)+'</span>';}
         html+='</div></div>';}}
 
