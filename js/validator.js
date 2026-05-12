@@ -1543,6 +1543,19 @@ function buildOrbitInspector(records, collected) {
           if (USE_CALENDAR && {decoder:1, truth:1, proof:1, epag:1, egg:1}[key]) return;
           if ((' ' + types + ' ').indexOf(' ' + key + ' ') < 0) types += ' ' + key;
         });
+        // Frozen chunks (no index, single position) belong only to THIS
+        // cell — not the whole cycle. Tag the specific cell so its
+        // filter highlights it without lighting the rest of the row.
+        if (rec && rec.chunks && typeof rec.chunks === 'object') {
+          Object.keys(rec.chunks).forEach(function(role) {
+            var e = rec.chunks[role];
+            if (!e || e.index !== undefined) return; // indexed already handled
+            var fkey = role;
+            if (role === 'easter_egg') fkey = 'egg';
+            else if (role === 'claim' || role === 'schematic') fkey = 'epag';
+            if ((' ' + types + ' ').indexOf(' ' + fkey + ' ') < 0) types += ' ' + fkey;
+          });
+        }
         cell.dataset.types = types.trim();
 
         td.appendChild(cell);
@@ -1764,12 +1777,34 @@ function buildOrbitInspector(records, collected) {
     var CC = {decoder:'#7bc4a0', truth:'#8898b8', proof:'#b898d8', epag:'#d4b87b', egg:'#c47bbb'};
 
     function resolveFilterCycle(filterKey) {
-      if (CL[filterKey] != null) return { len: CL[filterKey], off: CO[filterKey] || 0 };
-      // Custom layer filter — read the total from observed chunks. Custom
-      // layers start at outer position 0 and cycle every K positions.
+      // Canonical offsets only apply when in range. For a non-canonical
+      // chain (M=20, M=15, etc.), CO.egg=364 / CO.epag=360 land off the
+      // grid and gEdge math wraps to nonsense. Fall through to data-
+      // derived offsets in those cases.
+      if (CL[filterKey] != null && (CO[filterKey] || 0) < chainM) {
+        return { len: CL[filterKey], off: CO[filterKey] || 0 };
+      }
+      // Custom layer filter — read the total from observed chunks.
       var bucket = ageIndexed[filterKey];
-      var len = (bucket && bucket.total > 0) ? bucket.total : chainM;
-      return { len: len, off: 0 };
+      if (bucket && bucket.total > 0) return { len: bucket.total, off: 0 };
+      // Frozen-style filter (egg / epag / single-position custom role)
+      // — find any record carrying a chunk under this filter's role
+      // and treat it as a cycle of 1 at that position. Handles canonical
+      // names (egg → easter_egg, epag → claim/schematic) too.
+      var roles = [filterKey];
+      if (filterKey === 'egg') roles.push('easter_egg');
+      if (filterKey === 'epag') roles.push('claim', 'schematic');
+      for (var i = 0; i < ad.recs.length; i++) {
+        var r = ad.recs[i];
+        var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+        if (!ch) continue;
+        for (var j = 0; j < roles.length; j++) {
+          if (ch[roles[j]] !== undefined) {
+            return { len: 1, off: (r._gridPos != null ? r._gridPos : 0) };
+          }
+        }
+      }
+      return { len: chainM, off: 0 };
     }
 
     function resolveFilterColor(filterKey) {
