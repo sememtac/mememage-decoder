@@ -469,6 +469,7 @@ if (typeof TabBar !== 'undefined') {
     presetPanel:  document.getElementById('payloadPresetPanel'),
     presetSavePresetBtn: document.getElementById('payloadSavePresetBtn'),
     presetSaveAsBtn:    document.getElementById('payloadSaveAsNewBtn'),
+    presetNewBlankBtn:  document.getElementById('payloadNewBlankBtn'),
     presetList:   document.getElementById('payloadPresetList'),
   };
   if (!els.entries || !els.layers || !els.frozen) return; // panel missing — bail
@@ -542,13 +543,17 @@ if (typeof TabBar !== 'undefined') {
     var dirty = isDirty();
     els.dirty.hidden = !dirty;
     els.discardBtn.disabled = !dirty;
-    // Apply to chain: needs unsaved edits, no validation errors, AND the
-    // chain to be in EDITABLE state (between Ages or pre-genesis). While
-    // the lock state is still loading (undefined), keep the button off
-    // so we never invite a click that 409s.
+    // Apply to chain: needs unsaved edits, no validation errors, the
+    // chain to be in EDITABLE state, AND a non-empty template (at least
+    // one layer or frozen entry — the server's chain_config.validate()
+    // refuses a fully empty one). While the lock state is still loading
+    // (undefined), keep the button off so we never invite a click
+    // that 409s.
+    var w = state.working || {};
+    var isIncomplete = (w.layers || []).length === 0 && (w.frozen || []).length === 0;
     if (els.applyBtn) {
       var lockKnown = state.chainLocked !== undefined;
-      els.applyBtn.disabled = !dirty || hasErrors || !lockKnown || state.chainLocked === true;
+      els.applyBtn.disabled = !dirty || hasErrors || isIncomplete || !lockKnown || state.chainLocked === true;
       if (!lockKnown) {
         els.applyBtn.title = 'Checking chain lock state\u2026';
       } else if (state.chainLocked) {
@@ -558,6 +563,8 @@ if (typeof TabBar !== 'undefined') {
           'completes (or seal the next Age) before applying.';
       } else if (hasErrors) {
         els.applyBtn.title = 'Fix the validation errors below before applying.';
+      } else if (isIncomplete) {
+        els.applyBtn.title = 'Template needs at least one layer or frozen position before it can be applied.';
       } else if (!dirty) {
         els.applyBtn.title = 'No draft changes to apply.';
       } else {
@@ -570,10 +577,18 @@ if (typeof TabBar !== 'undefined') {
   function validate(cfg) {
     var msgs = [];
     if (!cfg) return msgs;
+    var nEntries = Object.keys(cfg.entries || {}).length;
     var nLayers = (cfg.layers || []).length;
     var nFrozen = (cfg.frozen || []).length;
+    // "No layer/frozen yet" stays informational — the editor lets you
+    // build in any order. Apply-to-chain has its own guard that blocks
+    // an incomplete template from being committed.
     if (nLayers === 0 && nFrozen === 0) {
-      msgs.push({severity: 'error', text: 'Define at least one layer or frozen position.'});
+      if (nEntries === 0) {
+        msgs.push({severity: 'info', text: 'Blank template \u2014 add entries, layers, and frozen positions to build it out.'});
+      } else {
+        msgs.push({severity: 'info', text: 'Add at least one layer or frozen position before applying to chain.'});
+      }
     }
     // M ≥ max(K_i)
     var maxK = 0;
@@ -794,12 +809,18 @@ if (typeof TabBar !== 'undefined') {
         if (!entry) return;
         var field = t.getAttribute('data-field');
         if (field === 'name') {
+          // Renaming swaps the dict key and rebuilds the row's DOM via
+          // renderAll(), which would destroy this input on every
+          // keystroke if we fired on the 'input' event. Defer the
+          // rename until blur/Enter (the 'change' event), so the user
+          // can type freely without losing focus.
+          if (e.type !== 'change') return;
           var newName = t.value.trim();
           if (newName && newName !== oldName) {
             renameEntry(oldName, newName);
             renderAll();
-            return;
           }
+          return;
         } else if (field && field.indexOf('source-') === 0) {
           // source-N → update sources[N] in place (no re-render — keeps focus)
           var srcIdx = parseInt(field.slice('source-'.length), 10);
@@ -1281,6 +1302,33 @@ if (typeof TabBar !== 'undefined') {
     if (nowOpen) loadPresetList();
   }
 
+  function newBlankTemplate() {
+    // Clear the editor to an empty template — no entries, no layers, no
+    // frozen positions. Preserves the active chain's identity (id, name,
+    // visibility) and M so the cleared draft is still a valid frame the
+    // user can build into.
+    if (isDirty() && !window.confirm(
+      'Start a blank template? Your current draft will be discarded. ' +
+      'Save it as a preset first if you want to keep it.'
+    )) return;
+    var current = state.working || state.saved || {};
+    state.working = {
+      id: current.id || '',
+      name: current.name || '',
+      visibility: current.visibility || 'light_energy',
+      M: current.M || 365,
+      schema_version: current.schema_version || 2,
+      entries: {},
+      layers: [],
+      frozen: [],
+    };
+    // Not derived from any preset.
+    state.lastPresetName = '';
+    refreshPresetButtonLabel();
+    renderAll();
+    refreshDirtyUI();
+  }
+
   // ===== Initial load + event wiring =====
   window.__loadPayloadTab = function() {
     if (state.loaded) return;
@@ -1308,6 +1356,7 @@ if (typeof TabBar !== 'undefined') {
   if (els.presetBtn) els.presetBtn.addEventListener('click', togglePresetPanel);
   if (els.presetSavePresetBtn) els.presetSavePresetBtn.addEventListener('click', function() { savePreset(); });
   if (els.presetSaveAsBtn) els.presetSaveAsBtn.addEventListener('click', function() { savePreset({forcePrompt: true}); });
+  if (els.presetNewBlankBtn) els.presetNewBlankBtn.addEventListener('click', newBlankTemplate);
 
   // The inspect modal is still in the DOM from earlier phases; close
   // handlers here keep it working (no inspect button surfaces in the

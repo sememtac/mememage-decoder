@@ -944,10 +944,12 @@ function buildOrbitInspector(records, collected) {
   var BAYER = '\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'.split('');
   var TOTAL_ROWS = Math.ceil(365 / 12); // 31
 
-  // Group by age. Position on the 365-grid prefers truth_chunk_index;
-  // older records (pre-truth-cycle) only carry decoder_chunk_index, so
-  // fall back to that (0-11) so a solo drop still lights a cell in the
-  // first decoder cycle rather than rendering an empty grid.
+  // Group by age. Position on the 365-grid prefers an explicit
+  // outer_position (set by minters that want a canonical position),
+  // then truth_chunk_index (the natural source for canonical chains),
+  // then decoder_chunk_index (fallback for pre-truth-cycle records).
+  // Arbitrary-layer chains carry outer_position directly so the grid
+  // still places records even when there's no decoder/truth/proof.
   var ages = {}, ageOrder = [];
   records.forEach(function(r) {
     // Read chunk metadata via shared helper (handles nested + legacy flat).
@@ -956,11 +958,10 @@ function buildOrbitInspector(records, collected) {
     var a = (rDec && rDec.age_name) || r.decoder_age_name || '_';
     if (!ages[a]) { ages[a] = { byPos: {}, recs: [] }; ageOrder.push(a); }
     ages[a].recs.push(r);
-    // Position on the 365-grid prefers truth index; fall back to
-    // decoder index (0-11) so a solo drop still lights a cell.
-    var ti = rTruth && rTruth.index != null ? rTruth.index
+    var ti = r.outer_position != null ? r.outer_position
+           : (rTruth && rTruth.index != null ? rTruth.index
            : (rDec && rDec.index != null ? rDec.index
-              : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index));
+              : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index)));
     if (ti != null) ages[a].byPos[ti] = r;
     // Cache for downstream rendering loops
     r._gridPos = ti;

@@ -499,6 +499,12 @@
   color: #604c00;
   border-left: 3px solid #b08c00;
 }
+.payload-validation-line.info {
+  background: rgba(60, 200, 220, 0.12);
+  color: #103060;
+  border-left: 3px solid #3cc8dc;
+  font-style: italic;
+}
 
 /* Collapsible section with add button */
 .payload-section {
