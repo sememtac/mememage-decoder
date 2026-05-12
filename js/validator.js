@@ -1014,136 +1014,135 @@ async function analyzeMeta(files){
   }
   html+='</div></div>'; // close ev-body + ev card
 
-  // === Chain, Constellation, Age — below the table ===
+  // === Chain & Constellation — one panel per chain ===
+  // For mixed-chain drops, each chain renders independently so its
+  // Parent Chain links don't get conflated with other chains' records
+  // and each chain's Constellations / Age can be read in isolation.
+  // Single-chain drops still render one panel titled "Chain & Constellation".
   if(valid.length>1){
-    html+='<div class="ev"><div class="ev-h" style="background:rgba(80,80,100,0.06);border-left:3px solid rgba(80,80,100,0.2);"><span class="ev-t">Chain &amp; Constellation</span></div><div class="ev-body">';
-    var idSet={};valid.forEach(function(r){if(r.identifier)idSet[r.identifier]=r;});
-    var chainOk=0,chainExt=0;
-    html+='<div class="ev-sec">Parent Chain</div><details><summary style="font-size:0.65rem;color:#6a6a80;cursor:pointer;">'+valid.length+' links</summary><div style="font-size:0.65rem;margin-top:0.3rem;">';
-    for(var ci=0;ci<valid.length;ci++){var cr=valid[ci],pid=cr.parent_id;
-      var ok2=!pid||!!idSet[pid];var ext=pid&&!idSet[pid];if(ok2)chainOk++;if(ext)chainExt++;
-      var col=!pid?'#8898b8':ok2?'#4ade80':'#facc15';
-      html+='<div style="padding:0.1rem 0;display:flex;gap:0.3rem;align-items:center;">';
-      html+='<span style="width:5px;height:5px;border-radius:50%;background:'+col+';"></span>';
-      html+='<span style="color:#8888a0;font-family:monospace;font-size:0.58rem;">'+escapeHtml((cr.identifier||cr._fn||'').slice(-14))+'</span>';
-      html+='<span style="color:'+col+';font-size:0.55rem;">'+(!pid?'genesis':escapeHtml(ok2?'\u2190'+pid.slice(-10):'\u2190'+pid.slice(-10)+' (ext)'))+'</span></div>';}
-    html+='</div></details>';
-    html+='<div style="font-size:0.62rem;color:#8a8a9a;margin-top:0.2rem;"><span style="color:#4ade80;">'+chainOk+' valid</span>'+(chainExt?' <span style="color:#facc15;">'+chainExt+' external</span>':'')+'</div>';
-
-    // Constellation Map. K (constellation cycle length) is derived per
-    // constellation from the records in that constellation: decoder
-    // chunk's total when present, else smallest non-schematic layer K,
-    // else 12 as a final fallback. So a fox K=3 chain reads as "3/3"
-    // and a canonical K=12 chain still reads as "12/12".
-    var conMap={};valid.forEach(function(r2){
-      var cn=r2.constellation_name||'_none';
-      if(!conMap[cn])conMap[cn]={recs:[],heart:null,chunks:new Set(),decoderK:0,smallestLayerK:0};
-      conMap[cn].recs.push(r2);
-      var d2=getChunk(r2,'decoder');
-      var dIdx = d2 ? d2.index : (r2.decoder_chunk_index !== undefined ? r2.decoder_chunk_index : undefined);
-      if(dIdx!==undefined)conMap[cn].chunks.add(dIdx);
-      if(d2 && typeof d2.total === 'number') conMap[cn].decoderK = d2.total;
-      else if(typeof r2.decoder_total_chunks === 'number') conMap[cn].decoderK = r2.decoder_total_chunks;
-      // Smallest non-schematic layer K (fallback for chains with no decoder)
-      var ch2 = r2.chunks && typeof r2.chunks === 'object' ? r2.chunks : null;
-      if (ch2) Object.keys(ch2).forEach(function(role){
-        var ent = ch2[role];
-        if (!ent || typeof ent.total !== 'number' || ent.total <= 0) return;
-        if (role === 'schematic') return;
-        conMap[cn].smallestLayerK = conMap[cn].smallestLayerK === 0
-          ? ent.total : Math.min(conMap[cn].smallestLayerK, ent.total);
-      });
-      if(r2.heart_star_id)conMap[cn].heart=r2.heart_star_id;
-    });
-    var conNames=Object.keys(conMap).filter(function(n){return n!=='_none';});
-    if(conNames.length>0){
-      var GREEK=('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
-               +'\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
-      function _label(i){return i<GREEK.length?GREEK[i]:('c'+i);}
-      html+='<div class="ev-sec">Constellations ('+conNames.length+')</div>';
-      for(var cni=0;cni<conNames.length;cni++){
-        var cn2=conNames[cni],cd=conMap[cn2];
-        var conK = cd.decoderK || cd.smallestLayerK || 12;
-        // Sort by outer_position so the heart star (lowest position in
-        // the K-cycle) lands at index 0 → BAYER[0] = α → gold. Real
-        // production records don't carry constellation_star, and
-        // valid-array sort order doesn't put the heart first by default.
-        cd.recs.sort(function(a, b) {
-          var ap = (a.outer_position != null) ? a.outer_position
-                 : (a._gridPos != null ? a._gridPos
-                 : (typeof a.decoder_chunk_index === 'number' ? a.decoder_chunk_index : 0));
-          var bp = (b.outer_position != null) ? b.outer_position
-                 : (b._gridPos != null ? b._gridPos
-                 : (typeof b.decoder_chunk_index === 'number' ? b.decoder_chunk_index : 0));
-          return ap - bp;
-        });
-        var present = cd.chunks.size || cd.recs.length;
-        var cc = present===conK;
-        html+='<div style="margin:0.3rem 0;padding:0.25rem 0.4rem;background:rgba(60,60,80,0.08);border-left:2px solid '+(cc?'rgba(74,158,74,0.4)':'rgba(180,160,60,0.3)')+';border-radius:3px;">';
-        html+='<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">'+escapeHtml(cn2)+'</span><span style="font-size:0.55rem;color:'+(cc?'#4ade80':'#facc15')+';">'+present+'/'+conK+'</span></div>';
-        html+='<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:0.15rem;">';
-        for(var cri=0;cri<cd.recs.length;cri++){
-          var cr2=cd.recs[cri];
-          var isH=cr2.identifier&&cr2.identifier===cd.heart;
-          // Real Bayer letter = record's position within its K-cycle.
-          // (outer_position % K). Production records may not set
-          // constellation_star; this derives it deterministically.
-          var pos2 = (cr2.outer_position != null) ? cr2.outer_position
-                   : (cr2._gridPos != null ? cr2._gridPos
-                   : (typeof cr2.decoder_chunk_index === 'number' ? cr2.decoder_chunk_index : cri));
-          var letterIdx = ((pos2 % conK) + conK) % conK; // handle negatives
-          var starLetter = cr2.constellation_star || _label(letterIdx);
-          html+='<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:'+(isH?'#d4b87b':'#4a4a60')+';">'+escapeHtml(starLetter)+'</span>';
-        }
-        html+='</div></div>';}}
-
-    // Age — broken out per chain so a mixed-chain drop shows each chain's
-    // age separately. "(consistent)" means all records from THIS chain
-    // agree on one age_name. Records that don't declare an age (custom
-    // chains without a decoder layer) fall back to the chain's display
-    // name with "(no age_name declared)". The chain discriminator
-    // prefix (first 10 chars) tags which chain each line belongs to.
-    var chainAgeMap = {};
-    var chainOrder = [];
-    valid.forEach(function(r2) {
-      var ck = r2._ageKey ? r2._ageKey.split('#')[0] : chainDiscriminator(r2);
-      if (!chainAgeMap[ck]) {
-        chainAgeMap[ck] = { displayName: r2._ageName || '_', ageNames: {} };
-        chainOrder.push(ck);
+    var chainGroups = {};
+    var chainGroupOrder = [];
+    valid.forEach(function(r) {
+      var ck = r._ageKey ? r._ageKey.split('#')[0] : chainDiscriminator(r);
+      if (!chainGroups[ck]) {
+        chainGroups[ck] = { recs: [], displayName: r._ageName || '_' };
+        chainGroupOrder.push(ck);
       }
-      var d2 = getChunk(r2, 'decoder');
-      var an = (d2 && d2.age_name) || r2.decoder_age_name;
-      if (an) chainAgeMap[ck].ageNames[an] = true;
+      chainGroups[ck].recs.push(r);
     });
-    if (chainOrder.length > 0) {
-      html += '<div class="ev-sec">Age</div>';
-      chainOrder.forEach(function(ck) {
-        var info = chainAgeMap[ck];
-        var names = Object.keys(info.ageNames);
-        var color, suffix, label;
-        if (names.length === 0) {
-          color = '#8a8a9a';
-          suffix = ' (no age_name declared)';
-          label = info.displayName === '_' ? 'Age I' : info.displayName;
-        } else if (names.length === 1) {
-          color = '#4ade80';
-          suffix = ' (consistent)';
-          label = names[0];
-        } else {
-          color = '#f87171';
-          suffix = ' (mixed)';
-          label = names.join(', ');
-        }
-        html += '<div style="font-size:0.7rem;color:' + color + ';margin:0.2rem 0;">';
-        if (chainOrder.length > 1) {
-          html += '<span style="color:#8888a0;font-family:monospace;font-size:0.55rem;">' + escapeHtml(ck.slice(0, 14)) + '\u2192</span> ';
-        }
-        html += escapeHtml(label) + '<span style="opacity:0.6">' + suffix + '</span>';
-        html += '</div>';
-      });
-    }
+    var GREEK_PANEL = ('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
+                     + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
+    function _panelLabel(i){return i<GREEK_PANEL.length?GREEK_PANEL[i]:('c'+i);}
 
-    html+='</div></div>';
+    chainGroupOrder.forEach(function(chainKey) {
+      var group = chainGroups[chainKey];
+      var chainRecs = group.recs;
+      var displayName = group.displayName === '_' ? 'Age I' : group.displayName;
+      var chainHeader = chainGroupOrder.length > 1
+        ? 'Chain · ' + chainKey.slice(0, 18) + (chainKey.length > 18 ? '\u2026' : '') + ' · ' + displayName
+        : 'Chain & Constellation';
+      html += '<div class="ev"><div class="ev-h" style="background:rgba(80,80,100,0.06);border-left:3px solid rgba(80,80,100,0.2);"><span class="ev-t">' + escapeHtml(chainHeader) + '</span></div><div class="ev-body">';
+
+      // Parent Chain — only this chain's records
+      var idSet = {}; chainRecs.forEach(function(r){if(r.identifier)idSet[r.identifier]=r;});
+      var chainOk = 0, chainExt = 0;
+      html += '<div class="ev-sec">Parent Chain</div><details><summary style="font-size:0.65rem;color:#6a6a80;cursor:pointer;">' + chainRecs.length + ' links</summary><div style="font-size:0.65rem;margin-top:0.3rem;">';
+      for (var ci = 0; ci < chainRecs.length; ci++) {
+        var cr = chainRecs[ci], pid = cr.parent_id;
+        var ok2 = !pid || !!idSet[pid];
+        var ext = pid && !idSet[pid];
+        if (ok2) chainOk++;
+        if (ext) chainExt++;
+        var col = !pid ? '#8898b8' : ok2 ? '#4ade80' : '#facc15';
+        html += '<div style="padding:0.1rem 0;display:flex;gap:0.3rem;align-items:center;">';
+        html += '<span style="width:5px;height:5px;border-radius:50%;background:' + col + ';"></span>';
+        html += '<span style="color:#8888a0;font-family:monospace;font-size:0.58rem;">' + escapeHtml((cr.identifier || cr._fn || '').slice(-14)) + '</span>';
+        html += '<span style="color:' + col + ';font-size:0.55rem;">' + (!pid ? 'genesis' : escapeHtml(ok2 ? '\u2190' + pid.slice(-10) : '\u2190' + pid.slice(-10) + ' (ext)')) + '</span></div>';
+      }
+      html += '</div></details>';
+      html += '<div style="font-size:0.62rem;color:#8a8a9a;margin-top:0.2rem;"><span style="color:#4ade80;">' + chainOk + ' valid</span>' + (chainExt ? ' <span style="color:#facc15;">' + chainExt + ' external</span>' : '') + '</div>';
+
+      // Constellations — only this chain's
+      var conMap = {};
+      chainRecs.forEach(function(r2) {
+        var cn = r2.constellation_name || '_none';
+        if (!conMap[cn]) conMap[cn] = {recs: [], heart: null, chunks: new Set(), decoderK: 0, smallestLayerK: 0};
+        conMap[cn].recs.push(r2);
+        var d2 = getChunk(r2, 'decoder');
+        var dIdx = d2 ? d2.index : (r2.decoder_chunk_index !== undefined ? r2.decoder_chunk_index : undefined);
+        if (dIdx !== undefined) conMap[cn].chunks.add(dIdx);
+        if (d2 && typeof d2.total === 'number') conMap[cn].decoderK = d2.total;
+        else if (typeof r2.decoder_total_chunks === 'number') conMap[cn].decoderK = r2.decoder_total_chunks;
+        var ch2 = r2.chunks && typeof r2.chunks === 'object' ? r2.chunks : null;
+        if (ch2) Object.keys(ch2).forEach(function(role) {
+          var ent = ch2[role];
+          if (!ent || typeof ent.total !== 'number' || ent.total <= 0) return;
+          if (role === 'schematic') return;
+          conMap[cn].smallestLayerK = conMap[cn].smallestLayerK === 0 ? ent.total : Math.min(conMap[cn].smallestLayerK, ent.total);
+        });
+        if (r2.heart_star_id) conMap[cn].heart = r2.heart_star_id;
+      });
+      var conNames = Object.keys(conMap).filter(function(n){return n !== '_none';});
+      if (conNames.length > 0) {
+        html += '<div class="ev-sec">Constellations (' + conNames.length + ')</div>';
+        for (var cni = 0; cni < conNames.length; cni++) {
+          var cn2 = conNames[cni], cd = conMap[cn2];
+          var conK = cd.decoderK || cd.smallestLayerK || 12;
+          cd.recs.sort(function(a, b) {
+            var ap = (a.outer_position != null) ? a.outer_position
+                   : (a._gridPos != null ? a._gridPos
+                   : (typeof a.decoder_chunk_index === 'number' ? a.decoder_chunk_index : 0));
+            var bp = (b.outer_position != null) ? b.outer_position
+                   : (b._gridPos != null ? b._gridPos
+                   : (typeof b.decoder_chunk_index === 'number' ? b.decoder_chunk_index : 0));
+            return ap - bp;
+          });
+          var present = cd.chunks.size || cd.recs.length;
+          var cc = present === conK;
+          html += '<div style="margin:0.3rem 0;padding:0.25rem 0.4rem;background:rgba(60,60,80,0.08);border-left:2px solid ' + (cc ? 'rgba(74,158,74,0.4)' : 'rgba(180,160,60,0.3)') + ';border-radius:3px;">';
+          html += '<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">' + escapeHtml(cn2) + '</span><span style="font-size:0.55rem;color:' + (cc ? '#4ade80' : '#facc15') + ';">' + present + '/' + conK + '</span></div>';
+          html += '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:0.15rem;">';
+          for (var cri = 0; cri < cd.recs.length; cri++) {
+            var cr2 = cd.recs[cri];
+            var isH = cr2.identifier && cr2.identifier === cd.heart;
+            var pos2 = (cr2.outer_position != null) ? cr2.outer_position
+                     : (cr2._gridPos != null ? cr2._gridPos
+                     : (typeof cr2.decoder_chunk_index === 'number' ? cr2.decoder_chunk_index : cri));
+            var letterIdx = ((pos2 % conK) + conK) % conK;
+            var starLetter = cr2.constellation_star || _panelLabel(letterIdx);
+            html += '<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:' + (isH ? '#d4b87b' : '#4a4a60') + ';">' + escapeHtml(starLetter) + '</span>';
+          }
+          html += '</div></div>';
+        }
+      }
+
+      // Age — single line for this chain
+      var ageNames = {};
+      chainRecs.forEach(function(r2) {
+        var d2 = getChunk(r2, 'decoder');
+        var an = (d2 && d2.age_name) || r2.decoder_age_name;
+        if (an) ageNames[an] = true;
+      });
+      var ageList = Object.keys(ageNames);
+      var ageColor, ageSuffix, ageLabel;
+      if (ageList.length === 0) {
+        ageColor = '#8a8a9a';
+        ageSuffix = ' (no age_name declared)';
+        ageLabel = displayName;
+      } else if (ageList.length === 1) {
+        ageColor = '#4ade80';
+        ageSuffix = ' (consistent)';
+        ageLabel = ageList[0];
+      } else {
+        ageColor = '#f87171';
+        ageSuffix = ' (mixed)';
+        ageLabel = ageList.join(', ');
+      }
+      html += '<div class="ev-sec">Age</div>';
+      html += '<div style="font-size:0.7rem;color:' + ageColor + ';">' + escapeHtml(ageLabel) + '<span style="opacity:0.6">' + ageSuffix + '</span></div>';
+
+      html += '</div></div>'; // close ev-body + ev card
+    });
   }
   // Render into sidebar
   var metaSidebar = document.getElementById('metaSidebarResults');
