@@ -1256,6 +1256,16 @@ function buildOrbitInspector(records, collected) {
     // === Grid ===
     var gridWrap = mk('div', 'orbit-grid');
     var tbl = mk('table', 'orbit-tbl');
+    // For narrow grids (small K_inner), the default ``width: 100%``
+    // stretches each cell to fill the container — three cells eat the
+    // whole row. Constrain to ~36px per cell + label width and center
+    // the table so a small Age renders compact instead of sprawling.
+    if (TOTAL_COLS < 12) {
+      var CELL_PX = 36;
+      var LABEL_PX = 72;
+      tbl.style.width = (LABEL_PX + TOTAL_COLS * CELL_PX) + 'px';
+      tbl.style.margin = '0 auto';
+    }
 
     // Header row
     var hdr = document.createElement('tr');
