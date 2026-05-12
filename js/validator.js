@@ -997,46 +997,37 @@ function buildOrbitInspector(records, collected) {
              + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
   function colLabel(i) { return i < GREEK.length ? GREEK[i] : ('c' + i); }
 
-  // Infer M (outer cycle) and K_inner (constellation cycle) from the
-  // records. M is the max observed extent. K_inner prefers the canonical
-  // decoder layer's K when present (the historical constellation cycle);
-  // for chains without a decoder layer, falls back to the smallest
-  // observed layer K. Defaults to canonical M=365 K=12.
-  var chainM = 0;
-  var decoderK = 0;
-  var smallestLayerK = 0;
-  records.forEach(function(r) {
-    if (typeof r.outer_cycle === 'number') chainM = Math.max(chainM, r.outer_cycle);
-    var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
-    if (ch) Object.keys(ch).forEach(function(role) {
-      var entry = ch[role];
-      if (!entry || typeof entry.total !== 'number') return;
-      chainM = Math.max(chainM, entry.total);
-      // Schematic is a frozen group (dark-day count), not a layer cycle.
-      if (role === 'schematic' || entry.total <= 0) return;
-      if (role === 'decoder') decoderK = entry.total;
-      smallestLayerK = smallestLayerK === 0 ? entry.total : Math.min(smallestLayerK, entry.total);
+  // Per-Age M / K_inner / row-col dimensions are computed inside
+  // render() from that Age's records only. This lets two chains
+  // (e.g. a canonical 365-day Age of Aries and a 3-record fox Age I)
+  // render side-by-side with different grid shapes. ``inferAgeDims``
+  // takes the records for a single Age and returns its derived layout.
+  function inferAgeDims(ageRecs) {
+    var m = 0, decoderK = 0, smallestLayerK = 0;
+    ageRecs.forEach(function(r) {
+      if (typeof r.outer_cycle === 'number') m = Math.max(m, r.outer_cycle);
+      var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
+      if (ch) Object.keys(ch).forEach(function(role) {
+        var entry = ch[role];
+        if (!entry || typeof entry.total !== 'number') return;
+        m = Math.max(m, entry.total);
+        if (role === 'schematic' || entry.total <= 0) return;
+        if (role === 'decoder') decoderK = entry.total;
+        smallestLayerK = smallestLayerK === 0 ? entry.total : Math.min(smallestLayerK, entry.total);
+      });
+      if (!decoderK && typeof r.decoder_total_chunks === 'number') decoderK = r.decoder_total_chunks;
+      if (typeof r.outer_position === 'number') m = Math.max(m, r.outer_position + 1);
+      if (typeof r.truth_chunk_index === 'number' && typeof r.truth_total_chunks === 'number') {
+        m = Math.max(m, r.truth_total_chunks);
+      }
     });
-    // Legacy flat shape: decoder chunk's total under a different key.
-    if (!decoderK && typeof r.decoder_total_chunks === 'number') decoderK = r.decoder_total_chunks;
-    if (typeof r.outer_position === 'number') chainM = Math.max(chainM, r.outer_position + 1);
-    if (typeof r.truth_chunk_index === 'number' && typeof r.truth_total_chunks === 'number') {
-      chainM = Math.max(chainM, r.truth_total_chunks);
-    }
-  });
-  if (!chainM) chainM = 365;
-  // Decoder K wins when observed (canonical constellation = 12). For
-  // pure custom chains (no decoder layer), fall back to smallest layer K.
-  var chainKInner = decoderK || smallestLayerK || 12;
-  // Don't let K_inner exceed M — for a tiny chain (M=3, K=3) the row
-  // is just K_inner=3 long, and that IS one row covering the Age.
-  if (chainKInner > chainM) chainKInner = chainM;
-  var TOTAL_COLS = chainKInner;
-  // Canonical calendar dark days (positions 360-363) + epagomenal day
-  // (364) only apply to M=365 chains. For other Ms, drop those slots.
-  var USE_CALENDAR = (chainM === 365);
-  var TOTAL_ROWS = USE_CALENDAR ? Math.ceil(365 / TOTAL_COLS)
-                                : Math.max(1, Math.ceil(chainM / TOTAL_COLS));
+    if (!m) m = 365;
+    var k = decoderK || smallestLayerK || 12;
+    if (k > m) k = m;
+    var useCalendar = (m === 365);
+    var rows = useCalendar ? Math.ceil(365 / k) : Math.max(1, Math.ceil(m / k));
+    return { M: m, K: k, COLS: k, ROWS: rows, USE_CALENDAR: useCalendar };
+  }
 
   // Group by age. Position on the 365-grid prefers an explicit
   // outer_position (set by minters that want a canonical position),
@@ -1098,6 +1089,16 @@ function buildOrbitInspector(records, collected) {
   function render() {
     el.innerHTML = '';
     var ad = ages[curAge];
+
+    // Per-Age dimensions — each Age in the inspector renders with its
+    // own grid shape, so a fox-only Age I (3×1) can sit beside a
+    // canonical Age of Aries (12×31) without one bleeding into the other.
+    var dims = inferAgeDims(ad.recs);
+    var chainM = dims.M;
+    var chainKInner = dims.K;
+    var TOTAL_COLS = dims.COLS;
+    var TOTAL_ROWS = dims.ROWS;
+    var USE_CALENDAR = dims.USE_CALENDAR;
 
     // Row → constellation name map (uses cached _gridPos from above)
     var rowCon = {}, rowHeart = {};
