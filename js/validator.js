@@ -1064,6 +1064,19 @@ async function analyzeMeta(files){
       for(var cni=0;cni<conNames.length;cni++){
         var cn2=conNames[cni],cd=conMap[cn2];
         var conK = cd.decoderK || cd.smallestLayerK || 12;
+        // Sort by outer_position so the heart star (lowest position in
+        // the K-cycle) lands at index 0 → BAYER[0] = α → gold. Real
+        // production records don't carry constellation_star, and
+        // valid-array sort order doesn't put the heart first by default.
+        cd.recs.sort(function(a, b) {
+          var ap = (a.outer_position != null) ? a.outer_position
+                 : (a._gridPos != null ? a._gridPos
+                 : (typeof a.decoder_chunk_index === 'number' ? a.decoder_chunk_index : 0));
+          var bp = (b.outer_position != null) ? b.outer_position
+                 : (b._gridPos != null ? b._gridPos
+                 : (typeof b.decoder_chunk_index === 'number' ? b.decoder_chunk_index : 0));
+          return ap - bp;
+        });
         var present = cd.chunks.size || cd.recs.length;
         var cc = present===conK;
         html+='<div style="margin:0.3rem 0;padding:0.25rem 0.4rem;background:rgba(60,60,80,0.08);border-left:2px solid '+(cc?'rgba(74,158,74,0.4)':'rgba(180,160,60,0.3)')+';border-radius:3px;">';
