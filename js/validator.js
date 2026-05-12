@@ -687,19 +687,33 @@ async function analyzeMeta(files){
         }
       });
     }
-    // Legacy flat-shape fallback for older records that predate the
-    // nested chunks dict — only easter_egg is observed in the wild.
-    if (!chDict || !chDict.easter_egg) {
-      if (cr.easter_egg && cr.easter_egg_chunk) {
-        collected.single.easter_egg = {
-          text: cr.easter_egg_text || cr.easter_egg_chunk || '',
-          image: cr.easter_egg_image || null,
-          data: cr.easter_egg_chunk || cr.easter_egg_text || '',
-          hash: cr.easter_egg_hash || null,
+    // Legacy flat-shape fallback. Older records (pre-nested-chunks)
+    // store chunk data at top-level keys: decoder_chunk, decoder_chunk_index,
+    // truth_chunk, etc. The getChunk() helper normalizes those into the
+    // nested shape on demand. Probe each canonical role here so records
+    // that lived through that earlier schema still surface in the auto-
+    // adapt UI.
+    var CANONICAL_PROBE = ['decoder', 'truth', 'proof', 'schematic', 'claim', 'easter_egg'];
+    CANONICAL_PROBE.forEach(function(role) {
+      if (chDict && chDict[role]) return; // already collected above
+      var entry = getChunk(cr, role);
+      if (!entry || entry.data === undefined) return;
+      if (entry.index !== undefined && entry.total !== undefined) {
+        if (!collected.indexed[role]) {
+          collected.indexed[role] = { total: entry.total, chunks: {} };
+        }
+        collected.indexed[role].total = entry.total;
+        collected.indexed[role].chunks[entry.index] = {
+          data: entry.data, hash: entry.hash || null, verified: null,
+        };
+      } else {
+        collected.single[role] = {
+          data: entry.data, hash: entry.hash || null,
+          text: entry.text || null, image: entry.image || null,
           verified: null,
         };
       }
-    }
+    });
   }
   // Verify chunk hashes asynchronously. Walk every collected role.
   for (var ir in collected.indexed) {
@@ -1155,11 +1169,18 @@ function buildOrbitInspector(records, collected) {
     // filter option with the role's display label.
     var observedRoles = {};
     var hasEpagPos = false;
+    var CANONICAL_PROBE = ['decoder', 'truth', 'proof', 'schematic', 'claim', 'easter_egg'];
     ad.recs.forEach(function(r) {
       if (r._gridPos != null && r._gridPos >= 360 && r._gridPos <= 364) hasEpagPos = true;
+      // Walk nested chunks dict (new shape).
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
-      if (!ch) return;
-      Object.keys(ch).forEach(function(role) { observedRoles[role] = true; });
+      if (ch) Object.keys(ch).forEach(function(role) { observedRoles[role] = true; });
+      // Probe canonical names via getChunk (handles flat-shape legacy
+      // records too) so old samples surface decoder/truth/proof filters.
+      CANONICAL_PROBE.forEach(function(role) {
+        if (observedRoles[role]) return;
+        if (getChunk(r, role)) observedRoles[role] = true;
+      });
     });
     // Canonical role → filter key mapping. Determines whether the
     // canonical filter option appears in the dropdown.
@@ -1352,19 +1373,30 @@ function buildOrbitInspector(records, collected) {
     var stats = mk('div', 'orbit-stats');
     var ageIndexed = {};  // role → {total, indices: Set}
     var ageSingle  = {};  // role → true
+    var CANONICAL_STATS_PROBE = ['decoder', 'truth', 'proof', 'schematic', 'claim', 'easter_egg'];
+    function bucketEntry(role, entry) {
+      if (!entry || entry.data === undefined) return;
+      if (entry.index !== undefined && entry.total !== undefined) {
+        if (!ageIndexed[role]) ageIndexed[role] = { total: entry.total, indices: {} };
+        ageIndexed[role].total = entry.total;
+        ageIndexed[role].indices[entry.index] = true;
+      } else {
+        ageSingle[role] = true;
+      }
+    }
     ad.recs.forEach(function(r) {
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
-      if (!ch) return;
-      Object.keys(ch).forEach(function(role) {
-        var entry = ch[role];
-        if (!entry || entry.data === undefined) return;
-        if (entry.index !== undefined && entry.total !== undefined) {
-          if (!ageIndexed[role]) ageIndexed[role] = { total: entry.total, indices: {} };
-          ageIndexed[role].total = entry.total;
-          ageIndexed[role].indices[entry.index] = true;
-        } else {
-          ageSingle[role] = true;
-        }
+      var seen = {};
+      if (ch) {
+        Object.keys(ch).forEach(function(role) {
+          seen[role] = true;
+          bucketEntry(role, ch[role]);
+        });
+      }
+      // Probe canonical names via getChunk for legacy flat-shape records.
+      CANONICAL_STATS_PROBE.forEach(function(role) {
+        if (seen[role]) return;
+        bucketEntry(role, getChunk(r, role));
       });
     });
     stats.innerHTML =
