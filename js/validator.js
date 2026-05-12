@@ -512,14 +512,61 @@ var ROLE_META = {
 
 function roleMeta(role) {
   if (ROLE_META[role]) return ROLE_META[role];
-  // Generic fallback: title-case the role name, generic color, binary
-  // download. Lets a chain emit any role and have it show up.
+  // Generic fallback: title-case the role name, derive a stable color
+  // from the role name itself (so every custom layer gets its own
+  // distinct color across sessions), binary download.
   return {
     label: role.replace(/[-_]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();}),
-    color: 'truth',
+    color: role,
     mime: 'application/octet-stream',
     filename: role + '.bin',
   };
+}
+
+// Shared palette + deterministic per-role color resolver. Canonical
+// roles + filter keys map to the curated palette; everything else gets
+// a hue hashed from the role/filter name. Same name → same color across
+// sessions, so a chain author can trust their layer's color to be stable.
+var ROLE_COLORS = {
+  all:        '255,255,255',
+  decoder:    '123,196,160',
+  truth:      '136,152,184',
+  proof:      '184,152,216',
+  epag:       '212,184,123',
+  egg:        '196,123,187',
+  // Canonical role names that happen to color via different filter keys.
+  schematic:  '212,184,123',
+  claim:      '212,184,123',
+  easter_egg: '196,123,187',
+};
+
+function getRoleColor(name) {
+  if (ROLE_COLORS[name]) return ROLE_COLORS[name];
+  if (!name) return '255,255,255';
+  // Deterministic hash → hue. Keeps S/L in a band that reads well on
+  // both yang and yin backgrounds.
+  var h = 0;
+  for (var i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0;
+  var hue = h % 360;
+  // Nudge away from the canonical hues so custom roles look distinct
+  // from decoder (green ~140), truth (blue ~220), proof (purple ~270),
+  // epag (gold ~45), egg (pink ~315). Skip ±15° around each.
+  var skip = [140, 220, 270, 45, 315];
+  for (var k = 0; k < skip.length; k++) {
+    if (Math.abs(hue - skip[k]) < 15) { hue = (hue + 30) % 360; }
+  }
+  var s = 0.45, l = 0.62;
+  var c = (1 - Math.abs(2 * l - 1)) * s;
+  var x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+  var m = l - c / 2;
+  var r1, g1, b1;
+  if (hue < 60)       { r1 = c; g1 = x; b1 = 0; }
+  else if (hue < 120) { r1 = x; g1 = c; b1 = 0; }
+  else if (hue < 180) { r1 = 0; g1 = c; b1 = x; }
+  else if (hue < 240) { r1 = 0; g1 = x; b1 = c; }
+  else if (hue < 300) { r1 = x; g1 = 0; b1 = c; }
+  else                { r1 = c; g1 = 0; b1 = x; }
+  return Math.round((r1 + m) * 255) + ',' + Math.round((g1 + m) * 255) + ',' + Math.round((b1 + m) * 255);
 }
 
 function sortRoles(roles) {
@@ -1398,8 +1445,7 @@ function buildOrbitInspector(records, collected) {
               // Re-apply filter to restore all cells (cadence borders, colors)
               sel.onchange();
               // Apply focus with filter-colored glow on top
-              var FC = {all:'255,255,255', decoder:'123,196,160', truth:'136,152,184', proof:'184,152,216', epag:'212,184,123', egg:'196,123,187'};
-              var fc = FC[curFilter] || FC.all;
+              var fc = getRoleColor(curFilter);
               cellEl.classList.add('focused');
               cellEl.style.background = 'rgba(' + fc + ',0.65)';
               cellEl.style.borderColor = 'rgba(' + fc + ',0.9)';
@@ -1496,12 +1542,13 @@ function buildOrbitInspector(records, collected) {
     }) || singleRoles.length > 0;
     if (hasComplete) {
       var ra = mk('div', 'orbit-assembly');
-      // Filter colors: decoder=green, truth=blue, proof=purple, epag=gold, egg=pink
-      var FC = {decoder:'123,196,160', truth:'136,152,184', proof:'184,152,216', epag:'212,184,123', egg:'196,123,187'};
+      // Filter colors come from getRoleColor(): canonical role/filter
+      // names map to the curated palette, anything else gets a stable
+      // hue hashed from the role name itself.
       function dlBtnColored(label, color, onclick) {
         var b = mk('button', 'orbit-vbtn');
         b.textContent = '\u2913 ' + label;
-        var c = FC[color] || '255,255,255';
+        var c = getRoleColor(color);
         b.style.borderColor = 'rgba(' + c + ',0.4)';
         b.style.color = 'rgb(' + c + ')';
         b.style.background = 'rgba(' + c + ',0.08)';
@@ -1669,10 +1716,9 @@ function buildOrbitInspector(records, collected) {
       // Update sector collapse for filter-aware rows
       fog();
       // Re-color focused cell glow to match new filter
-      var FC = {all:'255,255,255', decoder:'123,196,160', truth:'136,152,184', proof:'184,152,216', epag:'212,184,123', egg:'196,123,187'};
       var focusedEl = tbl.querySelector('.orbit-c.focused');
       if (focusedEl) {
-        var fc = FC[curFilter] || FC.all;
+        var fc = getRoleColor(curFilter);
         focusedEl.style.background = 'rgba(' + fc + ',0.65)';
         focusedEl.style.borderColor = 'rgba(' + fc + ',0.9)';
         focusedEl.style.boxShadow = '0 0 10px rgba(' + fc + ',0.5), 0 0 3px rgba(' + fc + ',0.8)';
@@ -1755,8 +1801,7 @@ function buildOrbitInspector(records, collected) {
     function restoreFocus() {
       var f = tbl.querySelector('.orbit-c.focused');
       if (!f) return;
-      var FC = {all:'255,255,255', decoder:'123,196,160', truth:'136,152,184', proof:'184,152,216', epag:'212,184,123', egg:'196,123,187'};
-      var fc = FC[curFilter] || FC.all;
+      var fc = getRoleColor(curFilter);
       f.style.background = 'rgba(' + fc + ',0.65)';
       f.style.borderColor = 'rgba(' + fc + ',0.9)';
       f.style.boxShadow = '0 0 10px rgba(' + fc + ',0.5), 0 0 3px rgba(' + fc + ',0.8)';
