@@ -997,34 +997,37 @@ function buildOrbitInspector(records, collected) {
              + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
   function colLabel(i) { return i < GREEK.length ? GREEK[i] : ('c' + i); }
 
-  // Infer the chain's outer-cycle length (M) and the "constellation"
-  // cycle length (the smallest layer K — naturally groups records into
-  // rows on the grid). Both come from the records: explicit fields
-  // first, then chunk totals + observed positions as fallbacks. Defaults
-  // to canonical M=365 K=12 so a stock chain renders exactly as before.
+  // Infer M (outer cycle) and K_inner (constellation cycle) from the
+  // records. M is the max observed extent. K_inner prefers the canonical
+  // decoder layer's K when present (the historical constellation cycle);
+  // for chains without a decoder layer, falls back to the smallest
+  // observed layer K. Defaults to canonical M=365 K=12.
   var chainM = 0;
-  var chainKInner = 0;
+  var decoderK = 0;
+  var smallestLayerK = 0;
   records.forEach(function(r) {
     if (typeof r.outer_cycle === 'number') chainM = Math.max(chainM, r.outer_cycle);
     var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
     if (ch) Object.keys(ch).forEach(function(role) {
       var entry = ch[role];
-      if (entry && typeof entry.total === 'number') {
-        chainM = Math.max(chainM, entry.total);
-        // Schematic is a frozen group (count of dark-day slots), not a
-        // layer cycle — don't let it shrink chainKInner.
-        if (role !== 'schematic' && entry.total > 0) {
-          chainKInner = chainKInner === 0 ? entry.total : Math.min(chainKInner, entry.total);
-        }
-      }
+      if (!entry || typeof entry.total !== 'number') return;
+      chainM = Math.max(chainM, entry.total);
+      // Schematic is a frozen group (dark-day count), not a layer cycle.
+      if (role === 'schematic' || entry.total <= 0) return;
+      if (role === 'decoder') decoderK = entry.total;
+      smallestLayerK = smallestLayerK === 0 ? entry.total : Math.min(smallestLayerK, entry.total);
     });
+    // Legacy flat shape: decoder chunk's total under a different key.
+    if (!decoderK && typeof r.decoder_total_chunks === 'number') decoderK = r.decoder_total_chunks;
     if (typeof r.outer_position === 'number') chainM = Math.max(chainM, r.outer_position + 1);
     if (typeof r.truth_chunk_index === 'number' && typeof r.truth_total_chunks === 'number') {
       chainM = Math.max(chainM, r.truth_total_chunks);
     }
   });
   if (!chainM) chainM = 365;
-  if (!chainKInner) chainKInner = 12;
+  // Decoder K wins when observed (canonical constellation = 12). For
+  // pure custom chains (no decoder layer), fall back to smallest layer K.
+  var chainKInner = decoderK || smallestLayerK || 12;
   // Don't let K_inner exceed M — for a tiny chain (M=3, K=3) the row
   // is just K_inner=3 long, and that IS one row covering the Age.
   if (chainKInner > chainM) chainKInner = chainM;
