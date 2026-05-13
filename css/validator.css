@@ -393,12 +393,18 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 .ev-h.bar-only { background: rgba(180,160,60,0.06); border-left: 3px solid rgba(180,160,60,0.4); }
 .ev-h.wm-only { background: rgba(74,120,190,0.06); border-left: 3px solid rgba(74,120,190,0.4); }
 .ev-h.lost { background: rgba(180,60,60,0.06); border-left: 3px solid rgba(180,60,60,0.4); }
+/* Sealed state — dark_matter record with ciphertext still in place.
+   Distinct warm-tan from bar-only (yellow) so "we can't verify yet"
+   reads differently from "no stored hash" or "mismatch". */
+.ev-h.sealed { background: rgba(200,176,128,0.06); border-left: 3px solid rgba(200,176,128,0.4); }
 .ev-t { font-size: 0.8rem; color: #b0b0b8; }
 .ev-b { font-size: 0.72rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600; }
 .ev-b.both { background: rgba(74,158,74,0.12); color: #4ade80; }
 .ev-b.bar-only { background: rgba(180,160,60,0.1); color: #facc15; }
 .ev-b.wm-only { background: rgba(74,120,190,0.1); color: #60a5fa; }
 .ev-b.lost { background: rgba(180,60,60,0.1); color: #f87171; }
+.ev-b.sealed { background: rgba(200,176,128,0.12); color: #c8b080; }
+.ev-mv.sealed { color: #c8b080; }
 .ev-body { padding: 0.8rem 1rem; }
 .ev-sec { font-size: 0.68rem; color: #808088; text-transform: uppercase; letter-spacing: 0.1em; margin: 0.8rem 0 0.3rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); }
 .ev-sec:first-child { border: none; margin-top: 0; padding-top: 0; }
@@ -606,10 +612,12 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 }
 
 /* Orbit Inspector — unified cosmic chain + cycle map
-   Yin palette: warm dark grays matching the .input-section plate */
+   Yin palette: warm dark grays matching the .input-section plate.
+   Pinned at the top of metaSidebarResults via flex layout (not
+   position:sticky) so the .meta-body scrollbar sits visually below
+   the carousel, not alongside it. */
 #orbitInspector {
-  position: sticky;
-  top: 0;
+  flex: 0 0 auto;
   z-index: 50;
   background: rgba(34,34,38,0.97);
   backdrop-filter: blur(12px);
@@ -694,6 +702,7 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 .orbit-stats span { display:flex; align-items:center; gap:0.15rem; }
 .orbit-stats .pass { color:#4ade80; }
 .orbit-stats .warn { color:#facc15; }
+.orbit-stats .sealed { color:#c8b080; }
 
 .orbit-assembly {
   display:flex; gap:0.4rem; justify-content:center; align-items:center;
@@ -722,6 +731,45 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
   -ms-overflow-style: none;
 }
 .panel-layout.layout-active .panel-left::-webkit-scrollbar { display: none; }
+
+/* Observatory split-scroll layout:
+   When a .soul drop renders the orbit inspector, the carousel + grid
+   + stats stay pinned at the top of the panel and a thin yin
+   scrollbar lives on the body content (records + chain panels) beneath.
+   Without this the panel scrollbar runs the full panel height, which
+   reads as "page scroll" rather than "content beneath the carousel
+   scrolls". The :has() selector scopes this to Observatory mode only —
+   Image / Audit tabs keep their original full-panel scroll behavior. */
+.panel-layout.layout-active .results-wrap:has(#orbitInspector:not(:empty)) {
+  overflow: hidden;
+}
+.panel-layout.layout-active .results-wrap:has(#orbitInspector:not(:empty)) #metaSidebarResults {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+#metaSidebarResults > .meta-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200,176,128,0.3) transparent;
+  -ms-overflow-style: auto;
+}
+#metaSidebarResults > .meta-body::-webkit-scrollbar {
+  width: 8px;
+}
+#metaSidebarResults > .meta-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+#metaSidebarResults > .meta-body::-webkit-scrollbar-thumb {
+  background: rgba(200,176,128,0.25);
+  border-radius: 4px;
+}
+#metaSidebarResults > .meta-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(200,176,128,0.5);
+}
 /* Sample cert (attack lab) sits at a fixed 720px inside this wrap, so
    the dark yin frame otherwise reads as a 1-2px black outline around
    the plate rim. Drop bg + border for the sample state so the plate

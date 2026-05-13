@@ -671,6 +671,48 @@ function sniffBinaryType(bytes) {
 
 // HASH_INCLUDED, sortKeysDeep, sha256_16 — loaded from js/verify.js
 
+// Dark Matter unlock state.
+//
+// Parsed records get cached here so the user can enter a chain password
+// after the initial drop — we re-run the render pipeline against the
+// cached records with passwords applied, instead of asking them to re-drop.
+//
+// _chainPasswords is keyed by chainDiscriminator(record) so a mixed drop
+// containing two independently-locked dark matter chains can be unlocked
+// one at a time. Passwords are kept only in memory (closing the tab
+// forgets them — mirrors decoder GPS unlock).
+var _observatoryCache = [];
+var _chainPasswords = {};
+
+// Attempt to decrypt a dark_matter record using a stored chain password.
+// Returns a new record with plaintext fields merged back, or the original
+// if no password is stored or decryption fails. Does not mutate the
+// caller's record — the cache stays the encrypted ciphertext shell.
+async function maybeUnlockRecord(record) {
+  if (!record || record.chain_visibility !== 'dark_matter') return record;
+  var key = chainDiscriminator(record);
+  var pw = _chainPasswords[key];
+  if (!pw || typeof Access === 'undefined') return record;
+  var unlocked = Object.assign({}, record);
+  var anyOk = false;
+  if (record.encrypted_soul) {
+    var soulRes = await Access.decryptSoul(record.encrypted_soul, pw);
+    if (soulRes.ok && soulRes.soul) {
+      Object.keys(soulRes.soul).forEach(function(k) { unlocked[k] = soulRes.soul[k]; });
+      anyOk = true;
+    }
+  }
+  if (record.encrypted_chunks) {
+    var chunksRes = await Access.decryptChunks(record.encrypted_chunks, pw);
+    if (chunksRes.ok && chunksRes.chunks) {
+      unlocked.chunks = chunksRes.chunks;
+      anyOk = true;
+    }
+  }
+  if (anyOk) unlocked._unlocked = true;
+  return unlocked;
+}
+
 async function analyzeMeta(files){
   // Render Observatory results in the sidebar, not inline
   clearOtherResults('meta');
@@ -695,6 +737,19 @@ async function analyzeMeta(files){
     // identifier locally without a network trip.
     if (m && m.identifier) OfflineRecords.add(m, m._fn);
   }catch(e){recs.push({_fn:toSoulName(files[i].name),_err:e.message});}}
+  // Cache for re-render after Dark Matter unlock.
+  _observatoryCache = recs;
+  _chainPasswords = {};
+  await _renderObservatoryFromCache();
+}
+
+// Re-render the Observatory from the cached parse, applying any chain
+// passwords entered since the initial drop. Split out so the "Unlock"
+// button handler can call it without re-reading files.
+async function _renderObservatoryFromCache() {
+  var recs = _observatoryCache;
+  var metaSidebar = document.getElementById('metaSidebarResults');
+  var metaErr = document.getElementById('metaError');
 
   var valid=recs.filter(function(r){return !r._err;});
   // Error rule: if nothing parsed, show the failure inline and leave
@@ -724,16 +779,62 @@ async function analyzeMeta(files){
     _seenIds[id] = true;
     return true;
   });
-  // Stamp every record with its (chain, age) key BEFORE building row
-  // HTML so data-age-key matches the curAge filterRecords compares against.
+  // Stamp every record with its (chain, age) key BEFORE attempting
+  // unlock — maybeUnlockRecord keys passwords by chainDiscriminator,
+  // which assignAgeKey computes once and caches on the record.
   valid.forEach(assignAgeKey);
+
+  // Apply any chain passwords entered since the initial drop. For each
+  // dark_matter record whose chain has a stored password we replace the
+  // entry in `valid` with a copy that has plaintext fields merged back
+  // (encrypted_soul → soul fields; encrypted_chunks → chunks dict).
+  // _observatoryCache stays the original ciphertext shell so a wrong
+  // password can be retried without re-dropping.
+  for (var ui = 0; ui < valid.length; ui++) {
+    valid[ui] = await maybeUnlockRecord(valid[ui]);
+  }
+
+  // Propagate age_name across each chain. Dark-day / epagomenal /
+  // frozen-only records carry no decoder chunk and therefore no
+  // age_name in assignAgeKey's first pass — they'd otherwise form
+  // their own "Age I" tab and sort ahead of "Age of Aries" records.
+  // Adopt the age_name from any chain peer that has one so the whole
+  // chain renders as a single Age.
+  var _chainAgeNames = {};
+  valid.forEach(function(r) {
+    if (r._ageName && r._ageName !== '_') {
+      var ck = chainDiscriminator(r);
+      _chainAgeNames[ck] = r._ageName;
+    }
+  });
+  valid.forEach(function(r) {
+    if (r._ageName === '_') {
+      var ck = chainDiscriminator(r);
+      if (_chainAgeNames[ck]) {
+        r._ageName = _chainAgeNames[ck];
+        r._ageKey = ck + '#' + r._ageName;
+      }
+    }
+  });
+
   valid.sort(function(a,b){
-    var ad=getChunk(a,'decoder')||{}, bd=getChunk(b,'decoder')||{};
-    var aa=ad.age||ad.age_name||'', ba=bd.age||bd.age_name||'';
-    if(aa!==ba)return aa<ba?-1:1;
+    // Group by chain first (preserves multi-chain isolation in mixed drops).
+    var ack = a._ageKey ? a._ageKey.split('#')[0] : '';
+    var bck = b._ageKey ? b._ageKey.split('#')[0] : '';
+    if (ack !== bck) return ack < bck ? -1 : 1;
+    // Within a chain: outer_position is the canonical record order.
+    // Universal across canonical (with decoder) and frozen-only records,
+    // so dark days T360-T364 render between T359 and the next age, not
+    // ahead of T0.
+    var ap = (a.outer_position != null) ? a.outer_position : Infinity;
+    var bp = (b.outer_position != null) ? b.outer_position : Infinity;
+    if (ap !== bp) return ap - bp;
+    // Last-resort fallback for records without outer_position: truth
+    // or decoder chunk index, then identifier.
     var at=getChunk(a,'truth')||{}, bt=getChunk(b,'truth')||{};
     var ai=at.index!=null?at.index:0, bi=bt.index!=null?bt.index:0;
-    return ai-bi;
+    if (ai !== bi) return ai - bi;
+    return (a.identifier || '') < (b.identifier || '') ? -1 : 1;
   });
 
   // Compute hashes for all valid records
@@ -742,6 +843,14 @@ async function analyzeMeta(files){
     var hashable={};Object.keys(r).filter(function(k){return HASH_INCLUDED.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
     try{r._computed=await sha256_16(hashable);}catch(e){r._computed=null;}
     r._match=stored&&r._computed&&stored===r._computed;
+    // Sealed = dark_matter record where soul/chunks ciphertext is still
+    // present and we haven't unlocked it. A plain hash mismatch on a
+    // sealed record is expected (the stored hash covers plaintext we
+    // can't see) — flag it separately so the UI can distinguish
+    // "we can't tell" from "we verified tampering".
+    r._sealed = r.chain_visibility === 'dark_matter'
+                && !r._unlocked
+                && (!!r.encrypted_soul || !!r.encrypted_chunks);
   }
 
   // Accumulate chunks from these records — generic walk over each record's
@@ -821,7 +930,13 @@ async function analyzeMeta(files){
   _gpsRecords=valid;
 
   // === Orbit Inspector placeholder (built after innerHTML set) ===
+  // The orbit inspector lives OUTSIDE the scrollable body so the
+  // carousel + grid + filter row stay pinned at the top of the panel
+  // and only the records + chain panels beneath scroll. CSS turns
+  // metaSidebarResults into a flex column when the inspector is
+  // populated.
   html+='<div id="orbitInspector"></div>';
+  html+='<div class="meta-body">';
 
   // === Compact record table — one row per record, click to expand ===
   html+='<div class="ev"><div class="ev-h" style="background:rgba(80,80,100,0.08);border-left:3px solid rgba(80,80,100,0.3);"><span class="ev-t">Records ('+recs.length+')</span><span style="font-size:0.6rem;color:#8a8a9a;">click row to expand</span></div><div class="ev-body" style="padding:0;">';
@@ -833,8 +948,11 @@ async function analyzeMeta(files){
   // Valid record rows
   for(var ri=0;ri<valid.length;ri++){
     var r=valid[ri];
-    var rBadgeCol=r._match?'#4ade80':r.content_hash?'#f87171':'#4a4a60';
-    var rBadge=r._match?'\u2713':r.content_hash?'\u2717':'\u2014';
+    var rBadgeCol=r._sealed?'#c8b080':r._match?'#4ade80':r.content_hash?'#f87171':'#4a4a60';
+    // Sealed records get a small lock glyph (U+1F512 + VS-15 to coax
+    // text-style rendering on platforms that default to color emoji),
+    // keeping the badge column visually homogeneous with ✓ / ✗ / —.
+    var rBadge=r._sealed?'\uD83D\uDD12\uFE0E':r._match?'\u2713':r.content_hash?'\u2717':'\u2014';
     // Pull chunk metadata once via the shared helper (handles both
     // nested + legacy flat shapes; see portal.js getChunk).
     var rDec = getChunk(r,'decoder');
@@ -868,8 +986,13 @@ async function analyzeMeta(files){
     var hashable={};Object.keys(r).filter(function(k){return HASH_INCLUDED.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
     var computed=null;try{computed=await sha256_16(hashable);}catch(e){}
     var match=stored&&computed&&stored===computed;
-    var cls=match?'both':stored?'lost':'bar-only';
-    var badge=match?'Verified':stored?'Hash Mismatch':'No Hash';
+    var sealed=r._sealed;
+    // Sealed wins over hash state: a dark_matter shell never matches the
+    // plaintext hash, so the "may be modified" verdict would be both
+    // technically correct and badly misleading. Sealed gets its own
+    // class + badge; the hash state is re-evaluated post-unlock.
+    var cls=sealed?'sealed':match?'both':stored?'lost':'bar-only';
+    var badge=sealed?'Sealed':match?'Verified':stored?'Hash Mismatch':'No Hash';
 
     html+='<div class="ev"><div class="ev-h '+cls+'"><span class="ev-t">'+_h(r._fn)+'</span><span class="ev-b '+cls+'">'+badge+'</span></div><div class="ev-body">';
 
@@ -885,9 +1008,12 @@ async function analyzeMeta(files){
 
     // Hash verification
     html+='<div class="ev-sec">Content Hash</div><div class="ev-g">';
-    html+='<div class="ev-m"><div class="ev-ml">Stored</div><div class="ev-mv '+(match?'pass':stored?'fail':'')+'">'+_h(stored||'none')+'</div></div>';
-    html+='<div class="ev-m"><div class="ev-ml">Computed</div><div class="ev-mv '+(match?'pass':computed?'fail':'')+'">'+_h(computed||'unavailable')+'</div></div>';
-    html+='<div class="ev-m w"><div class="ev-ml">Verdict</div><div class="ev-mv '+(match?'pass':'fail')+'">'+(match?'Untampered \u2014 hashes match':stored&&computed?'MISMATCH \u2014 record may be modified':'Cannot verify')+'</div></div>';
+    // When sealed, neutralize the red Stored/Computed coloring — the
+    // mismatch is expected, not evidence of tampering.
+    var hashCellCls=sealed?'sealed':match?'pass':'fail';
+    html+='<div class="ev-m"><div class="ev-ml">Stored</div><div class="ev-mv '+(sealed?'sealed':match?'pass':stored?'fail':'')+'">'+_h(stored||'none')+'</div></div>';
+    html+='<div class="ev-m"><div class="ev-ml">Computed</div><div class="ev-mv '+(sealed?'sealed':match?'pass':computed?'fail':'')+'">'+_h(computed||'unavailable')+'</div></div>';
+    html+='<div class="ev-m w"><div class="ev-ml">Verdict</div><div class="ev-mv '+(sealed?'sealed':match?'pass':'fail')+'">'+(sealed?'SEALED \u2014 unlock to verify':match?'Untampered \u2014 hashes match':stored&&computed?'MISMATCH \u2014 record may be modified':'Cannot verify')+'</div></div>';
     html+='</div>';
 
     // Field audit
@@ -1043,12 +1169,81 @@ async function analyzeMeta(files){
         : 'Chain & Constellation';
       html += '<div class="ev"><div class="ev-h" style="background:rgba(80,80,100,0.06);border-left:3px solid rgba(80,80,100,0.2);"><span class="ev-t">' + escapeHtml(chainHeader) + '</span></div><div class="ev-body">';
 
-      // Parent Chain — only this chain's records
+      // Dark Matter unlock — appears only when this chain's records are
+      // password-gated. Already-unlocked chains (records carry _unlocked
+      // after a successful decrypt) show a "Locked" → "Unlocked" pill
+      // instead of the input, so the section doesn't reset between
+      // re-renders. Input value isn't persisted across re-renders; the
+      // password lives in the in-memory _chainPasswords map.
+      var anyDark = chainRecs.some(function(r) { return r.chain_visibility === 'dark_matter'; });
+      if (anyDark) {
+        var unlocked = chainRecs.every(function(r) { return r._unlocked || r.chain_visibility !== 'dark_matter'; });
+        html += '<div class="ev-sec">Dark Matter</div>';
+        if (unlocked) {
+          html += '<div style="display:flex;gap:0.4rem;align-items:center;font-size:0.65rem;color:#c8b080;">'
+               +  '<span style="padding:0.1rem 0.4rem;border-radius:3px;background:rgba(200,176,128,0.12);border:1px solid rgba(200,176,128,0.3);">\u00b7 unlocked \u00b7</span>'
+               +  '<span style="color:#6a6a80;">soul + chunks decrypted in-memory</span>'
+               +  '</div>';
+        } else {
+          var inputId = 'dm-pw-' + chainKey.replace(/[^a-z0-9]/gi, '');
+          var errId = inputId + '-err';
+          html += '<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">This chain is sealed. Enter the creator\u2019s password to decrypt soul + chunks locally.</div>';
+          html += '<div style="display:flex;gap:0.3rem;align-items:center;">';
+          html += '<input id="' + inputId + '" type="password" placeholder="password" style="flex:1;font-family:inherit;font-size:0.7rem;padding:0.25rem 0.4rem;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);border-radius:3px;color:#d0d0d8;outline:none;" />';
+          html += '<button data-dm-chain="' + escapeHtml(chainKey) + '" data-dm-input="' + inputId + '" data-dm-err="' + errId + '" class="dm-unlock-btn" style="font-family:inherit;font-size:0.62rem;padding:0.25rem 0.6rem;background:rgba(200,176,128,0.12);border:1px solid rgba(200,176,128,0.3);border-radius:3px;color:#c8b080;cursor:pointer;letter-spacing:0.05em;">Unlock</button>';
+          html += '</div>';
+          html += '<div id="' + errId + '" style="font-size:0.6rem;color:#f87171;margin-top:0.25rem;min-height:0.7rem;"></div>';
+        }
+      }
+
+      // Parent Chain — walk the parent_id graph so records render in
+      // genesis → descendants order. Each "root" (genesis, or a record
+      // whose parent is external to this drop) starts its own contiguous
+      // run of descendants. Without this the list ordering depends on
+      // the input file iteration which reads as random.
       var idSet = {}; chainRecs.forEach(function(r){if(r.identifier)idSet[r.identifier]=r;});
+      var childrenOf = {};  // parent_id → [records whose parent_id matches]
+      var roots = [];       // records with no parent_id OR external parent_id
+      chainRecs.forEach(function(r) {
+        var pid = r.parent_id;
+        if (!pid || !idSet[pid]) { roots.push(r); return; }
+        if (!childrenOf[pid]) childrenOf[pid] = [];
+        childrenOf[pid].push(r);
+      });
+      // Deterministic ordering within a parent's children: by outer_position
+      // when available, then by identifier as a tiebreaker. Keeps two
+      // descendants of the same parent (rare in a clean chain) stable.
+      function _ord(a, b) {
+        var ap = (a.outer_position != null) ? a.outer_position : Infinity;
+        var bp = (b.outer_position != null) ? b.outer_position : Infinity;
+        if (ap !== bp) return ap - bp;
+        return (a.identifier || '') < (b.identifier || '') ? -1 : 1;
+      }
+      roots.sort(_ord);
+      Object.keys(childrenOf).forEach(function(k) { childrenOf[k].sort(_ord); });
+      // DFS from each root, capping depth to chainRecs.length so a
+      // pathological cycle (shouldn't happen — parent_id is set once at
+      // mint) can't loop forever.
+      var ordered = [];
+      var visited = {};
+      function walk(r, depth) {
+        if (!r || visited[r.identifier] || depth > chainRecs.length) return;
+        visited[r.identifier] = true;
+        ordered.push(r);
+        var kids = r.identifier && childrenOf[r.identifier];
+        if (kids) for (var ki = 0; ki < kids.length; ki++) walk(kids[ki], depth + 1);
+      }
+      roots.forEach(function(rt) { walk(rt, 0); });
+      // Safety net: any record not reachable from a root (orphan loop
+      // entry) still gets rendered so we never silently drop data.
+      chainRecs.forEach(function(r) {
+        if (r.identifier && !visited[r.identifier]) ordered.push(r);
+      });
+
       var chainOk = 0, chainExt = 0;
       html += '<div class="ev-sec">Parent Chain</div><details><summary style="font-size:0.65rem;color:#6a6a80;cursor:pointer;">' + chainRecs.length + ' links</summary><div style="font-size:0.65rem;margin-top:0.3rem;">';
-      for (var ci = 0; ci < chainRecs.length; ci++) {
-        var cr = chainRecs[ci], pid = cr.parent_id;
+      for (var ci = 0; ci < ordered.length; ci++) {
+        var cr = ordered[ci], pid = cr.parent_id;
         var ok2 = !pid || !!idSet[pid];
         var ext = pid && !idSet[pid];
         if (ok2) chainOk++;
@@ -1144,8 +1339,9 @@ async function analyzeMeta(files){
       html += '</div></div>'; // close ev-body + ev card
     });
   }
+  html += '</div>'; // close .meta-body (scrollable region)
+
   // Render into sidebar
-  var metaSidebar = document.getElementById('metaSidebarResults');
   if (metaSidebar) {
     metaSidebar.innerHTML = html;
   } else {
@@ -1154,6 +1350,80 @@ async function analyzeMeta(files){
 
   // === Build orbit inspector ===
   buildOrbitInspector(valid, collected);
+
+  // Wire Dark Matter unlock buttons. Each button knows its chain key and
+  // the input id to pull the password from; on submit we stash the
+  // password and re-run the render pipeline from cache. Wrong-password
+  // failures surface inline beneath the input — no alert.
+  var unlockBtns = document.querySelectorAll('.dm-unlock-btn');
+  for (var ub = 0; ub < unlockBtns.length; ub++) {
+    (function(btn) {
+      var run = async function() {
+        // Guard against double-fire: the input's Enter handler and the
+        // button's click handler both call run(); without this, a fast
+        // Enter→click sequence (or two Enters) could fire concurrent
+        // re-renders. The flag is cleared in `finally` so a thrown
+        // exception during render doesn't leave the button stuck.
+        if (btn.disabled) return;
+        var chainKey = btn.getAttribute('data-dm-chain');
+        var inputId = btn.getAttribute('data-dm-input');
+        var errId = btn.getAttribute('data-dm-err');
+        var input = document.getElementById(inputId);
+        var errEl = document.getElementById(errId);
+        var pw = input ? input.value : '';
+        if (!pw) {
+          if (errEl) errEl.textContent = 'Enter a password.';
+          return;
+        }
+        if (errEl) errEl.textContent = '';
+        btn.disabled = true; btn.textContent = '\u2026';
+        try {
+          _chainPasswords[chainKey] = pw;
+          // Probe one record from this chain to surface wrong-password
+          // before we burn the re-render. Without this the chain just
+          // re-renders unchanged and the user has no signal.
+          var probe = _observatoryCache.find(function(r) {
+            return !r._err && r.chain_visibility === 'dark_matter'
+                && chainDiscriminator(r) === chainKey;
+          });
+          var probeOk = false;
+          if (probe && probe.encrypted_soul) {
+            var pr = await Access.decryptSoul(probe.encrypted_soul, pw);
+            probeOk = pr.ok;
+          } else if (probe && probe.encrypted_chunks) {
+            var pc = await Access.decryptChunks(probe.encrypted_chunks, pw);
+            probeOk = pc.ok;
+          }
+          if (!probeOk) {
+            delete _chainPasswords[chainKey];
+            if (errEl) errEl.textContent = 'Wrong password.';
+            return;
+          }
+          await _renderObservatoryFromCache();
+          // Successful render replaces this button's DOM node — no need
+          // to restore state. finally{} below still runs in case the
+          // re-render threw before swap.
+        } catch (e) {
+          delete _chainPasswords[chainKey];
+          if (errEl) errEl.textContent = 'Unlock failed: ' + (e && e.message ? e.message : 'unknown error');
+        } finally {
+          // Only restore button state if it's still in the DOM (the
+          // re-render swaps the whole panel — orphaned button would no
+          // longer matter). isConnected is on Element since Chrome 51 /
+          // Safari 10 / Firefox 49 — safe for our target browsers.
+          if (btn.isConnected) {
+            btn.disabled = false;
+            btn.textContent = 'Unlock';
+          }
+        }
+      };
+      btn.addEventListener('click', run);
+      var input = document.getElementById(btn.getAttribute('data-dm-input'));
+      if (input) input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); run(); }
+      });
+    })(unlockBtns[ub]);
+  }
 }
 
 function buildOrbitInspector(records, collected) {
@@ -1228,6 +1498,23 @@ function buildOrbitInspector(records, collected) {
     r._gridPos = ti;
   });
 
+  // Disambiguate age labels when multiple chains share the same age_name
+  // (e.g. five chains all called "Age of Aries"). Without this, the
+  // carousel renders five identical tabs and the user can't tell which
+  // is which. We suffix each duplicate with a short chain hash.
+  var ageDisplayCounts = {};
+  ageOrder.forEach(function(k) {
+    var nm = ages[k].displayName;
+    ageDisplayCounts[nm] = (ageDisplayCounts[nm] || 0) + 1;
+  });
+  ageOrder.forEach(function(k) {
+    var nm = ages[k].displayName;
+    if (ageDisplayCounts[nm] > 1) {
+      var sig = k.split('#')[0].slice(0, 6);
+      ages[k].displayName = (nm === '_' ? 'Age I' : nm) + ' · ' + sig;
+    }
+  });
+
   var curAge = ageOrder[0], curSector = 0, mode = 'orbit', curFilter = 'all';
   var selectedCons = new Set(); // empty = show all in age
   var _ageAnimating = false;
@@ -1245,9 +1532,16 @@ function buildOrbitInspector(records, collected) {
     if (target) {
       var d = target.querySelector('.meta-detail');
       if (d) d.style.display = 'block';
-      // Scroll the results-wrap container (fixed panel), not the page
+      // Observatory split-scroll: records live inside .meta-body now,
+      // which owns the scrollbar. Prefer that over .results-wrap so
+      // clicks on grid cells scroll the inner body, not the (locked)
+      // outer panel. Fall back to the panel for Image / Audit tabs.
+      var mb = document.querySelector('#metaSidebarResults > .meta-body');
       var rw = document.getElementById('resultsWrap');
-      if (rw && window.getComputedStyle(rw).position === 'fixed') {
+      if (mb && mb.contains(target)) {
+        var targetTop = target.offsetTop - 4;
+        mb.scrollTo({ top: targetTop, behavior: 'smooth' });
+      } else if (rw && window.getComputedStyle(rw).position === 'fixed') {
         var h = el.offsetHeight || 0;
         var targetTop = target.offsetTop - h - 4;
         rw.scrollTo({ top: targetTop, behavior: 'smooth' });
@@ -1552,7 +1846,10 @@ function buildOrbitInspector(records, collected) {
 
         if (rec) {
           cell.classList.add('supplied');
-          if (rec._match === false) cell.classList.add('tampered');
+          // Sealed records have _match === false by design (the stored
+          // hash covers plaintext we can't see). Skip the red .tampered
+          // styling so they don't read as forged when they're just locked.
+          if (rec._match === false && !rec._sealed) cell.classList.add('tampered');
           cell.textContent = colLabel(ci);
           if (ci === 0 && rowHeart[ri]) cell.classList.add('heart');
           (function(record, row, cellEl) {
@@ -1678,9 +1975,20 @@ function buildOrbitInspector(records, collected) {
         bucketEntry(role, getChunk(r, role));
       });
     });
+    // Sealed records can't be verified without a password — count them
+    // separately so "0/3 verified" doesn't read as failure when the
+    // real state is "3 sealed, awaiting unlock".
+    var sealedCount = ad.recs.filter(function(r) { return r._sealed; }).length;
+    var verifiable = ad.recs.length - sealedCount;
+    var verifyClass = verifiable === 0 ? '' : (hashOk === verifiable ? 'pass' : 'warn');
     stats.innerHTML =
       '<span>' + ad.recs.length + ' stars</span>' +
-      '<span class="' + (hashOk === ad.recs.length ? 'pass' : 'warn') + '">' + hashOk + '/' + ad.recs.length + ' verified</span>';
+      (verifiable > 0
+        ? '<span class="' + verifyClass + '">' + hashOk + '/' + verifiable + ' verified</span>'
+        : '') +
+      (sealedCount > 0
+        ? '<span class="sealed">' + sealedCount + ' sealed</span>'
+        : '');
     el.appendChild(stats);
 
     // === Reassembly downloads ===
