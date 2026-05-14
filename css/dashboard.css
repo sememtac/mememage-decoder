@@ -228,6 +228,43 @@
   color: #1a1a20;
 }
 
+/* Native file picker capability gate. When the server lacks zenity /
+   kdialog / osascript (headless VPS, no DISPLAY), the dashboard sets
+   <html data-fs-pick="none"> at load time and every Browse button is
+   hidden so the user types paths into the text input instead — no
+   tempting button that surfaces a confusing error on click. */
+html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
+
+/* Dry-run toggle — sits above the drop zone in the empty state so
+   the user can flip it before dropping (the upload payload locks in
+   the value at drop time; toggling post-drop would have no effect).
+   Compact row with checkbox + label + a muted explainer. */
+.mint-dryrun-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  margin-bottom: 0.5rem;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.76rem;
+  cursor: pointer;
+  user-select: none;
+}
+/* Override the state-machine's generic `display: block` for our
+   data-mint-only="empty" row so the flex layout survives the show. */
+.mint-panel[data-mint-state="empty"] > .mint-dryrun-row[data-mint-only="empty"] {
+  display: flex;
+}
+.mint-dryrun-row input { cursor: pointer; margin: 0; }
+.mint-dryrun-label { color: #1a1a20; font-weight: 600; }
+.mint-dryrun-hint { color: #5a5a62; font-size: 0.7rem; font-style: italic; }
+/* Hint gets ellipsized if the row narrows so it never wraps awkwardly. */
+.mint-dryrun-row .mint-dryrun-hint {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto;
+}
+
 /* Awaiting-phone state — visible while the dashboard polls for the
    phone-side GPS capture. The mint URL is the load-bearing element
    (Discord/Slack webhooks may not be configured, so the user always
@@ -350,29 +387,125 @@
   animation: mint-pulse 1.2s ease-in-out infinite;
 }
 
-/* Done */
-.mint-result-head { font-size: 1.05rem; font-weight: 600; margin: 0; }
+/* Done — Witnessed state. Higher contrast across the board: labels
+   were opacity:0.75 on a light gradient (read as ghosted); now solid
+   dark. Values use a near-black monospace for legibility. The soul
+   URL is a readonly text input + copy/open buttons instead of a
+   truncated anchor — pasting the URL is the common action, and a
+   line that ends in "…" is useless for that. */
+.mint-result-head {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #1a1a20;
+  margin: 0 0 0.2rem;
+}
+.mint-result-head[data-dry-run="1"]::after {
+  content: "DRY RUN";
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  background: rgba(200, 176, 128, 0.22);
+  color: #6a5018;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  border: 1px solid rgba(200, 176, 128, 0.5);
+  border-radius: 999px;
+  vertical-align: middle;
+}
 .mint-result-meta {
   display: grid; grid-template-columns: max-content 1fr;
-  gap: 0.2rem 0.7rem; font-size: 0.72rem; margin: 0;
+  gap: 0.4rem 0.8rem; font-size: 0.78rem; margin: 0.5rem 0 0.8rem;
 }
-.mint-result-meta dt { font-weight: 600; opacity: 0.75; }
+.mint-result-meta dt {
+  font-weight: 700;
+  color: #2a2a30;
+  letter-spacing: 0.03em;
+}
 .mint-result-meta dd {
-  margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: monospace;
+  margin: 0;
+  overflow: hidden;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  color: #1a1a20;
+  word-break: break-all;
 }
-.mint-result-meta a { color: var(--accent-blue, #3cc8dc); }
-.mint-result-actions { display: flex; gap: 0.5rem; margin-top: auto; }
+/* Soul URL row — input + two small buttons, all flex-laid so the
+   input expands to fill but the buttons keep their natural width. */
+.mint-result-url-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.mint-result-url-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.7rem;
+  padding: 0.3rem 0.45rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius-sm, 6px);
+}
+.mint-result-url-btn {
+  font-family: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.55rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.mint-result-url-btn:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
+
+.mint-result-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+  flex-wrap: wrap;
+}
 .mint-action {
-  flex: 1; text-align: center;
-  padding: 0.55rem 0.8rem; font-family: inherit; font-size: 0.8rem;
-  border: none; border-radius: var(--radius-sm, 6px);
+  flex: 1 1 8rem;
+  text-align: center;
+  padding: 0.6rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
   background: linear-gradient(to bottom, #3cc8dc, #dc50dc);
-  color: white; cursor: pointer; text-decoration: none;
-  font-weight: 600; letter-spacing: 0.03em;
+  color: white;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
-.mint-action-secondary { background: rgba(0, 0, 0, 0.08); color: inherit; }
+.mint-action-secondary {
+  background: rgba(255, 255, 255, 0.7);
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
 .mint-action:hover { filter: brightness(1.05); }
+.mint-action-secondary:hover {
+  filter: none;
+  background: white;
+  border-color: rgba(0, 0, 0, 0.5);
+}
+/* Disabled-style for actions that aren't applicable in the current
+   state (e.g. "Soul in Discord" on dry-run — the soul didn't go to
+   IA, so we can't link to it; it's in the Discord attachment instead). */
+.mint-action.mint-action-disabled {
+  pointer-events: none;
+  opacity: 0.5;
+  cursor: default;
+  font-style: italic;
+}
 
 /* Failed */
 .mint-failed-head { font-size: 1rem; font-weight: 600; margin: 0; color: #b04040; }

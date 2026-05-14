@@ -23,6 +23,37 @@
 // cancel. Rejects on errors.
 // =====================================================================
 window.FilePicker = {
+  // Cached probe of the server's picker capability. The dashboard
+  // can read .available synchronously after FilePicker.checkAvailable()
+  // has resolved at least once. Defaults to true so we don't hide UI
+  // before the first probe completes — the actual pick call will
+  // surface its own error if the server can't pop a dialog.
+  available: true,
+  unavailableReason: '',
+  checkAvailable: async function() {
+    var token = window._MINT_API_TOKEN || '';
+    var headers = {};
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    try {
+      var resp = await fetch('/api/fs/pick/available', {headers: headers});
+      if (!resp.ok) return;
+      var data = await resp.json();
+      this.available = !!data.available;
+      this.unavailableReason = data.reason || '';
+      // Set an attribute on <html> so CSS can hide [data-fs-browse]
+      // buttons regardless of when they're added to the DOM. Without
+      // this the hide only catches buttons present at probe time —
+      // the Config tab renders lazily and would miss out.
+      document.documentElement.setAttribute(
+        'data-fs-pick', this.available ? 'ok' : 'none',
+      );
+      if (this.unavailableReason) {
+        document.documentElement.setAttribute(
+          'data-fs-pick-reason', this.unavailableReason,
+        );
+      }
+    } catch (e) { /* network blip — leave defaults */ }
+  },
   pick: async function(opts) {
     opts = opts || {};
     var token = window._MINT_API_TOKEN || '';
@@ -64,6 +95,18 @@ window.FilePicker = {
   var trove = (typeof Theme !== 'undefined') && Theme.taglines && Theme.taglines.dashboard;
   if (!sub || !trove || !trove.length) return;
   sub.textContent = trove[Math.floor(Math.random() * trove.length)];
+})();
+
+// Probe the server for native picker availability once at load. On
+// headless deployments (no DISPLAY, no zenity/kdialog) all
+// [data-fs-browse] buttons get hidden so the user isn't tempted to
+// click them — the text inputs are the primary path entry surface
+// instead. checkAvailable() is async + idempotent; subsequent
+// renderings will pick up the same flag without re-fetching.
+(function _probePicker() {
+  if (window.FilePicker && typeof window.FilePicker.checkAvailable === 'function') {
+    window.FilePicker.checkAvailable();
+  }
 })();
 
 // =====================================================================
@@ -129,11 +172,15 @@ if (typeof TabBar !== 'undefined') {
     conceive:    document.getElementById('mintConceive'),
     cancel:      document.getElementById('mintCancel'),
     progressBody:document.getElementById('mintProgressBody'),
-    resultId:    document.getElementById('mintResultId'),
-    resultHash:  document.getElementById('mintResultHash'),
-    resultUrl:   document.getElementById('mintResultUrl'),
-    download:    document.getElementById('mintDownload'),
-    again:       document.getElementById('mintAgain'),
+    resultHead:    document.getElementById('mintResultHead'),
+    resultId:      document.getElementById('mintResultId'),
+    resultHash:    document.getElementById('mintResultHash'),
+    resultUrl:     document.getElementById('mintResultUrl'),
+    resultUrlCopy: document.getElementById('mintResultUrlCopy'),
+    resultUrlOpen: document.getElementById('mintResultUrlOpen'),
+    download:      document.getElementById('mintDownload'),
+    downloadSoul:  document.getElementById('mintDownloadSoul'),
+    again:         document.getElementById('mintAgain'),
     retry:       document.getElementById('mintRetry'),
     failedBody:  document.getElementById('mintFailedBody'),
   };
@@ -218,6 +265,8 @@ if (typeof TabBar !== 'undefined') {
     els.drop.setAttribute('data-busy', '1');
     try {
       var image_b64 = await fileToBase64(file);
+      var dryRunEl = document.getElementById('mintDryRun');
+      var dryRun = dryRunEl ? dryRunEl.checked : false;
       var resp;
       try {
         resp = await fetch('/api/mint/upload', {
@@ -227,6 +276,7 @@ if (typeof TabBar !== 'undefined') {
             filename: file.name,
             image_data: image_b64,
             metadata: {},
+            dry_run: dryRun,
           }),
         });
       } catch (netErr) {
@@ -420,9 +470,33 @@ if (typeof TabBar !== 'undefined') {
   function showResult(s) {
     els.resultId.textContent = s.identifier;
     els.resultHash.textContent = s.content_hash;
-    els.resultUrl.textContent = s.url;
-    els.resultUrl.href = s.url;
-    els.download.href = '/api/mint/' + state.token + '/image';
+    // Soul URL is rendered into a readonly text input (not an anchor)
+    // so the user can copy it without right-clicking, and it doesn't
+    // get cropped with an ellipsis. Adjacent copy + open buttons cover
+    // the two common actions.
+    if (els.resultUrl) els.resultUrl.value = s.url || '';
+    if (els.resultUrlOpen) els.resultUrlOpen.href = s.url || '#';
+    // Prefer the server-built absolute download URL (uses
+    // externally-reachable host via _external_host) so the link is
+    // shareable across devices on the same tailnet. Fall back to a
+    // relative path for any older server that doesn't return it.
+    els.download.href = s.download_url || ('/api/mint/' + state.token + '/image');
+    // Soul download — points at our /api/mint/<token>/soul endpoint
+    // which streams the local .soul file regardless of whether IA
+    // received it. Works for both real mints (records/<id>.soul) and
+    // dry-runs (records/dryrun/<id>.soul). Falls back to the IA URL
+    // if the server didn't supply download_soul_url (older builds).
+    if (els.downloadSoul) {
+      els.downloadSoul.setAttribute('download', s.identifier + '.soul');
+      els.downloadSoul.href = s.download_soul_url || s.url || '#';
+      els.downloadSoul.classList.remove('mint-action-disabled');
+      els.downloadSoul.textContent = 'Download soul';
+      els.downloadSoul.title = '';
+    }
+    // Dry-run badge in the Witnessed header
+    if (els.resultHead) {
+      els.resultHead.setAttribute('data-dry-run', s.dry_run ? '1' : '0');
+    }
     setState('done');
   }
 
@@ -458,11 +532,13 @@ if (typeof TabBar !== 'undefined') {
   els.again.addEventListener('click', reset);
   els.retry.addEventListener('click', reset);
 
-  // Copy mint URL to clipboard for quick handoff to another device.
-  if (els.awaitCopy) {
-    els.awaitCopy.addEventListener('click', function() {
-      var input = els.awaitUrl;
-      if (!input || !input.value) return;
+  // Shared clipboard copy helper — wires a button to an input, flashes
+  // "copied" briefly. Used for both the await-state mint URL and the
+  // done-state soul URL.
+  function _wireCopyBtn(btn, input) {
+    if (!btn || !input) return;
+    btn.addEventListener('click', function() {
+      if (!input.value) return;
       input.select(); input.setSelectionRange(0, input.value.length);
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -470,12 +546,14 @@ if (typeof TabBar !== 'undefined') {
         } else {
           document.execCommand('copy');
         }
-        var prev = els.awaitCopy.textContent;
-        els.awaitCopy.textContent = 'copied';
-        setTimeout(function() { els.awaitCopy.textContent = prev; }, 1200);
+        var prev = btn.textContent;
+        btn.textContent = 'copied';
+        setTimeout(function() { btn.textContent = prev; }, 1200);
       } catch (e) { /* clipboard may be blocked on http:// — silent */ }
     });
   }
+  _wireCopyBtn(els.awaitCopy, els.awaitUrl);
+  _wireCopyBtn(els.resultUrlCopy, els.resultUrl);
 })();
 
 
@@ -765,7 +843,7 @@ if (typeof TabBar !== 'undefined') {
       var sourceInputs = sources.map(function(src, idx) {
         return '<div class="entry-source-row">' +
           '<input class="payload-edit-input monospace" data-field="source-' + idx + '" type="text" value="' + escapeHtml(src) + '" placeholder="path/to/file (or click Browse)">' +
-          '<button class="source-browse" data-action="browse-source" data-source-idx="' + idx + '" title="Pick a file from the server">Browse</button>' +
+          '<button class="source-browse" data-action="browse-source" data-source-idx="' + idx + '" data-fs-browse title="Pick a file from the server">Browse</button>' +
           '<button class="payload-edit-delete" data-action="remove-source" data-source-idx="' + idx + '" title="Remove this source">\u00d7</button>' +
           '</div>';
       }).join('');
@@ -1148,7 +1226,7 @@ if (typeof TabBar !== 'undefined') {
     }
   }
 
-  // ===== Build / Seal (unchanged from prior phase) =====
+  // ===== Build / Seal =====
   async function rebuild() {
     showError('');
     els.buildBtn.disabled = true;
@@ -1158,8 +1236,12 @@ if (typeof TabBar !== 'undefined') {
       await fetchJson('/api/payload/build', {
         method: 'POST', headers: authHeaders(), body: '{}',
       });
-      // After Build, reload so any new sources surface in entries
-      await loadConfig();
+      // Build writes Payload/<chain>/<entry>/ artifacts from sources;
+      // it doesn't touch chain.json. Re-rendering from current state
+      // (no fresh chain config fetch) preserves whichever preset /
+      // draft the user was editing. Previously we called loadConfig()
+      // here, which wiped state.working + state.lastPresetName.
+      renderAll();
     } catch (e) {
       showError('Build failed: ' + e.message);
     } finally {
@@ -1720,6 +1802,7 @@ if (typeof TabBar !== 'undefined') {
           events: (w.events || []).slice(),
           headers: w.headers || {},
           template: w.template || '',
+          attach_files: !!w.attach_files,
         };
       });
     }
@@ -1735,14 +1818,14 @@ if (typeof TabBar !== 'undefined') {
       '</div>' +
       '<div class="config-field config-field-with-browse">' +
       '  <span class="config-field-label">TLS cert</span>' +
-      '  <input class="config-input" id="configServerCert" type="text" value="' + escapeHtml(cert) + '" placeholder="(auto-detect at startup)" readonly>' +
-      '  <button class="config-btn" id="configServerCertBrowse">Browse\u2026</button>' +
+      '  <input class="config-input" id="configServerCert" type="text" value="' + escapeHtml(cert) + '" placeholder="/path/to/cert.pem (or auto-detect)">' +
+      '  <button class="config-btn" id="configServerCertBrowse" data-fs-browse>Browse\u2026</button>' +
       '  <button class="config-btn config-btn-subtle" id="configServerCertClear" title="Clear path" ' + (cert ? '' : 'disabled') + '>\u00d7</button>' +
       '</div>' +
       '<div class="config-field config-field-with-browse">' +
       '  <span class="config-field-label">TLS key</span>' +
-      '  <input class="config-input" id="configServerKey" type="text" value="' + escapeHtml(keyP) + '" placeholder="(auto-detect at startup)" readonly>' +
-      '  <button class="config-btn" id="configServerKeyBrowse">Browse\u2026</button>' +
+      '  <input class="config-input" id="configServerKey" type="text" value="' + escapeHtml(keyP) + '" placeholder="/path/to/key.pem (or auto-detect)">' +
+      '  <button class="config-btn" id="configServerKeyBrowse" data-fs-browse>Browse\u2026</button>' +
       '  <button class="config-btn config-btn-subtle" id="configServerKeyClear" title="Clear path" ' + (keyP ? '' : 'disabled') + '>\u00d7</button>' +
       '</div>' +
       '<div class="config-row">' +
@@ -1864,12 +1947,14 @@ if (typeof TabBar !== 'undefined') {
               '<button class="config-btn config-webhook-hdr-del" data-webhook-hdr-del="' + i + ':' + hi + '" title="Remove header">\u00d7</button>' +
             '</div>';
           }).join('');
+          var attachFiles = !!w.attach_files;
           return '' +
             '<div class="config-webhook-row" data-i="' + i + '">' +
               '<div class="config-webhook-main">' +
                 '<input class="config-input config-webhook-url" data-webhook-url="' + i + '" type="url" value="' + escapeHtml(w.url) + '" placeholder="https://…">' +
                 '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="conceived" ' + (allEv || hasC ? 'checked' : '') + '> conceived</label>' +
                 '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="ready"     ' + (allEv || hasR ? 'checked' : '') + '> ready</label>' +
+                '<label class="config-webhook-ev" title="Send minted image + .soul as Discord-style multipart attachments on conceived events"><input type="checkbox" data-webhook-attach="' + i + '" ' + (attachFiles ? 'checked' : '') + '> attach files</label>' +
                 '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
               '</div>' +
               '<details class="config-webhook-hdrs-section" ' + (hCount > 0 ? 'open' : '') + '>' +
@@ -1924,6 +2009,14 @@ if (typeof TabBar !== 'undefined') {
         if (cb.checked && !has) arr.push(ev);
         else if (!cb.checked && has) arr.splice(arr.indexOf(ev), 1);
         _webhooksDraft[i].events = arr;
+        _webhooksDirty = true;
+        markWebhooksDirty();
+      });
+    });
+    host.querySelectorAll('[data-webhook-attach]').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var i = parseInt(cb.getAttribute('data-webhook-attach'), 10);
+        _webhooksDraft[i].attach_files = cb.checked;
         _webhooksDirty = true;
         markWebhooksDirty();
       });
@@ -2097,6 +2190,7 @@ if (typeof TabBar !== 'undefined') {
             if (Object.keys(realHeaders).length) out.headers = realHeaders;
           }
           if (w.template && w.template.trim()) out.template = w.template.trim();
+          if (w.attach_files) out.attach_files = true;
           return out;
         })}),
       });
@@ -2410,8 +2504,8 @@ if (typeof TabBar !== 'undefined') {
       '</div>' +
       '<div class="config-field config-field-with-browse">' +
       '  <span class="config-field-label">Key file</span>' +
-      '  <input class="config-input" id="configProfileImportPath" type="text" placeholder="(click Browse\u2026)" readonly>' +
-      '  <button class="config-btn" id="configProfileImportBrowse">Browse\u2026</button>' +
+      '  <input class="config-input" id="configProfileImportPath" type="text" placeholder="Path to private key on this server">' +
+      '  <button class="config-btn" id="configProfileImportBrowse" data-fs-browse>Browse\u2026</button>' +
       '</div>' +
       '<div class="config-row">' +
       '  <button class="config-btn config-btn-primary" id="configProfileImportGo">Import</button>' +

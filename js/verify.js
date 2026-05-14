@@ -177,12 +177,30 @@ function computeDHash(imageData, width, height) {
   return bits; // 64 bits
 }
 
+// Mirror the thumbnail generator's center-crop-to-square so both sides
+// of the dHash comparison see the same framing. Without this, a
+// 1216×832 dropped image gets compared to an 832×832 thumbnail crop
+// across mismatched grid cells — guaranteed mismatch on any non-square
+// source. The thumbnail (mememage/thumbnail.py:generate_thumbnail)
+// center-crops then resizes to 80×80; we center-crop the dropped
+// pixels to a square before the 9×8 downsample so the grid geometry
+// matches.
+function _readCenterCroppedSquare(getImageData, srcW, srcH) {
+  var sq = Math.min(srcW, srcH);
+  var left = (srcW - sq) >> 1;
+  var top  = (srcH - sq) >> 1;
+  return { data: getImageData(left, top, sq, sq), width: sq, height: sq };
+}
+
 function dHashFromCanvas(canvas) {
-  // Full image — thumbnail is post-mint (has bar + watermark), so both
-  // sides match. Area-average downsample handles watermark noise.
+  // Square-framed dHash: drop-and-verify image gets center-cropped
+  // to match the thumbnail's framing before the 9×8 downsample.
   var ctx = canvas.getContext('2d', {willReadFrequently: true});
-  var px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  return computeDHash(px, canvas.width, canvas.height);
+  var cropped = _readCenterCroppedSquare(
+    function(x, y, w, h) { return ctx.getImageData(x, y, w, h).data; },
+    canvas.width, canvas.height,
+  );
+  return computeDHash(cropped.data, cropped.width, cropped.height);
 }
 
 function dHashFromDataURI(dataURI) {
@@ -193,7 +211,16 @@ function dHashFromDataURI(dataURI) {
       c.width = img.width; c.height = img.height;
       var ctx = c.getContext('2d', {willReadFrequently: true});
       ctx.drawImage(img, 0, 0);
-      resolve(computeDHash(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height));
+      // The stored thumbnail is ALREADY a square (center-cropped by
+      // the server), so this is functionally a no-op for it. Going
+      // through the same path keeps the geometry handling identical
+      // for both sides — and protects against any future thumbnail
+      // shape change.
+      var cropped = _readCenterCroppedSquare(
+        function(x, y, w, h) { return ctx.getImageData(x, y, w, h).data; },
+        c.width, c.height,
+      );
+      resolve(computeDHash(cropped.data, cropped.width, cropped.height));
     };
     img.onerror = function() { resolve(null); };
     img.src = dataURI;
