@@ -233,10 +233,17 @@ async function fetchKeychainRecord(fingerprint, filename) {
 }
 
 async function verifyKeychainSignature(record) {
-  // Verify a keychain record's Ed25519 signature
+  // Verify a keychain record's Ed25519 signature. The signing pubkey
+  // field name varies by record type:
+  //   - succession: signed by OLD key (old_public_key)
+  //   - revocation: signed by the key itself (public_key)
+  //   - alias:      signed by the SIGNER profile (signer_public_key)
   if (!record || !record.signature) return null;
   try {
-    var pubHex = record.action === 'succeed' ? record.old_public_key : record.public_key;
+    var pubHex;
+    if (record.action === 'succeed') pubHex = record.old_public_key;
+    else if (record.action === 'alias') pubHex = record.signer_public_key;
+    else pubHex = record.public_key;
     var sigHex = record.signature;
     var verifyObj = {};
     Object.keys(record).filter(function(k) { return k !== 'signature'; }).sort()
@@ -249,6 +256,86 @@ async function verifyKeychainSignature(record) {
       return await crypto.subtle.verify('Ed25519', key, sigBytes, msg);
     } catch (e) { return null; }
   } catch (e) { return false; }
+}
+
+// ----- Alias discovery ----------------------------------------------------
+//
+// An alias record (alias-<other_fp_clean>.json in the signer's keychain)
+// claims that two profiles belong to the same human. Verifiers discover
+// aliases via the IA metadata API — listing the signer's keychain files
+// and pulling each alias-*.json. The strongest signal is BIDIRECTIONAL:
+// A claims B is its sibling AND B claims A is its sibling. One-way
+// aliases are still recognized but rendered with a softer label.
+
+async function fetchKeychainFileList(fingerprint) {
+  // IA metadata endpoint returns the file manifest of an item. We use
+  // it once per identity to discover any alias-*.json records, rather
+  // than guessing fingerprints. Returns [] on any failure — alias
+  // discovery is a soft enrichment, never blocks the verdict.
+  var chainId = keychainIdentifier(fingerprint);
+  var urls = [
+    'https://archive.org/metadata/' + chainId + '?t=' + Date.now(),
+    'https://cors.archive.org/metadata/' + chainId + '?t=' + Date.now(),
+  ];
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      var resp = await fetch(urls[i], {cache: 'no-store'});
+      if (!resp.ok) continue;
+      var data = await resp.json();
+      if (data && Array.isArray(data.files)) {
+        return data.files.map(function(f) { return f.name; }).filter(Boolean);
+      }
+    } catch (e) { continue; }
+  }
+  return [];
+}
+
+async function discoverAliases(fingerprint) {
+  // Returns a list of verified alias records the named key has signed.
+  // Each entry: {alias_fingerprint, alias_public_key, timestamp,
+  //              creator_name, bidirectional: bool}.
+  // The bidirectional flag is set true when the OTHER side has also
+  // published a matching alias back. One-way claims are still returned
+  // so the cert renderer can show "B claims to be A's sibling but A
+  // hasn't confirmed" as a softer signal.
+  if (!fingerprint) return [];
+  var files = await fetchKeychainFileList(fingerprint);
+  var aliasFiles = files.filter(function(n) {
+    return /^alias-[0-9a-f]{16}\.json$/i.test(n);
+  });
+  if (!aliasFiles.length) return [];
+  var out = [];
+  for (var i = 0; i < aliasFiles.length; i++) {
+    var rec = await fetchKeychainRecord(fingerprint, aliasFiles[i]);
+    if (!rec || rec.action !== 'alias') continue;
+    var sigOk = await verifyKeychainSignature(rec);
+    if (sigOk !== true) continue;
+    // Check the other side's keychain for a reverse alias signed by
+    // the alias key naming our original fingerprint. Bidirectional
+    // confirmation is the strongest verifier signal.
+    var bi = false;
+    try {
+      var theirFiles = await fetchKeychainFileList(rec.alias_fingerprint);
+      var ourClean = (rec.signer_fingerprint || fingerprint).replace(/:/g, '');
+      var expectedName = 'alias-' + ourClean + '.json';
+      if (theirFiles.indexOf(expectedName) >= 0) {
+        var reverse = await fetchKeychainRecord(rec.alias_fingerprint, expectedName);
+        if (reverse && reverse.action === 'alias'
+            && reverse.alias_fingerprint === (rec.signer_fingerprint || fingerprint)
+            && (await verifyKeychainSignature(reverse)) === true) {
+          bi = true;
+        }
+      }
+    } catch (e) { /* one-way is still useful */ }
+    out.push({
+      alias_fingerprint: rec.alias_fingerprint,
+      alias_public_key: rec.alias_public_key,
+      creator_name: rec.creator_name || '',
+      timestamp: rec.timestamp || '',
+      bidirectional: bi,
+    });
+  }
+  return out;
 }
 
 async function checkKeychain(fingerprint, publicKeyHex) {

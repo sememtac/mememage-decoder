@@ -841,7 +841,23 @@ async function _renderObservatoryFromCache() {
   for(var vi=0;vi<valid.length;vi++){
     var r=valid[vi];var stored=r.content_hash||null;
     var hashable={};Object.keys(r).filter(function(k){return HASH_INCLUDED.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
-    try{r._computed=await sha256_16(hashable);}catch(e){r._computed=null;}
+    try {
+      r._computed = await sha256_16(hashable);
+    } catch (e) {
+      r._computed = null;
+      // Surface the actual reason — most often "crypto.subtle is
+      // undefined" because the validator was loaded in an insecure
+      // context (file:// or http:// on a non-localhost host). Show
+      // it to the user instead of the bare "unavailable" verdict.
+      r._computed_error = (e && e.message) || String(e);
+      if (typeof crypto === 'undefined' || !crypto.subtle) {
+        r._computed_error = 'crypto.subtle unavailable — '
+          + 'the validator must be loaded over HTTPS (or localhost). '
+          + 'You opened it via ' + location.protocol + '//' + location.hostname
+          + ' which doesn\u2019t qualify as a secure context for the Web Crypto API.';
+      }
+      console.warn('[validator] hash compute failed:', e);
+    }
     r._match=stored&&r._computed&&stored===r._computed;
     // Sealed = dark_matter record where soul/chunks ciphertext is still
     // present and we haven't unlocked it. A plain hash mismatch on a
@@ -991,8 +1007,22 @@ async function _renderObservatoryFromCache() {
     // plaintext hash, so the "may be modified" verdict would be both
     // technically correct and badly misleading. Sealed gets its own
     // class + badge; the hash state is re-evaluated post-unlock.
-    var cls=sealed?'sealed':match?'both':stored?'lost':'bar-only';
-    var badge=sealed?'Sealed':match?'Verified':stored?'Hash Mismatch':'No Hash';
+    //
+    // computed-failed case (e.g. crypto.subtle unavailable on
+    // insecure-context loads) gets its own badge so the badge column
+    // doesn't say "Hash Mismatch" while the verdict explains
+    // "Cannot verify" — those two used to disagree visually.
+    var computeFailed = stored && !computed;
+    var cls = sealed ? 'sealed'
+            : match ? 'both'
+            : computeFailed ? 'bar-only'
+            : stored ? 'lost'
+            : 'bar-only';
+    var badge = sealed ? 'Sealed'
+              : match ? 'Verified'
+              : computeFailed ? 'Cannot verify'
+              : stored ? 'Hash Mismatch'
+              : 'No Hash';
 
     html+='<div class="ev"><div class="ev-h '+cls+'"><span class="ev-t">'+_h(r._fn)+'</span><span class="ev-b '+cls+'">'+badge+'</span></div><div class="ev-body">';
 
@@ -1013,7 +1043,14 @@ async function _renderObservatoryFromCache() {
     var hashCellCls=sealed?'sealed':match?'pass':'fail';
     html+='<div class="ev-m"><div class="ev-ml">Stored</div><div class="ev-mv '+(sealed?'sealed':match?'pass':stored?'fail':'')+'">'+_h(stored||'none')+'</div></div>';
     html+='<div class="ev-m"><div class="ev-ml">Computed</div><div class="ev-mv '+(sealed?'sealed':match?'pass':computed?'fail':'')+'">'+_h(computed||'unavailable')+'</div></div>';
-    html+='<div class="ev-m w"><div class="ev-ml">Verdict</div><div class="ev-mv '+(sealed?'sealed':match?'pass':'fail')+'">'+(sealed?'SEALED \u2014 unlock to verify':match?'Untampered \u2014 hashes match':stored&&computed?'MISMATCH \u2014 record may be modified':'Cannot verify')+'</div></div>';
+    var verdictText = sealed
+      ? 'SEALED \u2014 unlock to verify'
+      : match
+        ? 'Untampered \u2014 hashes match'
+        : stored && computed
+          ? 'MISMATCH \u2014 record may be modified'
+          : 'Cannot verify' + (r._computed_error ? ' (' + r._computed_error + ')' : '');
+    html+='<div class="ev-m w"><div class="ev-ml">Verdict</div><div class="ev-mv '+(sealed?'sealed':match?'pass':'fail')+'">'+_h(verdictText)+'</div></div>';
     html+='</div>';
 
     // Field audit

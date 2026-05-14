@@ -82,12 +82,24 @@ if (typeof TabBar !== 'undefined') {
 }
 
 // =====================================================================
-// MINT TAB — drag-drop autopilot.
+// MINT TAB — desktop trigger for the phone-GPS conception flow.
 //
 // Flow:
-//   empty → user drops PNG → upload (auto-extract metadata) → reviewing
-//   reviewing → GPS captured + user clicks Conceive → minting
-//   minting → poll /api/mint/<token>/status → done | failed
+//   empty → user drops PNG → upload (auto-extract metadata)
+//        → server fires "ready" webhook with mint URL → Discord/Slack
+//          delivers the link to the user's phone
+//   awaiting → dashboard shows the mint URL + chain context; user goes
+//              to phone, taps the Discord/Slack link, browser captures
+//              GPS via watchPosition, POSTs back to /api/mint/<token>
+//   minting → server runs mint() (now under the chain's password +
+//              visibility), uploads to IA; dashboard polls
+//              /api/mint/<token>/status
+//   done | failed
+//
+// The desktop never captures GPS itself — desktop geolocation is
+// IP/wifi-based and accurate to ±500m at best. Phone GPS hardware is
+// accurate to ±5m, which is what the celestial birth certificate
+// needs. Dashboard is purely a TRIGGER.
 //
 // All API calls authenticate via MINT_API_TOKEN if available. The
 // /dashboard page itself is unauthenticated (same as /mint/new); the
@@ -105,8 +117,12 @@ if (typeof TabBar !== 'undefined') {
     filename:    document.getElementById('mintFilename'),
     size:        document.getElementById('mintSize'),
     metaGrid:    document.getElementById('mintMetaGrid'),
-    password:    document.getElementById('mintPassword'),
-    gps:         document.getElementById('mintGps'),
+    chainBanner: document.getElementById('mintChainBanner'),
+    chainId:     document.getElementById('mintChainId'),
+    chainName:   document.getElementById('mintChainName'),
+    chainVis:    document.getElementById('mintChainVis'),
+    awaitUrl:    document.getElementById('mintAwaitUrl'),
+    awaitCopy:   document.getElementById('mintAwaitCopy'),
     gpsText:     document.getElementById('mintGpsText'),
     error:       document.getElementById('mintError'),
     globalError: document.getElementById('mintGlobalError'),
@@ -142,7 +158,14 @@ if (typeof TabBar !== 'undefined') {
     pollTimer: null,
   };
 
-  function setState(s) { panel.setAttribute('data-mint-state', s); }
+  function setState(s) {
+    state.uiState = s;
+    panel.setAttribute('data-mint-state', s);
+    // When entering reviewing state, surface the mint URL the server
+    // returned at upload time so the user can hand it to their phone
+    // even if webhook delivery is misconfigured.
+    if (s === 'reviewing' && typeof showMintUrl === 'function') showMintUrl();
+  }
   // showError writes to the global slot (visible across all states) AND
   // logs to console so devtools is the second line of diagnostic.
   function showError(msg, opts) {
@@ -235,9 +258,14 @@ if (typeof TabBar !== 'undefined') {
       }
       state.token = data.token;
       state.metadata = data.metadata || {};
+      state.mintUrl = data.mint_url_full || data.mint_url || '';
       renderReview(file);
-      requestGps();
+      loadActiveChain();   // populate the chain context banner
       setState('reviewing');
+      // The server has already fired the "ready" webhook by this point.
+      // We start polling immediately so when the phone POSTs GPS and
+      // the server kicks off mint(), the dashboard sees status flip.
+      pollMintStatus();
     } finally {
       els.drop.removeAttribute('data-busy');
     }
@@ -279,76 +307,82 @@ if (typeof TabBar !== 'undefined') {
     dd.title = dd.textContent;
     els.metaGrid.appendChild(dt); els.metaGrid.appendChild(dd);
   }
+
+  // Populate the chain context banner. The mint has zero per-mint
+  // settings now — visibility and password are both chain properties
+  // configured in the Config tab. The banner tells the user where the
+  // mint lands and surfaces three states:
+  //
+  //   - Light + no password   : every field public (incl. GPS)
+  //   - Light + password set  : GPS sealed for personal time-lock,
+  //                             soul fields still public
+  //   - Dark + password set   : full sealing — soul + chunks encrypted
+  //
+  // Dark + no password is blocked server-side; we also surface a
+  // "Configure password" warning here so the user can fix it without
+  // hitting Conceive and getting an error.
+  state.chainVisibility = null;
+  state.chainPasswordSet = false;
+  async function loadActiveChain() {
+    try {
+      var resp = await fetch('/api/chain/current', {headers: authHeaders()});
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var data = await resp.json();
+      var id = data.id || '';
+      var info = data.info || {};
+      var name = info.name || '';
+      var vis = info.visibility || 'light_energy';
+      var pwSet = !!info.password_set;
+      state.chainVisibility = vis;
+      state.chainPasswordSet = pwSet;
+      els.chainId.textContent = id;
+      els.chainName.textContent = name && name !== id ? ' \u00b7 ' + name : '';
+      // Compose the visibility chip text: "Light" / "Light · sealed" /
+      // "Dark · sealed" / "Dark · MISSING KEY". Single chip carries
+      // the full state so the user doesn't have to scan two indicators.
+      var visText;
+      if (vis === 'dark_matter') {
+        visText = pwSet ? 'Dark · sealed' : 'Dark · NEEDS PASSWORD';
+      } else {
+        visText = pwSet ? 'Light · GPS sealed' : 'Light · public';
+      }
+      els.chainVis.textContent = visText;
+      els.chainVis.dataset.vis = vis;
+      els.chainVis.dataset.pwSet = pwSet ? '1' : '0';
+      // Surface the dark-chain-missing-password case inline so the user
+      // sees the problem before clicking Conceive.
+      if (vis === 'dark_matter' && !pwSet) {
+        showError('This chain is Dark but has no stored password — set it in Config → Chains before minting.');
+      } else {
+        showError('');
+      }
+    } catch (e) {
+      els.chainId.textContent = '(could not load active chain)';
+      els.chainName.textContent = '';
+      els.chainVis.textContent = '';
+      state.chainVisibility = null;
+      state.chainPasswordSet = false;
+    }
+  }
   function humanSize(b) {
     if (b < 1024) return b + ' B';
     if (b < 1024*1024) return (b / 1024).toFixed(1) + ' KB';
     return (b / (1024*1024)).toFixed(2) + ' MB';
   }
 
-  // ---- GPS capture ----
-  function requestGps() {
-    state.gps = null;
-    els.gps.setAttribute('data-state', 'locating');
-    els.gpsText.textContent = 'Requesting location\u2026';
-    els.conceive.disabled = true;
-
-    if (!('geolocation' in navigator)) {
-      els.gps.setAttribute('data-state', 'denied');
-      els.gpsText.textContent = 'Geolocation not available in this browser.';
-      return;
-    }
-    if (state.gpsWatchId !== null) navigator.geolocation.clearWatch(state.gpsWatchId);
-    state.gpsWatchId = navigator.geolocation.watchPosition(
-      function(pos) {
-        state.gps = {lat: pos.coords.latitude, lon: pos.coords.longitude,
-                     acc: pos.coords.accuracy};
-        els.gps.setAttribute('data-state', 'locked');
-        var acc = state.gps.acc ? '\u00b1' + Math.round(state.gps.acc) + 'm' : '';
-        els.gpsText.textContent = 'Locked: ' +
-          state.gps.lat.toFixed(4) + ', ' + state.gps.lon.toFixed(4) +
-          (acc ? ' (' + acc + ')' : '');
-        els.conceive.disabled = false;
-      },
-      function(err) {
-        els.gps.setAttribute('data-state', 'denied');
-        els.gpsText.textContent = 'GPS denied: ' + err.message;
-      },
-      {enableHighAccuracy: true, maximumAge: 0, timeout: 20000}
-    );
+  // ---- Mint URL display (phone-capture handoff) ----
+  // Replaces the old requestGps() — desktop GPS is unfit for the
+  // celestial birth certificate (±1km accuracy) so we show the mint
+  // URL and let the phone do the real capture.
+  function showMintUrl() {
+    var url = state.mintUrl || '';
+    if (els.awaitUrl) els.awaitUrl.value = url;
   }
 
-  // ---- reviewing → minting: submit conception ----
-  async function submitConception() {
-    if (!state.gps) { showError('Waiting for GPS lock.'); return; }
-    showError('');
-    setState('minting');
-
-    var visibilityEl = document.querySelector('input[name="mintVisibility"]:checked');
-    var payload = {
-      lat: state.gps.lat,
-      lon: state.gps.lon,
-      password: (els.password.value || '').trim() || undefined,
-      chain_visibility: visibilityEl ? visibilityEl.value : 'light_energy',
-    };
-
-    try {
-      var resp = await fetch('/api/mint/' + state.token, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify(payload),
-      });
-      var data = await resp.json();
-      if (!resp.ok) {
-        showFailure(data.error || ('HTTP ' + resp.status));
-        return;
-      }
-      pollUntilDone();
-    } catch (e) {
-      showFailure(e.message);
-    }
-  }
-
-  function pollUntilDone() {
+  // Status polling — starts immediately after upload while we await
+  // the phone, and continues through the server-side mint() pipeline
+  // until status flips to 'completed' / 'failed'.
+  function pollMintStatus() {
     if (state.pollTimer) clearTimeout(state.pollTimer);
     var attempt = 0;
 
@@ -360,7 +394,16 @@ if (typeof TabBar !== 'undefined') {
             showResult(s);
           } else if (s.status === 'failed') {
             showFailure(s.error || 'Mint failed');
+          } else if (s.status === 'minting') {
+            // Phone POSTed GPS — server is now in the mint() pipeline
+            // (hashing, signing, uploading to IA). Flip the UI from
+            // "awaiting phone" to the minting spinner.
+            if (state.uiState !== 'minting') setState('minting');
+            attempt++;
+            var delay = Math.min(3000, 600 + attempt * 200);
+            state.pollTimer = setTimeout(tick, delay);
           } else {
+            // 'pending' / 'awaiting' / unknown — phone hasn't POSTed yet.
             attempt++;
             // Vary cadence: fast at first, then back off. Caps at ~3s.
             var delay = Math.min(3000, 600 + attempt * 200);
@@ -389,16 +432,11 @@ if (typeof TabBar !== 'undefined') {
   }
 
   function reset() {
-    if (state.gpsWatchId !== null) {
-      navigator.geolocation.clearWatch(state.gpsWatchId);
-      state.gpsWatchId = null;
-    }
     if (state.pollTimer) { clearTimeout(state.pollTimer); state.pollTimer = null; }
     state.token = null;
     state.metadata = null;
-    state.gps = null;
+    state.mintUrl = '';
     els.fileInput.value = '';
-    els.password.value = '';
     showError('');
     setState('empty');
   }
@@ -416,10 +454,28 @@ if (typeof TabBar !== 'undefined') {
   els.fileInput.addEventListener('change', function(e) {
     if (e.target.files.length) handleFile(e.target.files[0]);
   });
-  els.conceive.addEventListener('click', submitConception);
   els.cancel.addEventListener('click', reset);
   els.again.addEventListener('click', reset);
   els.retry.addEventListener('click', reset);
+
+  // Copy mint URL to clipboard for quick handoff to another device.
+  if (els.awaitCopy) {
+    els.awaitCopy.addEventListener('click', function() {
+      var input = els.awaitUrl;
+      if (!input || !input.value) return;
+      input.select(); input.setSelectionRange(0, input.value.length);
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(input.value);
+        } else {
+          document.execCommand('copy');
+        }
+        var prev = els.awaitCopy.textContent;
+        els.awaitCopy.textContent = 'copied';
+        setTimeout(function() { els.awaitCopy.textContent = prev; }, 1200);
+      } catch (e) { /* clipboard may be blocked on http:// — silent */ }
+    });
+  }
 })();
 
 
@@ -1405,12 +1461,47 @@ if (typeof TabBar !== 'undefined') {
   var els = {
     error:      document.getElementById('configError'),
     chains:     document.getElementById('configChains'),
+    profiles:   document.getElementById('configProfiles'),
     identity:   document.getElementById('configIdentity'),
     server:     document.getElementById('configServer'),
     env:        document.getElementById('configEnv'),
-    easterEgg:  document.getElementById('configEasterEgg'),
   };
   if (!els.identity) return;
+
+  // Webhooks live in a draft buffer between fetches and the Save call.
+  // Mutating server.webhooks directly would lose unsaved adds/deletes
+  // every time we re-fetch /api/config (e.g. after keygen). The buffer
+  // is replaced whenever the server returns a fresh list.
+  var _webhooksDraft = null;
+  var _webhooksDirty = false;
+
+  // Webhook template presets. The server renders {{key}} placeholders
+  // with JSON-escaped values from the event payload.
+  //
+  // Event-agnostic keys (server-computed, always present):
+  //   {{event}}       — "ready" or "conceived"
+  //   {{summary}}     — short human description for this event
+  //   {{action_url}}  — the URL the recipient should click:
+  //                       ready     → /mint/<token> (GPS capture page)
+  //                       conceived → IA record URL
+  //
+  // Event-specific keys (only on the matching event):
+  //   ready:     mint_url, image_name
+  //   conceived: identifier, content_hash, url, image_path
+  //
+  // The presets below use the event-agnostic keys so a single template
+  // renders cleanly for both `ready` and `conceived` events; users who
+  // want richer per-event formatting can split into two webhook rows
+  // with different `events` lists.
+  var WEBHOOK_PRESETS = {
+    discord: JSON.stringify({
+      content: '\uD83C\uDFA8 {{summary}}\n{{action_url}}'
+    }, null, 2),
+    slack: JSON.stringify({
+      text: ':art: *{{summary}}*\n{{action_url}}'
+    }, null, 2),
+    raw: '',
+  };
 
   var loaded = false;
 
@@ -1472,6 +1563,7 @@ if (typeof TabBar !== 'undefined') {
     var fp = identity.fingerprint || '(unknown)';
     var pk = identity.public_key || '';
     var name = identity.name || '';
+    var hasRevCert = !!identity.has_revocation_cert;
     els.identity.innerHTML =
       '<div class="config-field">' +
       '  <span class="config-field-label">Name</span>' +
@@ -1492,35 +1584,529 @@ if (typeof TabBar !== 'undefined') {
       '</div>' +
       '<div class="config-row">' +
       '  <button class="config-btn" id="configSaveCreator">Save name</button>' +
+      '  <button class="config-btn" id="configRotateBtn">Rotate key\u2026</button>' +
+      '  <button class="config-btn config-btn-danger" id="configRevokeBtn"' + (hasRevCert ? '' : ' disabled title="No revocation cert on disk"') + '>Revoke key\u2026</button>' +
       '</div>' +
-      '<p class="config-note">Key rotation and revocation are CLI-only for safety:' +
-      ' <code>mememage rotate</code>, <code>mememage revoke</code>.</p>';
+      '<div id="configIdentityDanger" class="config-danger-zone" style="display:none;"></div>' +
+      '<p class="config-note">Rotation signs a succession record with the OLD key + uploads it to IA so verifiers can follow the keychain. Revocation publishes the pre-signed revocation cert; every record signed by this key will then show a revocation warning. Both are irreversible.</p>';
 
     document.getElementById('configSaveCreator').addEventListener('click', saveCreatorName);
+    document.getElementById('configRotateBtn').addEventListener('click', openRotateConfirm);
+    var revokeBtn = document.getElementById('configRevokeBtn');
+    if (revokeBtn && !revokeBtn.disabled) revokeBtn.addEventListener('click', openRevokeConfirm);
     els.identity.querySelectorAll('.config-copy-btn').forEach(function(btn) {
       btn.addEventListener('click', function() { copyToClipboard(btn); });
     });
   }
 
-  function renderServer(server) {
-    var domain = server.domain ? escapeHtml(server.domain) : '<span class="config-field-empty">(unset)</span>';
-    var cert   = server.cert   ? escapeHtml(server.cert)   : '<span class="config-field-empty">(unset)</span>';
-    var keyP   = server.key    ? escapeHtml(server.key)    : '<span class="config-field-empty">(unset)</span>';
+  // Renders an inline confirmation form into #configIdentityDanger.
+  // We don't use window.confirm() because the user needs to TYPE the
+  // confirmation string (matches the CLI's contract) and we want to
+  // show context: what will happen, what's reversible.
+  function openRotateConfirm() {
+    var zone = document.getElementById('configIdentityDanger');
+    if (!zone) return;
+    zone.style.display = '';
+    zone.innerHTML =
+      '<h4>Rotate identity key</h4>' +
+      '<p>This generates a new Ed25519 keypair, archives the current key under <code>~/.mememage/keychain/</code>, signs a succession record with the OLD key, and uploads that record to the Internet Archive so verifiers can follow the trail. <strong>Records signed by the old key still verify</strong> — but any record minted after this point is signed by the new key.</p>' +
+      '<div class="config-field"><span class="config-field-label">Creator name on the new key</span>' +
+      '  <input class="config-input" id="configRotateName" type="text" placeholder="(reuse current name if blank)">' +
+      '</div>' +
+      '<div class="config-field"><span class="config-field-label">Type <code>ROTATE</code> to confirm</span>' +
+      '  <input class="config-input" id="configRotateConfirm" type="text" autocomplete="off">' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn config-btn-primary" id="configRotateDo">Rotate</button>' +
+      '  <button class="config-btn" id="configRotateCancel">Cancel</button>' +
+      '</div>' +
+      '<div id="configRotateStatus" class="config-note"></div>';
+    document.getElementById('configRotateDo').addEventListener('click', doRotate);
+    document.getElementById('configRotateCancel').addEventListener('click', function() {
+      zone.style.display = 'none'; zone.innerHTML = '';
+    });
+  }
 
-    var webhooksHtml = '<span class="config-field-empty">(none)</span>';
-    if (server.webhooks_count > 0) {
-      webhooksHtml = server.webhooks.map(function(w) {
-        var ev = (w.events || []).join(', ');
-        return '<div>' + escapeHtml(w.url) + (ev ? ' \u00b7 <em>' + escapeHtml(ev) + '</em>' : '') + '</div>';
-      }).join('');
+  async function doRotate() {
+    var confirmEl = document.getElementById('configRotateConfirm');
+    var nameEl = document.getElementById('configRotateName');
+    var statusEl = document.getElementById('configRotateStatus');
+    var btn = document.getElementById('configRotateDo');
+    if (!confirmEl || confirmEl.value.trim() !== 'ROTATE') {
+      statusEl.textContent = 'Type ROTATE exactly to confirm.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    statusEl.style.color = '';
+    statusEl.textContent = 'Rotating\u2026';
+    btn.disabled = true;
+    try {
+      var res = await fetchJson('/api/identity/rotate', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({
+          name: (nameEl && nameEl.value.trim()) || null,
+          confirm: 'ROTATE',
+        }),
+      });
+      var msg = 'New key fingerprint: ' + (res.fingerprint || '(unknown)') + '. ';
+      msg += res.succession_uploaded
+        ? 'Succession record uploaded to IA.'
+        : 'Succession not uploaded (' + (res.upload_error || 'unknown error') + '). Retry via: mememage rotate.';
+      statusEl.textContent = msg;
+      statusEl.style.color = res.succession_uploaded ? '#1a7a1a' : '#a06010';
+      await refresh();
+    } catch (e) {
+      statusEl.textContent = 'Rotate failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
+    }
+  }
+
+  function openRevokeConfirm() {
+    var zone = document.getElementById('configIdentityDanger');
+    if (!zone) return;
+    zone.style.display = '';
+    zone.innerHTML =
+      '<h4 style="color:#b04040;">Revoke identity key</h4>' +
+      '<p><strong>Irreversible.</strong> Publishes the pre-signed revocation cert to the Internet Archive. Every record ever signed by this key will display a revocation warning after the cert propagates. Use only if your private key is compromised. The revocation cert was pre-signed at keygen time, so an attacker who steals the key cannot forge a revocation — but neither can you un-revoke.</p>' +
+      '<div class="config-field"><span class="config-field-label">Type <code>REVOKE</code> to confirm</span>' +
+      '  <input class="config-input" id="configRevokeConfirm" type="text" autocomplete="off">' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn config-btn-danger" id="configRevokeDo">Revoke</button>' +
+      '  <button class="config-btn" id="configRevokeCancel">Cancel</button>' +
+      '</div>' +
+      '<div id="configRevokeStatus" class="config-note"></div>';
+    document.getElementById('configRevokeDo').addEventListener('click', doRevoke);
+    document.getElementById('configRevokeCancel').addEventListener('click', function() {
+      zone.style.display = 'none'; zone.innerHTML = '';
+    });
+  }
+
+  async function doRevoke() {
+    var confirmEl = document.getElementById('configRevokeConfirm');
+    var statusEl = document.getElementById('configRevokeStatus');
+    var btn = document.getElementById('configRevokeDo');
+    if (!confirmEl || confirmEl.value.trim() !== 'REVOKE') {
+      statusEl.textContent = 'Type REVOKE exactly to confirm.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    statusEl.style.color = '';
+    statusEl.textContent = 'Publishing revocation\u2026';
+    btn.disabled = true;
+    try {
+      var res = await fetchJson('/api/identity/revoke', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({confirm: 'REVOKE'}),
+      });
+      statusEl.textContent = 'Revoked. Fingerprint ' + (res.fingerprint || '') + ' is now dead. Keychain: ' + (res.keychain_id || '');
+      statusEl.style.color = '#b04040';
+    } catch (e) {
+      statusEl.textContent = 'Revoke failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
+    }
+  }
+
+  function renderServer(server) {
+    // Adopt the server's webhook list as our draft on every render
+    // UNLESS the user has unsaved local edits — those win until they
+    // click Save (which flushes) or Cancel (which discards).
+    if (!_webhooksDirty) {
+      _webhooksDraft = (server.webhooks || []).map(function(w) {
+        return {
+          url: w.url || '',
+          events: (w.events || []).slice(),
+          headers: w.headers || {},
+          template: w.template || '',
+        };
+      });
     }
 
+    var domain = server.domain || '';
+    var cert   = server.cert   || '';
+    var keyP   = server.key    || '';
+
     els.server.innerHTML =
-      '<div class="config-field"><span class="config-field-label">Domain</span><span class="config-field-value">' + domain + '</span></div>' +
-      '<div class="config-field"><span class="config-field-label">TLS cert</span><span class="config-field-value">' + cert + '</span></div>' +
-      '<div class="config-field"><span class="config-field-label">TLS key</span><span class="config-field-value">' + keyP + '</span></div>' +
-      '<div class="config-field"><span class="config-field-label">Webhooks (' + server.webhooks_count + ')</span><span class="config-field-value">' + webhooksHtml + '</span></div>' +
-      '<p class="config-note">Edit <code>~/.mememage/server.json</code> directly to change these. Restart the server to pick up changes.</p>';
+      '<div class="config-field">' +
+      '  <span class="config-field-label">Domain</span>' +
+      '  <input class="config-input" id="configServerDomain" type="text" value="' + escapeHtml(domain) + '" placeholder="(auto-detect at startup)">' +
+      '</div>' +
+      '<div class="config-field config-field-with-browse">' +
+      '  <span class="config-field-label">TLS cert</span>' +
+      '  <input class="config-input" id="configServerCert" type="text" value="' + escapeHtml(cert) + '" placeholder="(auto-detect at startup)" readonly>' +
+      '  <button class="config-btn" id="configServerCertBrowse">Browse\u2026</button>' +
+      '  <button class="config-btn config-btn-subtle" id="configServerCertClear" title="Clear path" ' + (cert ? '' : 'disabled') + '>\u00d7</button>' +
+      '</div>' +
+      '<div class="config-field config-field-with-browse">' +
+      '  <span class="config-field-label">TLS key</span>' +
+      '  <input class="config-input" id="configServerKey" type="text" value="' + escapeHtml(keyP) + '" placeholder="(auto-detect at startup)" readonly>' +
+      '  <button class="config-btn" id="configServerKeyBrowse">Browse\u2026</button>' +
+      '  <button class="config-btn config-btn-subtle" id="configServerKeyClear" title="Clear path" ' + (keyP ? '' : 'disabled') + '>\u00d7</button>' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn" id="configServerSave">Save server.json</button>' +
+      '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
+      '</div>' +
+      '<p class="config-note">Cert/key paths use the native file picker — OS-agnostic, no copy-paste of long paths. Empty = auto-detect from <code>~/.mememage/certs/</code> at startup. Cert/key changes require a server restart to take effect.</p>' +
+      '<div id="configWebhooks" class="config-webhooks"></div>';
+
+    document.getElementById('configServerSave').addEventListener('click', saveServerConfig);
+    document.getElementById('configServerCertBrowse').addEventListener('click', function() {
+      pickCertOrKey('configServerCert', 'configServerCertClear');
+    });
+    document.getElementById('configServerKeyBrowse').addEventListener('click', function() {
+      pickCertOrKey('configServerKey', 'configServerKeyClear');
+    });
+    document.getElementById('configServerCertClear').addEventListener('click', function() {
+      clearCertOrKey('configServerCert', 'configServerCertClear');
+    });
+    document.getElementById('configServerKeyClear').addEventListener('click', function() {
+      clearCertOrKey('configServerKey', 'configServerKeyClear');
+    });
+    renderWebhooks();
+  }
+
+  // Cert/key paths use the native OS picker via /api/fs/pick rather
+  // than a free-form text input — paths can be long, easy to mistype,
+  // and platform-dependent in their separators. The picker also resolves
+  // ~ on the server side so we can store portable ~-prefixed paths.
+  async function pickCertOrKey(inputId, clearId) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    try {
+      var path = await window.FilePicker.pick({
+        type: 'file',
+        initDir: '~/.mememage/certs',
+      });
+      if (path) {
+        input.value = path;
+        var clearBtn = document.getElementById(clearId);
+        if (clearBtn) clearBtn.disabled = false;
+      }
+    } catch (e) {
+      showError('File picker failed: ' + e.message);
+    }
+  }
+
+  function clearCertOrKey(inputId, clearId) {
+    var input = document.getElementById(inputId);
+    if (input) input.value = '';
+    var clearBtn = document.getElementById(clearId);
+    if (clearBtn) clearBtn.disabled = true;
+  }
+
+  async function saveServerConfig() {
+    var domain = (document.getElementById('configServerDomain').value || '').trim();
+    var cert = (document.getElementById('configServerCert').value || '').trim();
+    var key = (document.getElementById('configServerKey').value || '').trim();
+    var statusEl = document.getElementById('configServerStatus');
+    var btn = document.getElementById('configServerSave');
+    showError('');
+    statusEl.textContent = '';
+    btn.disabled = true; btn.textContent = 'Saving\u2026';
+    try {
+      var res = await fetchJson('/api/config/server', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({domain: domain, cert: cert, key: key}),
+      });
+      statusEl.textContent = res.restart_needed
+        ? 'Saved. Restart server to apply cert/key.'
+        : 'Saved.';
+      statusEl.style.color = res.restart_needed ? '#a06010' : '#1a7a1a';
+      setTimeout(function() { statusEl.textContent = ''; }, 4000);
+    } catch (e) {
+      showError('Server save failed: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save server.json';
+    }
+  }
+
+  // Render the webhook editor inside #configWebhooks. The list is
+  // driven by _webhooksDraft so the user can stage adds/deletes/edits
+  // before committing with Save.
+  function renderWebhooks() {
+    var host = document.getElementById('configWebhooks');
+    if (!host) return;
+    var list = _webhooksDraft || [];
+
+    var rowsHtml = list.length === 0
+      ? '<p class="config-field-empty">No webhooks configured. Mints will not notify anywhere.</p>'
+      : list.map(function(w, i) {
+          var hasC = (w.events || []).indexOf('conceived') >= 0;
+          var hasR = (w.events || []).indexOf('ready') >= 0;
+          var allEv = (w.events || []).length === 0; // empty = all events
+          var hCount = w.headers ? Object.keys(w.headers).length : 0;
+          var tmpl = w.template || '';
+          // Identify which preset (if any) the template matches so the
+          // dropdown shows the right active item. Falls back to
+          // "custom" when the user has edited a preset or written
+          // their own.
+          var presetKey = 'raw';
+          if (tmpl) {
+            presetKey = 'custom';
+            for (var pk in WEBHOOK_PRESETS) {
+              if (WEBHOOK_PRESETS[pk] === tmpl) { presetKey = pk; break; }
+            }
+          }
+          var headerEntries = w.headers ? Object.keys(w.headers).sort() : [];
+          // Newly-added rows use a sentinel key (starts with NBSP +
+          // "new-") so the dict-keyed storage stays stable. Render
+          // those with empty key/value inputs — user fills in the real
+          // name; _syncHeadersForRow rewrites the dict on input.
+          function _isSentinel(k) { return typeof k === 'string' && k.indexOf('\u00a0new-') === 0; }
+          var headersRowsHtml = headerEntries.map(function(hk, hi) {
+            var displayKey = _isSentinel(hk) ? '' : hk;
+            return '<div class="config-webhook-hdr-row">' +
+              '<input class="config-input config-webhook-hdr-key" data-webhook-hdr-key="' + i + ':' + hi + '" type="text" value="' + escapeHtml(displayKey) + '" placeholder="Header-Name">' +
+              '<input class="config-input config-webhook-hdr-val" data-webhook-hdr-val="' + i + ':' + hi + '" type="text" value="' + escapeHtml(w.headers[hk]) + '" placeholder="value">' +
+              '<button class="config-btn config-webhook-hdr-del" data-webhook-hdr-del="' + i + ':' + hi + '" title="Remove header">\u00d7</button>' +
+            '</div>';
+          }).join('');
+          return '' +
+            '<div class="config-webhook-row" data-i="' + i + '">' +
+              '<div class="config-webhook-main">' +
+                '<input class="config-input config-webhook-url" data-webhook-url="' + i + '" type="url" value="' + escapeHtml(w.url) + '" placeholder="https://…">' +
+                '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="conceived" ' + (allEv || hasC ? 'checked' : '') + '> conceived</label>' +
+                '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="ready"     ' + (allEv || hasR ? 'checked' : '') + '> ready</label>' +
+                '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
+              '</div>' +
+              '<details class="config-webhook-hdrs-section" ' + (hCount > 0 ? 'open' : '') + '>' +
+                '<summary>Headers (' + hCount + ')</summary>' +
+                '<div class="config-webhook-hdrs-list">' + headersRowsHtml + '</div>' +
+                '<button class="config-btn config-webhook-hdr-add" data-webhook-hdr-add="' + i + '">+ Add header</button>' +
+              '</details>' +
+              '<div class="config-webhook-tmpl">' +
+                '<label class="config-webhook-tmpl-label">Body template:' +
+                  ' <select class="config-input config-webhook-preset" data-webhook-preset="' + i + '">' +
+                    '<option value="raw"' + (presetKey === 'raw' ? ' selected' : '') + '>Raw (generic JSON)</option>' +
+                    '<option value="discord"' + (presetKey === 'discord' ? ' selected' : '') + '>Discord</option>' +
+                    '<option value="slack"' + (presetKey === 'slack' ? ' selected' : '') + '>Slack</option>' +
+                    '<option value="custom"' + (presetKey === 'custom' ? ' selected' : '') + ' disabled>Custom (edited)</option>' +
+                  '</select>' +
+                '</label>' +
+                '<textarea class="config-input config-webhook-tmpl-input" data-webhook-tmpl="' + i + '" rows="3" placeholder="Empty = raw POST. JSON template with {{event}}, {{identifier}}, {{content_hash}}, {{url}}, {{mint_url}}, {{image_name}}.">' + escapeHtml(tmpl) + '</textarea>' +
+              '</div>' +
+            '</div>';
+        }).join('');
+
+    host.innerHTML =
+      '<div class="config-field-label" style="margin-bottom:0.3rem;">Webhooks (' + list.length + ')</div>' +
+      '<div class="config-webhooks-list">' + rowsHtml + '</div>' +
+      '<div class="config-row" style="margin-top:0.5rem;">' +
+        '<button class="config-btn" id="configWebhookAdd">+ Add webhook</button>' +
+        '<button class="config-btn config-btn-primary" id="configWebhookSave" ' + (_webhooksDirty ? '' : 'disabled') + '>Save</button>' +
+        '<button class="config-btn" id="configWebhookCancel" ' + (_webhooksDirty ? '' : 'disabled') + '>Cancel</button>' +
+      '</div>' +
+      '<p class="config-note">Webhooks fire on <code>conceived</code> (image minted) and <code>ready</code> (GPS capture link generated). Custom auth headers (Discord bot token, etc.) require editing <code>~/.mememage/server.json</code> directly — they\u2019re preserved here across saves but not editable from the dashboard.</p>';
+
+    // Wire row controls
+    host.querySelectorAll('[data-webhook-url]').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var i = parseInt(inp.getAttribute('data-webhook-url'), 10);
+        _webhooksDraft[i].url = inp.value;
+        _webhooksDirty = true;
+        // Don't re-render — that would steal focus mid-typing. Just
+        // mark dirty and update the Save/Cancel button state.
+        markWebhooksDirty();
+      });
+    });
+    host.querySelectorAll('[data-webhook-ev]').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var i = parseInt(cb.getAttribute('data-webhook-ev'), 10);
+        var ev = cb.value;
+        var arr = _webhooksDraft[i].events || [];
+        // Treat the canonical event set as the implicit "all". If both
+        // boxes are ticked we store [] (matches the firing-loop default
+        // and keeps server.json compact).
+        var has = arr.indexOf(ev) >= 0;
+        if (cb.checked && !has) arr.push(ev);
+        else if (!cb.checked && has) arr.splice(arr.indexOf(ev), 1);
+        _webhooksDraft[i].events = arr;
+        _webhooksDirty = true;
+        markWebhooksDirty();
+      });
+    });
+    host.querySelectorAll('[data-webhook-del]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var i = parseInt(b.getAttribute('data-webhook-del'), 10);
+        _webhooksDraft.splice(i, 1);
+        _webhooksDirty = true;
+        renderWebhooks();
+      });
+    });
+    host.querySelectorAll('[data-webhook-tmpl]').forEach(function(ta) {
+      ta.addEventListener('input', function() {
+        var i = parseInt(ta.getAttribute('data-webhook-tmpl'), 10);
+        _webhooksDraft[i].template = ta.value;
+        _webhooksDirty = true;
+        // Flip the preset dropdown to "Custom" when the user has
+        // edited away from the preset — but only if it no longer
+        // matches a known preset (so re-typing a preset verbatim
+        // still reads as that preset). Same focus-preservation
+        // reason as the URL input: don't re-render.
+        var sel = host.querySelector('[data-webhook-preset="' + i + '"]');
+        if (sel) {
+          var match = 'custom';
+          if (!ta.value) match = 'raw';
+          else for (var pk in WEBHOOK_PRESETS) {
+            if (WEBHOOK_PRESETS[pk] === ta.value) { match = pk; break; }
+          }
+          // The "Custom (edited)" option is disabled in markup so the
+          // user can't pick it directly; enable it just-in-time when
+          // we need to select it programmatically.
+          if (match === 'custom') {
+            var customOpt = sel.querySelector('option[value="custom"]');
+            if (customOpt) customOpt.disabled = false;
+          }
+          sel.value = match;
+        }
+        markWebhooksDirty();
+      });
+    });
+    host.querySelectorAll('[data-webhook-preset]').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        var i = parseInt(sel.getAttribute('data-webhook-preset'), 10);
+        var key = sel.value;
+        if (key === 'custom') return; // disabled, but defensive
+        var tmpl = WEBHOOK_PRESETS[key] || '';
+        _webhooksDraft[i].template = tmpl;
+        _webhooksDirty = true;
+        // Re-render this row's textarea content. Full re-render is
+        // overkill but cheap, and the preset is a deliberate one-shot
+        // action so focus loss is acceptable.
+        renderWebhooks();
+      });
+    });
+    // Header editor: key/value inputs, +Add, delete. The draft stores
+    // headers as a dict for transport, but the UI renders them in
+    // sorted-key order so the row positions match the data-attr index.
+    function _syncHeadersForRow(i) {
+      var row = host.querySelector('.config-webhook-row[data-i="' + i + '"]');
+      if (!row) return;
+      var dict = {};
+      var keys = row.querySelectorAll('[data-webhook-hdr-key^="' + i + ':"]');
+      var vals = row.querySelectorAll('[data-webhook-hdr-val^="' + i + ':"]');
+      for (var hi = 0; hi < keys.length; hi++) {
+        var k = (keys[hi].value || '').trim();
+        var v = (vals[hi] ? vals[hi].value : '');
+        if (k) dict[k] = v;
+      }
+      _webhooksDraft[i].headers = dict;
+      _webhooksDirty = true;
+      markWebhooksDirty();
+    }
+    host.querySelectorAll('[data-webhook-hdr-key]').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var i = parseInt(inp.getAttribute('data-webhook-hdr-key').split(':')[0], 10);
+        _syncHeadersForRow(i);
+      });
+    });
+    host.querySelectorAll('[data-webhook-hdr-val]').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var i = parseInt(inp.getAttribute('data-webhook-hdr-val').split(':')[0], 10);
+        _syncHeadersForRow(i);
+      });
+    });
+    host.querySelectorAll('[data-webhook-hdr-del]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var parts = b.getAttribute('data-webhook-hdr-del').split(':');
+        var i = parseInt(parts[0], 10);
+        var hi = parseInt(parts[1], 10);
+        var hdrs = _webhooksDraft[i].headers || {};
+        var sortedKeys = Object.keys(hdrs).sort();
+        var keyToDelete = sortedKeys[hi];
+        if (keyToDelete !== undefined) {
+          delete hdrs[keyToDelete];
+          _webhooksDirty = true;
+          renderWebhooks();
+        }
+      });
+    });
+    host.querySelectorAll('[data-webhook-hdr-add]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var i = parseInt(b.getAttribute('data-webhook-hdr-add'), 10);
+        // Insert a placeholder row using a sentinel key that won't
+        // clash with a real header name. _syncHeadersForRow rewrites
+        // the dict on first edit and the sentinel disappears.
+        _webhooksDraft[i].headers = _webhooksDraft[i].headers || {};
+        _webhooksDraft[i].headers['\u00a0new-' + Date.now()] = '';
+        _webhooksDirty = true;
+        renderWebhooks();
+      });
+    });
+    var addBtn = document.getElementById('configWebhookAdd');
+    if (addBtn) addBtn.addEventListener('click', function() {
+      _webhooksDraft.push({url: '', events: [], headers: {}});
+      _webhooksDirty = true;
+      renderWebhooks();
+      // Focus the newly-added URL input so the user can start typing.
+      var inputs = host.querySelectorAll('[data-webhook-url]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+    var saveBtn = document.getElementById('configWebhookSave');
+    if (saveBtn) saveBtn.addEventListener('click', saveWebhooks);
+    var cancelBtn = document.getElementById('configWebhookCancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', function() {
+      _webhooksDirty = false;
+      _webhooksDraft = null;
+      refresh();
+    });
+  }
+
+  // Toggle Save/Cancel disabled state without re-rendering the whole
+  // editor (avoid stealing focus mid-input).
+  function markWebhooksDirty() {
+    var save = document.getElementById('configWebhookSave');
+    var cancel = document.getElementById('configWebhookCancel');
+    if (save) save.disabled = !_webhooksDirty;
+    if (cancel) cancel.disabled = !_webhooksDirty;
+  }
+
+  async function saveWebhooks() {
+    // Strip empty-URL rows silently — they're staging artifacts from
+    // an "Add" click the user abandoned. Validate the rest.
+    var clean = (_webhooksDraft || []).filter(function(w) {
+      return w.url && w.url.trim();
+    });
+    for (var i = 0; i < clean.length; i++) {
+      if (!/^https?:\/\//.test(clean[i].url.trim())) {
+        showError('Webhook ' + (i + 1) + ': URL must start with http:// or https://');
+        return;
+      }
+    }
+    showError('');
+    var save = document.getElementById('configWebhookSave');
+    if (save) { save.disabled = true; save.textContent = 'Saving\u2026'; }
+    try {
+      await fetchJson('/api/config/webhooks', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({webhooks: clean.map(function(w) {
+          var out = {url: w.url.trim()};
+          if (w.events && w.events.length) out.events = w.events;
+          // Strip any sentinel placeholder keys left over from a
+          // "+ Add header" click the user abandoned without typing.
+          if (w.headers) {
+            var realHeaders = {};
+            Object.keys(w.headers).forEach(function(k) {
+              if (typeof k !== 'string') return;
+              if (k.indexOf('\u00a0new-') === 0) return;
+              realHeaders[k] = w.headers[k];
+            });
+            if (Object.keys(realHeaders).length) out.headers = realHeaders;
+          }
+          if (w.template && w.template.trim()) out.template = w.template.trim();
+          return out;
+        })}),
+      });
+      _webhooksDirty = false;
+      _webhooksDraft = null;
+      await refresh();
+    } catch (e) {
+      showError('Webhook save failed: ' + e.message);
+      if (save) { save.disabled = false; save.textContent = 'Save'; }
+    }
   }
 
   function renderEnv(envPresence) {
@@ -1529,36 +2115,82 @@ if (typeof TabBar !== 'undefined') {
       els.env.innerHTML = '<span class="config-field-empty">(no credentials)</span>';
       return;
     }
+    // Per-key inline editor. We never round-trip the actual value (the
+    // API only reports presence), so the input is empty by default with
+    // a placeholder that reflects current state. Type a new value +
+    // click Update to overwrite; click Clear to remove the key.
     var rowsHtml = keys.map(function(k) {
       var set = envPresence[k];
       return '<div class="config-env-row" data-set="' + (set ? '1' : '0') + '">' +
         '<span class="config-env-dot"></span>' +
         '<span class="config-env-name">' + escapeHtml(k) + '</span>' +
+        '<input class="config-input config-env-input" data-env-input="' + escapeHtml(k) + '" type="password" autocomplete="off" placeholder="' + (set ? '(set — type to replace)' : '(unset)') + '">' +
+        '<button class="config-btn config-env-update" data-env-update="' + escapeHtml(k) + '">Update</button>' +
+        '<button class="config-btn config-btn-danger config-env-clear" data-env-clear="' + escapeHtml(k) + '" ' + (set ? '' : 'disabled') + '>Clear</button>' +
         '<span class="config-env-state">' + (set ? 'set' : 'unset') + '</span>' +
       '</div>';
     }).join('');
     els.env.innerHTML = rowsHtml +
-      '<p class="config-note">Edit <code>.env</code> at the project root to set these. ' +
-      'Restart the server to pick up changes. Values are never read or returned via the API.</p>';
+      '<div id="configEnvStatus" class="config-note" style="margin-top:0.4rem;"></div>' +
+      '<p class="config-note">Updates write to <code>.env</code> at the project root and mirror into the running server\u2019s environment. Existing values are never read back from the API \u2014 the input always starts empty.</p>';
+
+    els.env.querySelectorAll('[data-env-update]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var k = b.getAttribute('data-env-update');
+        var input = els.env.querySelector('[data-env-input="' + cssEsc(k) + '"]');
+        var v = input ? input.value : '';
+        if (!v) {
+          setEnvStatus(k + ': enter a value (or click Clear to remove)', '#b04040');
+          return;
+        }
+        setEnvField(k, v);
+      });
+    });
+    els.env.querySelectorAll('[data-env-clear]').forEach(function(b) {
+      if (b.disabled) return;
+      b.addEventListener('click', function() {
+        var k = b.getAttribute('data-env-clear');
+        if (!window.confirm('Clear ' + k + ' from .env? The server will lose access to whatever this credential authorized.')) return;
+        setEnvField(k, '');
+      });
+    });
   }
 
-  function renderEasterEgg(ee) {
-    if (!ee.exists) {
-      els.easterEgg.innerHTML =
-        '<p class="config-field-empty">No easter egg sealed.</p>' +
-        '<p class="config-note">The easter egg is sealed once and reused at position 364 ' +
-        'of every Age. Configure yours with the <code>EASTER_EGG_FILE</code> at ' +
-        '<code>~/.mememage/madeline_sealed.json</code>.</p>';
-      return;
-    }
-    els.easterEgg.innerHTML =
-      '<div class="config-field"><span class="config-field-label">Name</span><span class="config-field-value">' + escapeHtml(ee.name || '') + '</span></div>' +
-      '<div class="config-field"><span class="config-field-label">Parent</span><span class="config-field-value">' + escapeHtml(ee.parent_id || '\u2205 (genesis)') + '</span></div>' +
-      '<div class="config-field"><span class="config-field-label">Sun</span><span class="config-field-value">' + escapeHtml(ee.born_sun || '') + '</span></div>' +
-      '<div class="config-field"><span class="config-field-label">Moon</span><span class="config-field-value">' + escapeHtml(ee.born_moon || '') + '</span></div>' +
-      '<div class="config-field"><span class="config-field-label">Image</span><span class="config-field-value">' + escapeHtml(ee.image_format || '') + ' \u00b7 ' + escapeHtml(ee.image_size_bytes || '') + ' bytes</span></div>' +
-      '<p class="config-note">Sealed once. Reused forever.</p>';
+  function setEnvStatus(msg, color) {
+    var s = document.getElementById('configEnvStatus');
+    if (!s) return;
+    s.textContent = msg;
+    s.style.color = color || '';
   }
+
+  function cssEsc(s) {
+    // CSS attribute-selector escape. The keys we deal with (IA_*, MINT_*)
+    // are alnum + underscore so escaping is a no-op, but be defensive
+    // in case a future allow-listed key contains a colon or dash.
+    if (window.CSS && window.CSS.escape) return window.CSS.escape(s);
+    return s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+  }
+
+  async function setEnvField(key, value) {
+    setEnvStatus('Updating ' + key + '\u2026', '');
+    showError('');
+    try {
+      var body = {};
+      body[key] = value;
+      await fetchJson('/api/config/env', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify(body),
+      });
+      setEnvStatus(key + ': ' + (value ? 'updated' : 'cleared'), '#1a7a1a');
+      // Refresh presence dots and the per-row UI state.
+      await refresh();
+    } catch (e) {
+      setEnvStatus(key + ': save failed — ' + e.message, '#b04040');
+    }
+  }
+
+  // renderEasterEgg removed: easter eggs are chain-dependent now,
+  // configured per-chain via the Payload tab's frozen-entry editor.
 
   async function saveCreatorName() {
     var input = document.getElementById('configCreatorName');
@@ -1624,12 +2256,298 @@ if (typeof TabBar !== 'undefined') {
       renderIdentity(data.identity || {});
       renderServer(data.server || {});
       renderEnv(data.env || {});
-      renderEasterEgg(data.easter_egg || {});
     } catch (e) {
       showError('Config load failed: ' + e.message);
     }
-    // Chains are a separate endpoint; load in parallel-ish.
-    await loadChains();
+    // Chains + profiles are separate endpoints; load them after the
+    // main config so the identity section's "active profile" label
+    // can reflect any switch that just happened.
+    await Promise.all([loadChains(), loadProfiles()]);
+  }
+
+  // ----- Profiles section -----------------------------------------------
+  //
+  // The Profiles section displays every Ed25519 identity living under
+  // ~/.mememage/profiles/, marks the active one, and exposes
+  // switch / new / import / alias / remove operations. Identity links
+  // between profiles (one human, many keys) are forged via signed
+  // alias records on IA — not by shared fingerprints. See
+  // docs/plans/multi-key-profiles.md for the full design.
+
+  async function loadProfiles() {
+    if (!els.profiles) return;
+    try {
+      var data = await fetchJson('/api/profiles');
+      renderProfiles(data.active, data.profiles || []);
+    } catch (e) {
+      els.profiles.innerHTML = '<p class="config-field-empty">Could not load profiles: ' + escapeHtml(e.message) + '</p>';
+    }
+  }
+
+  function renderProfiles(activeId, rows) {
+    if (!els.profiles) return;
+    var listHtml = rows.length === 0
+      ? '<p class="config-field-empty">No profiles found.</p>'
+      : rows.map(function(p) {
+          var active = p.id === activeId;
+          var fp = p.fingerprint || '(no key)';
+          var name = p.name || '';
+          var btns = '';
+          if (!active) {
+            btns += '<button class="config-btn config-profile-use" data-profile-use="' + escapeHtml(p.id) + '">Use</button>';
+            btns += '<button class="config-btn config-profile-alias" data-profile-alias="' + escapeHtml(p.id) + '">Alias\u2026</button>';
+            btns += '<button class="config-btn config-btn-danger config-profile-remove" data-profile-remove="' + escapeHtml(p.id) + '">Remove\u2026</button>';
+          }
+          return '' +
+            '<div class="config-profile-row" data-active="' + (active ? '1' : '0') + '">' +
+              '<span class="config-profile-dot"></span>' +
+              '<span class="config-profile-id">' + escapeHtml(p.id) + '</span>' +
+              '<span class="config-profile-fp">' + escapeHtml(fp) + '</span>' +
+              '<span class="config-profile-name">' + escapeHtml(name) + '</span>' +
+              '<span class="config-profile-state">' + (active ? 'active' : '') + '</span>' +
+              '<span class="config-profile-actions">' + btns + '</span>' +
+            '</div>';
+        }).join('');
+
+    els.profiles.innerHTML =
+      '<div class="config-profile-list">' + listHtml + '</div>' +
+      '<div class="config-row" style="margin-top:0.5rem;">' +
+      '  <button class="config-btn" id="configProfileNewBtn">+ New profile</button>' +
+      '  <button class="config-btn" id="configProfileImportBtn">Import existing key\u2026</button>' +
+      '</div>' +
+      '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
+      '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next mint. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side; verifiers walk both keychains to confirm.</p>';
+
+    // Wire row actions
+    els.profiles.querySelectorAll('[data-profile-use]').forEach(function(b) {
+      b.addEventListener('click', function() { switchProfile(b.getAttribute('data-profile-use')); });
+    });
+    els.profiles.querySelectorAll('[data-profile-alias]').forEach(function(b) {
+      b.addEventListener('click', function() { openAliasConfirm(b.getAttribute('data-profile-alias')); });
+    });
+    els.profiles.querySelectorAll('[data-profile-remove]').forEach(function(b) {
+      b.addEventListener('click', function() { openRemoveConfirm(b.getAttribute('data-profile-remove')); });
+    });
+    document.getElementById('configProfileNewBtn').addEventListener('click', openNewProfile);
+    document.getElementById('configProfileImportBtn').addEventListener('click', openImportProfile);
+  }
+
+  async function switchProfile(id) {
+    showError('');
+    try {
+      await fetchJson('/api/profiles/active', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({id: id}),
+      });
+      await refresh();
+    } catch (e) {
+      showError('Switch failed: ' + e.message);
+    }
+  }
+
+  // Inline forms render into #configProfileDanger so the user sees
+  // them next to the affected profile, not in a modal floating over
+  // the page. Same pattern as the identity rotate/revoke danger zone.
+  function openNewProfile() {
+    var zone = document.getElementById('configProfileDanger');
+    zone.style.display = '';
+    zone.innerHTML =
+      '<h4>Generate new profile</h4>' +
+      '<p>Creates a fresh Ed25519 keypair under <code>~/.mememage/profiles/&lt;id&gt;/</code> and switches it active. Identity links between profiles are created later via <strong>Alias</strong> \u2014 nothing crosses over automatically.</p>' +
+      '<div class="config-field"><span class="config-field-label">Profile id</span>' +
+      '  <input class="config-input" id="configProfileNewId" type="text" placeholder="vps-prod / laptop / scratch" autocomplete="off">' +
+      '</div>' +
+      '<div class="config-field"><span class="config-field-label">Creator name</span>' +
+      '  <input class="config-input" id="configProfileNewName" type="text" placeholder="(embedded in signed records)">' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn config-btn-primary" id="configProfileNewGo">Generate</button>' +
+      '  <button class="config-btn" id="configProfileNewCancel">Cancel</button>' +
+      '</div>' +
+      '<div id="configProfileNewStatus" class="config-note"></div>';
+    document.getElementById('configProfileNewGo').addEventListener('click', doNewProfile);
+    document.getElementById('configProfileNewCancel').addEventListener('click', closeProfileDanger);
+  }
+
+  async function doNewProfile() {
+    var idEl = document.getElementById('configProfileNewId');
+    var nameEl = document.getElementById('configProfileNewName');
+    var statusEl = document.getElementById('configProfileNewStatus');
+    var btn = document.getElementById('configProfileNewGo');
+    var pid = (idEl.value || '').trim();
+    if (!pid) {
+      statusEl.textContent = 'Profile id required.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    statusEl.textContent = 'Generating\u2026'; statusEl.style.color = '';
+    btn.disabled = true;
+    try {
+      await fetchJson('/api/profiles', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({id: pid, name: nameEl.value.trim()}),
+      });
+      closeProfileDanger();
+      await refresh();
+    } catch (e) {
+      statusEl.textContent = 'Failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
+    }
+  }
+
+  function openImportProfile() {
+    var zone = document.getElementById('configProfileDanger');
+    zone.style.display = '';
+    zone.innerHTML =
+      '<h4>Import existing key</h4>' +
+      '<p>Imports a standard Ed25519 private key (the same format <code>openssl genpkey -algorithm Ed25519</code> or <code>ssh-keygen -t ed25519</code> produce) as a new profile. The file stays where you point at it \u2014 we read it once and copy it into the profile directory under your selected id. Does NOT switch the active profile.</p>' +
+      '<div class="config-field"><span class="config-field-label">Profile id</span>' +
+      '  <input class="config-input" id="configProfileImportId" type="text" placeholder="laptop / vps-prod / friend-host" autocomplete="off">' +
+      '</div>' +
+      '<div class="config-field"><span class="config-field-label">Creator name</span>' +
+      '  <input class="config-input" id="configProfileImportName" type="text" placeholder="(embedded in signed records)">' +
+      '</div>' +
+      '<div class="config-field config-field-with-browse">' +
+      '  <span class="config-field-label">Key file</span>' +
+      '  <input class="config-input" id="configProfileImportPath" type="text" placeholder="(click Browse\u2026)" readonly>' +
+      '  <button class="config-btn" id="configProfileImportBrowse">Browse\u2026</button>' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn config-btn-primary" id="configProfileImportGo">Import</button>' +
+      '  <button class="config-btn" id="configProfileImportCancel">Cancel</button>' +
+      '</div>' +
+      '<div id="configProfileImportStatus" class="config-note"></div>';
+    document.getElementById('configProfileImportBrowse').addEventListener('click', async function() {
+      try {
+        var path = await window.FilePicker.pick({type: 'file', initDir: '~/.ssh'});
+        if (path) document.getElementById('configProfileImportPath').value = path;
+      } catch (e) {
+        showError('File picker failed: ' + e.message);
+      }
+    });
+    document.getElementById('configProfileImportGo').addEventListener('click', doImportProfile);
+    document.getElementById('configProfileImportCancel').addEventListener('click', closeProfileDanger);
+  }
+
+  async function doImportProfile() {
+    var pid = (document.getElementById('configProfileImportId').value || '').trim();
+    var name = (document.getElementById('configProfileImportName').value || '').trim();
+    var path = (document.getElementById('configProfileImportPath').value || '').trim();
+    var statusEl = document.getElementById('configProfileImportStatus');
+    var btn = document.getElementById('configProfileImportGo');
+    if (!pid) { statusEl.textContent = 'Profile id required.'; statusEl.style.color = '#b04040'; return; }
+    if (!path) { statusEl.textContent = 'Pick a key file first.'; statusEl.style.color = '#b04040'; return; }
+    statusEl.textContent = 'Importing\u2026'; statusEl.style.color = '';
+    btn.disabled = true;
+    try {
+      await fetchJson('/api/profiles/import', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({id: pid, name: name || null, key_path: path}),
+      });
+      closeProfileDanger();
+      await refresh();
+    } catch (e) {
+      statusEl.textContent = 'Failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
+    }
+  }
+
+  function openAliasConfirm(otherId) {
+    var zone = document.getElementById('configProfileDanger');
+    zone.style.display = '';
+    zone.innerHTML =
+      '<h4>Sign alias: active \u2192 ' + escapeHtml(otherId) + '</h4>' +
+      '<p>The active profile signs a record naming <code>' + escapeHtml(otherId) + '</code> as a sibling alias, then publishes it to the Internet Archive. Verifiers walking either keychain see the link. <strong>For bidirectional confirmation</strong> (the strongest verifier signal), switch to <code>' + escapeHtml(otherId) + '</code> afterwards and alias back to the current active profile.</p>' +
+      '<div class="config-field"><span class="config-field-label">Type <code>ALIAS</code> to confirm</span>' +
+      '  <input class="config-input" id="configProfileAliasConfirm" type="text" autocomplete="off">' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn config-btn-primary" id="configProfileAliasGo">Sign + publish</button>' +
+      '  <button class="config-btn" id="configProfileAliasCancel">Cancel</button>' +
+      '</div>' +
+      '<div id="configProfileAliasStatus" class="config-note"></div>';
+    document.getElementById('configProfileAliasGo').addEventListener('click', function() {
+      doAlias(otherId);
+    });
+    document.getElementById('configProfileAliasCancel').addEventListener('click', closeProfileDanger);
+  }
+
+  async function doAlias(otherId) {
+    var confirmVal = (document.getElementById('configProfileAliasConfirm').value || '').trim();
+    var statusEl = document.getElementById('configProfileAliasStatus');
+    var btn = document.getElementById('configProfileAliasGo');
+    if (confirmVal !== 'ALIAS') {
+      statusEl.textContent = 'Type ALIAS exactly to confirm.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    statusEl.textContent = 'Signing and publishing\u2026'; statusEl.style.color = '';
+    btn.disabled = true;
+    try {
+      var res = await fetchJson('/api/profiles/alias', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({other_id: otherId, confirm: 'ALIAS'}),
+      });
+      statusEl.textContent = res.uploaded
+        ? 'Alias published to ' + (res.keychain_id || '') + '.'
+        : 'Signed locally but upload failed: ' + (res.upload_error || 'unknown error') + '. Retry via: mememage profile alias ' + otherId;
+      statusEl.style.color = res.uploaded ? '#1a7a1a' : '#a06010';
+    } catch (e) {
+      statusEl.textContent = 'Failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
+    }
+  }
+
+  function openRemoveConfirm(pid) {
+    var zone = document.getElementById('configProfileDanger');
+    zone.style.display = '';
+    zone.innerHTML =
+      '<h4 style="color:#b04040;">Remove profile: ' + escapeHtml(pid) + '</h4>' +
+      '<p>Archives <code>~/.mememage/profiles/' + escapeHtml(pid) + '/</code> under <code>profiles/.removed/' + escapeHtml(pid) + '-&lt;timestamp&gt;/</code>. Records signed by this profile\u2019s key still verify. To fully delete, remove the archive directory by hand.</p>' +
+      '<div class="config-field"><span class="config-field-label">Type <code>REMOVE</code> to confirm</span>' +
+      '  <input class="config-input" id="configProfileRemoveConfirm" type="text" autocomplete="off">' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn config-btn-danger" id="configProfileRemoveGo">Archive</button>' +
+      '  <button class="config-btn" id="configProfileRemoveCancel">Cancel</button>' +
+      '</div>' +
+      '<div id="configProfileRemoveStatus" class="config-note"></div>';
+    document.getElementById('configProfileRemoveGo').addEventListener('click', function() {
+      doRemove(pid);
+    });
+    document.getElementById('configProfileRemoveCancel').addEventListener('click', closeProfileDanger);
+  }
+
+  async function doRemove(pid) {
+    var confirmVal = (document.getElementById('configProfileRemoveConfirm').value || '').trim();
+    var statusEl = document.getElementById('configProfileRemoveStatus');
+    var btn = document.getElementById('configProfileRemoveGo');
+    if (confirmVal !== 'REMOVE') {
+      statusEl.textContent = 'Type REMOVE exactly to confirm.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    btn.disabled = true;
+    try {
+      await fetchJson('/api/profiles/remove', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({id: pid, confirm: 'REMOVE'}),
+      });
+      closeProfileDanger();
+      await refresh();
+    } catch (e) {
+      statusEl.textContent = 'Failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
+    }
+  }
+
+  function closeProfileDanger() {
+    var zone = document.getElementById('configProfileDanger');
+    if (zone) { zone.style.display = 'none'; zone.innerHTML = ''; }
   }
 
   async function loadChains() {
@@ -1662,20 +2580,33 @@ if (typeof TabBar !== 'undefined') {
       ? (needsMigration ? '' : '<p class="config-field-empty">No chains found.</p>')
       : '<div class="config-chain-table">' + chains.map(function(c) {
           var isActive = c.id === currentId;
-          var meta = (c.visibility || '') + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
+          var vis = c.visibility || 'light_energy';
+          var pwSet = !!c.password_set;
+          // Password state phrasing surfaces the contract for the user:
+          // dark + no password is a configuration error; light + no
+          // password is a valid public-everything mode; both with
+          // passwords give partial/full sealing as appropriate.
+          var pwLabel;
+          if (vis === 'dark_matter') {
+            pwLabel = pwSet ? '\u00b7 sealed' : '\u00b7 NEEDS PASSWORD';
+          } else {
+            pwLabel = pwSet ? '\u00b7 GPS sealed' : '\u00b7 public';
+          }
+          var meta = vis + ' ' + pwLabel + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
           var renameBtn = '<button class="config-btn" data-chain-action="rename" data-chain-id="' + escapeHtml(c.id) + '" data-chain-name="' + escapeHtml(c.name || c.id) + '" title="Change display name (visibility is locked at creation)">Rename</button>';
+          var pwBtn = '<button class="config-btn" data-chain-action="password" data-chain-id="' + escapeHtml(c.id) + '" data-chain-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + (pwSet ? 'Change password\u2026' : 'Set password\u2026') + '</button>';
           var actions = isActive
             ? '<span class="config-chain-active-badge">active</span>' +
-              renameBtn +
+              renameBtn + pwBtn +
               '<button class="config-btn" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '" disabled title="Switch to a different chain first">Remove</button>'
             : '<button class="config-btn" data-chain-action="switch" data-chain-id="' + escapeHtml(c.id) + '">Switch</button>' +
-              renameBtn +
+              renameBtn + pwBtn +
               '<button class="config-btn" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '">Remove</button>';
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<span class="config-chain-active-mark">' + (isActive ? '\u25b6' : '') + '</span>' +
             '<span class="config-chain-id" title="' + escapeHtml(c.id) + '">' + escapeHtml(c.id) + '</span>' +
             '<span class="config-chain-meta" title="' + escapeHtml(c.name || '') + '">' +
-              escapeHtml(c.name || '') + (meta ? '<br><span style="opacity:0.7">' + escapeHtml(meta) + '</span>' : '') +
+              escapeHtml(c.name || '') + '<br><span class="config-chain-state" data-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>' +
             '</span>' +
             '<span class="config-chain-actions">' + actions + '</span>' +
             '<span></span>' +
@@ -1694,7 +2625,14 @@ if (typeof TabBar !== 'undefined') {
       '  <div class="config-field"><span class="config-field-label">Visibility</span><span>' +
       '    <label style="margin-right:1rem"><input type="radio" name="newChainVis" value="light_energy" checked> light</label>' +
       '    <label><input type="radio" name="newChainVis" value="dark_matter"> dark</label></span></div>' +
-      '  <p class="config-note config-chain-visibility-warning">\u26a0\ufe0f Visibility is permanent. Once you create the chain, you cannot switch between light and dark \u2014 visibility is baked into every record minted in it. The display name can be changed later; the ID and visibility cannot.</p>' +
+      '  <div class="config-field"><span class="config-field-label">Password</span>' +
+      '    <input class="config-input" id="configChainNewPw" type="password" autocomplete="off" placeholder="(optional for light, required for dark)"></div>' +
+      '  <p class="config-note" id="configChainNewPwHint" style="margin-top:0;">' +
+      '    Light + no password: every field public, including GPS. ' +
+      '    Light + password: GPS sealed for personal time-lock; soul fields stay public. ' +
+      '    Dark + password: soul + chunks sealed (viewers need this exact password to decrypt).' +
+      '  </p>' +
+      '  <p class="config-note config-chain-visibility-warning">\u26a0\ufe0f Visibility is permanent. Once you create the chain, you cannot switch between light and dark \u2014 visibility is baked into every record minted in it. The display name and password can be changed later; the ID and visibility cannot.</p>' +
       '  <div class="config-row">' +
       '    <button class="config-btn config-btn-primary" id="configChainNewCreate">Create</button>' +
       '    <button class="config-btn" id="configChainNewCancel">Cancel</button>' +
@@ -1726,7 +2664,7 @@ if (typeof TabBar !== 'undefined') {
     }
     if (createBtn) createBtn.addEventListener('click', createChain);
 
-    // Wire switch/remove buttons.
+    // Wire switch/remove/rename/password buttons.
     els.chains.querySelectorAll('[data-chain-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var action = btn.getAttribute('data-chain-action');
@@ -1734,8 +2672,84 @@ if (typeof TabBar !== 'undefined') {
         if (action === 'switch') switchChain(cid);
         else if (action === 'remove') removeChain(cid);
         else if (action === 'rename') renameChain(cid, btn.getAttribute('data-chain-name') || '');
+        else if (action === 'password') openChainPasswordEditor(
+          cid,
+          btn.getAttribute('data-chain-vis') || 'light_energy',
+          btn.getAttribute('data-pw-set') === '1'
+        );
       });
     });
+  }
+
+  // Per-chain password editor — inline form below the chain table.
+  // Surfaces what the password does for the chain's visibility class:
+  //
+  //   Light  : optional. Without it the entire record (incl. GPS) is
+  //            public. With it, GPS is sealed for personal time-lock.
+  //   Dark   : required. Soul fields and chunks are sealed with it.
+  //            Mints fail until configured.
+  //
+  // Stored under chain.json as `password` (file mode 0600). Never
+  // round-tripped via the API — GET returns only `password_set`.
+  function openChainPasswordEditor(chainId, visibility, currentlySet) {
+    var host = document.getElementById('configChainBanner');
+    // We reuse the chain banner slot for the editor; it's right below
+    // the chain list and already styled.
+    if (!host) return;
+    host.hidden = false;
+    host.style.background = 'rgba(255,255,255,0.5)';
+    host.style.borderLeftColor = 'rgba(0,0,0,0.2)';
+    host.style.color = '#1a1a20';
+    var nature = visibility === 'dark_matter'
+      ? '<strong>Dark chain</strong>: password seals the soul fields (prompt, born, rarity, …) AND the chunks. <strong>Required</strong> — mints fail without it. Viewers need this exact password to decrypt records.'
+      : '<strong>Light chain</strong>: password is optional. Without it, every field (including GPS) is public. With it, GPS is sealed for your own time-lock unlock; the rest stays public.';
+    host.innerHTML =
+      '<h4 style="margin:0 0 0.3rem;font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;">' + (currentlySet ? 'Change' : 'Set') + ' password \u2014 ' + escapeHtml(chainId) + '</h4>' +
+      '<p style="font-size:0.72rem;margin:0 0 0.5rem;line-height:1.5;">' + nature + '</p>' +
+      '<div class="config-field">' +
+      '  <span class="config-field-label">New password</span>' +
+      '  <input class="config-input" id="configChainPwInput" type="password" autocomplete="off" placeholder="' + (currentlySet ? 'type new password to change' : 'leave empty to skip') + '">' +
+      '</div>' +
+      '<div class="config-row">' +
+      '  <button class="config-btn config-btn-primary" id="configChainPwSave">Save</button>' +
+      (currentlySet ? '<button class="config-btn config-btn-danger" id="configChainPwClear">Clear stored password</button>' : '') +
+      '  <button class="config-btn" id="configChainPwCancel">Cancel</button>' +
+      '</div>' +
+      '<p class="config-note" style="margin-top:0.4rem;">Stored locally in <code>~/.mememage/chains/' + escapeHtml(chainId) + '/chain.json</code> at 0600 perms (owner-only). Same threat model as your Ed25519 private key. To keep the password out of files entirely, leave this blank and set <code>MEMEMAGE_PASSWORD</code> in <code>.env</code> instead.</p>';
+    var save = document.getElementById('configChainPwSave');
+    var clear = document.getElementById('configChainPwClear');
+    var cancel = document.getElementById('configChainPwCancel');
+    save.addEventListener('click', function() {
+      var val = document.getElementById('configChainPwInput').value;
+      saveChainPassword(chainId, val);
+    });
+    if (clear) clear.addEventListener('click', function() {
+      if (!window.confirm('Clear the stored password for ' + chainId + '? '
+          + (visibility === 'dark_matter'
+              ? 'Mints will fail until you set a new one (or pass MEMEMAGE_PASSWORD in env).'
+              : 'Future records on this chain will be fully public.'))) return;
+      saveChainPassword(chainId, '');
+    });
+    cancel.addEventListener('click', function() {
+      host.hidden = true; host.innerHTML = '';
+    });
+  }
+
+  async function saveChainPassword(chainId, password) {
+    var host = document.getElementById('configChainBanner');
+    var save = document.getElementById('configChainPwSave');
+    if (save) { save.disabled = true; save.textContent = 'Saving\u2026'; }
+    try {
+      await fetchJson('/api/chain/password', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({chain_id: chainId, password: password || ''}),
+      });
+      if (host) { host.hidden = true; host.innerHTML = ''; }
+      await loadChains();
+    } catch (e) {
+      showError('Password save failed: ' + e.message);
+      if (save) { save.disabled = false; save.textContent = 'Save'; }
+    }
   }
 
   function showChainBanner(msg, level) {
@@ -1848,18 +2862,41 @@ if (typeof TabBar !== 'undefined') {
     var idEl   = document.getElementById('configChainNewId');
     var nameEl = document.getElementById('configChainNewName');
     var visEl  = document.querySelector('input[name="newChainVis"]:checked');
+    var pwEl   = document.getElementById('configChainNewPw');
     var chainId = idEl ? idEl.value.trim() : '';
     if (!chainId) { showError('Chain ID required.'); return; }
     var visibility = visEl ? visEl.value : 'light_energy';
     var name = nameEl ? nameEl.value.trim() : '';
+    var password = pwEl ? pwEl.value : '';
+    // Front-load the contract: Dark chains MUST have a password to
+    // function. Catch this in the UI before the round-trip.
+    if (visibility === 'dark_matter' && !password) {
+      showError('Dark chains require a password. Set one now or pick Light visibility.');
+      return;
+    }
     showError('');
     try {
       await fetchJson('/api/chain/new', {
         method: 'POST', headers: authHeaders(),
         body: JSON.stringify({chain_id: chainId, name: name || chainId, visibility: visibility}),
       });
+      // Two-step: create the chain, then set its password if one was
+      // provided. Keeps the new-chain endpoint focused and lets us
+      // reuse /api/chain/password for later edits.
+      if (password) {
+        try {
+          await fetchJson('/api/chain/password', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({chain_id: chainId, password: password}),
+          });
+        } catch (e) {
+          showError('Chain created but password save failed: ' + e.message + '. Set it via the row\u2019s "Set password\u2026" button.');
+          await loadChains();
+          return;
+        }
+      }
       await loadChains();
-      showChainBanner('Created chain \u201c' + chainId + '\u201d. Switch to it to start editing its config.');
+      showChainBanner('Created chain \u201c' + chainId + '\u201d.' + (password ? ' Password stored.' : ''));
     } catch (e) {
       showError('Create failed: ' + e.message);
     }

@@ -121,45 +121,190 @@
   padding: 0.4rem 0.6rem;
 }
 .mint-meta-details summary {
-  font-size: 0.72rem; cursor: pointer; opacity: 0.8;
+  font-size: 0.74rem; cursor: pointer;
   letter-spacing: 0.04em;
+  color: #2a2a30;
 }
 .mint-meta-grid {
   display: grid; grid-template-columns: max-content 1fr;
-  gap: 0.2rem 0.5rem; font-size: 0.7rem; margin-top: 0.45rem;
+  gap: 0.2rem 0.5rem; font-size: 0.72rem; margin-top: 0.45rem;
   max-height: 90px; overflow-y: auto;
+  color: #2a2a30;
 }
-.mint-meta-grid dt { font-weight: 600; opacity: 0.75; }
-.mint-meta-grid dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mint-meta-grid dt { font-weight: 600; color: #1a1a20; }
+.mint-meta-grid dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a3a40; }
+
+/* Chain context banner — shown at the top of the mint review state so
+   the user sees which chain this mint will target and what kind it
+   is. The visibility chip is the key signal: chain visibility was
+   locked at chain creation in the Config tab, so the mint surface
+   just reports it. */
+.mint-chain-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.78rem;
+  color: #1a1a20;
+}
+.mint-chain-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5a5a62;
+  font-weight: 700;
+}
+.mint-chain-id {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 700;
+  color: #1a1a20;
+}
+.mint-chain-name { color: #3a3a40; }
+.mint-chain-vis {
+  margin-left: auto;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+.mint-chain-vis[data-vis="light_energy"] {
+  background: rgba(212, 184, 123, 0.18);
+  color: #6a5018;
+  border: 1px solid rgba(212, 184, 123, 0.5);
+}
+.mint-chain-vis[data-vis="dark_matter"] {
+  background: rgba(128, 128, 160, 0.15);
+  color: #2a2a48;
+  border: 1px solid rgba(128, 128, 160, 0.45);
+}
+/* Dark chain that hasn't been configured with a password — minting
+   will fail. Red chip so the user knows to fix it in Config. */
+.mint-chain-vis[data-vis="dark_matter"][data-pw-set="0"] {
+  background: rgba(176, 64, 64, 0.15);
+  color: #8c2424;
+  border: 1px solid rgba(176, 64, 64, 0.5);
+}
 
 .mint-field-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.mint-field { display: flex; flex-direction: column; flex: 1; gap: 0.2rem; }
+/* The [hidden] attribute's default `display: none` rule is lower
+   specificity than our `.mint-field-row { display: flex }` above, so
+   `<div class="mint-field-row" hidden>` would still render. Force
+   the hide here. */
+.mint-field-row[hidden] { display: none; }
+.mint-field { display: flex; flex-direction: column; flex: 1; gap: 0.25rem; }
+/* Higher-contrast label: was opacity 0.7 on light bg (read as ghosted).
+   Solid dark color reads as the structural element it actually is. */
 .mint-field-label {
-  font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
-  opacity: 0.7;
+  font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #2a2a30;
+  font-weight: 700;
 }
-.mint-field input,
-.mint-visibility-row input[type="password"] {
+.mint-field input {
   font-family: inherit; font-size: 0.85rem;
-  padding: 0.4rem 0.55rem;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: var(--radius-sm, 6px);
-  background: rgba(255, 255, 255, 0.6);
-  color: inherit;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a20;
 }
-.mint-visibility-row { gap: 0.9rem; }
-.mint-radio {
-  display: flex; align-items: center; gap: 0.3rem;
-  font-size: 0.75rem; cursor: pointer;
+.mint-field input::placeholder { color: rgba(0, 0, 0, 0.45); }
+.mint-field input:focus {
+  outline: none;
+  border-color: rgba(0, 0, 0, 0.5);
+  background: #fff;
 }
-.mint-radio em { font-style: italic; opacity: 0.6; font-size: 0.66rem; }
 
 .mint-gps {
   display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.4rem 0.6rem;
+  padding: 0.45rem 0.65rem;
   border-radius: var(--radius-sm, 6px);
-  background: rgba(0, 0, 0, 0.04);
-  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.78rem;
+  color: #1a1a20;
+}
+
+/* Awaiting-phone state — visible while the dashboard polls for the
+   phone-side GPS capture. The mint URL is the load-bearing element
+   (Discord/Slack webhooks may not be configured, so the user always
+   has a manual handoff path). */
+.mint-await {
+  padding: 0.7rem 0.8rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm, 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.mint-await-head {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1a1a20;
+  letter-spacing: 0.03em;
+}
+.mint-await-body {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #3a3a40;
+  line-height: 1.55;
+}
+.mint-await-url-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.mint-await-url-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5a5a62;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+.mint-await-url {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-sm, 6px);
+  color: #1a1a20;
+}
+.mint-await-copy {
+  font-family: inherit;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.6rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+.mint-await-copy:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
+/* Pulsing dot to indicate "still listening". Slow + subtle — same
+   cosmic tempo the validator + decoder use, never flashy. */
+.mint-await-spinner {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #3cc8dc;
+  align-self: center;
+  animation: mint-pulse 2.4s ease-in-out infinite;
+}
+@keyframes mint-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.35); }
 }
 .mint-gps[data-state="locating"] .mint-gps-icon { animation: mint-spin 1.6s linear infinite; }
 .mint-gps[data-state="locked"]   { background: rgba(60, 200, 60, 0.12); }
@@ -899,6 +1044,210 @@
   background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
   border-color: transparent;
 }
+/* Danger button — rotate/revoke and other irreversible actions. Tinted
+   ruby so it reads visually distinct from primary actions; muted enough
+   that it doesn't dominate the section. */
+.config-btn-danger {
+  background: rgba(176, 64, 64, 0.08);
+  color: #8c2424;
+  border-color: rgba(176, 64, 64, 0.35);
+}
+.config-btn-danger:hover {
+  background: rgba(176, 64, 64, 0.16);
+  border-color: rgba(176, 64, 64, 0.6);
+  color: #6c1818;
+}
+.config-btn-danger:disabled { opacity: 0.35; }
+/* Subtle ghost button — used for the × clear-path control next to
+   Browse, where we want the affordance without competing visually
+   with primary actions. */
+.config-btn-subtle {
+  background: transparent;
+  color: #54545c;
+  border-color: rgba(0, 0, 0, 0.18);
+  padding: 0.3rem 0.55rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.config-btn-subtle:hover { background: rgba(0, 0, 0, 0.04); color: #1a1a20; }
+
+/* TLS cert/key row layout: label + readonly path input + Browse + × */
+.config-field-with-browse {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+.config-field-with-browse .config-field-label {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+}
+.config-field-with-browse .config-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+  /* Readonly state: visually distinct from editable inputs so the user
+     reads the path as a pointer, not a field to type into. The picker
+     is the source of truth. */
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(255, 255, 255, 0.6);
+  color: #2a2a30;
+}
+.config-field-with-browse .config-input[readonly] {
+  cursor: default;
+}
+
+/* Inline confirmation zone for rotate/revoke. Shows beneath the
+   Identity row buttons; user must type the confirm string to proceed.
+   Modal-less to keep the dashboard yang-flat. */
+.config-danger-zone {
+  margin-top: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  background: rgba(176, 64, 64, 0.04);
+  border: 1px solid rgba(176, 64, 64, 0.18);
+  border-radius: var(--radius-sm, 6px);
+}
+.config-danger-zone h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.config-danger-zone p {
+  font-size: 0.72rem;
+  margin: 0.3rem 0 0.5rem;
+  line-height: 1.5;
+}
+
+/* Webhook editor — list of rows inside the Server section. Each row
+   is one configured webhook: URL input, two event checkboxes, a
+   headers indicator (display-only — custom auth headers stay in
+   server.json), and a delete button. */
+.config-webhooks {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.config-webhooks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.config-webhook-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-sm, 6px);
+}
+.config-webhook-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.config-webhook-url { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+.config-webhook-tmpl {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.3rem;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+.config-webhook-tmpl-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: #2a2a30;
+}
+.config-webhook-preset {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.35rem;
+  margin-top: 0;
+  width: auto;
+}
+.config-webhook-tmpl-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  resize: vertical;
+  min-height: 2.4rem;
+  width: 100%;
+  margin-top: 0;
+}
+.config-webhook-ev {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: #2a2a30;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.config-webhook-ev input { margin: 0; cursor: pointer; }
+.config-webhook-hdrs {
+  font-size: 0.65rem;
+  color: #6a6a72;
+  white-space: nowrap;
+  padding: 0 0.3rem;
+}
+/* Header editor — <details> expander with one row per header.
+   Open by default when there's at least one header; collapsed when
+   empty to keep the webhook row tidy. */
+.config-webhook-hdrs-section {
+  padding-top: 0.3rem;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+.config-webhook-hdrs-section > summary {
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: #3a3a40;
+  padding: 0.1rem 0;
+  user-select: none;
+}
+.config-webhook-hdrs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.3rem 0;
+}
+.config-webhook-hdr-row {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+.config-webhook-hdr-key {
+  flex: 1 1 30%;
+  margin-top: 0;
+}
+.config-webhook-hdr-val {
+  flex: 1 1 70%;
+  margin-top: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.config-webhook-hdr-del {
+  font-size: 0.85rem;
+  padding: 0.1rem 0.4rem;
+  line-height: 1;
+  color: #b04040;
+  border-color: rgba(176, 64, 64, 0.3);
+}
+.config-webhook-hdr-add {
+  font-size: 0.66rem;
+  padding: 0.2rem 0.5rem;
+}
+.config-webhook-del {
+  font-size: 0.9rem;
+  padding: 0.1rem 0.45rem;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.6);
+  color: #b04040;
+  border-color: rgba(176, 64, 64, 0.3);
+}
+.config-webhook-del:hover { background: #fff; border-color: rgba(176, 64, 64, 0.6); }
 
 .config-note {
   font-size: 0.7rem;
@@ -947,6 +1296,13 @@
   font-family: monospace;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Chain state line — encodes (visibility, password-set) as a single
+   text + color: green = sealed correctly, gold = light+public,
+   red = dark+no-password (broken). */
+.config-chain-state[data-vis="dark_matter"][data-pw-set="1"] { color: #155030; }
+.config-chain-state[data-vis="dark_matter"][data-pw-set="0"] { color: #8c2424; font-weight: 700; }
+.config-chain-state[data-vis="light_energy"][data-pw-set="1"] { color: #6a5018; }
+.config-chain-state[data-vis="light_energy"][data-pw-set="0"] { color: #54545c; }
 .config-chain-actions { display: flex; gap: 0.3rem; }
 .config-chain-actions .config-btn {
   padding: 0.25rem 0.55rem;
@@ -1022,6 +1378,71 @@
   margin: 0.4rem 0 0.6rem 0;
 }
 
+/* Profiles section — multi-key list with active marker and inline
+   action buttons. Visually echoes the Env row (presence dot + name +
+   state), but each row is wider to fit the fingerprint + action set. */
+.config-profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.config-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.74rem;
+  flex-wrap: wrap;
+}
+.config-profile-row[data-active="1"] {
+  background: rgba(60, 200, 120, 0.06);
+  border-color: rgba(60, 200, 120, 0.35);
+}
+.config-profile-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+.config-profile-row[data-active="1"] .config-profile-dot {
+  background: #2a8050;
+  box-shadow: 0 0 6px rgba(60, 200, 120, 0.5);
+}
+.config-profile-id {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 700;
+  min-width: 7rem;
+}
+.config-profile-fp {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  color: #54545c;
+  font-size: 0.68rem;
+  min-width: 11rem;
+}
+.config-profile-name {
+  flex: 1 1 auto;
+  color: #2a2a30;
+}
+.config-profile-state {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #2a8050;
+  min-width: 3.5rem;
+}
+.config-profile-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+}
+.config-profile-actions .config-btn {
+  font-size: 0.62rem;
+  padding: 0.25rem 0.55rem;
+}
+
 /* Env presence dots */
 .config-env-row {
   display: flex; align-items: center; gap: 0.6rem;
@@ -1035,12 +1456,26 @@
   flex-shrink: 0;
 }
 .config-env-row[data-set="1"] .config-env-dot { background: #2a8050; box-shadow: 0 0 6px rgba(60,200,120,0.5); }
-.config-env-row .config-env-name { flex: 1; }
+/* Env name shrinks to its content now (was flex:1) so the inline
+   editor inputs get the slack — the editor inputs are the primary
+   interaction, the name is just a label. */
+.config-env-row .config-env-name { flex: 0 0 auto; min-width: 11rem; }
 .config-env-row .config-env-state {
   font-size: 0.66rem; letter-spacing: 0.08em; font-weight: 700;
   text-transform: uppercase; color: #54545c;
+  flex: 0 0 auto;
 }
 .config-env-row[data-set="1"] .config-env-state { color: #2a8050; }
+.config-env-row .config-env-input {
+  flex: 1 1 auto; min-width: 0; margin-top: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.config-env-row .config-env-update,
+.config-env-row .config-env-clear {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  padding: 0.3rem 0.6rem;
+}
 
 /* Inline copy-to-clipboard button */
 .config-copy-btn {

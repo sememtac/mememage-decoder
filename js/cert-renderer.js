@@ -773,7 +773,27 @@ function renderCert(meta, options) {
     if (vf.signature === true) {
       var sigBadge = _div('verify-badge verify-authenticated');
       sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED';
-      sigBadge.title = vf.signatureDetail || 'Ed25519 signature verified';
+      // Aliases enrich the badge tooltip — they tell the viewer
+      // "this key is one of several aliases of the same human." We
+      // distinguish bidirectional (strongest) from one-way (softer).
+      var aliasTooltip = '';
+      if (vf.aliases && vf.aliases.length) {
+        var bi = vf.aliases.filter(function(a) { return a.bidirectional; });
+        var oneWay = vf.aliases.filter(function(a) { return !a.bidirectional; });
+        var parts = [];
+        if (bi.length) {
+          parts.push('Bidirectional aliases: ' + bi.map(function(a) {
+            return (a.creator_name || a.alias_fingerprint);
+          }).join(', '));
+        }
+        if (oneWay.length) {
+          parts.push('One-way claims: ' + oneWay.map(function(a) {
+            return (a.creator_name || a.alias_fingerprint);
+          }).join(', '));
+        }
+        aliasTooltip = '\n' + parts.join('\n');
+      }
+      sigBadge.title = (vf.signatureDetail || 'Ed25519 signature verified') + aliasTooltip;
       badgeWrap.appendChild(sigBadge);
     } else if (vf.signature === false) {
       var sigBadge2 = _div('verify-badge verify-forged');

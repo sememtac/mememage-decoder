@@ -66,9 +66,29 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
           } else if (kc.status === 'rotated') {
             result.signatureDetail += ' (key rotated — ' + kc.detail + ')';
           }
+          // Alias discovery — soft enrichment, never blocks verdict.
+          // Async-cheap when the IA metadata call returns no
+          // alias-*.json files (most identities will have none).
+          try {
+            if (typeof discoverAliases === 'function') {
+              result.aliases = await discoverAliases(record.key_fingerprint);
+            } else {
+              result.aliases = [];
+            }
+          } catch (e) {
+            result.aliases = [];
+          }
         }
 
-        // TOFU check (skip if revoked)
+        // TOFU check (skip if revoked).
+        //
+        // Alias bridge: if this key is bidirectionally aliased to a key
+        // already in TOFU, treat the new key as trusted under the same
+        // name. The bidirectional alias is a cryptographic claim by
+        // both sides — strong enough to extend trust without prompting.
+        // One-way aliases do NOT auto-trust (B claims sibling-of-A
+        // but A hasn't confirmed) — they're rendered with a softer
+        // signal via the badge tooltip and stay 'new' here.
         if (result.signature === true && record.key_fingerprint) {
           var tofu = tofuStore();
           var tofuStatus = tofu.check(record.key_fingerprint, record.public_key);
@@ -77,7 +97,25 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
             var entry = tofu.get(record.key_fingerprint);
             result.signatureDetail += ' — ' + entry.name + ' (trusted)';
           } else if (tofuStatus === 'new') {
-            result.signatureDetail += ' — new key, not yet named';
+            var trustedViaAlias = null;
+            if (result.aliases && result.aliases.length) {
+              for (var ai = 0; ai < result.aliases.length; ai++) {
+                var a = result.aliases[ai];
+                if (!a.bidirectional) continue;
+                var sibling = tofu.get(a.alias_fingerprint);
+                if (sibling) { trustedViaAlias = sibling; break; }
+              }
+            }
+            if (trustedViaAlias) {
+              // Pin the new fingerprint under the sibling's display
+              // name so subsequent visits skip this check too. Inherits
+              // trust via cryptographic alias chain, not a fresh TOFU.
+              tofu.set(record.key_fingerprint, trustedViaAlias.name, record.public_key);
+              result.tofu = 'trusted';
+              result.signatureDetail += ' — ' + trustedViaAlias.name + ' (trusted via alias)';
+            } else {
+              result.signatureDetail += ' — new key, not yet named';
+            }
           } else if (tofuStatus === 'conflict') {
             result.signatureDetail += ' — WARNING: different key for this fingerprint!';
           }
