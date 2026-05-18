@@ -118,6 +118,7 @@ function _saveLivePlate(plate, barId, barHash) {
       '.verify-badge { box-shadow: none !important; }' +
       '.gps-unlock { display: none !important; }' +
       '.save-cert-btn { display: none !important; }' +
+      '.verify-alias-cluster { display: none !important; }' +
       '.cosmic-player { display: none !important; }' +
       // Live plate has 28px bottom padding to breathe with the player
       // sticky-snapped above it. With the player hidden in the saved
@@ -312,20 +313,68 @@ function renderCert(meta, options) {
   //   [ DENOISE | SAMPLER | SCHEDULER ] numeric/label row
   //   [ MODEL           full ]
   //   [ LoRA            full ]
-  if (meta.seed !== undefined) GEN_PARAMS.push({l: 'Seed', v: '' + meta.seed, span: 3});
+  // Canonical AI-gen fields get curated labels + layout (Seed full-width,
+  // Steps/CFG/Guidance on one numeric row, etc.). Tracks which fields
+  // we consumed so we don't double-render them below in the catch-all.
+  var _claimedKeys = {prompt: 1, width: 1, height: 1};
+  function _push(key, label, value, span) {
+    GEN_PARAMS.push({l: label, v: '' + value, span: span || undefined});
+    _claimedKeys[key] = 1;
+  }
+  if (meta.seed !== undefined) _push('seed', 'Seed', meta.seed, 3);
   if (meta.width && meta.height) GEN_PARAMS.push({l: 'Size', v: meta.width + ' \u00d7 ' + meta.height, span: 3});
-  if (meta.mode) GEN_PARAMS.push({l: 'Mode', v: meta.mode, span: 3});
+  if (meta.mode) _push('mode', 'Mode', meta.mode, 3);
   // Numeric row (keep Steps / CFG / Guidance together visually)
-  if (meta.steps !== undefined) GEN_PARAMS.push({l: 'Steps', v: '' + meta.steps});
-  if (meta.cfg !== undefined) GEN_PARAMS.push({l: 'CFG', v: '' + meta.cfg});
-  if (meta.guidance !== undefined) GEN_PARAMS.push({l: 'Guidance', v: '' + meta.guidance});
+  if (meta.steps !== undefined) _push('steps', 'Steps', meta.steps);
+  if (meta.cfg !== undefined) _push('cfg', 'CFG', meta.cfg);
+  if (meta.guidance !== undefined) _push('guidance', 'Guidance', meta.guidance);
   // Second short row
-  if (meta.denoise !== undefined) GEN_PARAMS.push({l: 'Denoise', v: '' + meta.denoise});
-  if (meta.sampler) GEN_PARAMS.push({l: 'Sampler', v: meta.sampler});
-  if (meta.scheduler) GEN_PARAMS.push({l: 'Scheduler', v: meta.scheduler});
-  if (meta.unet) GEN_PARAMS.push({l: 'Model', v: meta.unet, span: 3});
-  if (meta.lora) GEN_PARAMS.push({l: 'LoRA', v: meta.lora, span: 3});
-  if (meta.lora_strength !== undefined) GEN_PARAMS.push({l: 'LoRA Str', v: '' + meta.lora_strength});
+  if (meta.denoise !== undefined) _push('denoise', 'Denoise', meta.denoise);
+  if (meta.sampler) _push('sampler', 'Sampler', meta.sampler);
+  if (meta.scheduler) _push('scheduler', 'Scheduler', meta.scheduler);
+  if (meta.unet) _push('unet', 'Model', meta.unet, 3);
+  if (meta.lora) _push('lora', 'LoRA', meta.lora, 3);
+  if (meta.lora_strength !== undefined) _push('lora_strength', 'LoRA Str', meta.lora_strength);
+
+  // Adaptive Origin panel: any extra string/number top-level fields
+  // the creator chose to declare get rendered alongside the canonical
+  // AI-gen fields. Lets non-AI mints (photographers, digital artists,
+  // anyone bringing their own image) describe their origin without
+  // pretending to be an AI gen. The exclusion list below holds the
+  // system-owned namespaces — identity, birth cert, machine, chunks,
+  // visibility, signing — so they don't get rendered as "origin".
+  var _systemKeys = {
+    // Identity
+    identifier: 1, content_hash: 1, signature: 1, public_key: 1,
+    key_fingerprint: 1, creator_name: 1, hash_version: 1, parent_id: 1,
+    // Birth certificate / celestial
+    born: 1, conceived: 1, rendered: 1, timestamp: 1,
+    constellation_name: 1, constellation_hash: 1, constellation_star: 1,
+    heart_star_id: 1,
+    rarity: 1, rarity_score: 1,
+    birth_temperament: 1, birth_traits: 1, birth_readings: 1, birth_summary: 1,
+    // Machine
+    machine_fingerprint: 1,
+    // Chunks / chain
+    chunks: 1, decoder_hash: 1, outer_position: 1, outer_cycle: 1,
+    // Visibility / encryption
+    chain_visibility: 1, encrypted_soul: 1, encrypted_chunks: 1, gps_encrypted: 1,
+    // Misc
+    thumbnail: 1, song_name: 1,
+  };
+  var _origKeys = Object.keys(meta).sort();
+  for (var _ki = 0; _ki < _origKeys.length; _ki++) {
+    var _k = _origKeys[_ki];
+    if (_systemKeys[_k]) continue;     // system-owned, skip
+    if (_claimedKeys[_k]) continue;    // already rendered above
+    if (_k[0] === '_') continue;       // private/transient
+    var _v = meta[_k];
+    if (_v === null || _v === undefined || _v === '') continue;
+    if (typeof _v === 'object') continue;  // dicts/arrays don't fit a single cell
+    // Title-case the key for display ("camera_model" → "Camera Model")
+    var _label = _k.replace(/[_-]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+    GEN_PARAMS.push({l: _label, v: '' + _v, span: 3});
+  }
 
   // Build PLANET_DATA from born
   var planetSymbols = {sun:'\u2609', moon:'\u263D', mercury:'\u263F', venus:'\u2640', mars:'\u2642', jupiter:'\u2643', saturn:'\u2644'};
@@ -772,14 +821,29 @@ function renderCert(meta, options) {
     // AUTHENTICATED badge (Ed25519 signature)
     if (vf.signature === true) {
       var sigBadge = _div('verify-badge verify-authenticated');
-      sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED';
-      // Aliases enrich the badge tooltip — they tell the viewer
-      // "this key is one of several aliases of the same human." We
-      // distinguish bidirectional (strongest) from one-way (softer).
+      // Aliases — when the signer's key has confirmed siblings, the
+      // badge gains a count pip (²/³/…) where the number is the TOTAL
+      // keys recognized for this human (signer + aliases). Click
+      // expands an inline cluster reveal below the badge row.
+      // Bidirectional aliases (signed both ways via IA keychain) are
+      // the strong signal; one-way claims are softer and rendered
+      // dimmed in the expansion.
+      var aliases = (vf.aliases || []);
+      var bi = aliases.filter(function(a) { return a.bidirectional; });
+      var oneWay = aliases.filter(function(a) { return !a.bidirectional; });
+      var totalKeys = 1 + bi.length + oneWay.length;
+      // Superscript numerals — Unicode has dedicated codepoints so the
+      // pip reads cleanly without CSS-based size hacks that fight
+      // html2canvas during save-cert.
+      var supDigits = {2:'\u00b2', 3:'\u00b3', 4:'\u2074', 5:'\u2075',
+                       6:'\u2076', 7:'\u2077', 8:'\u2078', 9:'\u2079'};
+      var pip = (totalKeys >= 2 && totalKeys <= 9) ? supDigits[totalKeys] : '';
+      sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED' +
+        (pip ? '<span class="verify-badge-pip" title="' + totalKeys + ' keys recognized">' + pip + '</span>' : '');
+
+      // Tooltip keeps the alias breakdown for quick hover discovery.
       var aliasTooltip = '';
-      if (vf.aliases && vf.aliases.length) {
-        var bi = vf.aliases.filter(function(a) { return a.bidirectional; });
-        var oneWay = vf.aliases.filter(function(a) { return !a.bidirectional; });
+      if (aliases.length) {
         var parts = [];
         if (bi.length) {
           parts.push('Bidirectional aliases: ' + bi.map(function(a) {
@@ -794,6 +858,16 @@ function renderCert(meta, options) {
         aliasTooltip = '\n' + parts.join('\n');
       }
       sigBadge.title = (vf.signatureDetail || 'Ed25519 signature verified') + aliasTooltip;
+
+      // Click → toggle an inline alias-cluster expansion below the
+      // badge row. Hidden by default; ::after the badge row in DOM.
+      if (aliases.length) {
+        sigBadge.classList.add('verify-badge-expandable');
+        sigBadge.addEventListener('click', function() {
+          var ex = sigBadge.parentNode.parentNode.querySelector('.verify-alias-cluster');
+          if (ex) ex.classList.toggle('verify-alias-cluster-open');
+        });
+      }
       badgeWrap.appendChild(sigBadge);
     } else if (vf.signature === false) {
       var sigBadge2 = _div('verify-badge verify-forged');
@@ -831,6 +905,52 @@ function renderCert(meta, options) {
     }
 
     plate.appendChild(badgeWrap);
+
+    // Alias cluster reveal — sibling-key list, toggled by clicking
+    // the AUTHENTICATED badge when it has a count pip. Lives outside
+    // the badge row so the three-badge silhouette stays clean; opens
+    // inline only when explicitly requested. Hidden during save-cert
+    // PNG render (see _saveLivePlate's CSS override list).
+    if (vf.signature === true && vf.aliases && vf.aliases.length) {
+      var cluster = _div('verify-alias-cluster');
+      var bi2 = vf.aliases.filter(function(a) { return a.bidirectional; });
+      var oneWay2 = vf.aliases.filter(function(a) { return !a.bidirectional; });
+      var rows = [];
+      // The signer itself, anchoring the cluster.
+      rows.push(
+        '<div class="verify-alias-row verify-alias-self">' +
+          '<span class="verify-alias-glyph">\u29bf</span>' +  // ⦿ filled dot
+          '<span class="verify-alias-name">' + escapeHtml(meta.creator_name || '(signer)') + '</span>' +
+          '<span class="verify-alias-fp">' + escapeHtml(meta.key_fingerprint || '') + '</span>' +
+          '<span class="verify-alias-tag verify-alias-tag-signer">this signer</span>' +
+        '</div>'
+      );
+      bi2.forEach(function(a) {
+        rows.push(
+          '<div class="verify-alias-row">' +
+            '<span class="verify-alias-glyph">\u29bf</span>' +
+            '<span class="verify-alias-name">' + escapeHtml(a.creator_name || '(sibling)') + '</span>' +
+            '<span class="verify-alias-fp">' + escapeHtml(a.alias_fingerprint || '') + '</span>' +
+            '<span class="verify-alias-tag verify-alias-tag-bi">bidirectional</span>' +
+          '</div>'
+        );
+      });
+      oneWay2.forEach(function(a) {
+        rows.push(
+          '<div class="verify-alias-row verify-alias-oneway">' +
+            '<span class="verify-alias-glyph">\u25cb</span>' +  // ○ empty dot
+            '<span class="verify-alias-name">' + escapeHtml(a.creator_name || '(claimed sibling)') + '</span>' +
+            '<span class="verify-alias-fp">' + escapeHtml(a.alias_fingerprint || '') + '</span>' +
+            '<span class="verify-alias-tag verify-alias-tag-oneway">one-way</span>' +
+          '</div>'
+        );
+      });
+      cluster.innerHTML =
+        '<div class="verify-alias-cluster-head">Keys recognized for this human</div>' +
+        '<div class="verify-alias-cluster-rows">' + rows.join('') + '</div>' +
+        '<p class="verify-alias-cluster-foot">Bidirectional aliases are signed by both keys (strongest signal). One-way claims are recognized but unconfirmed by the other side.</p>';
+      plate.appendChild(cluster);
+    }
   }
 
   plate.appendChild(_div('plate-divider-short'));
@@ -1036,7 +1156,7 @@ function renderCert(meta, options) {
   // 4. MACHINE DIE: vitals canvas band, machine rarity traits
   // ===================================================================
   if (MACHINE.length > 0 && !isSample) {
-    plate.appendChild(_sectionLabel('MACHINE AT BIRTH'));
+    plate.appendChild(_sectionLabel('MACHINE AT CONCEPTION'));
 
     var machWrap = _div('sky-band-wrap');
     var machContainer = _div('sky-band-container');
@@ -1230,6 +1350,27 @@ function renderCert(meta, options) {
     }
 
     plate.appendChild(gpsContainer);
+  } else if (!isSample && born && Object.keys(born).length > 0) {
+    // Honest placeholder for records minted on chains with
+    // ``gps_source: none`` (or any record lacking ``gps_locked``).
+    // The cert acknowledges the absence rather than silently hiding
+    // the section — like a camera that didn't write location to EXIF.
+    plate.appendChild(_sectionLabel('BIRTHPLACE \u2014 NOT RECORDED'));
+    var noGps = _div('gps-container gps-container-empty');
+    var gtc2 = _hexToRgb(tierColor || '#a0a0a0');
+    noGps.style.background = 'linear-gradient(180deg, rgb(' +
+      Math.floor(gtc2[0]*0.05) + ',' + Math.floor(gtc2[1]*0.05) + ',' + Math.floor(gtc2[2]*0.05) +
+      ') 0%, rgb(' +
+      Math.floor(gtc2[0]*0.08) + ',' + Math.floor(gtc2[1]*0.08) + ',' + Math.floor(gtc2[2]*0.08) +
+      ') 100%)';
+    var noGpsBody = _div('gps-empty-body');
+    noGpsBody.innerHTML =
+      '<p class="gps-empty-line">No GPS coordinates were captured at conception.</p>' +
+      '<p class="gps-empty-hint">This soul carries the sky but not the place. ' +
+      'The creator\u2019s chain is configured to omit location data \u2014 ' +
+      'like a camera that doesn\u2019t write GPS to EXIF.</p>';
+    noGps.appendChild(noGpsBody);
+    plate.appendChild(noGps);
   }
 
   // ===================================================================

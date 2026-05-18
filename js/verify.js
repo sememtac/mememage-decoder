@@ -240,13 +240,32 @@ function keychainIdentifier(fingerprint) {
   return 'mememage-keychain-' + fingerprint.replace(/:/g, '');
 }
 
-async function fetchKeychainRecord(fingerprint, filename) {
-  // Try to fetch a keychain record (succession.json or revocation.json) from IA
+// Derive a peer keychain root from a soul's _source URL. When the
+// validator fetches a soul from a non-IA peer (e.g.
+// https://X/api/souls/mememage-Y.soul), the same peer's keychain
+// lives at https://X/api/keychain/. Returns null if the source URL
+// doesn't match the peer pattern (IA souls fall back to the IA
+// metadata API as before).
+function peerKeychainRoot(sourceUrl) {
+  if (!sourceUrl) return null;
+  var m = /^(https?:\/\/[^/]+)\/api\/souls\//.exec(sourceUrl);
+  if (m) return m[1] + '/api/keychain';
+  return null;
+}
+
+async function fetchKeychainRecord(fingerprint, filename, peerRoot) {
+  // Try IA first (canonical source for chains that publish there),
+  // then the peer root derived from the soul's source URL if given.
+  // First non-null record wins — both sides should agree on content
+  // since records are signed.
   var chainId = keychainIdentifier(fingerprint);
   var urls = [
     'https://archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now(),
     'https://cors.archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now(),
   ];
+  if (peerRoot) {
+    urls.push(peerRoot + '/' + chainId + '/' + filename + '?t=' + Date.now());
+  }
   for (var i = 0; i < urls.length; i++) {
     try {
       var resp = await fetch(urls[i], {cache: 'no-store'});
@@ -294,59 +313,66 @@ async function verifyKeychainSignature(record) {
 // A claims B is its sibling AND B claims A is its sibling. One-way
 // aliases are still recognized but rendered with a softer label.
 
-async function fetchKeychainFileList(fingerprint) {
+async function fetchKeychainFileList(fingerprint, peerRoot) {
   // IA metadata endpoint returns the file manifest of an item. We use
   // it once per identity to discover any alias-*.json records, rather
-  // than guessing fingerprints. Returns [] on any failure — alias
-  // discovery is a soft enrichment, never blocks the verdict.
+  // than guessing fingerprints. When the soul came from a non-IA peer,
+  // also probe the peer's /api/keychain/<chain_id> listing endpoint —
+  // returns the same {files:[...]} shape so the merged file list
+  // catches aliases regardless of where they were published.
+  // Returns [] on any failure — alias discovery is a soft enrichment,
+  // never blocks the verdict.
   var chainId = keychainIdentifier(fingerprint);
   var urls = [
     'https://archive.org/metadata/' + chainId + '?t=' + Date.now(),
     'https://cors.archive.org/metadata/' + chainId + '?t=' + Date.now(),
   ];
+  if (peerRoot) {
+    urls.push(peerRoot + '/' + chainId + '?t=' + Date.now());
+  }
+  var merged = {};
   for (var i = 0; i < urls.length; i++) {
     try {
       var resp = await fetch(urls[i], {cache: 'no-store'});
       if (!resp.ok) continue;
       var data = await resp.json();
       if (data && Array.isArray(data.files)) {
-        return data.files.map(function(f) { return f.name; }).filter(Boolean);
+        data.files.forEach(function(f) {
+          // IA returns {name: ...}, peer returns plain strings
+          var name = (typeof f === 'string') ? f : f.name;
+          if (name) merged[name] = true;
+        });
       }
     } catch (e) { continue; }
   }
-  return [];
+  return Object.keys(merged);
 }
 
-async function discoverAliases(fingerprint) {
+async function discoverAliases(fingerprint, peerRoot) {
   // Returns a list of verified alias records the named key has signed.
-  // Each entry: {alias_fingerprint, alias_public_key, timestamp,
-  //              creator_name, bidirectional: bool}.
-  // The bidirectional flag is set true when the OTHER side has also
-  // published a matching alias back. One-way claims are still returned
-  // so the cert renderer can show "B claims to be A's sibling but A
-  // hasn't confirmed" as a softer signal.
+  // peerRoot is the optional keychain root derived from the soul's
+  // _source URL — lets the verifier find aliases on chains that
+  // published only to peer surfaces, not IA. Both sides of the
+  // bidirectional check probe the same peer too.
   if (!fingerprint) return [];
-  var files = await fetchKeychainFileList(fingerprint);
+  var files = await fetchKeychainFileList(fingerprint, peerRoot);
   var aliasFiles = files.filter(function(n) {
     return /^alias-[0-9a-f]{16}\.json$/i.test(n);
   });
   if (!aliasFiles.length) return [];
   var out = [];
   for (var i = 0; i < aliasFiles.length; i++) {
-    var rec = await fetchKeychainRecord(fingerprint, aliasFiles[i]);
+    var rec = await fetchKeychainRecord(fingerprint, aliasFiles[i], peerRoot);
     if (!rec || rec.action !== 'alias') continue;
     var sigOk = await verifyKeychainSignature(rec);
     if (sigOk !== true) continue;
-    // Check the other side's keychain for a reverse alias signed by
-    // the alias key naming our original fingerprint. Bidirectional
-    // confirmation is the strongest verifier signal.
     var bi = false;
     try {
-      var theirFiles = await fetchKeychainFileList(rec.alias_fingerprint);
+      var theirFiles = await fetchKeychainFileList(rec.alias_fingerprint, peerRoot);
       var ourClean = (rec.signer_fingerprint || fingerprint).replace(/:/g, '');
       var expectedName = 'alias-' + ourClean + '.json';
       if (theirFiles.indexOf(expectedName) >= 0) {
-        var reverse = await fetchKeychainRecord(rec.alias_fingerprint, expectedName);
+        var reverse = await fetchKeychainRecord(rec.alias_fingerprint, expectedName, peerRoot);
         if (reverse && reverse.action === 'alias'
             && reverse.alias_fingerprint === (rec.signer_fingerprint || fingerprint)
             && (await verifyKeychainSignature(reverse)) === true) {
@@ -365,13 +391,15 @@ async function discoverAliases(fingerprint) {
   return out;
 }
 
-async function checkKeychain(fingerprint, publicKeyHex) {
-  // Check for revocation or succession of a key.
-  // Returns: {status: 'active'|'revoked'|'rotated', detail: string, successor: object|null}
+async function checkKeychain(fingerprint, publicKeyHex, peerRoot) {
+  // Check for revocation or succession of a key. peerRoot is the
+  // optional keychain root derived from the soul's _source URL —
+  // ensures revocations/rotations on chains that publish only to
+  // peer surfaces are still discoverable.
   if (!fingerprint) return {status: 'active', detail: '', successor: null};
 
   // Check revocation first
-  var revocation = await fetchKeychainRecord(fingerprint, 'revocation.json');
+  var revocation = await fetchKeychainRecord(fingerprint, 'revocation.json', peerRoot);
   if (revocation && revocation.action === 'revoke') {
     var revOk = await verifyKeychainSignature(revocation);
     if (revOk === true) {
@@ -384,7 +412,7 @@ async function checkKeychain(fingerprint, publicKeyHex) {
   }
 
   // Check succession
-  var succession = await fetchKeychainRecord(fingerprint, 'succession.json');
+  var succession = await fetchKeychainRecord(fingerprint, 'succession.json', peerRoot);
   if (succession && succession.action === 'succeed') {
     var sucOk = await verifyKeychainSignature(succession);
     if (sucOk === true) {

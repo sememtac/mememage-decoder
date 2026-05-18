@@ -159,13 +159,22 @@ if (typeof TabBar !== 'undefined') {
     thumb:       document.getElementById('mintThumb'),
     filename:    document.getElementById('mintFilename'),
     size:        document.getElementById('mintSize'),
-    metaGrid:    document.getElementById('mintMetaGrid'),
+    metaEditor:  document.getElementById('mintMetaEditor'),
+    metaAdd:     document.getElementById('mintMetaAdd'),
     chainBanner: document.getElementById('mintChainBanner'),
     chainId:     document.getElementById('mintChainId'),
     chainName:   document.getElementById('mintChainName'),
     chainVis:    document.getElementById('mintChainVis'),
     awaitUrl:    document.getElementById('mintAwaitUrl'),
     awaitCopy:   document.getElementById('mintAwaitCopy'),
+    handoffHead: document.getElementById('mintHandoffHead'),
+    handoffBody: document.getElementById('mintHandoffBody'),
+    handoffQr:   document.getElementById('mintHandoffQr'),
+    handoffOpen: document.getElementById('mintHandoffOpen'),
+    ticket:      document.getElementById('mintTicket'),
+    ticketCopy:  document.getElementById('mintTicketCopy'),
+    resumeInput: document.getElementById('mintResumeTicket'),
+    resumeBtn:   document.getElementById('mintResumeBtn'),
     gpsText:     document.getElementById('mintGpsText'),
     error:       document.getElementById('mintError'),
     globalError: document.getElementById('mintGlobalError'),
@@ -252,8 +261,13 @@ if (typeof TabBar !== 'undefined') {
   }
 
   async function handleFile(file) {
-    if (!file || file.type !== 'image/png') {
-      showError('Only PNG files are accepted.');
+    // Accept any image — JPEG/WebP/PNG all work end-to-end (Pillow
+    // handles them and the bar+watermark survive JPEG q70+). HEIC
+    // needs pillow-heif on the server; we let the upload through and
+    // surface any server-side decode failure rather than gate at the
+    // browser, since the user's phone may auto-convert HEIC anyway.
+    if (!file || !(file.type || '').startsWith('image/')) {
+      showError('Please drop an image file.');
       return;
     }
     if (location.protocol === 'file:') {
@@ -306,15 +320,10 @@ if (typeof TabBar !== 'undefined') {
         showError(data.error || ('Upload failed (HTTP ' + resp.status + ').'));
         return;
       }
-      state.token = data.token;
-      state.metadata = data.metadata || {};
-      state.mintUrl = data.mint_url_full || data.mint_url || '';
-      renderReview(file);
-      loadActiveChain();   // populate the chain context banner
-      setState('reviewing');
-      // The server has already fired the "ready" webhook by this point.
-      // We start polling immediately so when the phone POSTs GPS and
-      // the server kicks off mint(), the dashboard sees status flip.
+      rehydrateFromSession(data, file);
+      // The server has fired the "ready" webhook on every upload now
+      // (host-awareness signal, not phone-only). Polling watches for
+      // the /mint/<token> page's Conceive button → mint() pipeline.
       pollMintStatus();
     } finally {
       els.drop.removeAttribute('data-busy');
@@ -334,28 +343,178 @@ if (typeof TabBar !== 'undefined') {
     reader.onload = function() { els.thumb.src = reader.result; };
     reader.readAsDataURL(file);
 
-    // Render metadata as a dl grid. Hide noisy keys, prioritize the
-    // human-meaningful ones.
-    els.metaGrid.innerHTML = '';
-    var keysOrdered = ['prompt', 'seed', 'width', 'height', 'steps', 'cfg',
-                       'sampler', 'scheduler', 'unet', 'mode'];
-    var seen = {};
-    var meta = state.metadata || {};
-    keysOrdered.forEach(function(k) {
-      if (k in meta) { appendMetaRow(k, meta[k]); seen[k] = true; }
-    });
-    Object.keys(meta).forEach(function(k) {
-      if (!seen[k] && meta[k] !== null && meta[k] !== '' && !k.startsWith('_')) {
-        appendMetaRow(k, meta[k]);
-      }
-    });
+    renderMetaEditor();
   }
-  function appendMetaRow(k, v) {
-    var dt = document.createElement('dt'); dt.textContent = k;
-    var dd = document.createElement('dd');
-    dd.textContent = (typeof v === 'string') ? v : JSON.stringify(v);
-    dd.title = dd.textContent;
-    els.metaGrid.appendChild(dt); els.metaGrid.appendChild(dd);
+
+  // Shared rehydration path — used by both the fresh-upload flow and
+  // the resume-by-ticket flow. The two have slightly different inputs:
+  //
+  //   - Upload : ``file`` is a File from the picker; thumbnail comes
+  //              from FileReader. ``data.filename`` not present.
+  //   - Resume : ``file`` is null; ``data`` carries ``filename`` and
+  //              ``thumb_data_uri`` from the server-side preview.
+  //
+  // Everything else is identical between the two paths, so collapse
+  // the state mutation here.
+  function rehydrateFromSession(data, file) {
+    state.token = data.token;
+    state.ticket = data.ticket || '';
+    state.metadata = data.metadata || {};
+    state.mintUrl = data.mint_url_full || data.mint_url || '';
+    state.gpsSource = data.gps_source || 'phone';
+    state.qrDataUri = data.qr_data_uri || '';
+    if (file) {
+      renderReview(file);
+    } else {
+      // Resume path — server provided filename + thumb data URI.
+      els.filename.textContent = data.filename || '(unknown filename)';
+      els.size.textContent = '';
+      if (data.thumb_data_uri) els.thumb.src = data.thumb_data_uri;
+      renderMetaEditor();
+    }
+    loadActiveChain();   // refresh chain banner (may have changed since)
+    applyHandoffUi();    // QR, URL, copy/open, ticket — same for every mode
+    setState('reviewing');
+  }
+
+  async function resumeByTicket(ticket) {
+    if (!ticket) return;
+    if (els.resumeBtn) els.resumeBtn.disabled = true;
+    try {
+      var resp = await fetch('/api/mint/resume/' + encodeURIComponent(ticket), {headers: authHeaders()});
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        showError(data.error || ('Resume failed (HTTP ' + resp.status + ').'));
+        if (els.resumeBtn) els.resumeBtn.disabled = false;
+        return;
+      }
+      showError('');
+      rehydrateFromSession(data, null);
+      pollMintStatus();  // pick up if the user conceives elsewhere
+    } catch (e) {
+      showError('Resume request failed: ' + e.message);
+    } finally {
+      if (els.resumeBtn) els.resumeBtn.disabled = false;
+    }
+  }
+
+  // Origin field editor — replaces the read-only metadata grid.
+  // Seeded from PNG-extracted fields (Madeline-style flows write
+  // prompt/seed/sampler etc. into PNG text chunks). Users can add,
+  // edit, or delete fields. width/height are derived from the image
+  // and shown read-only since the bar embedding step needs them.
+  // The mint pipeline reads whatever's here as the record's "origin"
+  // payload — the certificate's Origin panel renders adaptively from
+  // these.
+  var METADATA_FIXED_KEYS = {width: 1, height: 1};
+  function renderMetaEditor() {
+    var meta = state.metadata || {};
+    var host = document.getElementById('mintMetaEditor');
+    if (!host) return;
+    host.innerHTML = '';
+    // Order: prompt + seed up front when present, then everything else
+    // sorted alphabetically. width/height locked at the bottom.
+    var keys = Object.keys(meta).filter(function(k) {
+      return !k.startsWith('_') && !METADATA_FIXED_KEYS[k];
+    });
+    var canonical = ['prompt', 'seed', 'sampler', 'scheduler', 'unet', 'mode',
+                     'steps', 'cfg', 'guidance', 'denoise', 'lora', 'lora_strength'];
+    keys.sort(function(a, b) {
+      var ai = canonical.indexOf(a), bi = canonical.indexOf(b);
+      if (ai >= 0 && bi >= 0) return ai - bi;
+      if (ai >= 0) return -1;
+      if (bi >= 0) return 1;
+      return a.localeCompare(b);
+    });
+    keys.forEach(function(k) { host.appendChild(_metaRow(k, meta[k], false)); });
+    // width/height — read-only, derived from the image
+    if (meta.width && meta.height) {
+      var row = document.createElement('div');
+      row.className = 'mint-meta-row mint-meta-row-locked';
+      row.innerHTML =
+        '<span class="mint-meta-key">Size</span>' +
+        '<span class="mint-meta-val">' + meta.width + ' × ' + meta.height + ' (from image)</span>';
+      host.appendChild(row);
+    }
+  }
+  // Debounced push of edited Origin fields to the server-side session.
+  // 400ms is short enough to feel responsive, long enough to coalesce a
+  // burst of typing into a single request. We strip width/height before
+  // sending — the server already has the image dimensions and refuses
+  // to let edits clobber them.
+  var _metaPushTimer = null;
+  function scheduleMetadataPush() {
+    if (!state.token) return;
+    if (_metaPushTimer) clearTimeout(_metaPushTimer);
+    _metaPushTimer = setTimeout(pushMetadata, 400);
+  }
+  async function pushMetadata() {
+    if (!state.token || !state.metadata) return;
+    var payload = {};
+    var keys = Object.keys(state.metadata);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k === 'width' || k === 'height') continue;
+      if (k.charAt(0) === '_') continue;
+      payload[k] = state.metadata[k];
+    }
+    try {
+      await fetch('/api/mint/' + state.token + '/metadata', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({metadata: payload}),
+      });
+    } catch (e) {
+      console.warn('[mint] metadata sync failed', e);
+    }
+  }
+  function _metaRow(key, value, isNew) {
+    var row = document.createElement('div');
+    row.className = 'mint-meta-row';
+    var keyInp = document.createElement('input');
+    keyInp.className = 'mint-meta-key-input';
+    keyInp.type = 'text';
+    keyInp.placeholder = 'field name';
+    keyInp.value = key;
+    var valInp = document.createElement('input');
+    valInp.className = 'mint-meta-val-input';
+    valInp.type = 'text';
+    valInp.placeholder = 'value';
+    valInp.value = (value == null) ? '' : (typeof value === 'string' ? value : JSON.stringify(value));
+    if (isNew) setTimeout(function() { keyInp.focus(); }, 0);
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'mint-meta-del';
+    del.textContent = '×';
+    del.title = 'Remove field';
+    // Sync to state.metadata on every input + push to server (debounced).
+    // The mint pipeline reads the server-side session.metadata, so the
+    // client copy isn't enough — without the push, edits would be
+    // discarded the moment the phone confirms GPS.
+    function sync(prevKey) {
+      var newKey = keyInp.value.trim();
+      var newVal = valInp.value;
+      if (!state.metadata) state.metadata = {};
+      if (prevKey && prevKey !== newKey) delete state.metadata[prevKey];
+      if (newKey) state.metadata[newKey] = newVal;
+      scheduleMetadataPush();
+    }
+    var lastKey = key;
+    keyInp.addEventListener('input', function() {
+      sync(lastKey);
+      lastKey = keyInp.value.trim();
+    });
+    valInp.addEventListener('input', function() { sync(lastKey); });
+    del.addEventListener('click', function() {
+      if (lastKey) delete state.metadata[lastKey];
+      row.remove();
+      scheduleMetadataPush();
+    });
+    row.appendChild(keyInp);
+    row.appendChild(valInp);
+    row.appendChild(del);
+    return row;
   }
 
   // Populate the chain context banner. The mint has zero per-mint
@@ -418,6 +577,40 @@ if (typeof TabBar !== 'undefined') {
     if (b < 1024) return b + ' B';
     if (b < 1024*1024) return (b / 1024).toFixed(1) + ' KB';
     return (b / (1024*1024)).toFixed(2) + ' MB';
+  }
+
+  // ---- Conception handoff UI ----
+  // Same shape for every gps_source: drop image → server fires Discord
+  // ping → dashboard shows QR + URL + Open button → user opens the
+  // conception page on whichever device they prefer. The conception
+  // page itself adapts to gps_source (phone watchPosition / machine
+  // fetch / none). No Conceive action lives on the dashboard.
+  function applyHandoffUi() {
+    var src = state.gpsSource || 'phone';
+    var head, body;
+    if (src === 'phone') {
+      head = 'Conception link ready (phone GPS)';
+      body = 'Scan the QR with your phone, tap the Discord notification, or open below. The conception page will capture precise GPS via the phone\u2019s sensors.';
+    } else if (src === 'machine') {
+      head = 'Conception link ready (machine GPS)';
+      body = 'Open the conception page on any device — the server will fetch its own approximate GPS (city-level) when you press Conceive. Scan the QR, tap Discord, or click Open below.';
+    } else {
+      head = 'Conception link ready (no GPS)';
+      body = 'Open the conception page on any device and press Conceive — this chain records no GPS, and the cert will show "BIRTHPLACE — NOT RECORDED".';
+    }
+    if (els.handoffHead) els.handoffHead.textContent = head;
+    if (els.handoffBody) els.handoffBody.textContent = body;
+    if (els.awaitUrl) els.awaitUrl.value = state.mintUrl || '';
+    if (els.handoffOpen) els.handoffOpen.href = state.mintUrl || '#';
+    if (els.ticket) els.ticket.textContent = state.ticket || '\u2014';
+    if (els.handoffQr) {
+      if (state.qrDataUri) {
+        els.handoffQr.src = state.qrDataUri;
+        els.handoffQr.hidden = false;
+      } else {
+        els.handoffQr.hidden = true;
+      }
+    }
   }
 
   // ---- Mint URL display (phone-capture handoff) ----
@@ -510,7 +703,12 @@ if (typeof TabBar !== 'undefined') {
     state.token = null;
     state.metadata = null;
     state.mintUrl = '';
+    state.gpsSource = null;
+    state.qrDataUri = '';
+    state.ticket = '';
     els.fileInput.value = '';
+    if (els.resumeInput) els.resumeInput.value = '';
+    if (els.resumeBtn) els.resumeBtn.disabled = false;
     showError('');
     setState('empty');
   }
@@ -531,6 +729,39 @@ if (typeof TabBar !== 'undefined') {
   els.cancel.addEventListener('click', reset);
   els.again.addEventListener('click', reset);
   els.retry.addEventListener('click', reset);
+  if (els.metaAdd) {
+    els.metaAdd.addEventListener('click', function() {
+      if (els.metaEditor) els.metaEditor.appendChild(_metaRow('', '', true));
+    });
+  }
+  if (els.resumeBtn) {
+    els.resumeBtn.addEventListener('click', function() {
+      var v = els.resumeInput ? els.resumeInput.value : '';
+      resumeByTicket(v);
+    });
+  }
+  if (els.resumeInput) {
+    els.resumeInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        resumeByTicket(els.resumeInput.value);
+      }
+    });
+  }
+  if (els.ticketCopy && els.ticket) {
+    els.ticketCopy.addEventListener('click', function() {
+      var t = els.ticket.textContent || '';
+      if (!t || t === '\u2014') return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(t);
+        }
+        var prev = els.ticketCopy.textContent;
+        els.ticketCopy.textContent = 'copied';
+        setTimeout(function() { els.ticketCopy.textContent = prev; }, 1200);
+      } catch (e) { /* clipboard may be blocked on http:// — silent */ }
+    });
+  }
 
   // Shared clipboard copy helper — wires a button to an input, flashes
   // "copied" briefly. Used for both the await-state mint URL and the
@@ -1546,7 +1777,6 @@ if (typeof TabBar !== 'undefined') {
     profiles:   document.getElementById('configProfiles'),
     identity:   document.getElementById('configIdentity'),
     server:     document.getElementById('configServer'),
-    env:        document.getElementById('configEnv'),
   };
   if (!els.identity) return;
 
@@ -1569,12 +1799,21 @@ if (typeof TabBar !== 'undefined') {
   //
   // Event-specific keys (only on the matching event):
   //   ready:     mint_url, image_name
-  //   conceived: identifier, content_hash, url, image_path
+  //   conceived: identifier, content_hash, url (primary surface),
+  //              distribution (multiline "label: url" for every
+  //              surface the soul landed on), image_path, soul_path,
+  //              dry_run, chain_id, chain_visibility, creator_name,
+  //              key_fingerprint, constellation, constellation_star,
+  //              rarity_score, rarity_tier, gps_source
   //
   // The presets below use the event-agnostic keys so a single template
   // renders cleanly for both `ready` and `conceived` events; users who
   // want richer per-event formatting can split into two webhook rows
-  // with different `events` lists.
+  // with different `events` lists. For multi-surface mints, swap
+  // {{action_url}} for {{distribution}} in the conceived template to
+  // see every mirror in one message. For narrative templates, mix in
+  // {{constellation}} {{constellation_star}} or {{rarity_tier}} —
+  // "a Rare β Mecitamul was conceived" reads better than just a URL.
   var WEBHOOK_PRESETS = {
     discord: JSON.stringify({
       content: '\uD83C\uDFA8 {{summary}}\n{{action_url}}'
@@ -1791,7 +2030,8 @@ if (typeof TabBar !== 'undefined') {
     }
   }
 
-  function renderServer(server) {
+  function renderServer(server, env) {
+    env = env || {};
     // Adopt the server's webhook list as our draft on every render
     // UNLESS the user has unsaved local edits — those win until they
     // click Save (which flushes) or Cancel (which discards).
@@ -1810,6 +2050,7 @@ if (typeof TabBar !== 'undefined') {
     var domain = server.domain || '';
     var cert   = server.cert   || '';
     var keyP   = server.key    || '';
+    var tokenSet = !!env.MINT_API_TOKEN;
 
     els.server.innerHTML =
       '<div class="config-field">' +
@@ -1828,14 +2069,32 @@ if (typeof TabBar !== 'undefined') {
       '  <button class="config-btn" id="configServerKeyBrowse" data-fs-browse>Browse\u2026</button>' +
       '  <button class="config-btn config-btn-subtle" id="configServerKeyClear" title="Clear path" ' + (keyP ? '' : 'disabled') + '>\u00d7</button>' +
       '</div>' +
+      // Dashboard API token — write-only, masked. Gates /api/* and the
+      // dashboard itself when set. Empty = open on localhost (server-
+      // side guardrail warns + delays on public-domain startup).
+      '<div class="config-field">' +
+      '  <span class="config-field-label">API token <span class="config-channel-field-state" data-set="' + (tokenSet ? '1' : '0') + '">' + (tokenSet ? 'set' : 'unset') + '</span></span>' +
+      '  <input class="config-input" id="configServerToken" type="password" autocomplete="off" placeholder="' + (tokenSet ? '(set — type to replace)' : '(unset)') + '">' +
+      '  <button class="config-btn" id="configServerTokenSet">Update</button>' +
+      '</div>' +
       '<div class="config-row">' +
       '  <button class="config-btn" id="configServerSave">Save server.json</button>' +
       '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
       '</div>' +
-      '<p class="config-note">Cert/key paths use the native file picker — OS-agnostic, no copy-paste of long paths. Empty = auto-detect from <code>~/.mememage/certs/</code> at startup. Cert/key changes require a server restart to take effect.</p>' +
+      '<p class="config-note">Cert/key paths use the native file picker — OS-agnostic, no copy-paste of long paths. Empty = auto-detect from <code>~/.mememage/certs/</code> at startup. Cert/key + API token changes require a server restart to take effect for new sessions.</p>' +
       '<div id="configWebhooks" class="config-webhooks"></div>';
 
     document.getElementById('configServerSave').addEventListener('click', saveServerConfig);
+    document.getElementById('configServerTokenSet').addEventListener('click', function() {
+      var inp = document.getElementById('configServerToken');
+      var v = inp ? inp.value : '';
+      if (!v) {
+        showError('API token: enter a value (or leave empty to keep unchanged).');
+        return;
+      }
+      setEnvSecretGlobal('MINT_API_TOKEN', v, document.getElementById('configServerToken').closest('.config-field'));
+      inp.value = '';
+    });
     document.getElementById('configServerCertBrowse').addEventListener('click', function() {
       pickCertOrKey('configServerCert', 'configServerCertClear');
     });
@@ -1971,7 +2230,7 @@ if (typeof TabBar !== 'undefined') {
                     '<option value="custom"' + (presetKey === 'custom' ? ' selected' : '') + ' disabled>Custom (edited)</option>' +
                   '</select>' +
                 '</label>' +
-                '<textarea class="config-input config-webhook-tmpl-input" data-webhook-tmpl="' + i + '" rows="3" placeholder="Empty = raw POST. JSON template with {{event}}, {{identifier}}, {{content_hash}}, {{url}}, {{mint_url}}, {{image_name}}.">' + escapeHtml(tmpl) + '</textarea>' +
+                '<textarea class="config-input config-webhook-tmpl-input" data-webhook-tmpl="' + i + '" rows="3" placeholder="Empty = raw POST. JSON template with {{event}}, {{identifier}}, {{content_hash}}, {{url}} (primary surface), {{distribution}} (all surfaces, multiline), {{constellation}}, {{constellation_star}}, {{rarity_tier}}, {{rarity_score}}, {{creator_name}}, {{key_fingerprint}}, {{chain_id}}, {{chain_visibility}}, {{gps_source}}, {{mint_url}}, {{image_name}}.">' + escapeHtml(tmpl) + '</textarea>' +
               '</div>' +
             '</div>';
         }).join('');
@@ -2203,85 +2462,11 @@ if (typeof TabBar !== 'undefined') {
     }
   }
 
-  function renderEnv(envPresence) {
-    var keys = Object.keys(envPresence);
-    if (keys.length === 0) {
-      els.env.innerHTML = '<span class="config-field-empty">(no credentials)</span>';
-      return;
-    }
-    // Per-key inline editor. We never round-trip the actual value (the
-    // API only reports presence), so the input is empty by default with
-    // a placeholder that reflects current state. Type a new value +
-    // click Update to overwrite; click Clear to remove the key.
-    var rowsHtml = keys.map(function(k) {
-      var set = envPresence[k];
-      return '<div class="config-env-row" data-set="' + (set ? '1' : '0') + '">' +
-        '<span class="config-env-dot"></span>' +
-        '<span class="config-env-name">' + escapeHtml(k) + '</span>' +
-        '<input class="config-input config-env-input" data-env-input="' + escapeHtml(k) + '" type="password" autocomplete="off" placeholder="' + (set ? '(set — type to replace)' : '(unset)') + '">' +
-        '<button class="config-btn config-env-update" data-env-update="' + escapeHtml(k) + '">Update</button>' +
-        '<button class="config-btn config-btn-danger config-env-clear" data-env-clear="' + escapeHtml(k) + '" ' + (set ? '' : 'disabled') + '>Clear</button>' +
-        '<span class="config-env-state">' + (set ? 'set' : 'unset') + '</span>' +
-      '</div>';
-    }).join('');
-    els.env.innerHTML = rowsHtml +
-      '<div id="configEnvStatus" class="config-note" style="margin-top:0.4rem;"></div>' +
-      '<p class="config-note">Updates write to <code>.env</code> at the project root and mirror into the running server\u2019s environment. Existing values are never read back from the API \u2014 the input always starts empty.</p>';
-
-    els.env.querySelectorAll('[data-env-update]').forEach(function(b) {
-      b.addEventListener('click', function() {
-        var k = b.getAttribute('data-env-update');
-        var input = els.env.querySelector('[data-env-input="' + cssEsc(k) + '"]');
-        var v = input ? input.value : '';
-        if (!v) {
-          setEnvStatus(k + ': enter a value (or click Clear to remove)', '#b04040');
-          return;
-        }
-        setEnvField(k, v);
-      });
-    });
-    els.env.querySelectorAll('[data-env-clear]').forEach(function(b) {
-      if (b.disabled) return;
-      b.addEventListener('click', function() {
-        var k = b.getAttribute('data-env-clear');
-        if (!window.confirm('Clear ' + k + ' from .env? The server will lose access to whatever this credential authorized.')) return;
-        setEnvField(k, '');
-      });
-    });
-  }
-
-  function setEnvStatus(msg, color) {
-    var s = document.getElementById('configEnvStatus');
-    if (!s) return;
-    s.textContent = msg;
-    s.style.color = color || '';
-  }
-
-  function cssEsc(s) {
-    // CSS attribute-selector escape. The keys we deal with (IA_*, MINT_*)
-    // are alnum + underscore so escaping is a no-op, but be defensive
-    // in case a future allow-listed key contains a colon or dash.
-    if (window.CSS && window.CSS.escape) return window.CSS.escape(s);
-    return s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-  }
-
-  async function setEnvField(key, value) {
-    setEnvStatus('Updating ' + key + '\u2026', '');
-    showError('');
-    try {
-      var body = {};
-      body[key] = value;
-      await fetchJson('/api/config/env', {
-        method: 'POST', headers: authHeaders(),
-        body: JSON.stringify(body),
-      });
-      setEnvStatus(key + ': ' + (value ? 'updated' : 'cleared'), '#1a7a1a');
-      // Refresh presence dots and the per-row UI state.
-      await refresh();
-    } catch (e) {
-      setEnvStatus(key + ': save failed — ' + e.message, '#b04040');
-    }
-  }
+  // Credentials section was removed — channel-specific secrets now
+  // live alongside their channels in the Channels section (write
+  // directly to .env via the value input there). MINT_API_TOKEN moved
+  // to the Server section. Power users who need other env vars
+  // (MEMEMAGE_PASSWORD, anything not surfaced) edit .env directly.
 
   // renderEasterEgg removed: easter eggs are chain-dependent now,
   // configured per-chain via the Payload tab's frozen-entry editor.
@@ -2348,15 +2533,18 @@ if (typeof TabBar !== 'undefined') {
     try {
       var data = await fetchJson('/api/config');
       renderIdentity(data.identity || {});
-      renderServer(data.server || {});
-      renderEnv(data.env || {});
+      renderServer(data.server || {}, data.env || {});
+      // Cache env presence so the Channels section's "set"/"unset"
+      // dots can be accurate the first time it renders, even if
+      // /api/config arrived before loadChannels' own fetch.
+      _envPresence = data.env || {};
     } catch (e) {
       showError('Config load failed: ' + e.message);
     }
-    // Chains + profiles are separate endpoints; load them after the
-    // main config so the identity section's "active profile" label
-    // can reflect any switch that just happened.
-    await Promise.all([loadChains(), loadProfiles()]);
+    // Chains + profiles + channels are separate endpoints; load them
+    // after the main config so the identity section's "active profile"
+    // label can reflect any switch that just happened.
+    await Promise.all([loadChains(), loadProfiles(), loadChannels()]);
   }
 
   // ----- Profiles section -----------------------------------------------
@@ -2644,6 +2832,354 @@ if (typeof TabBar !== 'undefined') {
     if (zone) { zone.style.display = 'none'; zone.innerHTML = ''; }
   }
 
+  // ----- Channels section ---------------------------------------------
+  //
+  // Per the GoDaddy mental model: each channel is a type + credentials
+  // + config + enabled/primary flags. The dashboard reads each
+  // registered type's schema (CREDENTIAL_FIELDS / CONFIG_FIELDS) and
+  // renders the form generically — new channel types appear here as
+  // soon as the server registers them, no dashboard code change
+  // required. Edits write the full list back via POST /api/channels.
+
+  var _channelTypes = null;  // cache of /api/channels/types response
+  var _envPresence = {};     // env_var → bool, populated alongside loadChannels
+
+  async function loadChannels() {
+    var host = document.getElementById('configChannels');
+    if (!host) return;
+    try {
+      // Load schemas first if not cached — needed to render the
+      // per-channel field labels and the "+ Add channel" picker.
+      if (!_channelTypes) {
+        var typesResp = await fetchJson('/api/channels/types');
+        _channelTypes = (typesResp.types || []).reduce(function(acc, t) {
+          acc[t.type] = t;
+          return acc;
+        }, {});
+      }
+      // Channels section now also surfaces credential VALUES (write-
+      // only — we never read them back, only presence). Fetch env
+      // presence alongside the channels list so the per-field "set"
+      // dots are accurate on first render.
+      var data = await fetchJson('/api/channels');
+      try {
+        var cfg = await fetchJson('/api/config');
+        _envPresence = cfg.env || {};
+      } catch (_) { _envPresence = {}; }
+      renderChannels(host, data.channels || []);
+    } catch (e) {
+      host.innerHTML = '<p class="config-field-empty">Could not load channels: ' + escapeHtml(e.message) + '</p>';
+    }
+  }
+
+  function renderChannels(host, channels) {
+    // Cache by index so saveChannelsFromDom() can recover each row's
+    // type (not editable inline, so the DOM doesn't carry it).
+    _lastChannelsByIdx = {};
+    channels.forEach(function(c, i) { _lastChannelsByIdx[i] = c; });
+
+    var rows = channels.map(function(c, i) { return _channelRow(c, i); }).join('');
+    var addOptions = Object.keys(_channelTypes).map(function(t) {
+      return '<option value="' + escapeHtml(t) + '">' + escapeHtml(_channelTypes[t].display_name) + '</option>';
+    }).join('');
+
+    host.innerHTML =
+      (rows || '<p class="config-field-empty">No channels configured.</p>') +
+      '<div class="config-channel-add">' +
+      '  <select class="config-input config-channel-add-type" id="configChannelNewType">' +
+      addOptions +
+      '  </select>' +
+      '  <input class="config-input config-channel-add-id" id="configChannelNewId" type="text" placeholder="channel id (e.g. ia-backup)">' +
+      '  <button class="config-btn" id="configChannelAddBtn">+ Add channel</button>' +
+      '</div>' +
+      '<p class="config-note">The <strong>primary</strong> channel\u2019s URL becomes the bar\u2019s record link and the Discord notification target. Every enabled+configured channel receives a copy of the soul on every mint; at least one must succeed. Credentials always live in <code>.env</code> — fields below name the env var to read.</p>';
+
+    // Wire row controls
+    channels.forEach(function(c, i) {
+      _wireChannelRow(host, c, i);
+    });
+
+    // Wire add-channel button
+    var addBtn = document.getElementById('configChannelAddBtn');
+    if (addBtn) addBtn.addEventListener('click', addChannel);
+  }
+
+  function _channelRow(c, idx) {
+    var schema = _channelTypes[c.type];
+    var displayName = schema ? schema.display_name : c.type;
+    var statusBits = [];
+    if (!c.type_known) statusBits.push('<span class="config-channel-status-warn">unknown type</span>');
+    else if (!c.configured) statusBits.push('<span class="config-channel-status-warn">needs creds</span>');
+    else statusBits.push('<span class="config-channel-status-ok">configured</span>');
+    if (c.primary) statusBits.push('<span class="config-channel-status-primary">primary</span>');
+
+    // Credential field rows — read-only env var name + override input
+    var credFields = '';
+    if (schema && schema.credential_fields) {
+      credFields = schema.credential_fields.map(function(f) {
+        // Resolve the actual env var this field writes to: the channel
+        // may override the default name, otherwise fall back to the
+        // schema's env_var. Same resolution the server uses.
+        var envVar = (c.credentials || {})[f.name] || f.env_var;
+        var isSet = !!_envPresence[envVar];
+        var helpText = f.help ? ' \u00b7 ' + f.help : '';
+        return '' +
+          '<div class="config-channel-field">' +
+            '<label class="config-channel-field-label">' + escapeHtml(f.label) + (f.secret ? ' \u2022' : '') +
+              ' <span class="config-channel-field-state" data-set="' + (isSet ? '1' : '0') + '">' + (isSet ? 'set' : 'unset') + '</span>' +
+            '</label>' +
+            '<input class="config-input config-channel-field-input" data-channel-secret="' + escapeHtml(envVar) + '" type="password" autocomplete="off" ' +
+                   'placeholder="' + (isSet ? '(set \u2014 type to replace)' : '(unset)') + '">' +
+            '<span class="config-channel-field-hint">stored in env var <code>' + escapeHtml(envVar) + '</code>' + escapeHtml(helpText) + '</span>' +
+          '</div>';
+      }).join('');
+    }
+
+    // Config field rows — actual editable values, not env var refs.
+    // Boolean fields render as a checkbox + inline label inside a
+    // single row so the user can see the on/off state at a glance.
+    // Text fields keep the stacked label/input layout used for
+    // credential overrides.
+    var cfgFields = '';
+    if (schema && schema.config_fields) {
+      cfgFields = schema.config_fields.map(function(f) {
+        var val = (c.config || {})[f.name];
+        if (val === undefined || val === null) val = (f.default !== undefined ? f.default : '');
+        var isBool = (typeof val === 'boolean');
+        if (isBool) {
+          return '' +
+            '<div class="config-channel-field config-channel-field-bool">' +
+              '<label class="config-channel-field-checkbox">' +
+                '<input type="checkbox" data-channel-cfg="' + escapeHtml(f.name) + '"' + (val ? ' checked' : '') + '>' +
+                '<span>' + escapeHtml(f.label) + '</span>' +
+              '</label>' +
+              (f.help ? '<span class="config-channel-field-hint">' + escapeHtml(f.help) + '</span>' : '') +
+            '</div>';
+        }
+        return '' +
+          '<div class="config-channel-field">' +
+            '<label class="config-channel-field-label">' + escapeHtml(f.label) + '</label>' +
+            '<input class="config-input config-channel-field-input" data-channel-cfg="' + escapeHtml(f.name) + '" type="text" value="' + escapeHtml('' + val) + '">' +
+            (f.help ? '<span class="config-channel-field-hint">' + escapeHtml(f.help) + '</span>' : '') +
+          '</div>';
+      }).join('');
+    }
+
+    return '' +
+      '<div class="config-channel-row" data-channel-idx="' + idx + '" data-channel-id="' + escapeHtml(c.id) + '">' +
+        '<div class="config-channel-head">' +
+          '<span class="config-channel-name">' + escapeHtml(c.name || c.id) + '</span>' +
+          '<span class="config-channel-type">' + escapeHtml(displayName) + ' \u00b7 id <code>' + escapeHtml(c.id) + '</code></span>' +
+          '<span class="config-channel-status">' + statusBits.join(' ') + '</span>' +
+        '</div>' +
+        '<div class="config-channel-controls">' +
+          '<label><input type="checkbox" data-channel-enabled' + (c.enabled ? ' checked' : '') + '> enabled</label>' +
+          '<label><input type="radio" name="channelPrimary" data-channel-primary' + (c.primary ? ' checked' : '') + '> primary</label>' +
+          '<button type="button" class="config-btn config-channel-remove" data-channel-remove>Remove</button>' +
+        '</div>' +
+        (credFields ? '<div class="config-channel-fields">' + credFields + '</div>' : '') +
+        (cfgFields ? '<div class="config-channel-fields">' + cfgFields + '</div>' : '') +
+      '</div>';
+  }
+
+  function _wireChannelRow(host, channel, idx) {
+    var row = host.querySelector('[data-channel-idx="' + idx + '"]');
+    if (!row) return;
+
+    // Inputs that affect channels.json — enabled, primary, config
+    // fields (data-channel-cfg). Saved via /api/channels on change.
+    var channelInputs = row.querySelectorAll('[data-channel-enabled], [data-channel-primary], [data-channel-cfg]');
+    channelInputs.forEach(function(inp) {
+      inp.addEventListener('change', function() { saveChannelsFromDom(host); });
+    });
+
+    // Credential value inputs — write directly to .env via /api/config/env.
+    // Trigger on blur (lose focus) + Enter so users can paste-and-tab.
+    var secretInputs = row.querySelectorAll('[data-channel-secret]');
+    secretInputs.forEach(function(inp) {
+      function commit() {
+        var v = inp.value;
+        if (v === '') return;  // empty input = no-op (clear is via X button)
+        var envVar = inp.getAttribute('data-channel-secret');
+        setEnvSecret(envVar, v, row);
+        inp.value = '';
+      }
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit();
+        }
+      });
+    });
+
+    var removeBtn = row.querySelector('[data-channel-remove]');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', function() {
+        if (!confirm('Remove channel "' + (channel.name || channel.id) + '"? Existing records that already shipped to it are unaffected; future mints will skip it.')) return;
+        row.remove();
+        saveChannelsFromDom(host);
+      });
+    }
+  }
+
+  async function setEnvSecret(envVar, value, row) {
+    var ok = await _postEnvSecret(envVar, value);
+    if (!ok) return;
+    var inputEl = row.querySelector('[data-channel-secret="' + envVar + '"]');
+    if (!inputEl) return;
+    var fieldEl = inputEl.closest('.config-channel-field');
+    _flipFieldStateToSet(fieldEl, inputEl);
+  }
+
+  async function setEnvSecretGlobal(envVar, value, fieldEl) {
+    var ok = await _postEnvSecret(envVar, value);
+    if (!ok) return;
+    var inputEl = fieldEl && fieldEl.querySelector('input');
+    _flipFieldStateToSet(fieldEl, inputEl);
+  }
+
+  // Flip the "unset" pill → "set" + refresh the placeholder so the
+  // user has a visible confirmation that their secret committed.
+  // Reused by both per-channel + global (Server section) flows.
+  function _flipFieldStateToSet(fieldEl, inputEl) {
+    if (!fieldEl) return;
+    var stateEl = fieldEl.querySelector('.config-channel-field-state');
+    if (stateEl) {
+      stateEl.textContent = 'set';
+      stateEl.setAttribute('data-set', '1');
+    }
+    if (inputEl) {
+      inputEl.placeholder = '(set \u2014 type to replace)';
+    }
+  }
+
+  async function _postEnvSecret(envVar, value) {
+    var body = {};
+    body[envVar] = value;
+    try {
+      var resp = await fetch('/api/config/env', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body),
+      });
+      var data = await resp.json().catch(function() { return {}; });
+      if (!resp.ok) {
+        showError(data.error || ('Env update failed (HTTP ' + resp.status + ').'));
+        return false;
+      }
+      showError('');
+      _envPresence[envVar] = true;
+      return true;
+    } catch (e) {
+      showError('Env update failed: ' + e.message);
+      return false;
+    }
+  }
+
+  function saveChannelsFromDom(host) {
+    var rows = host.querySelectorAll('.config-channel-row');
+    var channels = [];
+    rows.forEach(function(row) {
+      var id = row.getAttribute('data-channel-id');
+      // Look up the corresponding row's channel data — we re-derive
+      // everything from the DOM so the user's in-flight edits are the
+      // source of truth, not the last server snapshot.
+      var enabled = !!row.querySelector('[data-channel-enabled]').checked;
+      var primary = !!row.querySelector('[data-channel-primary]').checked;
+      var typeEl = row.querySelector('[data-channel-name]');  // not used
+      var displayName = (row.querySelector('.config-channel-name') || {}).textContent || id;
+      // The type isn't editable inline; recover it from the previously
+      // rendered list. The simplest path: peek at the data-channel-type
+      // attribute we'll set below. For now, find it in the server's
+      // last snapshot via _lastChannelsByIdx.
+      var snapshot = _lastChannelsByIdx[row.getAttribute('data-channel-idx')];
+      var type = snapshot ? snapshot.type : '';
+
+      // Credentials map (env-var-name overrides) is preserved from the
+      // last server snapshot — it's not editable from the UI anymore
+      // (power-user concern; edit ~/.mememage/channels.json directly).
+      var credentials = (snapshot && snapshot.credentials) || {};
+      var config = {};
+      row.querySelectorAll('[data-channel-cfg]').forEach(function(inp) {
+        var k = inp.getAttribute('data-channel-cfg');
+        if (inp.type === 'checkbox') {
+          config[k] = !!inp.checked;
+        } else {
+          var v = inp.value;
+          if (v !== '') config[k] = v;
+        }
+      });
+
+      channels.push({
+        id: id,
+        type: type,
+        name: displayName,
+        enabled: enabled,
+        primary: primary,
+        credentials: credentials,
+        config: config,
+      });
+    });
+    return persistChannels(channels);
+  }
+
+  var _lastChannelsByIdx = {};
+
+  async function persistChannels(channels) {
+    try {
+      var resp = await fetch('/api/channels', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({channels: channels}),
+      });
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        showError(data.error || ('Channels save failed (HTTP ' + resp.status + ').'));
+        loadChannels();  // revert UI to server truth
+        return;
+      }
+      showError('');
+      // Refresh so the configured/primary chips reflect the saved state.
+      loadChannels();
+    } catch (e) {
+      showError('Channels save failed: ' + e.message);
+    }
+  }
+
+  function addChannel() {
+    var typeSel = document.getElementById('configChannelNewType');
+    var idInp = document.getElementById('configChannelNewId');
+    if (!typeSel || !idInp) return;
+    var type = typeSel.value;
+    var id = (idInp.value || '').trim();
+    if (!id) {
+      showError('Channel id required (e.g. "ia-backup", "my-server").');
+      return;
+    }
+    // Build a fresh channel with schema defaults filled in.
+    var schema = _channelTypes[type] || {};
+    var config = {};
+    (schema.config_fields || []).forEach(function(f) {
+      if (f.default !== undefined) config[f.name] = f.default;
+    });
+    var newCh = {
+      id: id,
+      type: type,
+      name: schema.display_name || id,
+      enabled: false,    // off by default so the user can fill creds first
+      primary: false,
+      credentials: {},
+      config: config,
+    };
+    // Append to current channels and persist
+    var host = document.getElementById('configChannels');
+    var existing = Object.values(_lastChannelsByIdx);
+    existing.push(newCh);
+    persistChannels(existing);
+  }
+
   async function loadChains() {
     if (!els.chains) return;
     try {
@@ -2686,6 +3222,7 @@ if (typeof TabBar !== 'undefined') {
           } else {
             pwLabel = pwSet ? '\u00b7 GPS sealed' : '\u00b7 public';
           }
+          var gpsSource = c.gps_source || 'phone';
           var meta = vis + ' ' + pwLabel + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
           var renameBtn = '<button class="config-btn" data-chain-action="rename" data-chain-id="' + escapeHtml(c.id) + '" data-chain-name="' + escapeHtml(c.name || c.id) + '" title="Change display name (visibility is locked at creation)">Rename</button>';
           var pwBtn = '<button class="config-btn" data-chain-action="password" data-chain-id="' + escapeHtml(c.id) + '" data-chain-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + (pwSet ? 'Change password\u2026' : 'Set password\u2026') + '</button>';
@@ -2696,6 +3233,20 @@ if (typeof TabBar !== 'undefined') {
             : '<button class="config-btn" data-chain-action="switch" data-chain-id="' + escapeHtml(c.id) + '">Switch</button>' +
               renameBtn + pwBtn +
               '<button class="config-btn" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '">Remove</button>';
+          // GPS source radio: three modes, persisted to chain.json on
+          // change. Kept inline with the chain row so the Mint tab can
+          // stay "drop image here" — the source decision lives here,
+          // once, per chain.
+          var gpsRadio =
+            '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
+              '<span class="config-chain-gps-label">GPS source</span>' +
+              '<label><input type="radio" name="gps-' + escapeHtml(c.id) + '" value="phone" ' +
+                (gpsSource === 'phone' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> phone</label>' +
+              '<label><input type="radio" name="gps-' + escapeHtml(c.id) + '" value="machine" ' +
+                (gpsSource === 'machine' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> machine (approximate)</label>' +
+              '<label><input type="radio" name="gps-' + escapeHtml(c.id) + '" value="none" ' +
+                (gpsSource === 'none' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> none</label>' +
+            '</div>';
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<span class="config-chain-active-mark">' + (isActive ? '\u25b6' : '') + '</span>' +
             '<span class="config-chain-id" title="' + escapeHtml(c.id) + '">' + escapeHtml(c.id) + '</span>' +
@@ -2703,7 +3254,7 @@ if (typeof TabBar !== 'undefined') {
               escapeHtml(c.name || '') + '<br><span class="config-chain-state" data-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>' +
             '</span>' +
             '<span class="config-chain-actions">' + actions + '</span>' +
-            '<span></span>' +
+            '<span class="config-chain-gps-cell">' + gpsRadio + '</span>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -2773,6 +3324,34 @@ if (typeof TabBar !== 'undefined') {
         );
       });
     });
+
+    // GPS source radio handler — persist on change, optimistic UI.
+    els.chains.querySelectorAll('input[data-chain-gps-set]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        if (!input.checked) return;
+        var cid = input.getAttribute('data-chain-gps-set');
+        setChainGpsSource(cid, input.value);
+      });
+    });
+  }
+
+  async function setChainGpsSource(chainId, gpsSource) {
+    try {
+      var resp = await fetch('/api/chain/gps-source', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({chain_id: chainId, gps_source: gpsSource}),
+      });
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        alert(data.error || ('Failed to set GPS source (HTTP ' + resp.status + ')'));
+        loadChains();  // revert UI to server truth
+      }
+    } catch (e) {
+      alert('Failed to set GPS source: ' + e.message);
+      loadChains();
+    }
   }
 
   // Per-chain password editor — inline form below the chain table.

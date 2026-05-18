@@ -56,9 +56,18 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
       if (sigOk === true) {
         result.signatureDetail = 'Ed25519 signature valid';
 
-        // Keychain check — revocation or succession
+        // Keychain check — revocation or succession.
+        //
+        // peerRoot lets us also walk the keychain on the peer surface
+        // the soul came from, not just IA. Chains that publish only
+        // to peer mirrors (IA disabled in channels.json) still get
+        // their keychain records discovered. peerKeychainRoot() returns
+        // null for IA-sourced souls — those fall back to the existing
+        // IA-only flow with no change.
+        var peerRoot = (typeof peerKeychainRoot === 'function')
+          ? peerKeychainRoot(record._source) : null;
         if (record.key_fingerprint) {
-          var kc = await checkKeychain(record.key_fingerprint, record.public_key);
+          var kc = await checkKeychain(record.key_fingerprint, record.public_key, peerRoot);
           result.keychain = kc;
           if (kc.status === 'revoked') {
             result.signature = false;
@@ -67,11 +76,11 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
             result.signatureDetail += ' (key rotated — ' + kc.detail + ')';
           }
           // Alias discovery — soft enrichment, never blocks verdict.
-          // Async-cheap when the IA metadata call returns no
-          // alias-*.json files (most identities will have none).
+          // Probes both IA AND the soul's source peer (if non-IA),
+          // merging alias-*.json file lists from each side.
           try {
             if (typeof discoverAliases === 'function') {
-              result.aliases = await discoverAliases(record.key_fingerprint);
+              result.aliases = await discoverAliases(record.key_fingerprint, peerRoot);
             } else {
               result.aliases = [];
             }

@@ -125,14 +125,88 @@
   letter-spacing: 0.04em;
   color: #2a2a30;
 }
-.mint-meta-grid {
-  display: grid; grid-template-columns: max-content 1fr;
-  gap: 0.2rem 0.5rem; font-size: 0.72rem; margin-top: 0.45rem;
-  max-height: 90px; overflow-y: auto;
-  color: #2a2a30;
+.mint-meta-editor {
+  display: flex; flex-direction: column;
+  gap: 0.3rem; margin-top: 0.5rem;
+  max-height: 240px; overflow-y: auto;
+  padding-right: 0.2rem;
 }
-.mint-meta-grid dt { font-weight: 600; color: #1a1a20; }
-.mint-meta-grid dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a3a40; }
+.mint-meta-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.4fr) 1fr auto;
+  gap: 0.35rem; align-items: center;
+  font-size: 0.74rem;
+}
+.mint-meta-key-input,
+.mint-meta-val-input {
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #1a1a20;
+  min-width: 0;
+}
+.mint-meta-key-input { font-weight: 600; }
+.mint-meta-key-input:focus,
+.mint-meta-val-input:focus {
+  outline: none;
+  border-color: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.85);
+}
+.mint-meta-del {
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  width: 1.6rem; height: 1.6rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.mint-meta-del:hover {
+  color: #b00;
+  border-color: rgba(176, 0, 0, 0.25);
+  background: rgba(176, 0, 0, 0.05);
+}
+.mint-meta-row-locked {
+  grid-template-columns: minmax(7rem, 0.4fr) 1fr;
+  padding: 0.25rem 0.4rem;
+  color: #4a4a50;
+  font-style: italic;
+  opacity: 0.7;
+}
+.mint-meta-row-locked .mint-meta-key {
+  font-weight: 600;
+  font-style: normal;
+  color: #1a1a20;
+}
+.mint-meta-actions {
+  display: flex; align-items: center; gap: 0.6rem;
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+}
+.mint-meta-add {
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px dashed rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  background: transparent;
+  color: #2a2a30;
+  cursor: pointer;
+}
+.mint-meta-add:hover {
+  border-style: solid;
+  background: rgba(0, 0, 0, 0.04);
+}
+.mint-meta-hint {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 0.68rem;
+}
 
 /* Chain context banner — shown at the top of the mint review state so
    the user sees which chain this mint will target and what kind it
@@ -265,11 +339,110 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto;
 }
 
-/* Awaiting-phone state — visible while the dashboard polls for the
-   phone-side GPS capture. The mint URL is the load-bearing element
-   (Discord/Slack webhooks may not be configured, so the user always
-   has a manual handoff path). */
-.mint-await {
+/* Resume-by-ticket — empty-state convenience for pulling back a
+   pending mint. Compact row so it doesn't compete with the drop
+   zone above. */
+.mint-resume {
+  display: grid;
+  grid-template-columns: max-content 9rem max-content 1fr;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+  padding: 0.3rem 0.1rem 0;
+  font-size: 0.72rem;
+}
+.mint-resume-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5a5a62;
+}
+.mint-resume-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.5rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-sm, 6px);
+  color: #1a1a20;
+  min-width: 0;
+}
+.mint-resume-input:focus { outline: none; border-color: rgba(0, 0, 0, 0.4); background: rgba(255, 255, 255, 0.9); }
+.mint-resume-btn {
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.7rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+}
+.mint-resume-btn:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
+.mint-resume-btn:disabled { opacity: 0.5; cursor: wait; }
+.mint-resume-hint {
+  font-size: 0.66rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+}
+
+/* Ticket display inside the conception handoff. Monospace + grouped
+   for memorability — like a flight number. */
+.mint-handoff-ticket {
+  display: grid;
+  grid-template-columns: max-content max-content max-content 1fr;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.5rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.7rem;
+}
+.mint-handoff-ticket-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5a5a62;
+}
+.mint-handoff-ticket-val {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #1a1a20;
+}
+.mint-handoff-ticket-copy {
+  font-family: inherit;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a20;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  font-weight: 600;
+}
+.mint-handoff-ticket-copy:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
+.mint-handoff-ticket-hint {
+  font-size: 0.64rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+  justify-self: end;
+  text-align: right;
+}
+
+/* Conception handoff — same shape for every gps_source. QR for cross-
+   device pickup, URL for manual paste, Open button for same-device
+   pickup. The Discord webhook fires alongside; the user picks which
+   route to use. */
+.mint-handoff {
   padding: 0.7rem 0.8rem;
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -278,59 +451,76 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   flex-direction: column;
   gap: 0.5rem;
 }
-.mint-await-head {
+.mint-handoff-head {
   margin: 0;
   font-size: 0.85rem;
   font-weight: 700;
   color: #1a1a20;
   letter-spacing: 0.03em;
 }
-.mint-await-body {
+.mint-handoff-body {
   margin: 0;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: #3a3a40;
   line-height: 1.55;
 }
-.mint-await-url-row {
+.mint-handoff-row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+  gap: 0.7rem;
 }
-.mint-await-url-label {
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #5a5a62;
-  font-weight: 700;
+.mint-handoff-qr {
   flex: 0 0 auto;
+  border-radius: 6px;
+  background: white;
+  padding: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
 }
-.mint-await-url {
-  flex: 1 1 12rem;
+.mint-handoff-actions {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   min-width: 0;
+}
+.mint-handoff-url {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   padding: 0.35rem 0.5rem;
   background: rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: var(--radius-sm, 6px);
   color: #1a1a20;
 }
-.mint-await-copy {
+.mint-handoff-btns {
+  display: flex;
+  gap: 0.3rem;
+}
+.mint-handoff-btn {
   font-family: inherit;
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.7rem;
   background: rgba(255, 255, 255, 0.85);
   color: #1a1a20;
   border: 1px solid rgba(0, 0, 0, 0.3);
   border-radius: var(--radius-sm, 6px);
   cursor: pointer;
-  flex: 0 0 auto;
   font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.mint-await-copy:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
+.mint-handoff-btn:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
+.mint-handoff-btn-primary {
+  background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
+  color: white;
+  border-color: transparent;
+}
+.mint-handoff-btn-primary:hover { filter: brightness(1.08); background: linear-gradient(to bottom, #dc50dc, #3cc8dc); }
+
 /* Pulsing dot to indicate "still listening". Slow + subtle — same
    cosmic tempo the validator + decoder use, never flashy. */
 .mint-await-spinner {
@@ -360,20 +550,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .mint-error-global:not(:empty) { display: block; }
 
-.mint-conceive {
-  margin-top: auto;
-  padding: 0.7rem 1rem;
-  font-family: inherit; font-size: 0.9rem; font-weight: 600;
-  letter-spacing: 0.04em;
-  border: none;
-  border-radius: var(--radius-sm, 6px);
-  background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
-  color: white;
-  cursor: pointer;
-  transition: opacity 160ms;
-}
-.mint-conceive:disabled { opacity: 0.4; cursor: not-allowed; }
-.mint-conceive:hover:not(:disabled) { filter: brightness(1.08); }
 
 /* Minting (in progress) */
 .mint-progress { align-items: center; justify-content: center; text-align: center; }
@@ -1092,6 +1268,12 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
  * relax that — the panel grows to fit all four sections so the user can
  * see everything at a glance without scrolling. */
 .input-panel#tab-config { height: auto; min-height: 365px; overflow: visible; }
+
+/* Mint tab grows with content. The conception-handoff block (QR +
+   URL + open) plus the origin-fields editor can push the panel past
+   the default 365px, and we want everything visible without
+   internal scroll. */
+.input-panel#tab-mint { height: auto; min-height: 365px; overflow: visible; }
 .config-panel { display: flex; flex-direction: column; gap: 0.5rem; height: auto; }
 
 .config-section {
@@ -1115,6 +1297,172 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   padding: 0.6rem 0.8rem 0.7rem;
   font-size: 0.78rem;
   color: #1a1a20;
+}
+
+/* Channels section — each channel is a card with head (name + type +
+   status chips), top-row controls (enabled, primary, remove), and
+   schema-driven credential + config fields below. */
+.config-channel-row {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm, 6px);
+  padding: 0.55rem 0.7rem;
+  margin: 0.45rem 0;
+  background: rgba(255, 255, 255, 0.45);
+  display: flex; flex-direction: column;
+  gap: 0.45rem;
+}
+.config-channel-head {
+  display: flex; align-items: baseline; gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.config-channel-name {
+  font-weight: 700;
+  color: #1a1a20;
+}
+.config-channel-type {
+  font-size: 0.7rem;
+  color: #54545c;
+}
+.config-channel-type code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 0.25rem;
+  border-radius: 3px;
+}
+.config-channel-status {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 0.3rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.config-channel-status-ok {
+  color: #155030;
+  background: rgba(70, 160, 90, 0.12);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-weight: 700;
+}
+.config-channel-status-warn {
+  color: #8c5e1c;
+  background: rgba(220, 160, 60, 0.18);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-weight: 700;
+}
+.config-channel-status-primary {
+  color: #2a2050;
+  background: rgba(60, 80, 220, 0.14);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-weight: 700;
+}
+.config-channel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.72rem;
+  color: #3a3a40;
+  flex-wrap: wrap;
+}
+.config-channel-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+}
+.config-channel-remove {
+  margin-left: auto;
+  font-size: 0.66rem;
+}
+.config-channel-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.7rem;
+  padding-top: 0.3rem;
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+.config-channel-field {
+  display: flex; flex-direction: column;
+  gap: 0.2rem;
+}
+/* Boolean config field — checkbox + inline label so the on/off state
+   reads at a glance. The text-input padding/styling that wraps non-
+   bool fields would otherwise eat the checkbox visually. */
+.config-channel-field-bool {
+  gap: 0.25rem;
+}
+.config-channel-field-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1a1a20;
+  cursor: pointer;
+}
+.config-channel-field-checkbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+.config-channel-field-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5a5a62;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+/* "set" / "unset" pill next to credential field labels — green when
+   the env var resolves to a value on disk, muted when empty. Same
+   treatment used for the Server section's API token state. */
+.config-channel-field-state {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-family: inherit;
+  text-transform: uppercase;
+}
+.config-channel-field-state[data-set="1"] {
+  background: rgba(70, 160, 90, 0.18);
+  color: #155030;
+}
+.config-channel-field-state[data-set="0"] {
+  background: rgba(0, 0, 0, 0.06);
+  color: #7a7a82;
+}
+.config-channel-field-input {
+  font-size: 0.74rem;
+  padding: 0.25rem 0.45rem;
+}
+.config-channel-field-hint {
+  font-size: 0.64rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+}
+.config-channel-field-hint code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 0.25rem;
+  border-radius: 3px;
+}
+.config-channel-add {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.7rem 0 0.4rem;
+  flex-wrap: wrap;
+}
+.config-channel-add-type {
+  flex: 0 0 12rem;
+}
+.config-channel-add-id {
+  flex: 1 1 12rem;
 }
 
 .config-field {
@@ -1441,6 +1789,37 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   padding: 0.25rem 0.55rem;
   font-size: 0.66rem;
 }
+/* GPS source picker — per-row radio. Sits in the trailing grid column.
+   Wraps to a second line below the row's actions when narrow. */
+.config-chain-gps-cell {
+  grid-column: 1 / -1;
+  padding: 0.2rem 0 0.1rem 32px;  /* align past the 24px active-mark column + 8px gap */
+}
+.config-chain-gps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.68rem;
+  color: #54545c;
+}
+.config-chain-gps-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #74747c;
+  margin-right: 0.15rem;
+}
+.config-chain-gps label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.config-chain-gps input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
 .config-chain-active-badge {
   font-size: 0.62rem;
   font-weight: 700;
@@ -1574,6 +1953,20 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .config-profile-actions .config-btn {
   font-size: 0.62rem;
   padding: 0.25rem 0.55rem;
+}
+
+/* Env credential groups — header per owner (channel / global) so the
+   user reads the section in the same mental model as the Channels
+   list above. */
+.config-env-group { margin-bottom: 0.55rem; }
+.config-env-group + .config-env-group { padding-top: 0.4rem; border-top: 1px dashed rgba(0, 0, 0, 0.08); }
+.config-env-group-head {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5a5a62;
+  margin: 0.3rem 0 0.2rem;
 }
 
 /* Env presence dots */

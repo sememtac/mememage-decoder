@@ -1112,7 +1112,9 @@ async function _renderObservatoryFromCache() {
         if(m.entropy){html+='<div class="ev-sec">Kernel Entropy</div><div class="ev-m w" style="margin:0.3rem 0;"><div class="ev-mv" style="font-size:0.55rem;word-break:break-all;line-height:1.5;color:#8898b8;">'+_h(m.entropy)+'</div></div>';}
       }
 
-      // GPS Time-Lock
+      // GPS Time-Lock — present only when the chain captured GPS.
+      // Chains with gps_source: none publish records without
+      // gps_locked; show an honest placeholder rather than skip.
       if(born.gps_locked){
         var gps=born.gps_locked;
         html+='<div class="ev-sec">Birthplace \u2014 Time-Locked</div><div class="ev-g">';
@@ -1121,6 +1123,9 @@ async function _renderObservatoryFromCache() {
         if(gps.T)html+='<div class="ev-m"><div class="ev-ml">Squarings</div><div class="ev-mv">'+_h(typeof gps.T==='number'?gps.T.toLocaleString():gps.T)+'</div></div>';
         if(gps.e)html+='<div class="ev-m"><div class="ev-ml">RSA e</div><div class="ev-mv">'+_h(gps.e)+'</div></div>';
         html+='</div>';
+      } else {
+        html+='<div class="ev-sec">Birthplace \u2014 Not Recorded</div>';
+        html+='<div class="ev-m w" style="margin:0.3rem 0;"><div class="ev-mv" style="font-size:0.65rem;color:#8090a0;font-style:italic;line-height:1.5;">No GPS coordinates were captured at conception. The creator\u2019s chain is configured to omit location data.</div></div>';
       }
 
       // GPS Password Unlock
@@ -2604,9 +2609,14 @@ function runAudit() {
   var soulUrl = expanded + '/' + identifier + '.soul';
   var jsonUrl = expanded + '/' + identifier + '.json';
   function iaFallback() {
+    // OPTIONAL CONVENIENCE PATH — only runs when the user pasted an
+    // archive.org base URL and the direct .soul / .json probes missed.
+    // Calls IA's /metadata/<identifier> resolver to discover the actual
+    // filename (legacy records may be at {id}.{hash}.soul; new ones at
+    // {id}.soul). Not load-bearing: the source field with {id}
+    // templating is the canonical path. Non-IA hosts get a plain
+    // fail() with probe-link guidance.
     if (!isArchiveOrg) { fail(); return; }
-    // archive.org resolver — /metadata/ API exposes the item's files,
-    // pick the .soul/.json and download it.
     var iaRoot = base.match(/^(https?:\/\/[^/]*archive\.org)/);
     iaRoot = iaRoot ? iaRoot[1] : 'https://archive.org';
     var resolvedDownload = null;
