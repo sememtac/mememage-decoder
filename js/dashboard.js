@@ -118,11 +118,28 @@ if (typeof TabBar !== 'undefined') {
     if (panelId === 'tab-payload' && window.__loadPayloadTab) {
       window.__loadPayloadTab();
     }
-    if (panelId === 'tab-config' && window.__loadConfigTab) {
-      window.__loadConfigTab();
+    if (panelId === 'tab-config') {
+      // First visit loads, subsequent tab activations refresh — picks
+      // up profile changes pushed by external sources (CLI edits,
+      // peers calling our pair endpoint, etc.) without a manual
+      // reload.
+      if (window.__loadConfigTab) window.__loadConfigTab();
+      if (window.__refreshConfigTab) window.__refreshConfigTab();
     }
   });
 }
+
+// Window-visibility refresh: when the user tabs back to the dashboard
+// and the Config tab is open, refetch. Covers the pair-receive case
+// (another machine called our /api/profiles/pair while the user was
+// away) and any other out-of-band change.
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState !== 'visible') return;
+  var configPanel = document.getElementById('tab-config');
+  if (configPanel && configPanel.classList.contains('active') && window.__refreshConfigTab) {
+    window.__refreshConfigTab();
+  }
+});
 
 // =====================================================================
 // MINT TAB — desktop trigger for the phone-GPS conception flow.
@@ -3701,5 +3718,12 @@ if (typeof TabBar !== 'undefined') {
     if (loaded) return;
     loaded = true;
     refresh();
+  };
+  // Refetches even if already loaded — for visibilitychange and the
+  // pair-receive case: when another machine calls /api/profiles/pair
+  // and the user tabs back to this dashboard, the profile list should
+  // reflect the new peer profile without a manual reload.
+  window.__refreshConfigTab = function() {
+    if (loaded) refresh();
   };
 })();
