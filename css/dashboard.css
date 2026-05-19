@@ -1955,6 +1955,83 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   padding: 0.25rem 0.55rem;
 }
 
+/* Profile alias chips — render as a second line under the main row
+   (wraps via flex-basis: 100%). Each chip names a linked profile;
+   bidirectional uses ↔ + green tint, one-way uses → + muted tint.
+   Unknown-locally targets render the truncated fingerprint instead. */
+.config-profile-alias-row {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 0.3rem;
+  margin-top: 0.2rem;
+  border-top: 1px dashed rgba(0, 0, 0, 0.06);
+  font-size: 0.66rem;
+}
+.config-profile-alias-label {
+  color: #6a6a72;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-right: 0.1rem;
+}
+.config-alias-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.12rem 0.5rem 0.12rem 0.35rem;
+  border-radius: 999px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.66rem;
+  border: 1px solid transparent;
+}
+.config-alias-glyph {
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.config-alias-bi {
+  color: #155030;
+  background: rgba(70, 160, 90, 0.14);
+  border-color: rgba(70, 160, 90, 0.28);
+}
+.config-alias-bi .config-alias-glyph { color: #2a8050; }
+.config-alias-oneway {
+  color: #6a6a72;
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  opacity: 0.85;
+}
+.config-alias-oneway .config-alias-glyph { color: #8a8a92; }
+
+/* Pair flow form — opens in the same danger-zone slot as the
+   alias-confirm and remove-confirm modals. Compact two-column
+   field layout. */
+.config-pair-form {
+  padding: 0.6rem 0.8rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-sm, 6px);
+}
+.config-pair-head {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.config-pair-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  color: #54545c;
+  margin-top: 0.4rem;
+}
+.config-pair-checkbox input { margin: 0; }
+
 /* Env credential groups — header per owner (channel / global) so the
    user reads the section in the same mental model as the Channels
    list above. */

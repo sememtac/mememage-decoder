@@ -823,15 +823,22 @@ function renderCert(meta, options) {
       var sigBadge = _div('verify-badge verify-authenticated');
       // Aliases — when the signer's key has confirmed siblings, the
       // badge gains a count pip (²/³/…) where the number is the TOTAL
-      // keys recognized for this human (signer + aliases). Click
-      // expands an inline cluster reveal below the badge row.
-      // Bidirectional aliases (signed both ways via IA keychain) are
-      // the strong signal; one-way claims are softer and rendered
-      // dimmed in the expansion.
+      // unique keys recognized for this human (signer + aliases).
+      // Dedupe by alias_fingerprint so a single key never inflates
+      // the count even if multiple records name it (back-compat with
+      // older records that have inconsistent metadata).
       var aliases = (vf.aliases || []);
-      var bi = aliases.filter(function(a) { return a.bidirectional; });
-      var oneWay = aliases.filter(function(a) { return !a.bidirectional; });
-      var totalKeys = 1 + bi.length + oneWay.length;
+      var seenAliasFp = {};
+      var uniqAliases = [];
+      aliases.forEach(function(a) {
+        var fp = a.alias_fingerprint || '';
+        if (!fp || seenAliasFp[fp]) return;
+        seenAliasFp[fp] = true;
+        uniqAliases.push(a);
+      });
+      var bi = uniqAliases.filter(function(a) { return a.bidirectional; });
+      var oneWay = uniqAliases.filter(function(a) { return !a.bidirectional; });
+      var totalKeys = 1 + uniqAliases.length;
       // Superscript numerals — Unicode has dedicated codepoints so the
       // pip reads cleanly without CSS-based size hacks that fight
       // html2canvas during save-cert.
@@ -841,21 +848,26 @@ function renderCert(meta, options) {
       sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED' +
         (pip ? '<span class="verify-badge-pip" title="' + totalKeys + ' keys recognized">' + pip + '</span>' : '');
 
-      // Tooltip keeps the alias breakdown for quick hover discovery.
+      // Simplified tooltip: "Also known as: A, B" — the badge speaks
+      // the headline, the cluster reveal carries the bi/one-way nuance
+      // and the full fingerprints. Names dedupe by alias_fingerprint
+      // so a single key never appears twice even if multiple records
+      // reference it. Bidirectional gets a ↔ glyph, one-way a → so
+      // the user can still tell them apart at a glance.
       var aliasTooltip = '';
       if (aliases.length) {
-        var parts = [];
-        if (bi.length) {
-          parts.push('Bidirectional aliases: ' + bi.map(function(a) {
-            return (a.creator_name || a.alias_fingerprint);
-          }).join(', '));
+        var seen = {};
+        var labels = [];
+        aliases.forEach(function(a) {
+          var fp = a.alias_fingerprint || '';
+          if (seen[fp]) return;
+          seen[fp] = true;
+          var name = a.creator_name || '?';
+          labels.push(name + (a.bidirectional ? ' \u2194' : ' \u2192'));
+        });
+        if (labels.length) {
+          aliasTooltip = '\nAlso known as: ' + labels.join(', ');
         }
-        if (oneWay.length) {
-          parts.push('One-way claims: ' + oneWay.map(function(a) {
-            return (a.creator_name || a.alias_fingerprint);
-          }).join(', '));
-        }
-        aliasTooltip = '\n' + parts.join('\n');
       }
       sigBadge.title = (vf.signatureDetail || 'Ed25519 signature verified') + aliasTooltip;
 
@@ -913,8 +925,18 @@ function renderCert(meta, options) {
     // PNG render (see _saveLivePlate's CSS override list).
     if (vf.signature === true && vf.aliases && vf.aliases.length) {
       var cluster = _div('verify-alias-cluster');
-      var bi2 = vf.aliases.filter(function(a) { return a.bidirectional; });
-      var oneWay2 = vf.aliases.filter(function(a) { return !a.bidirectional; });
+      // Dedupe by alias_fingerprint (same logic as the pip count
+      // above) so the panel matches the badge's stated total.
+      var seenAliasFp2 = {};
+      var uniqAliases2 = [];
+      vf.aliases.forEach(function(a) {
+        var fp = a.alias_fingerprint || '';
+        if (!fp || seenAliasFp2[fp]) return;
+        seenAliasFp2[fp] = true;
+        uniqAliases2.push(a);
+      });
+      var bi2 = uniqAliases2.filter(function(a) { return a.bidirectional; });
+      var oneWay2 = uniqAliases2.filter(function(a) { return !a.bidirectional; });
       var rows = [];
       // The signer itself, anchoring the cluster.
       rows.push(

@@ -380,10 +380,25 @@ async function discoverAliases(fingerprint, peerRoot) {
         }
       }
     } catch (e) { /* one-way is still useful */ }
+    // Prefer alias_creator_name (the TARGET's name as known by the
+    // signer at alias time) for the display name. Records signed
+    // before 2026-05-18 don't have this field — fall back to a
+    // truncated fingerprint so the cluster row still reads cleanly
+    // ("a4fb…" beats the wrong name "Prince" leaking from the signer
+    // field). The legacy creator_name (the SIGNER's name) is kept on
+    // the entry for verifiers that want signer-context.
+    var targetName = rec.alias_creator_name || '';
+    if (!targetName && rec.alias_fingerprint) {
+      var fpClean = rec.alias_fingerprint.replace(/:/g, '');
+      targetName = fpClean.slice(0, 8) + '\u2026';
+    }
     out.push({
       alias_fingerprint: rec.alias_fingerprint,
       alias_public_key: rec.alias_public_key,
-      creator_name: rec.creator_name || '',
+      // Name of the OTHER key (the sibling we're naming):
+      creator_name: targetName,
+      // Name of the SIGNER (kept for back-compat / future use):
+      signer_name: rec.creator_name || '',
       timestamp: rec.timestamp || '',
       bidirectional: bi,
     });

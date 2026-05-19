@@ -2580,6 +2580,30 @@ if (typeof TabBar !== 'undefined') {
             btns += '<button class="config-btn config-profile-alias" data-profile-alias="' + escapeHtml(p.id) + '">Alias\u2026</button>';
             btns += '<button class="config-btn config-btn-danger config-profile-remove" data-profile-remove="' + escapeHtml(p.id) + '">Remove\u2026</button>';
           }
+          // Alias chips — one per linked profile. Bidirectional uses
+          // ↔ glyph + green tint; one-way uses → + muted tint.
+          // Unknown-locally siblings (alias points at a fingerprint
+          // not in our local profile list) render with the truncated
+          // fingerprint instead of an id.
+          var aliasChips = '';
+          if (p.aliases && p.aliases.length) {
+            aliasChips = '<div class="config-profile-alias-row">' +
+              '<span class="config-profile-alias-label">linked:</span>' +
+              p.aliases.map(function(a) {
+                var label = a.other_id ||
+                  (a.other_fingerprint_clean ? a.other_fingerprint_clean.slice(0, 8) + '\u2026' : '?');
+                var glyph = a.bidirectional ? '\u2194' : '\u2192';  // ↔ or →
+                var cls = a.bidirectional ? 'config-alias-bi' : 'config-alias-oneway';
+                var title = a.bidirectional
+                  ? 'Bidirectional — both keys have signed the link'
+                  : 'One-way — this profile has signed the link; the other side has not signed back';
+                return '<span class="config-alias-chip ' + cls + '" title="' + title + '">' +
+                  '<span class="config-alias-glyph">' + glyph + '</span>' +
+                  escapeHtml(label) +
+                '</span>';
+              }).join('') +
+            '</div>';
+          }
           return '' +
             '<div class="config-profile-row" data-active="' + (active ? '1' : '0') + '">' +
               '<span class="config-profile-dot"></span>' +
@@ -2588,6 +2612,7 @@ if (typeof TabBar !== 'undefined') {
               '<span class="config-profile-name">' + escapeHtml(name) + '</span>' +
               '<span class="config-profile-state">' + (active ? 'active' : '') + '</span>' +
               '<span class="config-profile-actions">' + btns + '</span>' +
+              aliasChips +
             '</div>';
         }).join('');
 
@@ -2596,9 +2621,10 @@ if (typeof TabBar !== 'undefined') {
       '<div class="config-row" style="margin-top:0.5rem;">' +
       '  <button class="config-btn" id="configProfileNewBtn">+ New profile</button>' +
       '  <button class="config-btn" id="configProfileImportBtn">Import existing key\u2026</button>' +
+      '  <button class="config-btn" id="configProfilePairBtn">Pair with another mememage\u2026</button>' +
       '</div>' +
       '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
-      '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next mint. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side; verifiers walk both keychains to confirm.</p>';
+      '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next mint. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side, or <strong>Pair</strong> for a one-click cross-host handshake (each side keeps its private key, only public keys move).</p>';
 
     // Wire row actions
     els.profiles.querySelectorAll('[data-profile-use]').forEach(function(b) {
@@ -2612,6 +2638,102 @@ if (typeof TabBar !== 'undefined') {
     });
     document.getElementById('configProfileNewBtn').addEventListener('click', openNewProfile);
     document.getElementById('configProfileImportBtn').addEventListener('click', openImportProfile);
+    document.getElementById('configProfilePairBtn').addEventListener('click', openPairFlow);
+  }
+
+  // Pair-with-another-mememage modal. Cross-host key exchange in one
+  // click: this host calls the peer, peer accepts (auto if peer_token
+  // matches), both sides save each other's pubkey and sign their own
+  // alias to the other. Bidirectional in one round-trip.
+  function openPairFlow() {
+    var host = document.getElementById('configProfileDanger');
+    if (!host) return;
+    host.style.display = 'block';
+    host.innerHTML =
+      '<div class="config-pair-form">' +
+      '  <p class="config-pair-head">Pair with another mememage server</p>' +
+      '  <p class="config-note">Enter the peer\u2019s dashboard URL and its API token. Both sides will sign aliases naming each other; the link becomes bidirectional in one round-trip. Neither side\u2019s private key leaves its host.</p>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">Peer URL</span>' +
+      '    <input class="config-input" id="configPairUrl" type="text" placeholder="https://160.153.182.117:8444">' +
+      '  </div>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">Peer token</span>' +
+      '    <input class="config-input" id="configPairToken" type="password" autocomplete="off" placeholder="peer\u2019s MINT_API_TOKEN">' +
+      '  </div>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">Save as</span>' +
+      '    <input class="config-input" id="configPairId" type="text" placeholder="(optional — peer\u2019s own profile id by default)">' +
+      '  </div>' +
+      '  <label class="config-pair-checkbox">' +
+      '    <input type="checkbox" id="configPairSelfSigned"> Accept self-signed cert (for peers using the bundled tls helper)' +
+      '  </label>' +
+      '  <div class="config-row" style="margin-top:0.6rem;">' +
+      '    <button class="config-btn config-btn-primary" id="configPairSubmit">Pair</button>' +
+      '    <button class="config-btn" id="configPairCancel">Cancel</button>' +
+      '  </div>' +
+      '  <p class="config-note" id="configPairStatus" style="margin-top:0.4rem;"></p>' +
+      '</div>';
+    document.getElementById('configPairCancel').addEventListener('click', closePairFlow);
+    document.getElementById('configPairSubmit').addEventListener('click', submitPair);
+  }
+  function closePairFlow() {
+    var host = document.getElementById('configProfileDanger');
+    if (host) { host.style.display = 'none'; host.innerHTML = ''; }
+  }
+  async function submitPair() {
+    var url   = (document.getElementById('configPairUrl').value || '').trim();
+    var token = (document.getElementById('configPairToken').value || '').trim();
+    var pid   = (document.getElementById('configPairId').value || '').trim();
+    var ssc   = document.getElementById('configPairSelfSigned').checked;
+    var statusEl = document.getElementById('configPairStatus');
+    var submit = document.getElementById('configPairSubmit');
+    if (!url) { statusEl.textContent = 'Peer URL required.'; return; }
+    submit.disabled = true;
+    statusEl.textContent = 'Calling peer…';
+    statusEl.style.color = '';
+    try {
+      var resp = await fetch('/api/profiles/pair-call', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          peer_url: url,
+          peer_token: token,
+          peer_id: pid || undefined,
+          accept_self_signed: ssc,
+        }),
+      });
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        statusEl.style.color = '#b04040';
+        // Network errors carry a richer hint (NAT/Tailscale advice).
+        // Render the error + hint as two lines so the actionable
+        // guidance reads as guidance, not noise.
+        if (data.network_error && data.hint) {
+          statusEl.innerHTML =
+            '<strong>' + escapeHtml(data.error || 'Peer unreachable.') + '</strong>' +
+            '<br><span style="color:#54545c;font-style:italic;">' +
+              escapeHtml(data.hint) +
+            '</span>';
+        } else {
+          statusEl.textContent = data.error || ('Pair failed (HTTP ' + resp.status + ').');
+        }
+        submit.disabled = false;
+        return;
+      }
+      statusEl.style.color = '#155030';
+      statusEl.textContent = 'Paired with ' + (data.peer_creator_name || data.peer_profile_id || 'peer') +
+                             ' (' + (data.peer_fingerprint || '') + '). Refreshing\u2026';
+      setTimeout(function() {
+        closePairFlow();
+        loadProfiles();
+      }, 1200);
+    } catch (e) {
+      statusEl.style.color = '#b04040';
+      statusEl.textContent = 'Pair request failed: ' + e.message;
+      submit.disabled = false;
+    }
   }
 
   async function switchProfile(id) {
