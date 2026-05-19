@@ -367,6 +367,7 @@ async function discoverAliases(fingerprint, peerRoot) {
     var sigOk = await verifyKeychainSignature(rec);
     if (sigOk !== true) continue;
     var bi = false;
+    var reverseName = '';
     try {
       var theirFiles = await fetchKeychainFileList(rec.alias_fingerprint, peerRoot);
       var ourClean = (rec.signer_fingerprint || fingerprint).replace(/:/g, '');
@@ -377,20 +378,27 @@ async function discoverAliases(fingerprint, peerRoot) {
             && reverse.alias_fingerprint === (rec.signer_fingerprint || fingerprint)
             && (await verifyKeychainSignature(reverse)) === true) {
           bi = true;
+          // The reverse record was signed BY the other side, so its
+          // creator_name is that side's own self-declared name —
+          // exactly what we want to display. Captures the real name
+          // for older records that pre-date alias_creator_name.
+          reverseName = reverse.creator_name || '';
         }
       }
     } catch (e) { /* one-way is still useful */ }
-    // Prefer alias_creator_name (the TARGET's name as known by the
-    // signer at alias time) for the display name. Records signed
-    // before 2026-05-18 don't have this field — fall back to a
-    // truncated fingerprint so the cluster row still reads cleanly
-    // ("a4fb…" beats the wrong name "Prince" leaking from the signer
-    // field). The legacy creator_name (the SIGNER's name) is kept on
-    // the entry for verifiers that want signer-context.
-    var targetName = rec.alias_creator_name || '';
+
+    // Name resolution chain (other side's display name):
+    //   1. rec.alias_creator_name — new field (2026-05-18+), the
+    //      signer's local label for the target. Ideal.
+    //   2. reverseName — captured above for bidirectional records,
+    //      gives the other side's own self-declared name. Best
+    //      fallback for older records.
+    //   3. Truncated fingerprint — readable last resort. Beats
+    //      showing the signer's own name as if it were the target's.
+    var targetName = rec.alias_creator_name || reverseName || '';
     if (!targetName && rec.alias_fingerprint) {
       var fpClean = rec.alias_fingerprint.replace(/:/g, '');
-      targetName = fpClean.slice(0, 8) + '\u2026';
+      targetName = 'key ' + fpClean.slice(0, 8);
     }
     out.push({
       alias_fingerprint: rec.alias_fingerprint,
