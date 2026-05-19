@@ -104,6 +104,16 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
           result.tofu = tofuStatus;
           if (tofuStatus === 'trusted') {
             var entry = tofu.get(record.key_fingerprint);
+            // Self-rename: same pubkey, different declared name in the
+            // record (e.g., dashboard "Save Name" changed the profile
+            // label after first sighting). Pubkey is unchanged so this
+            // isn't impersonation — the key updates its own display
+            // name. The fingerprint+pubkey lock still anchors trust.
+            var declared = (record.creator_name || '').trim();
+            if (declared && declared !== entry.name) {
+              tofu.set(record.key_fingerprint, declared, record.public_key);
+              entry = tofu.get(record.key_fingerprint);
+            }
             result.signatureDetail += ' — ' + entry.name + ' (trusted)';
           } else if (tofuStatus === 'new') {
             var trustedViaAlias = null;
@@ -1030,7 +1040,16 @@ function tryVerifyPair() {
             var tofu = tofuStore();
             var ts = tofu.check(meta.key_fingerprint, meta.public_key);
             vf.tofu = ts;
-            if (ts === 'trusted') { var e = tofu.get(meta.key_fingerprint); vf.signatureDetail += ' — ' + e.name + ' (trusted)'; }
+            if (ts === 'trusted') {
+              var e = tofu.get(meta.key_fingerprint);
+              // Self-rename: same pubkey can update its own display name.
+              var declared2 = (meta.creator_name || '').trim();
+              if (declared2 && declared2 !== e.name) {
+                tofu.set(meta.key_fingerprint, declared2, meta.public_key);
+                e = tofu.get(meta.key_fingerprint);
+              }
+              vf.signatureDetail += ' — ' + e.name + ' (trusted)';
+            }
             else if (ts === 'new') {
               var sName = meta.creator_name || '';
               if (sName) { tofu.set(meta.key_fingerprint, sName, meta.public_key); vf.signatureDetail += ' — ' + sName + ' (trusted)'; vf.tofu = 'trusted'; }
