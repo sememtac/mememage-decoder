@@ -821,53 +821,19 @@ function renderCert(meta, options) {
     // AUTHENTICATED badge (Ed25519 signature)
     if (vf.signature === true) {
       var sigBadge = _div('verify-badge verify-authenticated');
-      // Aliases — when the signer's key has confirmed siblings, the
-      // badge gains a count pip (²/³/…) where the number is the TOTAL
-      // unique keys recognized for this human (signer + aliases).
-      // Dedupe by alias_fingerprint so a single key never inflates
-      // the count even if multiple records name it (back-compat with
-      // older records that have inconsistent metadata).
-      var aliases = (vf.aliases || []);
-      var seenAliasFp = {};
-      var uniqAliases = [];
-      aliases.forEach(function(a) {
-        var fp = a.alias_fingerprint || '';
-        if (!fp || seenAliasFp[fp]) return;
-        seenAliasFp[fp] = true;
-        uniqAliases.push(a);
-      });
-      var bi = uniqAliases.filter(function(a) { return a.bidirectional; });
-      var oneWay = uniqAliases.filter(function(a) { return !a.bidirectional; });
-      var totalKeys = 1 + uniqAliases.length;
-      // Superscript numerals — Unicode has dedicated codepoints so the
-      // pip reads cleanly without CSS-based size hacks that fight
-      // html2canvas during save-cert.
-      var supDigits = {2:'\u00b2', 3:'\u00b3', 4:'\u2074', 5:'\u2075',
-                       6:'\u2076', 7:'\u2077', 8:'\u2078', 9:'\u2079'};
-      var pip = (totalKeys >= 2 && totalKeys <= 9) ? supDigits[totalKeys] : '';
-      sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED' +
-        (pip ? '<span class="verify-badge-pip" title="' + totalKeys + ' keys recognized">' + pip + '</span>' : '');
+      sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED';
 
-      // Simplified tooltip: "Also known as: A, B" — the badge speaks
-      // the headline, the cluster reveal carries the bi/one-way nuance
-      // and the full fingerprints. Names dedupe by alias_fingerprint
-      // so a single key never appears twice even if multiple records
-      // reference it. Bidirectional gets a ↔ glyph, one-way a → so
-      // the user can still tell them apart at a glance.
-      // Tooltip: human-readable summary. Two kinds of clutter to
-      // suppress here (the expanded cluster panel below still shows
-      // everything for forensic detail):
-      //   - Same-name siblings: a Catmemes key paired with another
-      //     Catmemes key on a different machine. The name echoing
-      //     itself reads as redundant noise next to the badge's
-      //     own "Catmemes (trusted)" label. Collapse into a count.
-      //   - Stub names ("key 4afb607e"): old one-way records with
-      //     no resolvable real name. Collapse into the same count.
+      // Tooltip "Also known as": list nameable aliases only. People
+      // identify each other by names, not key counts, so unnamed
+      // and same-as-signer entries are silently dropped here. The
+      // expanded cluster panel below the badge still preserves
+      // the full inventory (with fingerprints + direction) for the
+      // forensic view.
+      var aliases = (vf.aliases || []);
       var aliasTooltip = '';
       if (aliases.length) {
         var seen = {};
         var labels = [];
-        var siblingCount = 0;
         var selfName = (meta.creator_name || '').trim().toLowerCase();
         aliases.forEach(function(a) {
           var fp = a.alias_fingerprint || '';
@@ -876,15 +842,9 @@ function renderCert(meta, options) {
           var rawName = (a.creator_name || '').trim();
           var isStub = /^key [0-9a-f]{6,16}$/i.test(rawName);
           var isSelfLabel = rawName && selfName && rawName.toLowerCase() === selfName;
-          if (isStub || isSelfLabel || !rawName) {
-            siblingCount++;
-            return;
-          }
+          if (isStub || isSelfLabel || !rawName) return;
           labels.push(rawName + (a.bidirectional ? ' \u2194' : ' \u2192'));
         });
-        if (siblingCount > 0) {
-          labels.push('+' + siblingCount + ' sibling key' + (siblingCount > 1 ? 's' : ''));
-        }
         if (labels.length) {
           aliasTooltip = '\nAlso known as: ' + labels.join(', ');
         }
