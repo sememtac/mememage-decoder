@@ -854,17 +854,37 @@ function renderCert(meta, options) {
       // so a single key never appears twice even if multiple records
       // reference it. Bidirectional gets a ↔ glyph, one-way a → so
       // the user can still tell them apart at a glance.
+      // Tooltip: human-readable summary. Two kinds of clutter to
+      // suppress here (the expanded cluster panel below still shows
+      // everything for forensic detail):
+      //   - Same-name siblings: a Catmemes key paired with another
+      //     Catmemes key on a different machine. The name echoing
+      //     itself reads as redundant noise next to the badge's
+      //     own "Catmemes (trusted)" label. Collapse into a count.
+      //   - Stub names ("key 4afb607e"): old one-way records with
+      //     no resolvable real name. Collapse into the same count.
       var aliasTooltip = '';
       if (aliases.length) {
         var seen = {};
         var labels = [];
+        var siblingCount = 0;
+        var selfName = (meta.creator_name || '').trim().toLowerCase();
         aliases.forEach(function(a) {
           var fp = a.alias_fingerprint || '';
           if (seen[fp]) return;
           seen[fp] = true;
-          var name = a.creator_name || '?';
-          labels.push(name + (a.bidirectional ? ' \u2194' : ' \u2192'));
+          var rawName = (a.creator_name || '').trim();
+          var isStub = /^key [0-9a-f]{6,16}$/i.test(rawName);
+          var isSelfLabel = rawName && selfName && rawName.toLowerCase() === selfName;
+          if (isStub || isSelfLabel || !rawName) {
+            siblingCount++;
+            return;
+          }
+          labels.push(rawName + (a.bidirectional ? ' \u2194' : ' \u2192'));
         });
+        if (siblingCount > 0) {
+          labels.push('+' + siblingCount + ' sibling key' + (siblingCount > 1 ? 's' : ''));
+        }
         if (labels.length) {
           aliasTooltip = '\nAlso known as: ' + labels.join(', ');
         }
