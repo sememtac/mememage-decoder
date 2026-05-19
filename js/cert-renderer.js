@@ -823,12 +823,14 @@ function renderCert(meta, options) {
       var sigBadge = _div('verify-badge verify-authenticated');
       sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED';
 
-      // Tooltip "Also known as": list nameable aliases only. People
-      // identify each other by names, not key counts, so unnamed
-      // and same-as-signer entries are silently dropped here. The
-      // expanded cluster panel below the badge still preserves
-      // the full inventory (with fingerprints + direction) for the
-      // forensic view.
+      // Tooltip "Also known as": comma-separated names only. People
+      // identify each other by names, not key directionality. Only
+      // bidirectional aliases qualify — those are mutual handshakes
+      // (both private keys signed). One-way claims are soft data that
+      // could mislead a viewer if rendered the same as confirmed ones
+      // (anyone can publish "I'm also Anthropic" unilaterally), so
+      // they stay confined to the expanded cluster panel below where
+      // the forensic context makes the distinction legible.
       var aliases = (vf.aliases || []);
       var aliasTooltip = '';
       if (aliases.length) {
@@ -836,6 +838,7 @@ function renderCert(meta, options) {
         var labels = [];
         var selfName = (meta.creator_name || '').trim().toLowerCase();
         aliases.forEach(function(a) {
+          if (!a.bidirectional) return;
           var fp = a.alias_fingerprint || '';
           if (seen[fp]) return;
           seen[fp] = true;
@@ -843,7 +846,7 @@ function renderCert(meta, options) {
           var isStub = /^key [0-9a-f]{6,16}$/i.test(rawName);
           var isSelfLabel = rawName && selfName && rawName.toLowerCase() === selfName;
           if (isStub || isSelfLabel || !rawName) return;
-          labels.push(rawName + (a.bidirectional ? ' \u2194' : ' \u2192'));
+          labels.push(rawName);
         });
         if (labels.length) {
           aliasTooltip = '\nAlso known as: ' + labels.join(', ');
