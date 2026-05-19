@@ -119,6 +119,7 @@ function _saveLivePlate(plate, barId, barHash) {
       '.gps-unlock { display: none !important; }' +
       '.save-cert-btn { display: none !important; }' +
       '.verify-alias-cluster { display: none !important; }' +
+      '.verify-mirrors-cluster { display: none !important; }' +
       '.cosmic-player { display: none !important; }' +
       // Live plate has 28px bottom padding to breathe with the player
       // sticky-snapped above it. With the player hidden in the saved
@@ -816,6 +817,27 @@ function renderCert(meta, options) {
       badge.innerHTML = '<span class="verify-icon">&#x25CB;</span> BODILESS';
       badge.title = 'No spirit \u2014 soul only, bring body to witness';
     }
+
+    // Distribution surfacing: every soul records the channels it
+    // landed on as ``record.distribution`` ({channel_id: url}). Add
+    // the channel list to the WITNESSED tooltip and make the badge
+    // expandable (click → reveal full URL list below). The mirror
+    // count is the sovereignty signal — "this soul exists in N
+    // places, no platform owns it" — surfaced compactly without
+    // adding a fourth badge.
+    var distribution = meta.distribution || {};
+    var channelIds = Object.keys(distribution).filter(function(k) {
+      return distribution[k];
+    });
+    if (channelIds.length && (vf.status === 'verified' || vf.status === 'bar_verified')) {
+      badge.title += '\nDistributed via: ' + channelIds.join(', ');
+      badge.classList.add('verify-badge-expandable');
+      badge.addEventListener('click', function() {
+        var ex = badge.parentNode.parentNode.querySelector('.verify-mirrors-cluster');
+        if (ex) ex.classList.toggle('verify-mirrors-cluster-open');
+      });
+    }
+
     badgeWrap.appendChild(badge);
 
     // AUTHENTICATED badge (Ed25519 signature)
@@ -955,6 +977,40 @@ function renderCert(meta, options) {
         '<div class="verify-alias-cluster-rows">' + rows.join('') + '</div>' +
         '<p class="verify-alias-cluster-foot">Bidirectional aliases are signed by both keys (strongest signal). One-way claims are recognized but unconfirmed by the other side.</p>';
       plate.appendChild(cluster);
+    }
+
+    // Mirrors cluster — reveals every surface the soul landed on
+    // when the WITNESSED badge is clicked. Mirrors the alias-cluster
+    // pattern (same collapse-on-default, same scroll fallback) but
+    // tinted with the WITNESSED green so the visual stays consistent
+    // with which badge opened it. Hidden during save-cert PNG render.
+    if ((vf.status === 'verified' || vf.status === 'bar_verified')) {
+      var mirrors = meta.distribution || {};
+      var mirrorIds = Object.keys(mirrors).filter(function(k) {
+        return mirrors[k];
+      });
+      if (mirrorIds.length) {
+        var mirrorCluster = _div('verify-mirrors-cluster');
+        var mirrorRows = mirrorIds.map(function(id) {
+          var url = mirrors[id];
+          var safeId = escapeHtml(id);
+          var safeUrl = escapeHtml(url);
+          return (
+            '<div class="verify-mirror-row">' +
+              '<span class="verify-mirror-glyph">\u29bf</span>' +
+              '<span class="verify-mirror-name">' + safeId + '</span>' +
+              '<a class="verify-mirror-url" href="' + safeUrl + '" target="_blank" rel="noopener">' + safeUrl + '</a>' +
+            '</div>'
+          );
+        });
+        mirrorCluster.innerHTML =
+          '<div class="verify-mirrors-cluster-head">Distributed across ' +
+            mirrorIds.length + ' surface' + (mirrorIds.length === 1 ? '' : 's') +
+          '</div>' +
+          '<div class="verify-mirrors-cluster-rows">' + mirrorRows.join('') + '</div>' +
+          '<p class="verify-mirrors-cluster-foot">No platform owns this soul. Any surface going offline doesn\u2019t erase it \u2014 the others still answer.</p>';
+        plate.appendChild(mirrorCluster);
+      }
     }
   }
 

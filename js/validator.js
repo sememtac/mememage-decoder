@@ -2933,6 +2933,24 @@ function renderAudit(rec, identifier, out) {
   if (rec.song_name) fieldRows += auditRow('Song', rec.song_name);
   html += auditSection('Field Completeness', fieldRows);
 
+  // === DISTRIBUTION ===
+  // Every channel the soul landed on at mint time, surfaced as a row
+  // per surface. The headline sovereignty signal: no platform owns
+  // this — if one mirror goes dark, the others still answer.
+  var distRows = '';
+  var distMap = rec.distribution || {};
+  var distIds = Object.keys(distMap).filter(function(k) { return distMap[k]; });
+  if (distIds.length) {
+    distIds.forEach(function(id) {
+      var url = distMap[id];
+      distRows +=
+        '<div class="audit-row"><span class="audit-label">' + id + '</span>' +
+          '<a href="' + url + '" target="_blank" rel="noopener" class="audit-val audit-info" ' +
+          'style="text-decoration:none;word-break:break-all;">' + url + ' \u2192</a></div>';
+    });
+    html += auditSection('Distribution (' + distIds.length + ' surface' + (distIds.length === 1 ? '' : 's') + ')', distRows);
+  }
+
   // === LINKS ===
   var linkRows = '';
   linkRows += '<div class="audit-row"><span class="audit-label">View in Decoder</span><a href="index.html#" onclick="localStorage.setItem(\'mememage-lookup\',\'' + (rec.identifier || identifier) + '\');return true;" class="audit-val audit-info" style="text-decoration:none;">Open \u2192</a></div>';

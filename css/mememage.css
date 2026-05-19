@@ -1603,6 +1603,86 @@
     color: rgba(255, 255, 255, 0.85);
     vertical-align: super;
   }
+  /* Mirrors cluster — reveals every surface the soul landed on
+     (record.distribution), toggled by clicking the WITNESSED badge.
+     Same collapse-on-default behavior as the alias cluster; tinted
+     with the WITNESSED green so the visual identifies which badge
+     opened it. Hidden during save-cert PNG render via the same
+     CSS-override list used for the alias cluster. */
+  .verify-mirrors-cluster {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.25s ease, opacity 0.25s ease;
+    opacity: 0;
+    padding: 0 12px;
+    margin: 0 auto;
+    max-width: 480px;
+    border-radius: 8px;
+    background: rgba(78, 200, 160, 0.06);
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+  }
+  .verify-mirrors-cluster.verify-mirrors-cluster-open {
+    max-height: 360px;
+    opacity: 1;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-color: rgba(78, 200, 160, 0.18);
+  }
+  .verify-mirrors-cluster-head {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #4ec8a0;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .verify-mirrors-cluster-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .verify-mirror-row {
+    display: grid;
+    grid-template-columns: 14px 1fr 2fr;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 4px;
+    font-family: ui-monospace, "JetBrains Mono", monospace;
+    font-size: 0.66rem;
+  }
+  .verify-mirror-glyph {
+    color: #4ec8a0;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .verify-mirror-name {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .verify-mirror-url {
+    color: #4ec8a0;
+    font-size: 0.62rem;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .verify-mirror-url:hover { text-decoration: underline; }
+  .verify-mirrors-cluster-foot {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 8px 0 0;
+    line-height: 1.5;
+    text-align: center;
+  }
+
   .verify-badge-expandable {
     cursor: pointer;
   }
