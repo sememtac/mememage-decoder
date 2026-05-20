@@ -944,14 +944,16 @@ var ButtonLoading = (function() {
   }
 
   function position(target) {
+    // Center on the viewport rather than pinning to the target. The
+    // tooltip fades out after a beat, so floating overlap is fine —
+    // and it removes the whole class of edge cases where a click
+    // hides the target (state transitions) or the target is partway
+    // offscreen (mobile scroll, narrow panels).
     var t = tooltipEl;
     requestAnimationFrame(function() {
-      var rect = target.getBoundingClientRect();
       var ttRect = t.getBoundingClientRect();
-      var left = rect.left + rect.width / 2 - ttRect.width / 2;
-      var top = rect.top - ttRect.height - 10;
-      left = Math.max(8, Math.min(left, window.innerWidth - ttRect.width - 8));
-      if (top < 8) top = rect.bottom + 10;
+      var left = Math.max(8, (window.innerWidth - ttRect.width) / 2);
+      var top = Math.max(40, (window.innerHeight - ttRect.height) / 2);
       t.style.left = left + 'px';
       t.style.top = top + 'px';
     });
@@ -960,13 +962,6 @@ var ButtonLoading = (function() {
   function show(target) {
     var text = target.getAttribute('title') || target.getAttribute('data-title');
     if (!text) return;
-    // Skip if the target has zero size or isn't visible. Catches the
-    // case where the click handler that triggered this tooltip ALSO
-    // toggled the target into display:none — positioning relative to
-    // a hidden box yields (0, 0) and the tooltip lands in the screen
-    // corner.
-    var rect = target.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
     var t = ensureEl();
     t.textContent = text;
     t.classList.add('visible');
