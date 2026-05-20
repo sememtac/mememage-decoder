@@ -944,19 +944,27 @@ var ButtonLoading = (function() {
   }
 
   function position(target) {
-    // Center horizontally, anchor vertically near the upper third
-    // of the viewport — roughly where the system box's image / drop
-    // zone sits on most pages. The hint fades after 2.5s so floating
-    // overlap with content underneath is fine, and it removes the
-    // whole class of edge cases where the trigger element moves /
-    // hides / scrolls offscreen between click and render.
+    // Toast-style positioning: bottom-right on desktop, bottom-center
+    // on mobile. Independent of the trigger element's geometry so
+    // hidden / scrolled / state-changing triggers don't lead to
+    // off-screen tooltips. The hint fades after 2.5s so floating
+    // overlap with footer content is fine.
     var t = tooltipEl;
     requestAnimationFrame(function() {
       var ttRect = t.getBoundingClientRect();
-      var left = Math.max(8, (window.innerWidth - ttRect.width) / 2);
-      var top = Math.max(40, window.innerHeight * 0.28);
-      t.style.left = left + 'px';
-      t.style.top = top + 'px';
+      var pad = 16;
+      var left, top;
+      if (window.innerWidth < 768) {
+        // Mobile: bottom-center, near the bottom safe area.
+        left = Math.max(pad, (window.innerWidth - ttRect.width) / 2);
+        top = window.innerHeight - ttRect.height - pad;
+      } else {
+        // Desktop: bottom-right.
+        left = window.innerWidth - ttRect.width - pad;
+        top = window.innerHeight - ttRect.height - pad;
+      }
+      t.style.left = Math.max(pad, left) + 'px';
+      t.style.top = Math.max(pad, top) + 'px';
     });
   }
 
