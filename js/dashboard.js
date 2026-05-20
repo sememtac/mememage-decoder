@@ -3107,8 +3107,19 @@ document.addEventListener('visibilitychange', function() {
     return '' +
       '<div class="config-channel-row" data-channel-idx="' + idx + '" data-channel-id="' + escapeHtml(c.id) + '">' +
         '<div class="config-channel-head">' +
-          '<span class="config-channel-name">' + escapeHtml(c.name || c.id) + '</span>' +
-          '<span class="config-channel-type">' + escapeHtml(displayName) + ' \u00b7 id <code>' + escapeHtml(c.id) + '</code></span>' +
+          '<div class="config-channel-labels">' +
+            '<label class="config-channel-label-row">' +
+              '<span class="config-channel-label-key">name</span>' +
+              '<input class="config-input config-channel-name-input" data-channel-name type="text" value="' + escapeHtml(c.name || '') + '" placeholder="' + escapeHtml(displayName) + '">' +
+              '<span class="config-channel-label-hint">local dashboard label</span>' +
+            '</label>' +
+            '<label class="config-channel-label-row">' +
+              '<span class="config-channel-label-key">id</span>' +
+              '<input class="config-input config-channel-id-input" data-channel-id-input type="text" value="' + escapeHtml(c.id) + '" pattern="[A-Za-z0-9_-]+">' +
+              '<span class="config-channel-label-hint">appears on viewer certificates</span>' +
+            '</label>' +
+          '</div>' +
+          '<span class="config-channel-type">' + escapeHtml(displayName) + '</span>' +
           '<span class="config-channel-status">' + statusBits.join(' ') + '</span>' +
         '</div>' +
         '<div class="config-channel-controls">' +
@@ -3126,10 +3137,27 @@ document.addEventListener('visibilitychange', function() {
     if (!row) return;
 
     // Inputs that affect channels.json — enabled, primary, config
-    // fields (data-channel-cfg). Saved via /api/channels on change.
+    // fields (data-channel-cfg), name, and id. Saved via /api/channels
+    // on change. Text inputs commit on blur or Enter so users don't
+    // round-trip per keystroke.
     var channelInputs = row.querySelectorAll('[data-channel-enabled], [data-channel-primary], [data-channel-cfg]');
     channelInputs.forEach(function(inp) {
       inp.addEventListener('change', function() { saveChannelsFromDom(host); });
+    });
+    var textCommitInputs = row.querySelectorAll('[data-channel-name], [data-channel-id-input]');
+    textCommitInputs.forEach(function(inp) {
+      var initial = inp.value;
+      inp.addEventListener('blur', function() {
+        if (inp.value === initial) return;
+        saveChannelsFromDom(host);
+        initial = inp.value;
+      });
+      inp.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          inp.blur();
+        }
+      });
     });
 
     // Credential value inputs — write directly to .env via /api/config/env.
@@ -3220,18 +3248,17 @@ document.addEventListener('visibilitychange', function() {
     var rows = host.querySelectorAll('.config-channel-row');
     var channels = [];
     rows.forEach(function(row) {
-      var id = row.getAttribute('data-channel-id');
-      // Look up the corresponding row's channel data — we re-derive
-      // everything from the DOM so the user's in-flight edits are the
-      // source of truth, not the last server snapshot.
+      // Prefer the editable id input if present; fall back to the
+      // data-channel-id attribute (the id at render time) so unaffected
+      // rows still serialize correctly.
+      var idInput = row.querySelector('[data-channel-id-input]');
+      var id = (idInput ? idInput.value.trim() : row.getAttribute('data-channel-id'));
       var enabled = !!row.querySelector('[data-channel-enabled]').checked;
       var primary = !!row.querySelector('[data-channel-primary]').checked;
-      var typeEl = row.querySelector('[data-channel-name]');  // not used
-      var displayName = (row.querySelector('.config-channel-name') || {}).textContent || id;
-      // The type isn't editable inline; recover it from the previously
-      // rendered list. The simplest path: peek at the data-channel-type
-      // attribute we'll set below. For now, find it in the server's
-      // last snapshot via _lastChannelsByIdx.
+      var nameInput = row.querySelector('[data-channel-name]');
+      var displayName = nameInput ? nameInput.value.trim() : id;
+      // The type isn't editable inline; recover from the server's last
+      // snapshot via _lastChannelsByIdx.
       var snapshot = _lastChannelsByIdx[row.getAttribute('data-channel-idx')];
       var type = snapshot ? snapshot.type : '';
 

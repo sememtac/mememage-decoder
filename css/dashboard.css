@@ -1319,6 +1319,33 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-weight: 700;
   color: #1a1a20;
 }
+.config-channel-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 100%;
+}
+.config-channel-label-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.config-channel-label-key {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #54545c;
+  font-weight: 700;
+}
+.config-channel-label-hint {
+  font-size: 0.62rem;
+  color: #74747c;
+  font-style: italic;
+}
+.config-channel-id-input {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
 .config-channel-type {
   font-size: 0.7rem;
   color: #54545c;
