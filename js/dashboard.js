@@ -198,6 +198,7 @@ document.addEventListener('visibilitychange', function() {
     globalError: document.getElementById('mintGlobalError'),
     conceive:    document.getElementById('mintConceive'),
     cancel:      document.getElementById('mintCancel'),
+    deleteSession: document.getElementById('mintDeleteSession'),
     progressBody:document.getElementById('mintProgressBody'),
     resultHead:    document.getElementById('mintResultHead'),
     resultId:      document.getElementById('mintResultId'),
@@ -726,16 +727,11 @@ document.addEventListener('visibilitychange', function() {
 
   function reset() {
     if (state.pollTimer) { clearTimeout(state.pollTimer); state.pollTimer = null; }
-    // Fire-and-forget DELETE so the server-side session goes away with
-    // the client-side reset. The server gates "minting" status server-
-    // side (returns 409), so a reset mid-mint can't actually nuke a
-    // live conception — it just no-ops if the session is busy.
-    var staleToken = state.token;
-    if (staleToken) {
-      fetch('/api/mint/' + encodeURIComponent(staleToken), {
-        method: 'DELETE', headers: authHeaders(),
-      }).catch(function() { /* best-effort */ });
-    }
+    // Non-destructive: just clear the local view and return to empty.
+    // The server-side session lives on so the user can come back via
+    // Resume or the pending list. Explicit Delete is the destructive
+    // path (Cancel/× button in reviewing state, or the row × in the
+    // pending list).
     state.token = null;
     state.metadata = null;
     state.mintUrl = '';
@@ -769,6 +765,28 @@ document.addEventListener('visibilitychange', function() {
   els.cancel.addEventListener('click', reset);
   els.again.addEventListener('click', reset);
   els.retry.addEventListener('click', reset);
+  if (els.deleteSession) {
+    els.deleteSession.addEventListener('click', async function() {
+      if (!state.token) { reset(); return; }
+      if (!window.confirm(
+        'Permanently delete this pending session? The staged image + ' +
+        'metadata will be dropped server-side. This can\u2019t be undone.'
+      )) return;
+      var tok = state.token;
+      els.deleteSession.disabled = true;
+      try {
+        await fetch('/api/mint/' + encodeURIComponent(tok), {
+          method: 'DELETE', headers: authHeaders(),
+        });
+      } catch (e) {
+        showError('Delete request failed: ' + e.message);
+        els.deleteSession.disabled = false;
+        return;
+      }
+      els.deleteSession.disabled = false;
+      reset();
+    });
+  }
   if (els.metaAdd) {
     els.metaAdd.addEventListener('click', function() {
       if (els.metaEditor) els.metaEditor.appendChild(_metaRow('', '', true));
