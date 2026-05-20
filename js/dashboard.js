@@ -2114,6 +2114,17 @@ document.addEventListener('visibilitychange', function() {
         showError('API token: enter a value (or leave empty to keep unchanged).');
         return;
       }
+      // Updating the token kicks every other session — including
+      // the one the user is currently in. Make them copy + confirm
+      // before committing so they don't lock themselves out by
+      // hitting Update without having recorded the new value.
+      var ok = window.confirm(
+        'About to set MINT_API_TOKEN to:\n\n' + v +
+        '\n\nCopy this value FIRST — every dashboard session ' +
+        '(including this one) will need it after save.\n\n' +
+        'Press OK to commit, Cancel to back out.'
+      );
+      if (!ok) return;
       setEnvSecretGlobal('MINT_API_TOKEN', v, document.getElementById('configServerToken').closest('.config-field'));
       inp.value = '';
     });
