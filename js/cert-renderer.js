@@ -360,6 +360,12 @@ function renderCert(meta, options) {
     chunks: 1, decoder_hash: 1, outer_position: 1, outer_cycle: 1,
     // Visibility / encryption
     chain_visibility: 1, encrypted_soul: 1, encrypted_chunks: 1, gps_encrypted: 1,
+    // Distribution — set by the channels framework, not declared by
+    // the creator. `url` is the primary-channel URL (used by the
+    // Discord-message link / legacy bar); `distribution` is the full
+    // {channel_id: url} mirror map (already filtered by the typeof
+    // object guard, but listed explicitly so intent is unambiguous).
+    url: 1, distribution: 1,
     // Misc
     thumbnail: 1, song_name: 1,
   };
