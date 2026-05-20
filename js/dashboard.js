@@ -2089,11 +2089,16 @@ document.addEventListener('visibilitychange', function() {
       // Dashboard API token — write-only, masked. Gates /api/* and the
       // dashboard itself when set. Empty = open on localhost (server-
       // side guardrail warns + delays on public-domain startup).
+      // "Generate phrase" produces a readable 12-word token (~108 bits)
+      // via /api/config/token/generate; the user reviews + clicks
+      // Update to commit. Old hex tokens keep working unchanged.
       '<div class="config-field">' +
       '  <span class="config-field-label">API token <span class="config-channel-field-state" data-set="' + (tokenSet ? '1' : '0') + '">' + (tokenSet ? 'set' : 'unset') + '</span></span>' +
-      '  <input class="config-input" id="configServerToken" type="password" autocomplete="off" placeholder="' + (tokenSet ? '(set — type to replace)' : '(unset)') + '">' +
+      '  <input class="config-input" id="configServerToken" type="text" autocomplete="off" placeholder="' + (tokenSet ? '(set — type to replace)' : '(unset)') + '">' +
+      '  <button class="config-btn" id="configServerTokenGen" title="Generate a readable word-phrase token (paste into input then click Update to save)">Generate phrase</button>' +
       '  <button class="config-btn" id="configServerTokenSet">Update</button>' +
       '</div>' +
+      '<p class="config-note" style="margin-top:-0.3rem;">Word-phrase tokens are easier to read than hex blobs. Either works — server auth is plain string equality. Changing the token kicks every other dashboard session.</p>' +
       '<div class="config-row">' +
       '  <button class="config-btn" id="configServerSave">Save server.json</button>' +
       '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
@@ -2112,6 +2117,31 @@ document.addEventListener('visibilitychange', function() {
       setEnvSecretGlobal('MINT_API_TOKEN', v, document.getElementById('configServerToken').closest('.config-field'));
       inp.value = '';
     });
+    var tokenGenBtn = document.getElementById('configServerTokenGen');
+    if (tokenGenBtn) {
+      tokenGenBtn.addEventListener('click', async function() {
+        var inp = document.getElementById('configServerToken');
+        if (!inp) return;
+        var prev = tokenGenBtn.textContent;
+        tokenGenBtn.disabled = true;
+        tokenGenBtn.textContent = 'Generating\u2026';
+        try {
+          var resp = await fetchJson('/api/config/token/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ words: 12 }),
+          });
+          inp.value = resp.token || '';
+          inp.focus();
+          inp.select();
+        } catch (e) {
+          showError('Token generation failed: ' + e.message);
+        } finally {
+          tokenGenBtn.textContent = prev;
+          tokenGenBtn.disabled = false;
+        }
+      });
+    }
     document.getElementById('configServerCertBrowse').addEventListener('click', function() {
       pickCertOrKey('configServerCert', 'configServerCertClear');
     });
