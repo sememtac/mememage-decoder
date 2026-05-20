@@ -2128,7 +2128,7 @@ document.addEventListener('visibilitychange', function() {
         try {
           var resp = await fetchJson('/api/config/token/generate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders(),
             body: JSON.stringify({ words: 12 }),
           });
           inp.value = resp.token || '';
