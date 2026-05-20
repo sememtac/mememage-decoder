@@ -192,6 +192,7 @@ document.addEventListener('visibilitychange', function() {
     ticketCopy:  document.getElementById('mintTicketCopy'),
     resumeInput: document.getElementById('mintResumeTicket'),
     resumeBtn:   document.getElementById('mintResumeBtn'),
+    resumeDelete:document.getElementById('mintResumeDelete'),
     gpsText:     document.getElementById('mintGpsText'),
     error:       document.getElementById('mintError'),
     globalError: document.getElementById('mintGlobalError'),
@@ -720,6 +721,16 @@ document.addEventListener('visibilitychange', function() {
 
   function reset() {
     if (state.pollTimer) { clearTimeout(state.pollTimer); state.pollTimer = null; }
+    // Fire-and-forget DELETE so the server-side session goes away with
+    // the client-side reset. The server gates "minting" status server-
+    // side (returns 409), so a reset mid-mint can't actually nuke a
+    // live conception — it just no-ops if the session is busy.
+    var staleToken = state.token;
+    if (staleToken) {
+      fetch('/api/mint/' + encodeURIComponent(staleToken), {
+        method: 'DELETE', headers: authHeaders(),
+      }).catch(function() { /* best-effort */ });
+    }
     state.token = null;
     state.metadata = null;
     state.mintUrl = '';
@@ -758,6 +769,35 @@ document.addEventListener('visibilitychange', function() {
     els.resumeBtn.addEventListener('click', function() {
       var v = els.resumeInput ? els.resumeInput.value : '';
       resumeByTicket(v);
+    });
+  }
+  if (els.resumeDelete) {
+    els.resumeDelete.addEventListener('click', async function() {
+      var v = els.resumeInput ? els.resumeInput.value : '';
+      if (!v || !v.trim()) {
+        showError('Paste a ticket to delete (or use the × button on a staged image).');
+        return;
+      }
+      if (!window.confirm('Permanently delete the session for ticket "' +
+          v.trim() + '"? The pending image + metadata will be dropped.')) return;
+      els.resumeDelete.disabled = true;
+      try {
+        var resp = await fetch('/api/mint/' + encodeURIComponent(v.trim()), {
+          method: 'DELETE', headers: authHeaders(),
+        });
+        var data = {};
+        try { data = await resp.json(); } catch (e) {}
+        if (!resp.ok) {
+          showError(data.error || ('Delete failed (HTTP ' + resp.status + ')'));
+        } else {
+          showError('');
+          if (els.resumeInput) els.resumeInput.value = '';
+        }
+      } catch (e) {
+        showError('Delete request failed: ' + e.message);
+      } finally {
+        els.resumeDelete.disabled = false;
+      }
     });
   }
   if (els.resumeInput) {

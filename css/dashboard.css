@@ -344,11 +344,20 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
    zone above. */
 .mint-resume {
   display: grid;
-  grid-template-columns: max-content 9rem max-content 1fr;
+  grid-template-columns: max-content 9rem max-content max-content 1fr;
   align-items: center;
   gap: 0.4rem 0.5rem;
   padding: 0.3rem 0.1rem 0;
   font-size: 0.72rem;
+}
+.mint-resume-btn-danger {
+  border-color: rgba(180, 60, 40, 0.4);
+  color: rgba(140, 40, 30, 0.85);
+}
+.mint-resume-btn-danger:hover {
+  background: rgba(255, 230, 225, 0.7);
+  border-color: rgba(180, 60, 40, 0.7);
+  color: rgba(120, 30, 20, 1);
 }
 .mint-resume-label {
   font-size: 0.62rem;
