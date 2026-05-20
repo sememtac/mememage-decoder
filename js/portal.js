@@ -960,6 +960,13 @@ var ButtonLoading = (function() {
   function show(target) {
     var text = target.getAttribute('title') || target.getAttribute('data-title');
     if (!text) return;
+    // Skip if the target has zero size or isn't visible. Catches the
+    // case where the click handler that triggered this tooltip ALSO
+    // toggled the target into display:none — positioning relative to
+    // a hidden box yields (0, 0) and the tooltip lands in the screen
+    // corner.
+    var rect = target.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
     var t = ensureEl();
     t.textContent = text;
     t.classList.add('visible');
