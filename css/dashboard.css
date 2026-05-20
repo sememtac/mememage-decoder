@@ -399,6 +399,75 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-style: italic;
 }
 
+/* --- Mint-tab recent pending sessions --- */
+.mint-recent {
+  margin: 0.2rem 0 0;
+  padding: 0.5rem 0.7rem;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-sm, 6px);
+}
+.mint-panel[data-mint-state="empty"] > .mint-recent[data-mint-only="empty"] { display: block; }
+.mint-panel:not([data-mint-state="empty"]) > .mint-recent[data-mint-only="empty"] { display: none; }
+.mint-recent[hidden] { display: none !important; }
+.mint-recent-head {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0 0 0.4rem;
+}
+.mint-recent-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.mint-recent-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr max-content max-content max-content;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  padding: 0.3rem 0.4rem;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+}
+.mint-recent-ticket {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #1a1a20;
+}
+.mint-recent-image {
+  color: #3a3a44;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mint-recent-age {
+  font-size: 0.65rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+.mint-recent-btn {
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  color: #1a1a20;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mint-recent-btn:hover { background: white; border-color: rgba(0, 0, 0, 0.45); }
+.mint-recent-btn-danger {
+  border-color: rgba(180, 60, 40, 0.4);
+  color: rgba(140, 40, 30, 0.85);
+  padding: 0.2rem 0.5rem;
+}
+.mint-recent-btn-danger:hover {
+  background: rgba(255, 230, 225, 0.7);
+  border-color: rgba(180, 60, 40, 0.7);
+}
+
 /* --- Mint-tab forecast widget --- */
 .mint-forecast {
   margin: 0.2rem 0 0;

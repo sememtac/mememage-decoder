@@ -211,6 +211,8 @@ document.addEventListener('visibilitychange', function() {
     forecastBlock:    document.getElementById('mintForecastBlock'),
     forecastHeadline: document.getElementById('mintForecastHeadline'),
     forecastBody:     document.getElementById('mintForecastBody'),
+    recentBlock:      document.getElementById('mintRecentBlock'),
+    recentList:       document.getElementById('mintRecentList'),
     retry:       document.getElementById('mintRetry'),
     failedBody:  document.getElementById('mintFailedBody'),
   };
@@ -396,6 +398,9 @@ document.addEventListener('visibilitychange', function() {
     loadActiveChain();   // refresh chain banner (may have changed since)
     applyHandoffUi();    // QR, URL, copy/open, ticket — same for every mode
     setState('reviewing');
+    // New session just landed server-side (upload) or we just resumed
+    // an existing one; either way the pending list is now stale.
+    if (typeof window._mintReloadRecent === 'function') window._mintReloadRecent();
   }
 
   async function resumeByTicket(ticket) {
@@ -742,6 +747,10 @@ document.addEventListener('visibilitychange', function() {
     if (els.resumeBtn) els.resumeBtn.disabled = false;
     showError('');
     setState('empty');
+    // Refresh the pending-sessions list now that we've returned to
+    // the empty state (the staged session, if any, is being deleted
+    // server-side in the background).
+    if (typeof window._mintReloadRecent === 'function') window._mintReloadRecent();
   }
 
   // ---- Wiring ----
@@ -958,15 +967,91 @@ document.addEventListener('visibilitychange', function() {
   // Initial load. Run async so the tab paint isn't blocked.
   loadForecast();
 
+  // ---- Recent pending sessions ----
+  // Top 5 by created desc, with Resume / Delete per row. Hidden when
+  // the list is empty so the empty state stays clean for fresh users.
+  function _formatAge(seconds) {
+    if (seconds < 60) return Math.round(seconds) + 's';
+    if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+    if (seconds < 86400) return Math.round(seconds / 3600) + 'h';
+    return Math.round(seconds / 86400) + 'd';
+  }
+  async function loadRecent() {
+    if (!els.recentBlock || !els.recentList) return;
+    try {
+      var resp = await fetch('/api/mint/sessions?status=pending&limit=5',
+        { headers: authHeaders() });
+      if (!resp.ok) {
+        els.recentBlock.hidden = true;
+        return;
+      }
+      var data = await resp.json();
+      var rows = data.sessions || [];
+      if (!rows.length) {
+        els.recentBlock.hidden = true;
+        els.recentList.innerHTML = '';
+        return;
+      }
+      els.recentBlock.hidden = false;
+      els.recentList.innerHTML = rows.map(function(r) {
+        return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '">' +
+          '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
+          '<span class="mint-recent-image" title="' + escapeHtml(r.image) + '">' +
+            escapeHtml(r.image) + '</span>' +
+          '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
+            (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
+          '<button type="button" class="mint-recent-btn" data-recent-action="resume">Resume</button>' +
+          '<button type="button" class="mint-recent-btn mint-recent-btn-danger" data-recent-action="delete">\u00d7</button>' +
+          '</div>';
+      }).join('');
+    } catch (e) {
+      els.recentBlock.hidden = true;
+    }
+  }
+  if (els.recentList) {
+    els.recentList.addEventListener('click', async function(ev) {
+      var btn = ev.target.closest('[data-recent-action]');
+      if (!btn) return;
+      var row = btn.closest('.mint-recent-row');
+      if (!row) return;
+      var ticket = row.getAttribute('data-ticket');
+      var action = btn.getAttribute('data-recent-action');
+      if (action === 'resume') {
+        if (typeof resumeByTicket === 'function') resumeByTicket(ticket);
+      } else if (action === 'delete') {
+        if (!window.confirm('Delete pending session ' + ticket + '?')) return;
+        btn.disabled = true;
+        try {
+          await fetch('/api/mint/' + encodeURIComponent(ticket), {
+            method: 'DELETE', headers: authHeaders(),
+          });
+          loadRecent();
+        } catch (e) {
+          showError('Delete failed: ' + e.message);
+          btn.disabled = false;
+        }
+      }
+    });
+  }
+  loadRecent();
+
   // Refresh on tab activation. Mint is the default-active tab, so
   // the first activation is the page load (handled above). Subsequent
   // returns to the tab pick up any drift in sky/machine. TabBar.wire
   // appends — doesn't replace — the existing dispatcher hooks.
   if (typeof TabBar !== 'undefined') {
     TabBar.wire(function(panelId) {
-      if (panelId === 'tab-mint') loadForecast();
+      if (panelId === 'tab-mint') {
+        loadForecast();
+        loadRecent();
+      }
     });
   }
+
+  // Expose to the outer reset() so it can refresh the pending list
+  // after a cancel/again/retry. reset() also fires the DELETE
+  // server-side, so we wait briefly before re-listing.
+  window._mintReloadRecent = function() { setTimeout(loadRecent, 200); };
 })();
 
 
