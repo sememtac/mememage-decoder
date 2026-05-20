@@ -944,16 +944,17 @@ var ButtonLoading = (function() {
   }
 
   function position(target) {
-    // Center on the viewport rather than pinning to the target. The
-    // tooltip fades out after a beat, so floating overlap is fine —
-    // and it removes the whole class of edge cases where a click
-    // hides the target (state transitions) or the target is partway
-    // offscreen (mobile scroll, narrow panels).
+    // Center horizontally, anchor vertically near the upper third
+    // of the viewport — roughly where the system box's image / drop
+    // zone sits on most pages. The hint fades after 2.5s so floating
+    // overlap with content underneath is fine, and it removes the
+    // whole class of edge cases where the trigger element moves /
+    // hides / scrolls offscreen between click and render.
     var t = tooltipEl;
     requestAnimationFrame(function() {
       var ttRect = t.getBoundingClientRect();
       var left = Math.max(8, (window.innerWidth - ttRect.width) / 2);
-      var top = Math.max(40, (window.innerHeight - ttRect.height) / 2);
+      var top = Math.max(40, window.innerHeight * 0.28);
       t.style.left = left + 'px';
       t.style.top = top + 'px';
     });
