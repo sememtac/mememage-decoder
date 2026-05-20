@@ -614,15 +614,22 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
    for memorability — like a flight number. */
 .mint-handoff-ticket {
   display: grid;
-  grid-template-columns: max-content max-content max-content 1fr;
+  /* Hint sits above on its own row, ticket label + value + copy sit
+     below. Stops the long hint from squeezing the ticket row into
+     a single-word-per-line column. */
+  grid-template-columns: max-content max-content max-content;
+  grid-template-areas:
+    "hint hint hint"
+    "label value copy";
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.3rem 0.5rem;
+  gap: 0.4rem 0.5rem;
+  padding: 0.45rem 0.6rem;
   background: rgba(0, 0, 0, 0.05);
   border-radius: var(--radius-sm, 6px);
   font-size: 0.7rem;
 }
 .mint-handoff-ticket-label {
+  grid-area: label;
   font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -630,6 +637,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   color: #5a5a62;
 }
 .mint-handoff-ticket-val {
+  grid-area: value;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.95rem;
   font-weight: 700;
@@ -637,6 +645,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   color: #1a1a20;
 }
 .mint-handoff-ticket-copy {
+  grid-area: copy;
   font-family: inherit;
   font-size: 0.6rem;
   letter-spacing: 0.06em;
@@ -651,11 +660,11 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .mint-handoff-ticket-copy:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
 .mint-handoff-ticket-hint {
+  grid-area: hint;
   font-size: 0.64rem;
-  color: rgba(0, 0, 0, 0.5);
+  color: rgba(0, 0, 0, 0.55);
   font-style: italic;
-  justify-self: end;
-  text-align: right;
+  line-height: 1.4;
 }
 
 /* Conception handoff — same shape for every gps_source. QR for cross-
@@ -715,6 +724,13 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .mint-handoff-btns {
   display: flex;
   gap: 0.3rem;
+  flex-wrap: wrap;
+}
+/* Mobile: stack the URL + Copy + Open buttons so they don't get
+   forced out of the narrow handoff cell. */
+@media (max-width: 600px) {
+  .mint-handoff-btns { flex-direction: column; align-items: stretch; }
+  .mint-handoff-btn { width: 100%; }
 }
 .mint-handoff-btn {
   font-family: inherit;
