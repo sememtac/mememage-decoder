@@ -816,15 +816,17 @@ document.addEventListener('visibilitychange', function() {
     if (!els.forecastHeadline || !els.forecastBody) return;
     var tiers = report.tier_pct || {};
     // Order tiers by displayed weight (descending) so the headline
-    // reads "X most likely, then Y…"
+    // reads "X most likely, then Y…". Zero-percent tiers still show
+    // in the breakdown (so Legendary stays visible even when the
+    // current conditions can't reach it) — they just sort to the end.
     var ordered = Object.keys(tiers)
       .map(function(k) { return [k, tiers[k]]; })
-      .filter(function(e) { return e[1] > 0; })
       .sort(function(a, b) { return b[1] - a[1]; });
 
-    var headlineParts = ordered.slice(0, 3).map(function(e) {
-      return e[0] + ' ' + e[1].toFixed(0) + '%';
-    });
+    var headlineParts = ordered.filter(function(e) { return e[1] > 0; })
+      .slice(0, 3).map(function(e) {
+        return e[0] + ' ' + e[1].toFixed(0) + '%';
+      });
     els.forecastHeadline.textContent =
       'Forecast: ' + headlineParts.join(' \u00b7 ');
 
@@ -847,10 +849,14 @@ document.addEventListener('visibilitychange', function() {
       var name = e[0];
       var pct = e[1];
       var color = TIER_COLORS[name] || '#606060';
-      html += '<div class="mint-forecast-bar-row">' +
+      // 0% tiers render with no fill width but still show the row so
+      // the full tier ladder is always visible.
+      var fillWidth = pct > 0 ? Math.max(2, pct) : 0;
+      var rowClass = pct > 0 ? 'mint-forecast-bar-row' : 'mint-forecast-bar-row mint-forecast-bar-row-zero';
+      html += '<div class="' + rowClass + '">' +
         '<span class="mint-forecast-bar-name" style="color:' + color + '">' + escapeHtml(name) + '</span>' +
         '<span class="mint-forecast-bar-track"><span class="mint-forecast-bar-fill" style="width:' +
-          Math.max(2, pct) + '%;background:' + color + '"></span></span>' +
+          fillWidth + '%;background:' + color + '"></span></span>' +
         '<span class="mint-forecast-bar-pct">' + pct.toFixed(1) + '%</span>' +
         '</div>';
     });

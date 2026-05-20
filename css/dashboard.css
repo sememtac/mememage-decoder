@@ -461,6 +461,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border-radius: 3px;
   opacity: 0.85;
 }
+.mint-forecast-bar-row-zero { opacity: 0.55; }
 .mint-forecast-bar-pct {
   text-align: right;
   font-variant-numeric: tabular-nums;
