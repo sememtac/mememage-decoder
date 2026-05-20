@@ -555,6 +555,26 @@ body {
   cursor: wait;
 }
 
+/* Partial-failure row — a channel that errored mid-blast while
+   at least one other surface accepted the soul. Sits below the
+   success list with a muted red tint so the user can see at a
+   glance which mirror dropped without scraping logs. */
+.conception-surface-error {
+  background: rgba(60, 20, 18, 0.32);
+  border-color: rgba(200, 80, 60, 0.22);
+}
+.conception-surface-error-msg {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  color: rgba(220, 140, 120, 0.85);
+  text-align: right;
+  font-style: italic;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Failed state --- */
 .conception-state-failed {
   align-items: stretch;
