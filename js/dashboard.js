@@ -207,6 +207,9 @@ document.addEventListener('visibilitychange', function() {
     download:      document.getElementById('mintDownload'),
     downloadSoul:  document.getElementById('mintDownloadSoul'),
     again:         document.getElementById('mintAgain'),
+    forecastBlock:    document.getElementById('mintForecastBlock'),
+    forecastHeadline: document.getElementById('mintForecastHeadline'),
+    forecastBody:     document.getElementById('mintForecastBody'),
     retry:       document.getElementById('mintRetry'),
     failedBody:  document.getElementById('mintFailedBody'),
   };
@@ -802,6 +805,109 @@ document.addEventListener('visibilitychange', function() {
   }
   _wireCopyBtn(els.awaitCopy, els.awaitUrl);
   _wireCopyBtn(els.resultUrlCopy, els.resultUrl);
+
+  // ---- Forecast widget ----
+  // Monte-Carlo distribution against current sky + machine state.
+  // Tells the creator "if I conceive now, what should I expect?".
+  // Refreshes on init and whenever the Mint tab becomes visible
+  // again (sky drifts slowly, but a long-paused dashboard catches up).
+
+  function _renderForecast(report) {
+    if (!els.forecastHeadline || !els.forecastBody) return;
+    var tiers = report.tier_pct || {};
+    // Order tiers by displayed weight (descending) so the headline
+    // reads "X most likely, then Y…"
+    var ordered = Object.keys(tiers)
+      .map(function(k) { return [k, tiers[k]]; })
+      .filter(function(e) { return e[1] > 0; })
+      .sort(function(a, b) { return b[1] - a[1]; });
+
+    var headlineParts = ordered.slice(0, 3).map(function(e) {
+      return e[0] + ' ' + e[1].toFixed(0) + '%';
+    });
+    els.forecastHeadline.textContent =
+      'Forecast: ' + headlineParts.join(' \u00b7 ');
+
+    // Full breakdown — tier bars + score range + halo + traits.
+    var html = '';
+    html += '<div class="mint-forecast-bars">';
+    ordered.forEach(function(e) {
+      var name = e[0];
+      var pct = e[1];
+      html += '<div class="mint-forecast-bar-row">' +
+        '<span class="mint-forecast-bar-name">' + escapeHtml(name) + '</span>' +
+        '<span class="mint-forecast-bar-track"><span class="mint-forecast-bar-fill" style="width:' +
+          Math.max(2, pct) + '%"></span></span>' +
+        '<span class="mint-forecast-bar-pct">' + pct.toFixed(1) + '%</span>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="mint-forecast-stats">' +
+      '<span>score range <strong>' + report.min + '\u2013' + report.max + '</strong></span>' +
+      '<span>median <strong>' + report.median + '</strong></span>' +
+      '<span>p99 <strong>' + report.p99 + '</strong></span>' +
+      '<span>halo <strong>' + (report.halo_pct || 0).toFixed(3) + '%</strong></span>' +
+      '</div>';
+
+    function _renderTraits(label, items, fireRates) {
+      if (!items || !items.length) return '';
+      var rows = items.map(function(c) {
+        var obs = (fireRates || {})[c.trait] || 0;
+        return '<div class="mint-forecast-trait-row">' +
+          '<span class="mint-forecast-trait-value">+' + c.value + '</span>' +
+          '<span class="mint-forecast-trait-name">' + escapeHtml(c.trait) + '</span>' +
+          '<span class="mint-forecast-trait-gate">gate ' + c.gate_pct.toFixed(0) + '%</span>' +
+          '<span class="mint-forecast-trait-obs">observed ' + obs.toFixed(0) + '%</span>' +
+          '</div>';
+      }).join('');
+      return '<div class="mint-forecast-traits"><p class="mint-forecast-traits-label">' +
+        label + '</p>' + rows + '</div>';
+    }
+    html += _renderTraits('Eligible celestial traits',
+      report.candidates_celestial, report.fire_rate_celestial);
+    html += _renderTraits('Eligible machine traits',
+      report.candidates_machine, report.fire_rate_machine);
+    if (!(report.candidates_celestial || []).length
+        && !(report.candidates_machine || []).length) {
+      html += '<p class="mint-forecast-empty">No candidate traits ' +
+        'right now \u2014 score will come from machine signature + ' +
+        'rare entropy hits only.</p>';
+    }
+    els.forecastBody.innerHTML = html;
+  }
+
+  var _forecastInflight = false;
+  async function loadForecast() {
+    if (!els.forecastBlock || _forecastInflight) return;
+    _forecastInflight = true;
+    try {
+      var resp = await fetch('/api/forecast', { headers: authHeaders() });
+      if (!resp.ok) {
+        els.forecastHeadline.textContent = 'Forecast unavailable';
+        return;
+      }
+      var report = await resp.json();
+      if (report && report.tier_pct) _renderForecast(report);
+    } catch (e) {
+      els.forecastHeadline.textContent = 'Forecast unavailable';
+    } finally {
+      _forecastInflight = false;
+    }
+  }
+
+  // Initial load. Run async so the tab paint isn't blocked.
+  loadForecast();
+
+  // Refresh on tab activation. Mint is the default-active tab, so
+  // the first activation is the page load (handled above). Subsequent
+  // returns to the tab pick up any drift in sky/machine. TabBar.wire
+  // appends — doesn't replace — the existing dispatcher hooks.
+  if (typeof TabBar !== 'undefined') {
+    TabBar.wire(function(panelId) {
+      if (panelId === 'tab-mint') loadForecast();
+    });
+  }
 })();
 
 

@@ -390,6 +390,122 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-style: italic;
 }
 
+/* --- Mint-tab forecast widget --- */
+.mint-forecast {
+  margin: 0.2rem 0 0;
+  padding: 0.55rem 0.7rem;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.74rem;
+}
+.mint-panel[data-mint-state="empty"] > .mint-forecast[data-mint-only="empty"] { display: block; }
+.mint-panel:not([data-mint-state="empty"]) > .mint-forecast[data-mint-only="empty"] { display: none; }
+.mint-forecast-summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  list-style: none;
+  outline: none;
+}
+.mint-forecast-summary::-webkit-details-marker { display: none; }
+.mint-forecast-summary::before {
+  content: '\25B8';
+  display: inline-block;
+  color: rgba(0, 0, 0, 0.4);
+  margin-right: 0.3rem;
+  transition: transform 0.15s ease;
+}
+.mint-forecast[open] .mint-forecast-summary::before { transform: rotate(90deg); }
+.mint-forecast-headline {
+  flex: 1;
+  font-weight: 600;
+  color: #1a1a20;
+  font-variant-numeric: tabular-nums;
+}
+.mint-forecast-toggle-hint {
+  font-size: 0.62rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-style: italic;
+}
+.mint-forecast[open] .mint-forecast-toggle-hint { display: none; }
+.mint-forecast-body {
+  margin-top: 0.6rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.mint-forecast-bars { display: flex; flex-direction: column; gap: 0.25rem; }
+.mint-forecast-bar-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 3.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+}
+.mint-forecast-bar-name { color: #3a3a44; font-weight: 600; }
+.mint-forecast-bar-track {
+  position: relative;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mint-forecast-bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(78, 200, 160, 0.45), rgba(78, 200, 160, 0.85));
+  border-radius: 3px;
+}
+.mint-forecast-bar-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #3a3a44;
+}
+.mint-forecast-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  font-size: 0.66rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+.mint-forecast-stats strong { color: #1a1a20; font-weight: 700; }
+.mint-forecast-traits {
+  padding: 0.45rem 0.5rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+}
+.mint-forecast-traits-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0 0 0.3rem;
+}
+.mint-forecast-trait-row {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr 5rem 6rem;
+  gap: 0.4rem;
+  font-size: 0.66rem;
+  padding: 0.15rem 0;
+  font-variant-numeric: tabular-nums;
+  color: #3a3a44;
+}
+.mint-forecast-trait-value { color: #2a6044; font-weight: 700; }
+.mint-forecast-trait-name { color: #1a1a20; }
+.mint-forecast-trait-gate, .mint-forecast-trait-obs { color: rgba(0, 0, 0, 0.5); }
+.mint-forecast-empty {
+  font-size: 0.66rem;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+}
+
 /* Ticket display inside the conception handoff. Monospace + grouped
    for memorability — like a flight number. */
 .mint-handoff-ticket {
