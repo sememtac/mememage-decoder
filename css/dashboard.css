@@ -447,7 +447,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   gap: 0.5rem;
   font-size: 0.7rem;
 }
-.mint-forecast-bar-name { color: #3a3a44; font-weight: 600; }
+.mint-forecast-bar-name { font-weight: 600; }
 .mint-forecast-bar-track {
   position: relative;
   height: 6px;
@@ -458,8 +458,8 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .mint-forecast-bar-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, rgba(78, 200, 160, 0.45), rgba(78, 200, 160, 0.85));
   border-radius: 3px;
+  opacity: 0.85;
 }
 .mint-forecast-bar-pct {
   text-align: right;

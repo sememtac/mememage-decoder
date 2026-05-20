@@ -828,16 +828,29 @@ document.addEventListener('visibilitychange', function() {
     els.forecastHeadline.textContent =
       'Forecast: ' + headlineParts.join(' \u00b7 ');
 
+    // Tier colors match the cert plate's rarity palette so the
+    // widget reads the same visual language as the conceived cert.
+    // Mirrors RARITY_TIERS in cert-renderer.js.
+    var TIER_COLORS = {
+      'Legendary': '#d44040',
+      'Epic':      '#8a6210',
+      'Very Rare': '#5a2a8a',
+      'Rare':      '#2a5090',
+      'Uncommon':  '#2a7030',
+      'Common':    '#606060',
+    };
+
     // Full breakdown — tier bars + score range + halo + traits.
     var html = '';
     html += '<div class="mint-forecast-bars">';
     ordered.forEach(function(e) {
       var name = e[0];
       var pct = e[1];
+      var color = TIER_COLORS[name] || '#606060';
       html += '<div class="mint-forecast-bar-row">' +
-        '<span class="mint-forecast-bar-name">' + escapeHtml(name) + '</span>' +
+        '<span class="mint-forecast-bar-name" style="color:' + color + '">' + escapeHtml(name) + '</span>' +
         '<span class="mint-forecast-bar-track"><span class="mint-forecast-bar-fill" style="width:' +
-          Math.max(2, pct) + '%"></span></span>' +
+          Math.max(2, pct) + '%;background:' + color + '"></span></span>' +
         '<span class="mint-forecast-bar-pct">' + pct.toFixed(1) + '%</span>' +
         '</div>';
     });
