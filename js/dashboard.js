@@ -141,6 +141,20 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 
+// Slow background poll while the Config tab is the active panel AND
+// the document is visible. Catches out-of-band changes that visibility
+// alone misses: a peer pushing config via /api/sync/accept, a CLI
+// edit (mememage profile new from a terminal), a chain rename from
+// another browser. 20s cadence is cheap and well below human "I did
+// X, why don't I see it" patience.
+setInterval(function() {
+  if (document.visibilityState !== 'visible') return;
+  var configPanel = document.getElementById('tab-config');
+  if (configPanel && configPanel.classList.contains('active') && window.__refreshConfigTab) {
+    window.__refreshConfigTab();
+  }
+}, 20000);
+
 // =====================================================================
 // MINT TAB — desktop trigger for the phone-GPS conception flow.
 //
