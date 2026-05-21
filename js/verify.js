@@ -15,10 +15,23 @@
 // =====================================================================
 
 // ----- Content hash computation -----
-// Canonical list of fields that contribute to content_hash. Mirrors
-// mememage/core.py's _HASH_INCLUDED. Adding a field to a record does
-// NOT add it to the hash — it must be added here.
-const HASH_INCLUDED = new Set([
+//
+// Versioned inclusion sets — mirror mememage/core.py's
+// _HASH_INCLUDED_BY_VERSION. Verifiers walking historical records must
+// use the set that applied when the record was minted, NOT whatever
+// the active version says today.
+//
+// Adding a new version requires changes in lockstep here AND in
+// core.py. The Python side has the full checklist; the JS short
+// version:
+//   1. Add a new const HASH_INCLUDED_V{n} = new Set([...]) below.
+//   2. Add it to HASH_INCLUDED_BY_VERSION.
+//   3. Bump CURRENT_HASH_VERSION (only used by the Attack Lab — real
+//      records carry their own version field).
+//   4. Don't rename fields silently across versions. Don't change
+//      sortKeysDeep / sha256_16 serialization without bumping.
+
+const HASH_INCLUDED_V4 = new Set([
   'prompt', 'seed', 'width', 'height', 'steps', 'cfg', 'guidance',
   'denoise', 'sampler', 'scheduler', 'unet', 'lora', 'lora_strength', 'mode',
   'timestamp', 'conceived', 'rendered',
@@ -31,6 +44,24 @@ const HASH_INCLUDED = new Set([
   'constellation_name', 'heart_star_id', 'constellation_star',
   'decoder_hash',
 ]);
+
+const HASH_INCLUDED_BY_VERSION = {
+  4: HASH_INCLUDED_V4,
+  // 5: new Set([...HASH_INCLUDED_V4, 'new_field']),  // future
+};
+
+const CURRENT_HASH_VERSION = 4;
+const DEFAULT_HASH_VERSION = 4;
+
+function _hashSetForRecord(record) {
+  var v = (record && record.hash_version) || DEFAULT_HASH_VERSION;
+  return HASH_INCLUDED_BY_VERSION[v] || HASH_INCLUDED_BY_VERSION[DEFAULT_HASH_VERSION];
+}
+
+// Back-compat alias for callers that read the active set directly
+// (Attack Lab, debug tools). New code should call _hashSetForRecord
+// (record) so it stays version-aware.
+const HASH_INCLUDED = HASH_INCLUDED_BY_VERSION[CURRENT_HASH_VERSION];
 
 function sortKeysDeep(obj) {
   if (Array.isArray(obj)) return obj.map(sortKeysDeep);
@@ -55,8 +86,9 @@ async function sha256_16(obj) {
 
 async function computeContentHash(record) {
   try {
+    var include = _hashSetForRecord(record);
     var hashable = {};
-    Object.keys(record).filter(function(k) { return HASH_INCLUDED.has(k); }).sort()
+    Object.keys(record).filter(function(k) { return include.has(k); }).sort()
       .forEach(function(k) { hashable[k] = record[k]; });
     return await sha256_16(hashable);
   } catch (e) {

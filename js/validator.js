@@ -840,7 +840,8 @@ async function _renderObservatoryFromCache() {
   // Compute hashes for all valid records
   for(var vi=0;vi<valid.length;vi++){
     var r=valid[vi];var stored=r.content_hash||null;
-    var hashable={};Object.keys(r).filter(function(k){return HASH_INCLUDED.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
+    var _setA=_hashSetForRecord(r);
+    var hashable={};Object.keys(r).filter(function(k){return _setA.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
     try {
       r._computed = await sha256_16(hashable);
     } catch (e) {
@@ -999,7 +1000,8 @@ async function _renderObservatoryFromCache() {
     html+='<div class="meta-detail" style="display:none;padding:0.5rem 0.8rem;background:rgba(24,24,28,0.6);">';
 
     var stored=r.content_hash||null;
-    var hashable={};Object.keys(r).filter(function(k){return HASH_INCLUDED.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
+    var _setB=_hashSetForRecord(r);
+    var hashable={};Object.keys(r).filter(function(k){return _setB.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
     var computed=null;try{computed=await sha256_16(hashable);}catch(e){}
     var match=stored&&computed&&stored===computed;
     var sealed=r._sealed;
@@ -2683,9 +2685,11 @@ function renderAudit(rec, identifier, out) {
   var hashRows = '';
   var storedHash = rec.content_hash;
   if (storedHash) {
-    // Compute hash client-side — uses shared HASH_INCLUDED from verify.js
+    // Compute hash client-side — uses the per-record inclusion set from
+    // verify.js so historical records verify under their own hash_version.
     var hashable = {};
-    HASH_INCLUDED.forEach(function(k) { if (rec[k] !== undefined && rec[k] !== null) hashable[k] = rec[k]; });
+    var _setC = _hashSetForRecord(rec);
+    _setC.forEach(function(k) { if (rec[k] !== undefined && rec[k] !== null) hashable[k] = rec[k]; });
     var sorted = JSON.stringify(sortKeysDeep(hashable)).replace(/[\u0080-\uffff]/g, function(c) { return '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'); });
     crypto.subtle.digest('SHA-256', new TextEncoder().encode(sorted)).then(function(buf) {
       var computed = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('').slice(0, 16);
