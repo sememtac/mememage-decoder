@@ -5,6 +5,119 @@
  * decoder establishes. Most of the dashboard is intentionally plain.
  */
 
+/* Glossary surface — page-header ? button + inline ? indicators
+   that open the glossary modal. Single source of truth for term
+   explanations; entries live in dashboard.js. */
+.page-header-glossary {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.page-header-glossary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: white;
+}
+.page-header { position: relative; }
+
+.glossary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-left: 0.3rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: rgba(0, 0, 0, 0.55);
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  vertical-align: middle;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.glossary-link:hover {
+  background: rgba(200, 168, 80, 0.25);
+  color: #4a3a08;
+  border-color: rgba(200, 168, 80, 0.6);
+}
+
+.config-modal-glossary {
+  width: min(720px, 100%);
+  max-height: 82vh;
+}
+.glossary-search {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.025);
+}
+.glossary-search .config-input {
+  width: 100%;
+  font-size: 0.78rem;
+}
+.glossary-list {
+  padding: 0.8rem 1rem 1rem;
+  overflow: auto;
+  flex: 1;
+}
+.glossary-entry {
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+.glossary-entry-highlight {
+  background: rgba(220, 200, 130, 0.35);
+  border-color: rgba(200, 168, 80, 0.7);
+}
+.glossary-entry-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a1a20;
+}
+.glossary-entry-body {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  color: rgba(0, 0, 0, 0.75);
+}
+.glossary-entry-body code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.7rem;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0 0.25rem;
+  border-radius: 3px;
+}
+.glossary-empty {
+  padding: 1rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 /* Welcome checklist — first-run gating-step surface. Lives above the
    system box, auto-hides when every step is green. Returning users
    re-open via the .welcome-reopen-link below. Yang palette, distinct
@@ -1194,6 +1307,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   background: rgba(0, 0, 0, 0.65);
   padding: 1.2rem;
 }
+.config-modal[hidden] { display: none; }
 .config-modal-card {
   background: #f4f4f6;
   color: #1a1a20;

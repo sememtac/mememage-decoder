@@ -4526,3 +4526,154 @@ setInterval(function() {
     if (loaded) refresh();
   };
 })();
+
+
+// =====================================================================
+// GLOSSARY — single source of truth for terminology, surfaced via a
+// ? button in the page header and inline data-glossary="<term>"
+// buttons throughout the dashboard. Click any of them → modal opens,
+// optionally scrolled to the requested entry.
+// =====================================================================
+(function() {
+  var modal = document.getElementById('glossaryModal');
+  var listEl = document.getElementById('glossaryList');
+  var searchEl = document.getElementById('glossarySearch');
+  var openBtn = document.getElementById('glossaryOpenBtn');
+  var closeBtn = document.getElementById('glossaryClose');
+  if (!modal || !listEl) return;
+
+  // Each entry: {id, label, body}. id is the slug used in
+  // data-glossary attributes; label is what shows in the modal;
+  // body is rendered as inline HTML (kept short — one paragraph).
+  // Order is intentional: most-common terms first within each
+  // group so a new user scanning top-down hits the essentials early.
+  var ENTRIES = [
+    // --- The model ---
+    { id: 'soul', label: 'Soul',
+      body: 'The metadata record — a JSON file (<code>.soul</code>) carrying every fact about a conception: prompt, seed, birth sky, machine vitals, GPS, signature. Lives on Internet Archive (or any channel you configure) and on your local disk. The <em>soul</em> is the meaning; the image is the body.' },
+    { id: 'bar', label: 'Bar',
+      body: 'The 2-pixel-tall strip at the bottom of every conceived image. Encodes the identifier (so any decoder can look up the soul) and the content hash (so tampering is detectable). Survives JPEG q50+ via Reed-Solomon FEC and 8-pixel M/Y/C delimiter bands.' },
+    { id: 'conception', label: 'Conception (mint)',
+      body: 'The act of binding a body (image) to a soul (metadata): server hashes the record, signs it with your active key, writes the bar into the image, blasts the soul to your channels. <code>mint</code> in code; <em>conception</em> in the philosophy. GPS is mandatory.' },
+    { id: 'identifier', label: 'Identifier',
+      body: 'The key for finding a soul: <code>mememage-{12 hex chars}</code>. Derived from prompt + seed + dimensions + timestamp. Lives in the bar; readers use it to fetch the soul from any source.' },
+    { id: 'content_hash', label: 'Content hash',
+      body: 'SHA-256 of the soul\u2019s canonical JSON, first 16 hex chars. Baked into the bar so anyone can verify a soul matches the image even when the file came from a stranger. The integrity authority.' },
+
+    // --- Chains + Profiles ---
+    { id: 'chain', label: 'Chain',
+      body: 'A universe of conceptions. Multiple chains let one host run separate provenance streams (public art chain, private chain with password, test chain). Each chain has its own Age cycle, records dir, and visibility setting.' },
+    { id: 'age', label: 'Age',
+      body: 'A version epoch within a chain. Each Age runs a 365-position outer cycle (one solar year). Sealing an Age locks the decoder + truth chunks; the next Age begins with position 0.' },
+    { id: 'constellation', label: 'Constellation',
+      body: 'Twelve conceptions sharing one decoder cycle within a chain. The first conception (the <em>heart star</em>) names the constellation from its sky; subsequent stars are Greek-lettered β-μ in conception order. Family claims are tamper-evident in the content hash.' },
+    { id: 'heart_star', label: 'Heart star',
+      body: 'The first conception in a constellation — α. Its identifier names the family; its sky picks the constellation\u2019s phonetic name.' },
+    { id: 'profile', label: 'Profile',
+      body: 'One Ed25519 signing identity. A human can carry many — one per machine — so a compromised VPS doesn\u2019t expose the laptop\u2019s primary key. Profiles link into one human identity via signed alias records, never via shared bytes.' },
+    { id: 'active_profile', label: 'Active profile',
+      body: 'The profile whose key signs the next mint. One profile is active at a time per host. Switching is instant; the bar / Discord toast / cert all reflect the new signer from the next conception onward.' },
+    { id: 'alias', label: 'Alias',
+      body: 'A signed record naming another profile as a sibling. When both profiles sign matching aliases pointing at each other (bidirectional), verifiers recognize the keys as one human.' },
+    { id: 'pair', label: 'Pair (cross-host alias handshake)',
+      body: 'One-click cross-host pairing: this host calls the peer, both sides sign aliases naming the other, both records get published. Achieves bidirectional alias in one round-trip without copying private keys.' },
+    { id: 'sync', label: 'Sync (config push)',
+      body: 'One-shot push of your chains + channels (+ optionally webhooks) to a peer mememage host. Peer applies additively. No private keys / tokens / credentials cross the wire (webhooks excepted, with opt-in).' },
+
+    // --- Channels ---
+    { id: 'channel', label: 'Channel',
+      body: 'A pluggable destination for souls. Each enabled+configured channel receives a copy on every mint; at least one must succeed. Standard channels: <code>internet_archive</code>, <code>http_push</code> (peer mememage), <code>zenodo</code>. The framework supports more.' },
+    { id: 'primary', label: 'Primary channel',
+      body: 'The one channel whose URL becomes <code>record.url</code> — the bar reference, the Discord toast link. Exactly one channel can be primary at a time; users promote / demote via the radio button or the Scope flow.' },
+    { id: 'channel_scope', label: 'Channel scope (per-profile)',
+      body: 'A profile can restrict which channels it publishes to. Privacy boundary: a VPS-only profile that shouldn\u2019t leak its rotations to IA marks itself scope=[self-host only]. None / empty = use every enabled channel (default).' },
+    { id: 'distribution', label: 'Distribution',
+      body: 'The <code>record.distribution</code> field: {channel_id → url} listing every surface the soul landed on. Visible in the cert\u2019s WITNESSED expandable reveal. Sovereignty signal — no platform owns the soul.' },
+
+    // --- Sessions + Tickets ---
+    { id: 'session', label: 'Session',
+      body: 'A pending mint not yet confirmed. Created when an image is staged on the dashboard, completes when the phone POSTs GPS to <code>/api/mint/&lt;token&gt;</code>. Lives 7 days unless explicitly deleted.' },
+    { id: 'ticket', label: 'Ticket',
+      body: 'Short 8-char prefix of a session token (e.g. <code>E33C9891</code>). Pasteable handle for resuming or deleting a pending session without dealing with the full token.' },
+
+    // --- Verification badges ---
+    { id: 'witnessed', label: 'WITNESSED',
+      body: 'Hash match: the image\u2019s bar carries the same content_hash the soul claims. Body and soul are joined. Sealed by spirit.' },
+    { id: 'authenticated', label: 'AUTHENTICATED',
+      body: 'Ed25519 signature verifies: only the holder of the signing key could have minted this. TOFU (Trust On First Use) stores the creator name in your browser; later records under the same fingerprint inherit it.' },
+    { id: 'embodied', label: 'EMBODIED',
+      body: 'Portrait match via dHash: the image you have IS the original body (not a re-encode that happens to share the bar). Post-mint thumbnail comparison — protected by signature, not by the content hash.' },
+
+    // --- Chain visibility + GPS ---
+    { id: 'light_energy', label: 'Light energy (visibility)',
+      body: 'Public chain. Records are unencrypted; anyone with the identifier can fetch and verify the soul fully.' },
+    { id: 'dark_matter', label: 'Dark matter (visibility)',
+      body: 'Password-gated chain. Protected fields (prompt, GPS, soul fields) live encrypted; readers need the chain password to unlock. Public fields (identifier, content_hash) stay visible.' },
+    { id: 'gps_source', label: 'GPS source',
+      body: 'Chain-level setting: <code>phone</code> (default — phone Safari watchPosition), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded; record carries no time-lock puzzle).' },
+
+    // --- Misc tech ---
+    { id: 'halo', label: 'Halo',
+      body: 'Rare bonus: when the kernel\u2019s entropy at conception happens to contain the bar\u2019s magic bytes (<code>AD4E</code>) somewhere in the hex, the image wears a halo. ~0.09% per mint. +10 rarity score.' },
+    { id: 'hash_version', label: 'Hash version',
+      body: 'Which inclusion set was used to compute this record\u2019s content_hash. Lets the system evolve which fields are tamper-evident without invalidating older records — verifiers dispatch on the field at hash time.' },
+  ];
+
+  // Build a lookup map for deep-linking.
+  var BY_ID = {};
+  ENTRIES.forEach(function(e) { BY_ID[e.id] = e; });
+
+  function _renderList(filter) {
+    var q = (filter || '').trim().toLowerCase();
+    var html = '';
+    ENTRIES.forEach(function(e) {
+      if (q && e.label.toLowerCase().indexOf(q) < 0 && e.body.toLowerCase().indexOf(q) < 0) return;
+      html += '<div class="glossary-entry" id="glossary-entry-' + e.id + '">' +
+        '<h4 class="glossary-entry-label">' + e.label + '</h4>' +
+        '<p class="glossary-entry-body">' + e.body + '</p>' +
+      '</div>';
+    });
+    listEl.innerHTML = html || '<p class="glossary-empty"><em>No matches.</em></p>';
+  }
+
+  function open(focusId) {
+    modal.hidden = false;
+    _renderList('');
+    if (searchEl) searchEl.value = '';
+    if (focusId && BY_ID[focusId]) {
+      // Scroll the entry into view inside the list container.
+      var target = document.getElementById('glossary-entry-' + focusId);
+      if (target) {
+        target.scrollIntoView({behavior: 'smooth', block: 'start'});
+        target.classList.add('glossary-entry-highlight');
+        setTimeout(function() {
+          if (target) target.classList.remove('glossary-entry-highlight');
+        }, 1800);
+      }
+    } else if (searchEl) {
+      searchEl.focus();
+    }
+  }
+
+  function close() { modal.hidden = true; }
+
+  if (openBtn) openBtn.addEventListener('click', function() { open(); });
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', function(e) { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !modal.hidden) close();
+  });
+  if (searchEl) {
+    searchEl.addEventListener('input', function() { _renderList(searchEl.value); });
+  }
+
+  // Delegated handler for every [data-glossary] trigger anywhere in
+  // the document. New sections + future inline links light up
+  // automatically without per-section wiring.
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-glossary]');
+    if (!btn) return;
+    e.preventDefault();
+    open(btn.getAttribute('data-glossary'));
+  });
+})();
