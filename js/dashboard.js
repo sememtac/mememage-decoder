@@ -3292,6 +3292,60 @@ document.addEventListener('visibilitychange', function() {
   var _channelTypes = null;  // cache of /api/channels/types response
   var _envPresence = {};     // env_var → bool, populated alongside loadChannels
 
+  async function openChannelsRawModal() {
+    var existing = document.getElementById('configChannelsRawModal');
+    if (existing) existing.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'configChannelsRawModal';
+    modal.className = 'config-modal config-modal-channels-raw';
+    modal.innerHTML =
+      '<div class="config-modal-card">' +
+      '  <div class="config-modal-head">' +
+      '    <span>channels.json (read-only)</span>' +
+      '    <button type="button" class="config-modal-close" aria-label="Close">\u00d7</button>' +
+      '  </div>' +
+      '  <pre class="config-modal-pre" id="configChannelsRawBody">Loading\u2026</pre>' +
+      '  <div class="config-modal-foot">' +
+      '    <span class="config-note">Edit through the dashboard fields above. This view is for inspection only \u2014 paste-edits won\u2019t persist.</span>' +
+      '    <button type="button" class="config-btn" id="configChannelsRawCopy">Copy</button>' +
+      '  </div>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    function close() { modal.remove(); }
+    modal.querySelector('.config-modal-close').addEventListener('click', close);
+    modal.addEventListener('click', function(e) { if (e.target === modal) close(); });
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+    });
+
+    var bodyEl = document.getElementById('configChannelsRawBody');
+    try {
+      var resp = await fetch('/api/channels/raw', { headers: authHeaders() });
+      if (!resp.ok) {
+        bodyEl.textContent = 'Failed to load (HTTP ' + resp.status + ')';
+        return;
+      }
+      var text = await resp.text();
+      bodyEl.textContent = text;
+    } catch (e) {
+      bodyEl.textContent = 'Failed to load: ' + e.message;
+    }
+
+    var copyBtn = document.getElementById('configChannelsRawCopy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async function() {
+        try {
+          await navigator.clipboard.writeText(bodyEl.textContent);
+          var prev = copyBtn.textContent;
+          copyBtn.textContent = 'Copied';
+          setTimeout(function() { copyBtn.textContent = prev; }, 1200);
+        } catch (e) { /* clipboard blocked — ignore */ }
+      });
+    }
+  }
+
   async function loadChannels() {
     var host = document.getElementById('configChannels');
     if (!host) return;
@@ -3339,6 +3393,7 @@ document.addEventListener('visibilitychange', function() {
       '  </select>' +
       '  <input class="config-input config-channel-add-id" id="configChannelNewId" type="text" placeholder="channel id (e.g. ia-backup)">' +
       '  <button class="config-btn" id="configChannelAddBtn">+ Add channel</button>' +
+      '  <button type="button" class="config-btn config-btn-subtle" id="configChannelViewRaw">View raw JSON\u2026</button>' +
       '</div>' +
       '<p class="config-note">The <strong>primary</strong> channel\u2019s URL becomes the bar\u2019s record link and the Discord notification target. Every enabled+configured channel receives a copy of the soul on every mint; at least one must succeed. Credentials always live in <code>.env</code> — fields below name the env var to read.</p>';
 
@@ -3350,6 +3405,13 @@ document.addEventListener('visibilitychange', function() {
     // Wire add-channel button
     var addBtn = document.getElementById('configChannelAddBtn');
     if (addBtn) addBtn.addEventListener('click', addChannel);
+
+    // Wire "View raw JSON" — opens a read-only modal with the
+    // current channels.json file contents. Useful for debugging
+    // when the dashboard UI doesn't expose a field (legacy keys,
+    // hand-edits, etc.).
+    var rawBtn = document.getElementById('configChannelViewRaw');
+    if (rawBtn) rawBtn.addEventListener('click', openChannelsRawModal);
   }
 
   function _channelRow(c, idx) {

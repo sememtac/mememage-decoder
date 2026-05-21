@@ -1073,6 +1073,67 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .payload-modal-meta dt { font-weight: 700; color: #404048; }
 .payload-modal-meta dd { margin: 0; font-family: monospace; word-break: break-all; }
 
+/* Generic config-modal — reused for the channels.json raw view +
+   future read-only inspections. Mirrors payload-modal proportions
+   and chrome but takes its own class so future styling deltas
+   (light/dark, themed variants) don't have to fight payload's CSS. */
+.config-modal {
+  position: fixed; inset: 0;
+  z-index: 9990;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 1.2rem;
+}
+.config-modal-card {
+  background: #f4f4f6;
+  color: #1a1a20;
+  border-radius: var(--radius, 10px);
+  width: min(640px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.config-modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.04);
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.config-modal-close {
+  background: transparent; border: none; cursor: pointer;
+  font-size: 1.4rem; line-height: 1; opacity: 0.5;
+  color: inherit;
+  padding: 0 0.3rem;
+}
+.config-modal-close:hover { opacity: 1; }
+.config-modal-pre {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  overflow: auto;
+  flex: 1;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: #1a1a20;
+  white-space: pre;
+  background: rgba(255, 255, 255, 0.7);
+}
+.config-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+}
+.config-modal-foot .config-note { margin: 0; font-size: 0.66rem; }
+
 /* "Browse" button next to a source path input — opens the OS-native
  * file dialog via /api/fs/pick. */
 .entry-source-row .source-browse {
