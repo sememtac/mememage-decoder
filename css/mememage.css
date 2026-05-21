@@ -76,7 +76,7 @@
     z-index: 0;
   }
 
-  body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-player) { position: relative; z-index: 1; }
+  body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-player):not(.config-modal):not(.payload-modal) { position: relative; z-index: 1; }
 
   /* --- Header (theme overrides; structure in layout.css) --- */
   .page-header h1 {
