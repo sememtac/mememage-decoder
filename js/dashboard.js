@@ -2989,6 +2989,7 @@ document.addEventListener('visibilitychange', function() {
       '  <button class="config-btn" id="configProfileNewBtn">+ New profile</button>' +
       '  <button class="config-btn" id="configProfileImportBtn">Import existing key\u2026</button>' +
       '  <button class="config-btn" id="configProfilePairBtn">Pair with another mememage\u2026</button>' +
+      '  <button class="config-btn" id="configProfileSyncBtn" title="Push your chains / channels / webhooks to another mememage host (additive — peer keeps anything it already has)">Push config\u2026</button>' +
       '</div>' +
       '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
       '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next mint. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side, or <strong>Pair</strong> for a one-click cross-host handshake (each side keeps its private key, only public keys move).</p>';
@@ -3011,12 +3012,135 @@ document.addEventListener('visibilitychange', function() {
     document.getElementById('configProfileNewBtn').addEventListener('click', openNewProfile);
     document.getElementById('configProfileImportBtn').addEventListener('click', openImportProfile);
     document.getElementById('configProfilePairBtn').addEventListener('click', openPairFlow);
+    document.getElementById('configProfileSyncBtn').addEventListener('click', openSyncFlow);
   }
 
   // Pair-with-another-mememage modal. Cross-host key exchange in one
   // click: this host calls the peer, peer accepts (auto if peer_token
   // matches), both sides save each other's pubkey and sign their own
   // alias to the other. Bidirectional in one round-trip.
+  function openSyncFlow() {
+    // Push this host's config to a peer. Additive on the receiver
+    // side — peer keeps anything it already has, only new entries
+    // land. Mirrors the pair-call shape so users who learned that
+    // flow have one fewer thing to learn here.
+    var host = document.getElementById('configProfileDanger');
+    if (!host) return;
+    host.style.display = 'block';
+    host.innerHTML =
+      '<div class="config-pair-form">' +
+      '  <p class="config-pair-head">Push config to peer</p>' +
+      '  <p class="config-note">Sends your chains + channels (no credentials) to another mememage host. Peer applies additively \u2014 anything it already has is kept untouched, new entries are appended. Private keys, API tokens, and channel credentials NEVER cross the wire.</p>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">Peer URL</span>' +
+      '    <input class="config-input" id="configSyncUrl" type="text" placeholder="https://160.153.182.117:8444">' +
+      '  </div>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">Peer token</span>' +
+      '    <input class="config-input" id="configSyncToken" type="password" autocomplete="off" placeholder="peer\u2019s MINT_API_TOKEN">' +
+      '  </div>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">Include</span>' +
+      '    <div class="config-sync-categories">' +
+      '      <label><input type="checkbox" id="configSyncChains" checked> Chains <span class="config-note" style="margin:0;">(id, name, visibility, gps_source \u2014 no password)</span></label>' +
+      '      <label><input type="checkbox" id="configSyncChannels" checked> Channels <span class="config-note" style="margin:0;">(id, type, name, config \u2014 no credentials)</span></label>' +
+      '      <label><input type="checkbox" id="configSyncWebhooks"> Webhooks ' +
+      '        <span class="config-note" style="margin:0;color:#a65030;">\u26a0 includes Discord/Slack bot tokens embedded in URLs/headers. Only enable if you trust the peer.</span>' +
+      '      </label>' +
+      '    </div>' +
+      '  </div>' +
+      '  <label class="config-pair-checkbox">' +
+      '    <input type="checkbox" id="configSyncSelfSigned"> Accept self-signed cert (for peers using the bundled tls helper)' +
+      '  </label>' +
+      '  <div class="config-row" style="margin-top:0.6rem;">' +
+      '    <button class="config-btn config-btn-primary" id="configSyncSubmit">Push</button>' +
+      '    <button class="config-btn" id="configSyncCancel">Cancel</button>' +
+      '  </div>' +
+      '  <div class="config-note" id="configSyncStatus" style="margin-top:0.4rem;"></div>' +
+      '</div>';
+    document.getElementById('configSyncCancel').addEventListener('click', closeProfileDanger);
+    document.getElementById('configSyncSubmit').addEventListener('click', submitSync);
+  }
+
+  async function submitSync() {
+    var url   = (document.getElementById('configSyncUrl').value || '').trim();
+    var token = (document.getElementById('configSyncToken').value || '').trim();
+    var ssc   = document.getElementById('configSyncSelfSigned').checked;
+    var include = {
+      chains:   document.getElementById('configSyncChains').checked,
+      channels: document.getElementById('configSyncChannels').checked,
+      webhooks: document.getElementById('configSyncWebhooks').checked,
+    };
+    var statusEl = document.getElementById('configSyncStatus');
+    var submit = document.getElementById('configSyncSubmit');
+    if (!url) { statusEl.textContent = 'Peer URL required.'; statusEl.style.color = '#b04040'; return; }
+    if (!include.chains && !include.channels && !include.webhooks) {
+      statusEl.textContent = 'Pick at least one category to send.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    if (include.webhooks) {
+      var ok = window.confirm(
+        'Webhooks include embedded Discord/Slack bot tokens. The peer ' +
+        'will receive those tokens in plaintext and will fire to the ' +
+        'same surfaces this host does.\n\nProceed?'
+      );
+      if (!ok) return;
+    }
+    submit.disabled = true;
+    statusEl.textContent = 'Calling peer\u2026';
+    statusEl.style.color = '';
+    try {
+      var resp = await fetch('/api/sync/call', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          peer_url: url,
+          peer_token: token,
+          accept_self_signed: ssc,
+          include: include,
+        }),
+      });
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        statusEl.style.color = '#b04040';
+        if (data.network_error && data.hint) {
+          statusEl.innerHTML =
+            '<strong>' + escapeHtml(data.error || 'Peer unreachable.') + '</strong>' +
+            '<br><span style="color:#54545c;font-style:italic;">' +
+              escapeHtml(data.hint) +
+            '</span>';
+        } else {
+          statusEl.textContent = data.error || ('Sync failed (HTTP ' + resp.status + ').');
+        }
+        submit.disabled = false;
+        return;
+      }
+      // Render the peer's summary so the user can see what landed.
+      var s = data.peer_summary || {};
+      var lines = [];
+      if (s.chains) {
+        lines.push('Chains: ' + s.chains.created.length + ' created' +
+          (s.chains.skipped.length ? ', ' + s.chains.skipped.length + ' skipped (already present)' : ''));
+      }
+      if (s.channels) {
+        lines.push('Channels: ' + s.channels.created.length + ' created' +
+          (s.channels.skipped.length ? ', ' + s.channels.skipped.length + ' skipped (already present)' : ''));
+      }
+      if (s.webhooks) {
+        lines.push('Webhooks: ' + s.webhooks.created + ' created' +
+          (s.webhooks.skipped ? ', ' + s.webhooks.skipped + ' skipped (URL already present)' : ''));
+      }
+      statusEl.style.color = '#306020';
+      statusEl.innerHTML = '<strong>Pushed.</strong><br>' + lines.map(escapeHtml).join('<br>');
+    } catch (e) {
+      statusEl.textContent = 'Sync request failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      submit.disabled = false;
+    }
+  }
+
   function openPairFlow() {
     var host = document.getElementById('configProfileDanger');
     if (!host) return;

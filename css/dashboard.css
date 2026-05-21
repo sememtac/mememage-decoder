@@ -2330,6 +2330,18 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   gap: 0.15rem;
   margin: 0.45rem 0 0.6rem;
 }
+.config-sync-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.config-sync-categories label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.config-sync-categories label > input { margin: 0; }
 .config-profile-scope-row {
   display: flex;
   align-items: center;
