@@ -3413,13 +3413,22 @@ document.addEventListener('visibilitychange', function() {
       }).join('');
     }
 
+    // Primary channel gets a row-level marker + star next to its name
+    // input so the canonical "this is the URL in the bar" channel is
+    // obvious at a glance, not buried in a status pill.
+    var primaryClass = c.primary ? ' config-channel-row-primary' : '';
+    var primaryStar = c.primary
+      ? '<span class="config-channel-primary-star" title="Primary channel — its URL becomes record.url (bar reference, Discord toast)">\u2605</span>'
+      : '';
     return '' +
-      '<div class="config-channel-row" data-channel-idx="' + idx + '" data-channel-id="' + escapeHtml(c.id) + '">' +
+      '<div class="config-channel-row' + primaryClass + '" data-channel-idx="' + idx + '" data-channel-id="' + escapeHtml(c.id) + '">' +
         '<div class="config-channel-head">' +
           '<div class="config-channel-labels">' +
             '<label class="config-channel-label-row">' +
               '<span class="config-channel-label-key">name</span>' +
-              '<input class="config-input config-channel-name-input" data-channel-name type="text" value="' + escapeHtml(c.name || '') + '" placeholder="' + escapeHtml(displayName) + '">' +
+              '<span class="config-channel-name-wrap">' + primaryStar +
+                '<input class="config-input config-channel-name-input" data-channel-name type="text" value="' + escapeHtml(c.name || '') + '" placeholder="' + escapeHtml(displayName) + '">' +
+              '</span>' +
               '<span class="config-channel-label-hint">local dashboard label</span>' +
             '</label>' +
             '<label class="config-channel-label-row">' +

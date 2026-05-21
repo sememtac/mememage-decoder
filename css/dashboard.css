@@ -1555,6 +1555,28 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   display: flex; flex-direction: column;
   gap: 0.45rem;
 }
+/* Primary channel — left-edge gold band + warmer fill so the row
+   carrying the canonical URL (bar reference, Discord toast) is
+   obvious at a glance without scanning radio buttons. */
+.config-channel-row-primary {
+  border-left: 3px solid #c8a850;
+  background: linear-gradient(90deg, rgba(220, 200, 130, 0.18), rgba(255, 255, 255, 0.55) 30%);
+}
+.config-channel-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+.config-channel-name-wrap .config-channel-name-input { flex: 1; }
+.config-channel-primary-star {
+  color: #c8a850;
+  font-size: 0.95rem;
+  line-height: 1;
+  flex: 0 0 auto;
+  text-shadow: 0 0 4px rgba(200, 168, 80, 0.4);
+}
 .config-channel-head {
   display: flex; align-items: baseline; gap: 0.6rem;
   flex-wrap: wrap;
