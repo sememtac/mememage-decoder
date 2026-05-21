@@ -5,6 +5,110 @@
  * decoder establishes. Most of the dashboard is intentionally plain.
  */
 
+/* Welcome checklist — first-run gating-step surface. Lives above the
+   system box, auto-hides when every step is green. Returning users
+   re-open via the .welcome-reopen-link below. Yang palette, distinct
+   enough from the system box to read as orientation rather than a
+   primary control. */
+.welcome-card {
+  max-width: var(--system-box-max-width, 880px);
+  margin: 0 auto 0.7rem;
+  padding: 0.7rem 0.9rem 0.9rem;
+  background: linear-gradient(180deg, rgba(220, 200, 130, 0.18), rgba(255, 255, 255, 0.7));
+  border: 1px solid rgba(200, 168, 80, 0.4);
+  border-left: 3px solid #c8a850;
+  border-radius: var(--radius-sm, 6px);
+  color: #1a1a20;
+}
+.welcome-card[hidden] { display: none; }
+.welcome-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+.welcome-card-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #4a3a08;
+}
+.welcome-card-dismiss {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0.5;
+  color: inherit;
+  padding: 0 0.3rem;
+}
+.welcome-card-dismiss:hover { opacity: 1; }
+.welcome-card-body {
+  font-size: 0.72rem;
+  color: rgba(0, 0, 0, 0.65);
+  margin: 0 0 0.6rem;
+  font-style: italic;
+}
+.welcome-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.welcome-step {
+  display: grid;
+  grid-template-columns: 1.3rem max-content 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.welcome-step:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.25);
+}
+.welcome-step-icon {
+  font-size: 0.85rem;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.45);
+  font-weight: 700;
+}
+.welcome-step-done .welcome-step-icon {
+  color: #2a7030;
+}
+.welcome-step-done {
+  opacity: 0.75;
+}
+.welcome-step-label {
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #1a1a20;
+}
+.welcome-step-detail {
+  font-size: 0.7rem;
+  color: rgba(0, 0, 0, 0.55);
+  font-style: italic;
+}
+
+.welcome-reopen-row {
+  max-width: var(--system-box-max-width, 880px);
+  margin: 0 auto 0.6rem;
+  text-align: right;
+}
+.welcome-reopen-link {
+  font-size: 0.68rem;
+  color: rgba(0, 0, 0, 0.55);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.3);
+  padding-bottom: 1px;
+}
+.welcome-reopen-link[hidden] { display: none; }
+.welcome-reopen-link:hover { color: #4a3a08; border-color: #4a3a08; }
+
 /* Empty-state cards for each tab until the phase wiring lands. */
 .dashboard-placeholder {
   display: flex;

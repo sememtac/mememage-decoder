@@ -141,6 +141,138 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 
+// =====================================================================
+// WELCOME CHECKLIST — first-run gating-step surface.
+//
+// Auto-shows when essential state is missing. Hides itself when every
+// step is green. Returning users can re-open via a tiny "Setup
+// checklist" link below the card. Each step row jumps to the right
+// tab + scrolls to the relevant section.
+// =====================================================================
+(function() {
+  var card = document.getElementById('welcomeCard');
+  var reopen = document.getElementById('welcomeReopen');
+  if (!card || !reopen) return;
+
+  var stepsHost = document.getElementById('welcomeSteps');
+  var dismissBtn = document.getElementById('welcomeCardDismiss');
+
+  // Persisted: user explicitly closed the card via × — don't auto-pop
+  // it back the next page load. The reopen link is still available.
+  // Clears itself when everything's green (we no-op anyway in that
+  // case) AND when the user opens via the reopen link.
+  var DISMISS_KEY = 'mememage-welcome-dismissed';
+
+  function _authHeaders() {
+    var t = window._MINT_API_TOKEN || '';
+    var h = {'Content-Type': 'application/json'};
+    if (t) h['Authorization'] = 'Bearer ' + t;
+    return h;
+  }
+
+  function _escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function _jumpTo(step) {
+    // Activate the target tab via TabBar if it isn't already.
+    if (typeof TabBar !== 'undefined' && step.tab) {
+      var tab = document.querySelector('.input-tab[data-panel="' + step.tab + '"]');
+      if (tab) tab.click();
+    }
+    // Scroll the anchor element into view if there is one. The Config
+    // tab loads asynchronously on first visit, so give it a beat.
+    if (step.anchor) {
+      setTimeout(function() {
+        var el = document.getElementById(step.anchor);
+        if (el && el.scrollIntoView) {
+          el.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+      }, 250);
+    }
+  }
+
+  function _render(steps, complete) {
+    var html = steps.map(function(s) {
+      var icon = s.done ? '\u2713' : '\u25CB';
+      var rowCls = s.done ? 'welcome-step welcome-step-done' : 'welcome-step';
+      return '<a href="#" class="' + rowCls + '" data-step-id="' + _escapeHtml(s.id) + '">' +
+        '<span class="welcome-step-icon">' + icon + '</span>' +
+        '<span class="welcome-step-label">' + _escapeHtml(s.label) + '</span>' +
+        '<span class="welcome-step-detail">' + _escapeHtml(s.detail || '') + '</span>' +
+      '</a>';
+    }).join('');
+    stepsHost.innerHTML = html;
+    stepsHost.querySelectorAll('[data-step-id]').forEach(function(el) {
+      el.addEventListener('click', function(ev) {
+        ev.preventDefault();
+        var id = el.getAttribute('data-step-id');
+        var match = steps.find(function(s) { return s.id === id; });
+        if (match) _jumpTo(match);
+      });
+    });
+    // Show the card when there's anything left to do AND the user
+    // hasn't explicitly dismissed it. Show the reopen link whenever
+    // the card is hidden but there's still work — gives returning
+    // users a way back in without scrolling for it.
+    var dismissed = false;
+    try { dismissed = localStorage.getItem(DISMISS_KEY) === '1'; } catch (e) {}
+    if (complete) {
+      card.hidden = true;
+      reopen.hidden = true;
+      try { localStorage.removeItem(DISMISS_KEY); } catch (e) {}
+    } else if (dismissed) {
+      card.hidden = true;
+      reopen.hidden = false;
+    } else {
+      card.hidden = false;
+      reopen.hidden = true;
+    }
+  }
+
+  async function _load() {
+    try {
+      var resp = await fetch('/api/onboarding/status', { headers: _authHeaders() });
+      if (!resp.ok) return;
+      var data = await resp.json();
+      _render(data.steps || [], !!data.complete);
+    } catch (e) {
+      // Silent — the card just stays hidden. The dashboard works
+      // without the checklist.
+    }
+  }
+
+  dismissBtn.addEventListener('click', function() {
+    try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {}
+    card.hidden = true;
+    reopen.hidden = false;
+  });
+  reopen.addEventListener('click', function(ev) {
+    ev.preventDefault();
+    try { localStorage.removeItem(DISMISS_KEY); } catch (e) {}
+    _load();  // refetch in case state changed since last view
+  });
+
+  // Initial load.
+  _load();
+
+  // Refetch when the user returns to the dashboard tab (visibility) —
+  // catches "user generated a key in another window" style cases.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') _load();
+  });
+
+  // Also refetch on a slow cadence while the page is visible — same
+  // 20s rhythm as the Config tab background poll. Cheap, catches any
+  // state change that happens out-of-band (a peer pushes config, a
+  // CLI mint completes).
+  setInterval(function() {
+    if (document.visibilityState === 'visible') _load();
+  }, 20000);
+})();
+
 // Slow background poll while the Config tab is the active panel AND
 // the document is visible. Catches out-of-band changes that visibility
 // alone misses: a peer pushing config via /api/sync/accept, a CLI
