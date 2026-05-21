@@ -613,27 +613,33 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 /* Ticket display inside the conception handoff. Monospace + grouped
    for memorability — like a flight number. */
 .mint-handoff-ticket {
-  /* Hint stacks on top, label + value + copy share the bottom row.
-     auto columns + justify-content: start makes the bottom row hug
-     the left edge — no stretchy whitespace where the columns would
-     align with the hint above. */
-  display: grid;
-  grid-template-columns: auto auto auto;
-  grid-template-areas:
-    "hint hint hint"
-    "label value copy";
-  justify-content: start;
+  /* Hint on top (forced own row via flex-basis: 100%), then a
+     label+value group and a Copy button on a flex line that wraps
+     when the cell gets too narrow. The ticket value is the sacred
+     piece — it never shrinks, never ellipses; Copy wraps below if
+     anything's gotta give. */
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 0.5rem;
+  column-gap: 0.5rem;
+  row-gap: 0.4rem;
   padding: 0.45rem 0.6rem;
   background: rgba(0, 0, 0, 0.05);
   border-radius: var(--radius-sm, 6px);
   font-size: 0.7rem;
-  min-width: 0;
-  overflow: hidden;
+}
+.mint-handoff-ticket-hint { flex-basis: 100%; }
+.mint-handoff-ticket-group {
+  /* label + value glued together with a single tight gap, no
+     extra column-gap from the parent (the negative margin
+     compensates so the gap between TICKET and the value reads
+     visually as a single space). */
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  white-space: nowrap;
 }
 .mint-handoff-ticket-label {
-  grid-area: label;
   font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -641,21 +647,14 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   color: #5a5a62;
 }
 .mint-handoff-ticket-val {
-  grid-area: value;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: #1a1a20;
-  /* Let the value break out of grid min-content so a narrow viewport
-     can ellipsis instead of pushing the copy button out of the cell. */
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .mint-handoff-ticket-copy {
-  grid-area: copy;
   font-family: inherit;
   font-size: 0.6rem;
   letter-spacing: 0.06em;
@@ -670,7 +669,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .mint-handoff-ticket-copy:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
 .mint-handoff-ticket-hint {
-  grid-area: hint;
   font-size: 0.64rem;
   color: rgba(0, 0, 0, 0.55);
   font-style: italic;
