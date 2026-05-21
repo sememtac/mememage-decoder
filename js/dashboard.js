@@ -3037,7 +3037,7 @@ document.addEventListener('visibilitychange', function() {
       '  </div>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">Peer token</span>' +
-      '    <input class="config-input" id="configSyncToken" type="password" autocomplete="off" placeholder="peer\u2019s MINT_API_TOKEN">' +
+      '    <input class="config-input" id="configSyncToken" type="text" autocomplete="off" spellcheck="false" placeholder="peer\u2019s MINT_API_TOKEN (the peer\u2019s, not this host\u2019s)">' +
       '  </div>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">Include</span>' +
@@ -3155,7 +3155,7 @@ document.addEventListener('visibilitychange', function() {
       '  </div>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">Peer token</span>' +
-      '    <input class="config-input" id="configPairToken" type="password" autocomplete="off" placeholder="peer\u2019s MINT_API_TOKEN">' +
+      '    <input class="config-input" id="configPairToken" type="text" autocomplete="off" spellcheck="false" placeholder="peer\u2019s MINT_API_TOKEN (the peer\u2019s, not this host\u2019s)">' +
       '  </div>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">Save as</span>' +
