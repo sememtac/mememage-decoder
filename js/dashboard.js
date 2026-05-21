@@ -478,6 +478,13 @@ document.addEventListener('visibilitychange', function() {
   }
   async function pushMetadata() {
     if (!state.token || !state.metadata) return;
+    // Local lock: if we know the session is no longer pending,
+    // don't bother POSTing. Defends against keystrokes that arrived
+    // after the poller flipped state.uiState to minting/completed
+    // but before the editor finished disabling.
+    if (state.uiState === 'minting' || state.uiState === 'result' || state.uiState === 'failure') {
+      return;
+    }
     var payload = {};
     var keys = Object.keys(state.metadata);
     for (var i = 0; i < keys.length; i++) {
@@ -487,14 +494,31 @@ document.addEventListener('visibilitychange', function() {
       payload[k] = state.metadata[k];
     }
     try {
-      await fetch('/api/mint/' + state.token + '/metadata', {
+      var resp = await fetch('/api/mint/' + state.token + '/metadata', {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({metadata: payload}),
       });
+      if (resp.status === 400) {
+        // Server rejected the edit because the session already started
+        // (phone POSTed GPS, mint pipeline is running). Lock the editor
+        // immediately so further keystrokes don't queue up doomed
+        // requests, surface a banner so the user understands their
+        // late edits won't appear in the mint, and force a status poll
+        // so the UI transitions to the minting spinner promptly.
+        _lockMetaEditor('Mint started \u2014 late edits won\u2019t be included in this conception.');
+        if (typeof pollMintStatus === 'function') pollMintStatus();
+      }
     } catch (e) {
       console.warn('[mint] metadata sync failed', e);
     }
+  }
+  function _lockMetaEditor(message) {
+    if (!els.metaEditor) return;
+    var inputs = els.metaEditor.querySelectorAll('input, button');
+    inputs.forEach(function(el) { el.disabled = true; });
+    if (els.metaAdd) els.metaAdd.disabled = true;
+    if (message) showError(message);
   }
   function _metaRow(key, value, isNew) {
     var row = document.createElement('div');
