@@ -3287,7 +3287,7 @@ document.addEventListener('visibilitychange', function() {
       '<h4>Channel scope: ' + escapeHtml(pid) + '</h4>' +
       '<p>Restrict which channels this profile publishes to. Affects souls AND keychain records (succession, revocation, alias) signed by this profile. Leave <em>all unchecked</em> to use every enabled channel (default).</p>' +
       '<p class="config-note">Use case: a VPS-only profile that shouldn\u2019t leak its key rotations / aliases to the public Internet Archive index. Keep the IA box unchecked here and the keychain records will only land on your peer surfaces.</p>' +
-      '<div id="configProfileScopeBoxes" class="config-field"><em>Loading channels\u2026</em></div>' +
+      '<div id="configProfileScopeBoxes" class="config-profile-scope-list"><em>Loading channels\u2026</em></div>' +
       '<div class="config-row">' +
       '  <button class="config-btn" id="configProfileScopeGo">Save</button>' +
       '  <button class="config-btn" id="configProfileScopeCancel">Cancel</button>' +
