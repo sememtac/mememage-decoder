@@ -2568,14 +2568,25 @@ setInterval(function() {
     }
 
     var domain = server.domain || '';
+    var resolved = server.domain_resolved || '';
     var cert   = server.cert   || '';
     var keyP   = server.key    || '';
     var tokenSet = !!env.MINT_API_TOKEN;
+    // Show what the server is actually using right now. If the user
+    // explicitly set a domain, that's the value; otherwise the
+    // auto-detected one (MEMEMAGE_SELF_HOST first entry). Never an
+    // empty field — empty makes users think the server has no
+    // domain, when really it just auto-resolved.
+    var domainShown = domain || resolved;
+    var domainHint = domain
+      ? 'set via server.json (overrides auto-detect)'
+      : (resolved ? 'auto-detected at startup' : 'not set');
 
     els.server.innerHTML =
       '<div class="config-field">' +
       '  <span class="config-field-label">Domain</span>' +
-      '  <input class="config-input" id="configServerDomain" type="text" value="' + escapeHtml(domain) + '" placeholder="(auto-detect at startup)">' +
+      '  <input class="config-input" id="configServerDomain" type="text" value="' + escapeHtml(domainShown) + '" placeholder="(auto-detect at startup)">' +
+      '  <span class="config-channel-field-hint">' + escapeHtml(domainHint) + '</span>' +
       '</div>' +
       '<div class="config-field config-field-with-browse advanced-only">' +
       '  <span class="config-field-label">TLS cert</span>' +
@@ -2589,19 +2600,24 @@ setInterval(function() {
       '  <button class="config-btn" id="configServerKeyBrowse" data-fs-browse>Browse\u2026</button>' +
       '  <button class="config-btn config-btn-subtle" id="configServerKeyClear" title="Clear path" ' + (keyP ? '' : 'disabled') + '>\u00d7</button>' +
       '</div>' +
-      // Dashboard API token — write-only, masked. Gates /api/* and the
-      // dashboard itself when set. Empty = open on localhost (server-
-      // side guardrail warns + delays on public-domain startup).
-      // "Generate phrase" produces a readable 12-word token (~108 bits)
-      // via /api/config/token/generate; the user reviews + clicks
-      // Update to commit. Old hex tokens keep working unchanged.
+      // Dashboard API token. Button-driven: "Generate phrase" produces
+      // a fresh word-phrase token, "Save token" commits it. The input
+      // is readonly — typing is reserved for the Advanced path (paste
+      // a token you generated elsewhere, or restore a known value).
+      // Gates /api/* and the dashboard itself; empty = open on
+      // localhost (server-side guardrail warns on public-domain bind).
       '<div class="config-field">' +
       '  <span class="config-field-label">API token <span class="config-channel-field-state" data-set="' + (tokenSet ? '1' : '0') + '">' + (tokenSet ? 'set' : 'unset') + '</span></span>' +
-      '  <input class="config-input" id="configServerToken" type="text" autocomplete="off" placeholder="' + (tokenSet ? '(set — type to replace)' : '(unset)') + '">' +
-      '  <button class="config-btn" id="configServerTokenGen" title="Generate a readable word-phrase token (paste into input then click Update to save)">Generate phrase</button>' +
-      '  <button class="config-btn" id="configServerTokenSet">Update</button>' +
+      '  <input class="config-input" id="configServerToken" type="text" autocomplete="off" spellcheck="false" readonly placeholder="' + (tokenSet ? '(set \u2014 click Generate phrase to replace)' : '(unset \u2014 click Generate phrase)') + '">' +
+      '  <button class="config-btn config-btn-primary" id="configServerTokenGen" title="Generate a readable word-phrase token (~108 bits of entropy)">Generate phrase</button>' +
+      '  <button class="config-btn" id="configServerTokenSet" disabled title="Generate or paste a token first">Save token</button>' +
       '</div>' +
-      '<p class="config-note" style="margin-top:-0.3rem;">Word-phrase tokens are easier to read than hex blobs. Either works — server auth is plain string equality. Changing the token kicks every other dashboard session.</p>' +
+      '<div class="config-field advanced-only">' +
+      '  <span class="config-field-label">Custom token</span>' +
+      '  <input class="config-input" id="configServerTokenCustom" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a token here (rarely needed)">' +
+      '  <button class="config-btn" id="configServerTokenUseCustom">Use this</button>' +
+      '</div>' +
+      '<p class="config-note" style="margin-top:-0.3rem;">Word-phrase tokens are easier to read than hex blobs. Either works \u2014 server auth is plain string equality. Changing the token kicks every other dashboard session.</p>' +
       '<div class="config-row">' +
       '  <button class="config-btn" id="configServerSave">Save server.json</button>' +
       '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
@@ -2610,17 +2626,11 @@ setInterval(function() {
       '<div id="configWebhooks" class="config-webhooks"></div>';
 
     document.getElementById('configServerSave').addEventListener('click', saveServerConfig);
-    document.getElementById('configServerTokenSet').addEventListener('click', function() {
-      var inp = document.getElementById('configServerToken');
-      var v = inp ? inp.value : '';
-      if (!v) {
-        showError('API token: enter a value (or leave empty to keep unchanged).');
-        return;
-      }
-      // Updating the token kicks every other session — including
-      // the one the user is currently in. Make them copy + confirm
-      // before committing so they don't lock themselves out by
-      // hitting Update without having recorded the new value.
+    function _commitNewToken(v) {
+      // Updating the token kicks every other session — including the
+      // one the user is currently in. Make them confirm with the value
+      // visible so they can copy it before hitting OK.
+      if (!v) return;
       var ok = window.confirm(
         'About to set MINT_API_TOKEN to:\n\n' + v +
         '\n\nCopy this value FIRST — every dashboard session ' +
@@ -2629,12 +2639,22 @@ setInterval(function() {
       );
       if (!ok) return;
       setEnvSecretGlobal('MINT_API_TOKEN', v, document.getElementById('configServerToken').closest('.config-field'));
-      inp.value = '';
+      var inp = document.getElementById('configServerToken');
+      if (inp) inp.value = '';
+      var saveBtn = document.getElementById('configServerTokenSet');
+      if (saveBtn) saveBtn.disabled = true;
+      var customInp = document.getElementById('configServerTokenCustom');
+      if (customInp) customInp.value = '';
+    }
+    document.getElementById('configServerTokenSet').addEventListener('click', function() {
+      var v = (document.getElementById('configServerToken') || {}).value || '';
+      _commitNewToken(v);
     });
     var tokenGenBtn = document.getElementById('configServerTokenGen');
     if (tokenGenBtn) {
       tokenGenBtn.addEventListener('click', async function() {
         var inp = document.getElementById('configServerToken');
+        var saveBtn = document.getElementById('configServerTokenSet');
         if (!inp) return;
         var prev = tokenGenBtn.textContent;
         tokenGenBtn.disabled = true;
@@ -2646,14 +2666,33 @@ setInterval(function() {
             body: JSON.stringify({ words: 12 }),
           });
           inp.value = resp.token || '';
-          inp.focus();
-          inp.select();
+          // Enable Save once we have a value worth committing.
+          if (saveBtn) saveBtn.disabled = !inp.value;
         } catch (e) {
           showError('Token generation failed: ' + e.message);
         } finally {
           tokenGenBtn.textContent = prev;
           tokenGenBtn.disabled = false;
         }
+      });
+    }
+    // Advanced-fold custom-token entry: paste-then-Use-this fills the
+    // primary readonly field with the typed value, then the same Save
+    // path commits it. Lets users restore a known token or paste one
+    // generated elsewhere without making the primary input editable.
+    var useCustomBtn = document.getElementById('configServerTokenUseCustom');
+    if (useCustomBtn) {
+      useCustomBtn.addEventListener('click', function() {
+        var custom = (document.getElementById('configServerTokenCustom') || {}).value || '';
+        custom = custom.trim();
+        if (!custom) {
+          showError('Paste a token in the field above before clicking Use this.');
+          return;
+        }
+        var inp = document.getElementById('configServerToken');
+        var saveBtn = document.getElementById('configServerTokenSet');
+        if (inp) inp.value = custom;
+        if (saveBtn) saveBtn.disabled = false;
       });
     }
     document.getElementById('configServerCertBrowse').addEventListener('click', function() {
