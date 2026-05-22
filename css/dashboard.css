@@ -2222,7 +2222,31 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .config-row {
   display: flex; gap: 0.4rem;
+  flex-wrap: wrap;
   margin-top: 0.5rem;
+}
+/* Radio / checkbox + adjacent text label baseline-align mismatch:
+   the input sits on the text baseline, which pushes the label
+   text up relative to the box. Force vertical centering for any
+   <label> that directly wraps a radio/checkbox input. */
+label > input[type="radio"],
+label > input[type="checkbox"] {
+  vertical-align: middle;
+  position: relative;
+  top: -0.05em;
+}
+/* Stronger pattern: labels that ARE the input-plus-text affordance
+   (config-sync-categories, profile-scope rows, chain GPS, etc.)
+   render with inline-flex so input + text share the same baseline
+   regardless of font metrics. */
+.config-sync-categories label,
+.config-profile-scope-row,
+.config-chain-gps label,
+.config-webhook-ev,
+.config-webhook-tmpl-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 .config-btn {
   font-family: inherit; font-size: 0.72rem; font-weight: 600;
@@ -2344,12 +2368,18 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-sm, 6px);
 }
+.config-webhook-urlrow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.config-webhook-url { flex: 1 1 auto; min-width: 0; margin-top: 0; }
 .config-webhook-main {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
 }
-.config-webhook-url { flex: 1 1 auto; min-width: 0; margin-top: 0; }
 .config-webhook-tmpl {
   display: flex;
   flex-direction: column;

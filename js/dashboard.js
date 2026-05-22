@@ -2809,12 +2809,17 @@ setInterval(function() {
           var attachFiles = !!w.attach_files;
           return '' +
             '<div class="config-webhook-row" data-i="' + i + '">' +
-              '<div class="config-webhook-main">' +
+              // URL on its own row — long Discord/Slack URLs need
+              // the full width to read; sharing the row with checkboxes
+              // crammed everything on narrow widths.
+              '<div class="config-webhook-urlrow">' +
                 '<input class="config-input config-webhook-url" data-webhook-url="' + i + '" type="url" value="' + escapeHtml(w.url) + '" placeholder="https://…">' +
+                '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
+              '</div>' +
+              '<div class="config-webhook-main">' +
                 '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="conceived" ' + (allEv || hasC ? 'checked' : '') + '> conceived</label>' +
                 '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="ready"     ' + (allEv || hasR ? 'checked' : '') + '> ready</label>' +
-                '<label class="config-webhook-ev" title="Send minted image + .soul as Discord-style multipart attachments on conceived events"><input type="checkbox" data-webhook-attach="' + i + '" ' + (attachFiles ? 'checked' : '') + '> attach files</label>' +
-                '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
+                '<label class="config-webhook-ev" title="Send minted image + .soul as Discord-style multipart attachments on conceived events"><input type="checkbox" data-webhook-attach="' + i + '" ' + (attachFiles ? 'checked' : '') + '> attachment</label>' +
               '</div>' +
               '<details class="config-webhook-hdrs-section" ' + (hCount > 0 ? 'open' : '') + '>' +
                 '<summary>Headers (' + hCount + ')</summary>' +
