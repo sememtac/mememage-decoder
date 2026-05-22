@@ -3053,8 +3053,48 @@ label > input[type="checkbox"] {
   .config-chain-actions .config-btn {
     padding: 0.4rem 0.7rem; font-size: 0.72rem;
   }
+  /* Radio / checkbox groups stack on mobile. Three short labels
+     (phone / machine / none) can fit horizontally in theory but
+     in practice they push past the cell edge or wrap awkwardly
+     mid-label — vertical stacking is the predictable choice. */
   .config-chain-gps {
-    display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .config-chain-gps label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  /* Sync push / export "include" categories were already a column,
+     but make explicit and tighten gap. */
+  .config-sync-categories {
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  /* New-chain Visibility radios — currently sit in a <span> with
+     inline margin. Override that span to render as a stacked
+     column on mobile. */
+  .config-chain-new-form .config-field > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .config-chain-new-form .config-field > span > label {
+    margin: 0 !important;  /* beats the inline style="margin-right:1rem" */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  /* Webhook event toggles (conceived / ready / attachment) — three
+     short labels but the URL field above already spans the full
+     width, so stacking the toggles here keeps the cell tidy. */
+  .config-webhook-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
   }
 
   /* --- Channel rows --- */
