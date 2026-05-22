@@ -4987,6 +4987,20 @@ setInterval(function() {
   if (closeBtn) closeBtn.addEventListener('click', close);
   modal.addEventListener('click', function(e) { if (e.target === modal) close(); });
 
+  // Click affordance — the discoverable surface for users who don't
+  // know the hotkey. Lives in the page header next to the glossary.
+  var openBtnHeader = document.getElementById('paletteOpenBtn');
+  if (openBtnHeader) openBtnHeader.addEventListener('click', open);
+
+  // Show the platform-correct shortcut hint inside the header button.
+  // navigator.platform is loosely "MacIntel" / "MacPPC" / "Mac68K" on
+  // macOS Safari + Chrome; fall back to Ctrl on everything else.
+  var hint = document.querySelector('.page-header-palette-hint');
+  if (hint) {
+    var isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+    hint.textContent = isMac ? '\u2318K' : 'Ctrl K';
+  }
+
   searchEl.addEventListener('input', function() { _filter(searchEl.value); });
   searchEl.addEventListener('keydown', function(e) {
     if (e.key === 'ArrowDown') {
