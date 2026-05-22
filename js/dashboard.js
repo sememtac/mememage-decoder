@@ -652,7 +652,7 @@ setInterval(function() {
         // requests, surface a banner so the user understands their
         // late edits won't appear in the mint, and force a status poll
         // so the UI transitions to the minting spinner promptly.
-        _lockMetaEditor('Mint started \u2014 late edits won\u2019t be included in this conception.');
+        _lockMetaEditor('Conception started \u2014 late edits won\u2019t be included.');
         if (typeof pollMintStatus === 'function') pollMintStatus();
       }
     } catch (e) {
@@ -758,7 +758,7 @@ setInterval(function() {
       // Surface the dark-chain-missing-password case inline so the user
       // sees the problem before clicking Conceive.
       if (vis === 'dark_matter' && !pwSet) {
-        showError('This chain is Dark but has no stored password — set it in Config → Chains before minting.');
+        showError('This chain is Dark but has no stored password — set it in Config → Chains before conceiving.');
       } else {
         showError('');
       }
@@ -833,7 +833,7 @@ setInterval(function() {
           if (s.status === 'completed') {
             showResult(s);
           } else if (s.status === 'failed') {
-            showFailure(s.error || 'Mint failed');
+            showFailure(s.error || 'Conception failed');
           } else if (s.status === 'minting') {
             // Phone POSTed GPS — server is now in the mint() pipeline
             // (hashing, signing, uploading to IA). Flip the UI from
@@ -3138,7 +3138,7 @@ setInterval(function() {
       '  <button class="config-btn" id="configProfileSyncBtn" title="Push your chains / channels / webhooks to another mememage host (additive — peer keeps anything it already has)">Push config\u2026</button>' +
       '</div>' +
       '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
-      '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next mint. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side, or <strong>Pair</strong> for a one-click cross-host handshake (each side keeps its private key, only public keys move).</p>';
+      '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next conception. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side, or <strong>Pair</strong> for a one-click cross-host handshake (each side keeps its private key, only public keys move).</p>';
 
     // Wire row actions
     els.profiles.querySelectorAll('[data-profile-use]').forEach(function(b) {
@@ -4222,7 +4222,7 @@ setInterval(function() {
       '  </div>' +
       '</div>' +
       '<div class="config-chain-banner" id="configChainBanner" hidden></div>' +
-      '<p class="config-note">Switching chains updates the Payload tab and routes new mints / seals to the chosen chain immediately \u2014 no restart needed.</p>';
+      '<p class="config-note">Switching chains updates the Payload tab and routes new conceptions / seals to the chosen chain immediately \u2014 no restart needed.</p>';
 
     els.chains.innerHTML = migrateBanner + rows + newForm;
 
@@ -4337,7 +4337,7 @@ setInterval(function() {
     if (clear) clear.addEventListener('click', function() {
       if (!window.confirm('Clear the stored password for ' + chainId + '? '
           + (visibility === 'dark_matter'
-              ? 'Mints will fail until you set a new one (or pass MEMEMAGE_PASSWORD in env).'
+              ? 'Conceptions will fail until you set a new one (or pass MEMEMAGE_PASSWORD in env).'
               : 'Future records on this chain will be fully public.'))) return;
       saveChainPassword(chainId, '');
     });
@@ -4419,7 +4419,7 @@ setInterval(function() {
       await loadChains();
       showChainBanner(
         'Active chain is now \u201c' + chainId + '\u201d. The Payload tab will reload from this chain. ' +
-        'Mints and seals are routed to this chain immediately.'
+        'Conceptions and seals are routed to this chain immediately.'
       );
     } catch (e) {
       showError('Switch failed: ' + e.message);
