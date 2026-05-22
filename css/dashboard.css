@@ -111,6 +111,19 @@
   padding: 0 0.25rem;
   border-radius: 3px;
 }
+.glossary-snippet {
+  margin: 0.5rem 0 0;
+  padding: 0.55rem 0.75rem;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.66rem;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.75);
+  white-space: pre;
+  overflow-x: auto;
+}
 .glossary-empty {
   padding: 1rem;
   color: rgba(0, 0, 0, 0.5);
