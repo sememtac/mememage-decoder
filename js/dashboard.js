@@ -3204,6 +3204,8 @@ setInterval(function() {
       '  <button class="config-btn advanced-only" id="configProfileImportBtn">Import existing key\u2026</button>' +
       '  <button class="config-btn advanced-only" id="configProfilePairBtn">Pair with another mememage\u2026</button>' +
       '  <button class="config-btn advanced-only" id="configProfileSyncBtn" title="Push your chains / channels / webhooks to another mememage host (additive — peer keeps anything it already has)">Push config\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfileExportBtn" title="Download chains + channels (+ optionally webhooks) as a JSON file. Re-importable on this host or pushable to a peer\u2019s /api/sync/accept.">Export config\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfileImportFileBtn" title="Import a previously-exported config file. Additive — existing entries on this host are kept untouched.">Import config\u2026</button>' +
       '</div>' +
       '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
       '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next conception. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side, or <strong>Pair</strong> for a one-click cross-host handshake (each side keeps its private key, only public keys move).</p>';
@@ -3227,6 +3229,8 @@ setInterval(function() {
     document.getElementById('configProfileImportBtn').addEventListener('click', openImportProfile);
     document.getElementById('configProfilePairBtn').addEventListener('click', openPairFlow);
     document.getElementById('configProfileSyncBtn').addEventListener('click', openSyncFlow);
+    document.getElementById('configProfileExportBtn').addEventListener('click', openExportFlow);
+    document.getElementById('configProfileImportFileBtn').addEventListener('click', openImportFlow);
   }
 
   // Pair-with-another-mememage modal. Cross-host key exchange in one
@@ -3352,6 +3356,193 @@ setInterval(function() {
       statusEl.textContent = 'Sync request failed: ' + e.message;
       statusEl.style.color = '#b04040';
       submit.disabled = false;
+    }
+  }
+
+  function openExportFlow() {
+    // Download a JSON snapshot of this host's chains + channels
+    // (+ optionally webhooks). Same shape /api/sync/accept consumes,
+    // so the file can be pushed to a peer OR re-imported here.
+    var host = document.getElementById('configProfileDanger');
+    if (!host) return;
+    host.style.display = 'block';
+    host.innerHTML =
+      '<div class="config-pair-form">' +
+      '  <p class="config-pair-head">Export config to file</p>' +
+      '  <p class="config-note">Downloads a JSON snapshot of your chains + channels (no credentials). Re-importable on this host or pushable to a peer via the existing Push flow.</p>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">Include</span>' +
+      '    <div class="config-sync-categories">' +
+      '      <label><input type="checkbox" id="configExportChains" checked> Chains</label>' +
+      '      <label><input type="checkbox" id="configExportChannels" checked> Channels <span class="config-note" style="margin:0;">(no credentials)</span></label>' +
+      '      <label><input type="checkbox" id="configExportWebhooks"> Webhooks ' +
+      '        <span class="config-note" style="margin:0;color:#a65030;">\u26a0 includes embedded bot tokens. Only enable for personal backup files.</span>' +
+      '      </label>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="config-row" style="margin-top:0.6rem;">' +
+      '    <button class="config-btn config-btn-primary" id="configExportSubmit">Download</button>' +
+      '    <button class="config-btn" id="configExportCancel">Cancel</button>' +
+      '  </div>' +
+      '  <div class="config-note" id="configExportStatus" style="margin-top:0.4rem;"></div>' +
+      '</div>';
+    document.getElementById('configExportCancel').addEventListener('click', closeProfileDanger);
+    document.getElementById('configExportSubmit').addEventListener('click', submitExport);
+  }
+
+  async function submitExport() {
+    var include = {
+      chains: document.getElementById('configExportChains').checked,
+      channels: document.getElementById('configExportChannels').checked,
+      webhooks: document.getElementById('configExportWebhooks').checked,
+    };
+    var statusEl = document.getElementById('configExportStatus');
+    var btn = document.getElementById('configExportSubmit');
+    if (!include.chains && !include.channels && !include.webhooks) {
+      statusEl.textContent = 'Pick at least one category to export.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    if (include.webhooks) {
+      var ok = window.confirm(
+        'Webhooks include embedded Discord/Slack bot tokens. The ' +
+        'downloaded file will contain those tokens in plaintext.\n\n' +
+        'Only download to a location you trust (personal backup).'
+      );
+      if (!ok) return;
+    }
+    btn.disabled = true;
+    statusEl.textContent = 'Building snapshot\u2026';
+    statusEl.style.color = '';
+    try {
+      var resp = await fetch('/api/sync/export', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ include: include }),
+      });
+      if (!resp.ok) {
+        statusEl.textContent = 'Export failed (HTTP ' + resp.status + ')';
+        statusEl.style.color = '#b04040';
+        btn.disabled = false;
+        return;
+      }
+      var data = await resp.json();
+      var blob = new Blob([JSON.stringify(data, null, 2)],
+                         {type: 'application/json'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.href = url;
+      a.download = 'mememage-config-' + stamp + '.json';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() {
+        URL.revokeObjectURL(url);
+        a.remove();
+      }, 1000);
+      statusEl.style.color = '#306020';
+      var counts = [];
+      if (data.chains) counts.push(data.chains.length + ' chain(s)');
+      if (data.channels) counts.push(data.channels.length + ' channel(s)');
+      if (data.webhooks) counts.push(data.webhooks.length + ' webhook(s)');
+      statusEl.innerHTML = '<strong>Downloaded.</strong> ' + counts.join(', ') + '.';
+      btn.disabled = false;
+    } catch (e) {
+      statusEl.textContent = 'Export request failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
+    }
+  }
+
+  function openImportFlow() {
+    // File picker + apply to /api/sync/accept (same endpoint peer
+    // pushes use — additive on this host).
+    var host = document.getElementById('configProfileDanger');
+    if (!host) return;
+    host.style.display = 'block';
+    host.innerHTML =
+      '<div class="config-pair-form">' +
+      '  <p class="config-pair-head">Import config from file</p>' +
+      '  <p class="config-note">Reads a JSON file previously produced by Export config (or a peer\u2019s sync export). Applies additively \u2014 entries this host already has are kept untouched, new ones are appended.</p>' +
+      '  <div class="config-field">' +
+      '    <span class="config-field-label">File</span>' +
+      '    <input class="config-input" type="file" id="configImportFile" accept="application/json,.json">' +
+      '  </div>' +
+      '  <div class="config-row" style="margin-top:0.6rem;">' +
+      '    <button class="config-btn config-btn-primary" id="configImportSubmit">Import</button>' +
+      '    <button class="config-btn" id="configImportCancel">Cancel</button>' +
+      '  </div>' +
+      '  <div class="config-note" id="configImportStatus" style="margin-top:0.4rem;"></div>' +
+      '</div>';
+    document.getElementById('configImportCancel').addEventListener('click', closeProfileDanger);
+    document.getElementById('configImportSubmit').addEventListener('click', submitImport);
+  }
+
+  async function submitImport() {
+    var fileEl = document.getElementById('configImportFile');
+    var statusEl = document.getElementById('configImportStatus');
+    var btn = document.getElementById('configImportSubmit');
+    if (!fileEl.files || !fileEl.files[0]) {
+      statusEl.textContent = 'Pick a JSON file to import.';
+      statusEl.style.color = '#b04040';
+      return;
+    }
+    btn.disabled = true;
+    statusEl.textContent = 'Applying\u2026';
+    statusEl.style.color = '';
+    try {
+      var text = await fileEl.files[0].text();
+      var data;
+      try { data = JSON.parse(text); }
+      catch (e) {
+        statusEl.textContent = 'Invalid JSON: ' + e.message;
+        statusEl.style.color = '#b04040';
+        btn.disabled = false;
+        return;
+      }
+      // Strip the envelope before forwarding — sync/accept just wants
+      // the categories. Forwarding mememage_config_export / exported_at /
+      // host wouldn't break anything but reads as noise.
+      var payload = {};
+      if (Array.isArray(data.chains)) payload.chains = data.chains;
+      if (Array.isArray(data.channels)) payload.channels = data.channels;
+      if (Array.isArray(data.webhooks)) payload.webhooks = data.webhooks;
+      var resp = await fetch('/api/sync/accept', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+      var body;
+      try { body = await resp.json(); } catch (e) { body = {}; }
+      if (!resp.ok) {
+        statusEl.textContent = body.error || 'Import failed (HTTP ' + resp.status + ')';
+        statusEl.style.color = '#b04040';
+        btn.disabled = false;
+        return;
+      }
+      var s = body.summary || {};
+      var lines = [];
+      if (s.chains) {
+        lines.push('Chains: ' + s.chains.created.length + ' created' +
+          (s.chains.skipped.length ? ', ' + s.chains.skipped.length + ' skipped' : ''));
+      }
+      if (s.channels) {
+        lines.push('Channels: ' + s.channels.created.length + ' created' +
+          (s.channels.skipped.length ? ', ' + s.channels.skipped.length + ' skipped' : ''));
+      }
+      if (s.webhooks) {
+        lines.push('Webhooks: ' + s.webhooks.created + ' created' +
+          (s.webhooks.skipped ? ', ' + s.webhooks.skipped + ' skipped' : ''));
+      }
+      statusEl.style.color = '#306020';
+      statusEl.innerHTML = '<strong>Imported.</strong><br>' + lines.map(escapeHtml).join('<br>');
+      // Refresh adjacent panels so the new chains/channels appear.
+      try { if (typeof loadChannels === 'function') loadChannels(); } catch (e) {}
+      try { if (typeof loadChains === 'function') loadChains(); } catch (e) {}
+      btn.disabled = false;
+    } catch (e) {
+      statusEl.textContent = 'Import request failed: ' + e.message;
+      statusEl.style.color = '#b04040';
+      btn.disabled = false;
     }
   }
 
@@ -3739,6 +3930,52 @@ setInterval(function() {
     var zone = document.getElementById('configProfileDanger');
     if (zone) { zone.style.display = 'none'; zone.innerHTML = ''; }
   }
+
+  // Keyboard polish: Esc closes whichever inline drawer is open inside
+  // configProfileDanger (Pair / Push / Export / Import / Scope / Alias
+  // / Remove / New profile / Import key / Rotate / Revoke / Keygen).
+  // Cancel buttons stay — Esc is just the extra path.
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    var zone = document.getElementById('configProfileDanger');
+    if (!zone || zone.style.display === 'none' || !zone.innerHTML) return;
+    // Don't fight with the glossary / palette modals — those have their
+    // own Esc handlers and intercept before bubble. If a modal is
+    // visible, defer to it.
+    if (document.querySelector('.config-modal:not([hidden])')) return;
+    closeProfileDanger();
+  });
+
+  // Enter submits the primary action when focus is inside a drawer.
+  // The drawer's primary submit button always has the
+  // .config-btn-primary class and lives inside .config-pair-form (or
+  // its sibling shapes — we just look for the first primary button).
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    // Skip if the focused element is a textarea / select / type=button
+    // — Enter has its own semantics there. We only auto-submit on
+    // single-line text / password / search / checkbox / radio inputs.
+    var t = e.target;
+    if (!t) return;
+    var tag = (t.tagName || '').toLowerCase();
+    if (tag === 'textarea' || tag === 'select') return;
+    if (tag === 'input') {
+      var inputType = (t.type || 'text').toLowerCase();
+      if (inputType !== 'text' && inputType !== 'password' && inputType !== 'search' &&
+          inputType !== 'email' && inputType !== 'number' && inputType !== 'url') {
+        return;
+      }
+    } else if (tag !== 'body') {
+      return;
+    }
+    var zone = document.getElementById('configProfileDanger');
+    if (!zone || zone.style.display === 'none' || !zone.contains(t)) return;
+    var primary = zone.querySelector('.config-btn-primary');
+    if (primary && !primary.disabled) {
+      e.preventDefault();
+      primary.click();
+    }
+  });
 
   // ----- Channels section ---------------------------------------------
   //
