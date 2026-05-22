@@ -5,6 +5,35 @@
  * decoder establishes. Most of the dashboard is intentionally plain.
  */
 
+/* Progressive disclosure — Advanced toggle per Config section.
+   Common controls render always; .advanced-only items only when the
+   parent section carries data-show-advanced="true". Per-section
+   toggle state persists in localStorage (see dashboard.js).
+   Power users flip everything on and never see the fold again. */
+.advanced-only { display: none !important; }
+.config-section[data-show-advanced="true"] .advanced-only { display: revert !important; }
+/* Edge case: flex / grid layouts where children are flex/grid items
+   need the parent's normal display. `revert` restores it. */
+
+.config-section-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.2rem 0.8rem 0.2rem 0;
+  margin-bottom: 0.25rem;
+}
+.config-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.65rem;
+  color: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  user-select: none;
+}
+.config-advanced-toggle input { margin: 0; cursor: pointer; }
+.config-advanced-toggle:hover { color: #1a1a20; }
+
 /* Glossary surface — page-header ? button + inline ? indicators
    that open the glossary modal. Single source of truth for term
    explanations; entries live in dashboard.js. */

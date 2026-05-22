@@ -113,6 +113,40 @@ window.FilePicker = {
 // TAB WIRING — TabBar (from portal.js) handles the class toggling.
 // Per-tab callbacks fire on tab change so we can lazy-load data.
 // =====================================================================
+// Per-section "Advanced" toggles. The dashboard hides power-user
+// controls (Scope, Pair, Push, Rotate, TLS paths, raw JSON, etc.)
+// behind a per-section checkbox. State persists in localStorage so
+// returning users keep their preference. Sections inherit
+// data-show-advanced="true" on the parent <details> element, and
+// CSS hides anything with .advanced-only unless the parent has it.
+// =====================================================================
+(function() {
+  var STORAGE_KEY = 'mememage-advanced-sections';
+  function _load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function _save(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  var state = _load();
+  document.querySelectorAll('[data-advanced-toggle]').forEach(function(input) {
+    var key = input.getAttribute('data-advanced-toggle');
+    var section = input.closest('.config-section');
+    if (!section) return;
+    var on = !!state[key];
+    input.checked = on;
+    if (on) section.setAttribute('data-show-advanced', 'true');
+    input.addEventListener('change', function() {
+      var nowOn = input.checked;
+      if (nowOn) section.setAttribute('data-show-advanced', 'true');
+      else section.removeAttribute('data-show-advanced');
+      state[key] = nowOn;
+      _save(state);
+    });
+  });
+})();
+
 if (typeof TabBar !== 'undefined') {
   TabBar.wire(function(panelId) {
     if (panelId === 'tab-payload' && window.__loadPayloadTab) {
@@ -2360,8 +2394,8 @@ setInterval(function() {
       '</div>' +
       '<div class="config-row">' +
       '  <button class="config-btn" id="configSaveCreator">Save name</button>' +
-      '  <button class="config-btn" id="configRotateBtn">Rotate key\u2026</button>' +
-      '  <button class="config-btn config-btn-danger" id="configRevokeBtn"' + (hasRevCert ? '' : ' disabled title="No revocation cert on disk"') + '>Revoke key\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configRotateBtn">Rotate key\u2026</button>' +
+      '  <button class="config-btn config-btn-danger advanced-only" id="configRevokeBtn"' + (hasRevCert ? '' : ' disabled title="No revocation cert on disk"') + '>Revoke key\u2026</button>' +
       '</div>' +
       '<div id="configIdentityDanger" class="config-danger-zone" style="display:none;"></div>' +
       '<p class="config-note">Rotation signs a succession record with the OLD key + uploads it to IA so verifiers can follow the keychain. Revocation publishes the pre-signed revocation cert; every record signed by this key will then show a revocation warning. Both are irreversible.</p>';
@@ -2512,13 +2546,13 @@ setInterval(function() {
       '  <span class="config-field-label">Domain</span>' +
       '  <input class="config-input" id="configServerDomain" type="text" value="' + escapeHtml(domain) + '" placeholder="(auto-detect at startup)">' +
       '</div>' +
-      '<div class="config-field config-field-with-browse">' +
+      '<div class="config-field config-field-with-browse advanced-only">' +
       '  <span class="config-field-label">TLS cert</span>' +
       '  <input class="config-input" id="configServerCert" type="text" value="' + escapeHtml(cert) + '" placeholder="/path/to/cert.pem (or auto-detect)">' +
       '  <button class="config-btn" id="configServerCertBrowse" data-fs-browse>Browse\u2026</button>' +
       '  <button class="config-btn config-btn-subtle" id="configServerCertClear" title="Clear path" ' + (cert ? '' : 'disabled') + '>\u00d7</button>' +
       '</div>' +
-      '<div class="config-field config-field-with-browse">' +
+      '<div class="config-field config-field-with-browse advanced-only">' +
       '  <span class="config-field-label">TLS key</span>' +
       '  <input class="config-input" id="configServerKey" type="text" value="' + escapeHtml(keyP) + '" placeholder="/path/to/key.pem (or auto-detect)">' +
       '  <button class="config-btn" id="configServerKeyBrowse" data-fs-browse>Browse\u2026</button>' +
@@ -3072,11 +3106,14 @@ setInterval(function() {
           var name = p.name || '';
           var btns = '';
           if (!active) {
+            // Use is common — needed any time you have >1 profile.
+            // Alias / Remove / Scope are advanced (multi-host / privacy
+            // concepts most single-machine users won't touch).
             btns += '<button class="config-btn config-profile-use" data-profile-use="' + escapeHtml(p.id) + '">Use</button>';
-            btns += '<button class="config-btn config-profile-alias" data-profile-alias="' + escapeHtml(p.id) + '">Alias\u2026</button>';
-            btns += '<button class="config-btn config-btn-danger config-profile-remove" data-profile-remove="' + escapeHtml(p.id) + '">Remove\u2026</button>';
+            btns += '<button class="config-btn config-profile-alias advanced-only" data-profile-alias="' + escapeHtml(p.id) + '">Alias\u2026</button>';
+            btns += '<button class="config-btn config-btn-danger config-profile-remove advanced-only" data-profile-remove="' + escapeHtml(p.id) + '">Remove\u2026</button>';
           }
-          btns += '<button class="config-btn config-profile-scope" data-profile-scope="' + escapeHtml(p.id) + '" title="Restrict which channels this profile publishes to (privacy boundary)">Scope\u2026</button>';
+          btns += '<button class="config-btn config-profile-scope advanced-only" data-profile-scope="' + escapeHtml(p.id) + '" title="Restrict which channels this profile publishes to (privacy boundary)">Scope\u2026</button>';
           // Alias chips — one per linked profile. Bidirectional uses
           // ↔ glyph + green tint; one-way uses → + muted tint.
           // Unknown-locally siblings (alias points at a fingerprint
@@ -3133,9 +3170,9 @@ setInterval(function() {
       '<div class="config-profile-list">' + listHtml + '</div>' +
       '<div class="config-row" style="margin-top:0.5rem;">' +
       '  <button class="config-btn" id="configProfileNewBtn">+ New profile</button>' +
-      '  <button class="config-btn" id="configProfileImportBtn">Import existing key\u2026</button>' +
-      '  <button class="config-btn" id="configProfilePairBtn">Pair with another mememage\u2026</button>' +
-      '  <button class="config-btn" id="configProfileSyncBtn" title="Push your chains / channels / webhooks to another mememage host (additive — peer keeps anything it already has)">Push config\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfileImportBtn">Import existing key\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfilePairBtn">Pair with another mememage\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfileSyncBtn" title="Push your chains / channels / webhooks to another mememage host (additive — peer keeps anything it already has)">Push config\u2026</button>' +
       '</div>' +
       '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
       '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next conception. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side, or <strong>Pair</strong> for a one-click cross-host handshake (each side keeps its private key, only public keys move).</p>';
@@ -3785,7 +3822,7 @@ setInterval(function() {
       '  </select>' +
       '  <input class="config-input config-channel-add-id" id="configChannelNewId" type="text" placeholder="channel id (e.g. ia-backup)">' +
       '  <button class="config-btn" id="configChannelAddBtn">+ Add channel</button>' +
-      '  <button type="button" class="config-btn config-btn-subtle" id="configChannelViewRaw">View raw JSON\u2026</button>' +
+      '  <button type="button" class="config-btn config-btn-subtle advanced-only" id="configChannelViewRaw">View raw JSON\u2026</button>' +
       '</div>' +
       '<p class="config-note">The <strong>primary</strong> channel\u2019s URL becomes the bar\u2019s record link and the Discord notification target. Every enabled+configured channel receives a copy of the soul on every mint; at least one must succeed. Credentials always live in <code>.env</code> — fields below name the env var to read.</p>';
 
@@ -3899,8 +3936,13 @@ setInterval(function() {
           '<label><input type="radio" name="channelPrimary" data-channel-primary' + (c.primary ? ' checked' : '') + '> primary</label>' +
           '<button type="button" class="config-btn config-channel-remove" data-channel-remove>Remove</button>' +
         '</div>' +
-        (credFields ? '<div class="config-channel-fields">' + credFields + '</div>' : '') +
-        (cfgFields ? '<div class="config-channel-fields">' + cfgFields + '</div>' : '') +
+        // Credential overrides + non-essential config rows live behind
+        // the Advanced toggle — most users don't override env-var names
+        // or fiddle with content_type / extra headers / accept_self_signed.
+        // The dashboard's default channel set (IA, Zenodo, self-push)
+        // works without ever opening these.
+        (credFields ? '<div class="config-channel-fields advanced-only">' + credFields + '</div>' : '') +
+        (cfgFields ? '<div class="config-channel-fields advanced-only">' + cfgFields + '</div>' : '') +
       '</div>';
   }
 
@@ -4163,20 +4205,23 @@ setInterval(function() {
           var gpsSource = c.gps_source || 'phone';
           var meta = vis + ' ' + pwLabel + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
           var renameBtn = '<button class="config-btn" data-chain-action="rename" data-chain-id="' + escapeHtml(c.id) + '" data-chain-name="' + escapeHtml(c.name || c.id) + '" title="Change display name (visibility is locked at creation)">Rename</button>';
-          var pwBtn = '<button class="config-btn" data-chain-action="password" data-chain-id="' + escapeHtml(c.id) + '" data-chain-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + (pwSet ? 'Change password\u2026' : 'Set password\u2026') + '</button>';
+          // Password gating + Remove are advanced — most chains run public
+          // (light) without a password, and removing a chain is rare.
+          var pwBtn = '<button class="config-btn advanced-only" data-chain-action="password" data-chain-id="' + escapeHtml(c.id) + '" data-chain-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + (pwSet ? 'Change password\u2026' : 'Set password\u2026') + '</button>';
+          var removeBtn = isActive
+            ? '<button class="config-btn advanced-only" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '" disabled title="Switch to a different chain first">Remove</button>'
+            : '<button class="config-btn advanced-only" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '">Remove</button>';
           var actions = isActive
             ? '<span class="config-chain-active-badge">active</span>' +
-              renameBtn + pwBtn +
-              '<button class="config-btn" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '" disabled title="Switch to a different chain first">Remove</button>'
+              renameBtn + pwBtn + removeBtn
             : '<button class="config-btn" data-chain-action="switch" data-chain-id="' + escapeHtml(c.id) + '">Switch</button>' +
-              renameBtn + pwBtn +
-              '<button class="config-btn" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '">Remove</button>';
+              renameBtn + pwBtn + removeBtn;
           // GPS source radio: three modes, persisted to chain.json on
           // change. Kept inline with the chain row so the Mint tab can
           // stay "drop image here" — the source decision lives here,
           // once, per chain.
           var gpsRadio =
-            '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
+            '<div class="config-chain-gps advanced-only" data-chain-id="' + escapeHtml(c.id) + '">' +
               '<span class="config-chain-gps-label">GPS source</span>' +
               '<label><input type="radio" name="gps-' + escapeHtml(c.id) + '" value="phone" ' +
                 (gpsSource === 'phone' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> phone</label>' +
@@ -4205,10 +4250,10 @@ setInterval(function() {
       '    <input class="config-input" id="configChainNewId" type="text" placeholder="aries / private_one / landscapes"></div>' +
       '  <div class="config-field"><span class="config-field-label">Name</span>' +
       '    <input class="config-input" id="configChainNewName" type="text" placeholder="Display name"></div>' +
-      '  <div class="config-field"><span class="config-field-label">Visibility</span><span>' +
+      '  <div class="config-field advanced-only"><span class="config-field-label">Visibility</span><span>' +
       '    <label style="margin-right:1rem"><input type="radio" name="newChainVis" value="light_energy" checked> light</label>' +
       '    <label><input type="radio" name="newChainVis" value="dark_matter"> dark</label></span></div>' +
-      '  <div class="config-field"><span class="config-field-label">Password</span>' +
+      '  <div class="config-field advanced-only"><span class="config-field-label">Password</span>' +
       '    <input class="config-input" id="configChainNewPw" type="password" autocomplete="off" placeholder="(optional for light, required for dark)"></div>' +
       '  <p class="config-note" id="configChainNewPwHint" style="margin-top:0;">' +
       '    Light + no password: every field public, including GPS. ' +
