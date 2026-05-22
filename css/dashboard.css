@@ -2845,3 +2845,246 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .config-copy-btn:hover { color: #103060; }
 .config-copy-btn[data-copied="1"] { color: #2a8050; }
+
+
+/* =====================================================================
+ * MOBILE / NARROW VIEWPORT PASS
+ *
+ * Single 679px breakpoint matches the existing decoder/validator
+ * cutover. Goals:
+ *   - Touch targets ≥ 36px tall (Apple HIG suggests 44 but the dashboard
+ *     UI already uses tight rows; 36 keeps density tolerable while
+ *     staying tappable on most phones)
+ *   - Complex multi-column rows (chains, channels, profiles, pending
+ *     sessions, ticket cell) collapse to single-column or wrap
+ *   - Modals fit the viewport; palette/glossary readable
+ *   - Header actions don't overlap the wordmark
+ *   - Welcome card, forecast, recent-sessions all stack cleanly
+ *
+ * Out of scope: hiding controls that are desktop-only. Everything
+ * available on desktop stays reachable; it just stacks.
+ * ===================================================================== */
+@media (max-width: 679px) {
+
+  /* --- Tabs --- */
+  .input-tabs { flex-wrap: wrap; }
+  .input-tab {
+    flex: 1 1 30%;
+    min-width: 0;
+    text-align: center;
+    padding: 0.55rem 0.4rem;
+    font-size: 0.78rem;
+  }
+
+  /* --- Header actions: push below title so they don't overlap --- */
+  .page-header-actions {
+    position: static;
+    justify-content: center;
+    margin: 0.4rem 0 0;
+  }
+  .page-header { text-align: center; }
+
+  /* --- Welcome card --- */
+  .welcome-step {
+    grid-template-columns: 1.3rem 1fr;
+    grid-template-areas:
+      "icon label"
+      "icon detail";
+    gap: 0.15rem 0.5rem;
+  }
+  .welcome-step-icon { grid-area: icon; align-self: start; padding-top: 0.15rem; }
+  .welcome-step-label { grid-area: label; }
+  .welcome-step-detail { grid-area: detail; }
+
+  /* --- Pending sessions list --- */
+  .mint-recent-row {
+    grid-template-columns: max-content 1fr;
+    grid-template-areas:
+      "ticket image"
+      "ticket meta"
+      "actions actions";
+    gap: 0.25rem 0.6rem;
+    padding: 0.5rem 0.6rem;
+  }
+  .mint-recent-row > .mint-recent-ticket { grid-area: ticket; align-self: center; font-size: 0.78rem; }
+  .mint-recent-row > .mint-recent-image  { grid-area: image; font-size: 0.72rem; }
+  .mint-recent-row > .mint-recent-age    { grid-area: meta; }
+  .mint-recent-row > .mint-recent-btn:not(.mint-recent-btn-danger) {
+    grid-area: actions; justify-self: stretch; padding: 0.45rem 0.6rem; font-size: 0.7rem;
+  }
+  .mint-recent-row > .mint-recent-btn-danger {
+    /* Stack the × under the Resume button on its own line */
+    position: absolute; top: 0.4rem; right: 0.5rem; padding: 0.15rem 0.45rem;
+  }
+  .mint-recent-row { position: relative; }
+
+  /* --- Resume input row (empty state) --- */
+  .mint-resume {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+  .mint-resume-label { grid-column: 1; }
+  .mint-resume-input { grid-column: 1; width: 100%; }
+  .mint-resume-btn   { grid-column: 1; padding: 0.5rem 0.7rem; font-size: 0.75rem; }
+  .mint-resume-hint  { grid-column: 1; }
+
+  /* --- Forecast widget --- */
+  .mint-forecast-summary { flex-wrap: wrap; }
+  .mint-forecast-headline { flex-basis: 100%; font-size: 0.72rem; }
+  .mint-forecast-bar-row {
+    grid-template-columns: 4.5rem 1fr 3rem;
+    gap: 0.4rem;
+  }
+  .mint-forecast-stats { gap: 0.35rem 0.7rem; }
+  .mint-forecast-trait-row {
+    grid-template-columns: 2rem 1fr;
+    grid-template-areas:
+      "value name"
+      "value gate"
+      "value obs";
+    gap: 0.1rem 0.4rem;
+  }
+  .mint-forecast-trait-value { grid-area: value; }
+  .mint-forecast-trait-name  { grid-area: name; }
+  .mint-forecast-trait-gate  { grid-area: gate; font-size: 0.62rem; }
+  .mint-forecast-trait-obs   { grid-area: obs; font-size: 0.62rem; }
+
+  /* --- Config sections: tighter padding so content has room --- */
+  .config-section-body { padding: 0.55rem 0.5rem 0.6rem; }
+
+  /* Section controls (Advanced toggle) stacks on its own row */
+  .config-section-controls {
+    padding: 0.25rem 0.5rem 0.25rem 0;
+  }
+
+  /* Field grids collapse to single column so labels + inputs stack */
+  .config-field {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+  .config-field-with-browse {
+    grid-template-columns: 1fr;
+  }
+
+  /* --- Profile rows --- */
+  .config-profile-row {
+    grid-template-columns: max-content 1fr;
+    grid-template-areas:
+      "dot id"
+      "dot fp"
+      "dot name"
+      "state state"
+      "actions actions"
+      "alias alias";
+    gap: 0.2rem 0.5rem;
+    padding: 0.5rem 0.6rem;
+  }
+  .config-profile-row > .config-profile-dot     { grid-area: dot; }
+  .config-profile-row > .config-profile-id      { grid-area: id; font-size: 0.82rem; }
+  .config-profile-row > .config-profile-fp      { grid-area: fp; font-size: 0.66rem; }
+  .config-profile-row > .config-profile-name    { grid-area: name; font-size: 0.74rem; }
+  .config-profile-row > .config-profile-state   { grid-area: state; }
+  .config-profile-row > .config-profile-actions {
+    grid-area: actions;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.3rem;
+  }
+  .config-profile-row > .config-profile-alias-row { grid-area: alias; }
+  .config-profile-actions .config-btn {
+    flex: 0 1 auto;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.72rem;
+  }
+
+  /* --- Chain rows --- */
+  .config-chain-row {
+    grid-template-columns: max-content 1fr;
+    grid-template-areas:
+      "mark id"
+      "mark meta"
+      "actions actions"
+      "gps gps";
+    gap: 0.2rem 0.5rem;
+    padding: 0.55rem 0.6rem;
+  }
+  .config-chain-row > .config-chain-active-mark { grid-area: mark; }
+  .config-chain-row > .config-chain-id          { grid-area: id; }
+  .config-chain-row > .config-chain-meta        { grid-area: meta; }
+  .config-chain-row > .config-chain-actions     {
+    grid-area: actions;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.3rem;
+  }
+  .config-chain-row > .config-chain-gps-cell    { grid-area: gps; }
+  .config-chain-actions .config-btn {
+    padding: 0.4rem 0.7rem; font-size: 0.72rem;
+  }
+  .config-chain-gps {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem;
+  }
+
+  /* --- Channel rows --- */
+  .config-channel-head { flex-direction: column; align-items: stretch; gap: 0.4rem; }
+  .config-channel-labels { width: 100%; }
+  .config-channel-label-row {
+    grid-template-columns: 50px 1fr;
+    gap: 0.3rem 0.4rem;
+  }
+  .config-channel-label-row > .config-channel-label-hint { grid-column: 2; }
+  .config-channel-controls {
+    flex-wrap: wrap; gap: 0.5rem 0.8rem;
+  }
+  .config-channel-field-label { white-space: normal; }
+
+  /* --- Ticket cell (handoff) --- */
+  .mint-handoff-ticket {
+    padding: 0.5rem 0.6rem;
+  }
+  .mint-handoff-ticket-val { font-size: 0.88rem; }
+
+  /* --- Handoff buttons (already stacks per Phase 5 polish) --- */
+  .mint-handoff-row { flex-direction: column; align-items: stretch; }
+  .mint-handoff-qr { align-self: center; }
+
+  /* --- Buttons: bigger touch targets across the board --- */
+  .config-btn {
+    min-height: 2rem;
+    padding: 0.45rem 0.7rem;
+  }
+  .config-btn-subtle { min-height: auto; }
+
+  /* --- Modals: tighten the viewport-fit math --- */
+  .config-modal { padding: 0.6rem; }
+  .config-modal-card { max-height: 90vh; }
+  .config-modal-glossary { width: 100%; }
+  .config-modal-palette  { width: 100%; }
+  .glossary-entry-label  { font-size: 0.86rem; }
+  .glossary-entry-body   { font-size: 0.78rem; }
+  .palette-row           { font-size: 0.82rem; padding: 0.5rem 0.7rem; }
+  .palette-context       { display: none; }  /* secondary on mobile */
+
+  /* Sync / Push categories — wider labels wrap on phones */
+  .config-sync-categories label { flex-wrap: wrap; }
+  .config-profile-scope-row label { padding: 0.4rem 0; }
+
+  /* --- Mint result + Mint review --- */
+  .mint-thumb-row { flex-wrap: wrap; }
+  .mint-thumb-actions {
+    flex-direction: row;
+    width: 100%;
+    margin-top: 0.4rem;
+  }
+  .mint-back, .mint-delete-session {
+    flex: 1 1 auto; padding: 0.55rem 0.7rem;
+    font-size: 0.74rem;
+  }
+  .mint-result-meta {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+  .mint-result-actions { flex-direction: column; }
+}
