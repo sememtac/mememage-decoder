@@ -113,6 +113,37 @@ window.FilePicker = {
 // TAB WIRING — TabBar (from portal.js) handles the class toggling.
 // Per-tab callbacks fire on tab change so we can lazy-load data.
 // =====================================================================
+// Per-section open/closed state for the Config tab. <details> doesn't
+// persist its open state across page loads by default. Wire it to
+// localStorage so users who collapsed Server (or whichever section
+// they rarely touch) get that state back on next reload.
+// =====================================================================
+(function() {
+  var STORAGE_KEY = 'mememage-section-state';
+  function _load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  function _save(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  var state = _load();
+  document.querySelectorAll('.config-section[data-section]').forEach(function(d) {
+    var key = d.getAttribute('data-section');
+    // Honor stored state if present; otherwise leave the HTML default
+    // (every section starts open for fresh users — they should see
+    // what's available before deciding to collapse).
+    if (Object.prototype.hasOwnProperty.call(state, key)) {
+      d.open = !!state[key];
+    }
+    d.addEventListener('toggle', function() {
+      state[key] = d.open;
+      _save(state);
+    });
+  });
+})();
+
+// =====================================================================
 // Per-section "Advanced" toggles. The dashboard hides power-user
 // controls (Scope, Pair, Push, Rotate, TLS paths, raw JSON, etc.)
 // behind a per-section checkbox. State persists in localStorage so
@@ -4721,5 +4752,272 @@ setInterval(function() {
     if (!btn) return;
     e.preventDefault();
     open(btn.getAttribute('data-glossary'));
+  });
+})();
+
+
+// =====================================================================
+// COMMAND PALETTE — ⌘K / Ctrl-K opens a fuzzy search across every
+// labeled control in the dashboard. Indexed lazily on first open
+// (rebuilt on every open so it picks up controls that were rendered
+// after page load — chains, channels, profiles). Enter activates
+// the tab, expands the section, scrolls the control into view, and
+// flashes it briefly so the user sees where they landed.
+// =====================================================================
+(function() {
+  var modal = document.getElementById('paletteModal');
+  var listEl = document.getElementById('paletteList');
+  var searchEl = document.getElementById('paletteSearch');
+  var closeBtn = document.getElementById('paletteClose');
+  if (!modal || !listEl || !searchEl) return;
+
+  // ---- Index build ----
+  // Walk the document for labeled controls. We treat as "control":
+  //   - <input>, <select>, <textarea>, <button> with an accessible name
+  //   - <label>'d controls (label text is the name)
+  //   - tab buttons (.input-tab)
+  //   - <details> summaries
+  // For each, capture: label, optional aria/group context, and the
+  // element to scroll-into-view + flash.
+  function _accessibleName(el) {
+    // Priority: explicit aria-label > title > nearest <label> text >
+    // placeholder > inner text > id.
+    var name = el.getAttribute('aria-label');
+    if (name && name.trim()) return name.trim();
+    name = el.getAttribute('title');
+    if (name && name.trim()) return name.trim();
+    if (el.id) {
+      var lbl = document.querySelector('label[for="' + el.id + '"]');
+      if (lbl && lbl.textContent.trim()) return lbl.textContent.trim();
+    }
+    // Walk up to nearest <label> ancestor.
+    var anc = el.closest('label');
+    if (anc) {
+      // Strip the input's own text from the label so we don't double-count.
+      var clone = anc.cloneNode(true);
+      clone.querySelectorAll('input, select, textarea, button').forEach(function(c) {
+        c.remove();
+      });
+      var t = clone.textContent.trim();
+      if (t) return t;
+    }
+    name = el.getAttribute('placeholder');
+    if (name && name.trim()) return name.trim();
+    if (el.textContent && el.textContent.trim()) return el.textContent.trim();
+    return el.id || '';
+  }
+
+  function _sectionContext(el) {
+    // Best-effort: read the nearest config-section's summary text +
+    // the active tab name so users see WHERE they're jumping to.
+    var ctx = [];
+    var section = el.closest('.config-section');
+    if (section) {
+      var summary = section.querySelector(':scope > summary');
+      if (summary) {
+        var t = summary.cloneNode(true);
+        t.querySelectorAll('button').forEach(function(b) { b.remove(); });
+        var txt = t.textContent.trim();
+        if (txt) ctx.push(txt);
+      }
+    }
+    var panel = el.closest('.input-panel');
+    if (panel && panel.id) {
+      var tabName = panel.id.replace(/^tab-/, '');
+      if (tabName) ctx.unshift(tabName.charAt(0).toUpperCase() + tabName.slice(1));
+    }
+    return ctx.join(' \u203a ');
+  }
+
+  function _buildIndex() {
+    var items = [];
+    var seen = new Set();
+    function _push(el, label, context) {
+      if (!el || !label) return;
+      if (seen.has(el)) return;
+      seen.add(el);
+      items.push({ el: el, label: label, context: context || '' });
+    }
+
+    // Tab buttons — top-level navigation.
+    document.querySelectorAll('.input-tab').forEach(function(t) {
+      var label = (t.textContent || '').trim();
+      if (label) _push(t, label, 'Tab');
+    });
+
+    // <details> summaries — section anchors.
+    document.querySelectorAll('.config-section').forEach(function(d) {
+      var s = d.querySelector(':scope > summary');
+      if (!s) return;
+      var t = s.cloneNode(true);
+      t.querySelectorAll('button').forEach(function(b) { b.remove(); });
+      var label = t.textContent.trim();
+      if (label) _push(d, label, 'Section');
+    });
+
+    // Labeled controls.
+    document.querySelectorAll([
+      '.input-panel input',
+      '.input-panel select',
+      '.input-panel textarea',
+      '.input-panel button:not(.glossary-link):not(.config-modal-close)',
+    ].join(',')).forEach(function(el) {
+      // Skip hidden / advanced-folded elements at index time? No —
+      // index everything; the jump will expand sections / toggle
+      // Advanced if needed. Lets users discover controls they didn't
+      // know existed.
+      if (el.closest('.config-modal')) return;  // skip modal contents
+      if (el.type === 'hidden') return;
+      var label = _accessibleName(el);
+      if (!label || label.length > 80) return;
+      var ctx = _sectionContext(el);
+      _push(el, label, ctx);
+    });
+
+    return items;
+  }
+
+  // ---- Fuzzy scoring ----
+  // Simple subsequence match — characters of the query must appear
+  // in order within the label (case-insensitive). Score = length of
+  // label (shorter wins) + position of last matched char (earlier
+  // wins). Good enough for ~50-100 controls.
+  function _score(query, label) {
+    if (!query) return label.length;
+    var q = query.toLowerCase();
+    var l = label.toLowerCase();
+    var qi = 0;
+    var lastIdx = -1;
+    for (var i = 0; i < l.length && qi < q.length; i++) {
+      if (l[i] === q[qi]) {
+        lastIdx = i;
+        qi++;
+      }
+    }
+    if (qi < q.length) return -1;  // not all chars matched
+    return label.length + lastIdx;
+  }
+
+  var _items = [];
+  var _filtered = [];
+  var _activeIdx = 0;
+
+  function _render() {
+    listEl.innerHTML = _filtered.length === 0
+      ? '<p class="palette-empty"><em>No matches.</em></p>'
+      : _filtered.map(function(it, i) {
+          var cls = 'palette-row' + (i === _activeIdx ? ' palette-row-active' : '');
+          return '<div class="' + cls + '" data-palette-idx="' + i + '">' +
+            '<span class="palette-label">' + escapeHtml(it.label) + '</span>' +
+            (it.context ? '<span class="palette-context">' + escapeHtml(it.context) + '</span>' : '') +
+            '</div>';
+        }).join('');
+    var active = listEl.querySelector('.palette-row-active');
+    if (active && active.scrollIntoView) active.scrollIntoView({block: 'nearest'});
+  }
+
+  function _filter(q) {
+    if (!q) {
+      _filtered = _items.slice(0, 50);
+    } else {
+      _filtered = _items
+        .map(function(it) { return { it: it, score: _score(q, it.label) }; })
+        .filter(function(x) { return x.score >= 0; })
+        .sort(function(a, b) { return a.score - b.score; })
+        .slice(0, 50)
+        .map(function(x) { return x.it; });
+    }
+    _activeIdx = 0;
+    _render();
+  }
+
+  function _jump(it) {
+    if (!it || !it.el) return;
+    close();
+    var el = it.el;
+    // If inside a <details> that's closed, open it.
+    var details = el.closest('details');
+    while (details) {
+      if (!details.open) details.open = true;
+      details = details.parentElement && details.parentElement.closest ? details.parentElement.closest('details') : null;
+    }
+    // If inside an advanced-only block, expose it temporarily.
+    var advBlock = el.closest('.advanced-only');
+    if (advBlock) {
+      var section = advBlock.closest('.config-section');
+      if (section && !section.hasAttribute('data-show-advanced')) {
+        // Flip the toggle so the user can see the control AND adjust
+        // anything else in the section's advanced fold.
+        var toggle = section.querySelector('[data-advanced-toggle]');
+        if (toggle && !toggle.checked) {
+          toggle.checked = true;
+          toggle.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+      }
+    }
+    // If inside an inactive tab panel, click the right tab first.
+    var panel = el.closest('.input-panel');
+    if (panel && panel.id && !panel.classList.contains('active')) {
+      var tab = document.querySelector('.input-tab[data-panel="' + panel.id + '"]');
+      if (tab) tab.click();
+    }
+    // Scroll + flash.
+    setTimeout(function() {
+      try { el.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+      catch (e) { el.scrollIntoView(); }
+      el.classList.add('palette-flash');
+      setTimeout(function() { el.classList.remove('palette-flash'); }, 1500);
+      if (typeof el.focus === 'function') {
+        try { el.focus({preventScroll: true}); } catch (e) {}
+      }
+    }, 150);
+  }
+
+  function open() {
+    modal.hidden = false;
+    searchEl.value = '';
+    _items = _buildIndex();
+    _filter('');
+    setTimeout(function() { searchEl.focus(); }, 0);
+  }
+  function close() {
+    modal.hidden = true;
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', function(e) { if (e.target === modal) close(); });
+
+  searchEl.addEventListener('input', function() { _filter(searchEl.value); });
+  searchEl.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _activeIdx = Math.min(_activeIdx + 1, _filtered.length - 1);
+      _render();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _activeIdx = Math.max(_activeIdx - 1, 0);
+      _render();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      _jump(_filtered[_activeIdx]);
+    }
+  });
+  listEl.addEventListener('click', function(e) {
+    var row = e.target.closest('[data-palette-idx]');
+    if (!row) return;
+    var idx = parseInt(row.getAttribute('data-palette-idx'), 10);
+    _jump(_filtered[idx]);
+  });
+
+  // Global keyboard shortcut.
+  document.addEventListener('keydown', function(e) {
+    var isCmdK = (e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K');
+    if (isCmdK) {
+      e.preventDefault();
+      if (modal.hidden) open();
+      else close();
+      return;
+    }
+    if (e.key === 'Escape' && !modal.hidden) close();
   });
 })();

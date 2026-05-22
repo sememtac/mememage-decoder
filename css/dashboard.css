@@ -95,6 +95,60 @@
   width: min(720px, 100%);
   max-height: 82vh;
 }
+.config-modal-palette {
+  width: min(620px, 100%);
+  max-height: 70vh;
+}
+.palette-search {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.025);
+}
+.palette-search .config-input { width: 100%; font-size: 0.85rem; }
+.palette-list {
+  overflow: auto;
+  flex: 1;
+  padding: 0.3rem;
+}
+.palette-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: #1a1a20;
+}
+.palette-row:hover { background: rgba(0, 0, 0, 0.05); }
+.palette-row-active {
+  background: rgba(200, 168, 80, 0.22);
+}
+.palette-label {
+  font-weight: 600;
+}
+.palette-context {
+  font-size: 0.65rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+  white-space: nowrap;
+}
+.palette-empty {
+  padding: 1rem;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.5);
+}
+/* Brief warm-gold flash on the jumped-to control so the user sees
+   where they landed. */
+@keyframes palette-flash-anim {
+  0%   { box-shadow: 0 0 0 4px rgba(200, 168, 80, 0.7); }
+  100% { box-shadow: 0 0 0 4px rgba(200, 168, 80, 0); }
+}
+.palette-flash {
+  animation: palette-flash-anim 1.5s ease-out;
+  border-radius: 4px;
+}
 .glossary-search {
   padding: 0.5rem 1rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -1860,6 +1914,13 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   cursor: pointer;
   list-style-position: inside;
   color: #1a1a20;
+  /* Sticky so the section's label stays visible while scrolling its
+     body. Slight z-index so it lays over the body content cleanly. */
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(244, 240, 224, 0.96);
+  border-radius: var(--radius-sm, 6px) var(--radius-sm, 6px) 0 0;
 }
 .config-section[open] > summary {
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
