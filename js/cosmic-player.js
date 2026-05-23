@@ -419,7 +419,8 @@ var CosmicPlayer = (function() {
     var _bt = (typeof BirthText !== 'undefined' && meta.birth_traits)
       ? BirthText.read(meta.birth_traits) : null;
     var temperament = parseTemperament((_bt && _bt.temperament) || meta.birth_temperament);
-    var rarityScore = meta.rarity_score || 0;
+    var rarityScore = (typeof RarityScore !== 'undefined')
+      ? RarityScore.fromRecord(meta) : (meta.rarity_score || 0);
     var tier = getRarityTier(rarityScore);
     var rKey = rarityKey(tier.name);
 

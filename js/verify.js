@@ -39,7 +39,9 @@ const HASH_INCLUDED_V1 = new Set([
   'denoise', 'sampler', 'scheduler', 'model', 'lora', 'lora_strength',
   'conceived', 'rendered',
   'born', 'constellation_hash', 'machine_fingerprint',
-  'rarity_score', 'rarity',
+  // rarity dict is hashed; rarity_score is the derived sum — readers
+  // reconstruct via rarity-helpers.js / RarityScore.fromRecord().
+  'rarity',
   // birth_traits are codes; birth_readings/temperament/summary are
   // derived at display time via birth-text.js — not persisted, not hashed.
   'birth_traits',

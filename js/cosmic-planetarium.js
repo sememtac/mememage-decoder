@@ -665,7 +665,10 @@ var CosmicPlanetarium = (function() {
     }
 
     if (typeof getRarityTier === 'function') {
-      var tier = getRarityTier((openOpts.meta && openOpts.meta.rarity_score) || 0);
+      var _ptm = openOpts.meta;
+      var _pts = (typeof RarityScore !== 'undefined' && _ptm)
+        ? RarityScore.fromRecord(_ptm) : ((_ptm && _ptm.rarity_score) || 0);
+      var tier = getRarityTier(_pts);
       document.body.style.setProperty('--rarity-color', tier.color);
     }
 

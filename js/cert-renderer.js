@@ -574,7 +574,10 @@ function renderCert(meta, options) {
   }
 
   // Rarity tier
-  var rarityScore = meta.rarity_score || 0;
+  // V1: rarity_score is derived from the dice dict, not persisted.
+  // RarityScore.fromRecord also reads any legacy persisted value.
+  var rarityScore = (typeof RarityScore !== 'undefined')
+    ? RarityScore.fromRecord(meta) : (meta.rarity_score || 0);
   var tier = getRarityTier(rarityScore);
   var tierName = tier.name;
   var tierColor = tier.color;
@@ -888,7 +891,8 @@ function renderCert(meta, options) {
   // Brand + Title + Rarity (integrated header)
   var header = _div('plate-header');
   var headerHtml = '<div class="plate-brand">M E M E M A G E</div><div class="plate-title">Certificate of Origin</div>';
-  if (meta.rarity_score !== undefined) {
+  // V1: derive from rarity dict; rarityScore already computed up top.
+  if (meta.rarity) {
     // Lighten rarity color toward white for readability against drop shadow
     var _rc = _hexToRgb(tierColor);
     var _lR = Math.min(255, _rc[0] + Math.round((255 - _rc[0]) * 0.4));
@@ -1164,7 +1168,7 @@ function renderCert(meta, options) {
             // Denormalize to meta.heart_rarity in production; until then
             // default to 0 so the heart glows K-class orange.
             heartRarity: meta.heart_rarity || 0,
-            currentRarity: meta.rarity_score || 0,
+            currentRarity: rarityScore,
             meta: meta
           });
         } else if (meta.heart_star_id && meta.heart_star_id !== meta._identifier) {

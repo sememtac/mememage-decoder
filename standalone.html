@@ -5244,7 +5244,10 @@ var CosmicPlanetarium = (function() {
     }
 
     if (typeof getRarityTier === 'function') {
-      var tier = getRarityTier((openOpts.meta && openOpts.meta.rarity_score) || 0);
+      var _ptm = openOpts.meta;
+      var _pts = (typeof RarityScore !== 'undefined' && _ptm)
+        ? RarityScore.fromRecord(_ptm) : ((_ptm && _ptm.rarity_score) || 0);
+      var tier = getRarityTier(_pts);
       document.body.style.setProperty('--rarity-color', tier.color);
     }
 
@@ -5802,7 +5805,9 @@ const HASH_INCLUDED_V1 = new Set([
   'denoise', 'sampler', 'scheduler', 'model', 'lora', 'lora_strength',
   'conceived', 'rendered',
   'born', 'constellation_hash', 'machine_fingerprint',
-  'rarity_score', 'rarity',
+  // rarity dict is hashed; rarity_score is the derived sum — readers
+  // reconstruct via rarity-helpers.js / RarityScore.fromRecord().
+  'rarity',
   // birth_traits are codes; birth_readings/temperament/summary are
   // derived at display time via birth-text.js — not persisted, not hashed.
   'birth_traits',
@@ -6540,6 +6545,51 @@ var Access = (function() {
 </script>
 <script>
 // =====================================================================
+// RARITY HELPERS — reconstruct derived rarity fields from the dice dict.
+// =====================================================================
+// Records store the rarity dice rolls themselves (rarity.celestial,
+// .machine, .entropy, .machine_signature, .halo). The aggregate
+// rarity_score used to be persisted alongside, but it's a pure sum
+// of those components — readers reconstruct it via RarityScore.compute.
+//
+// Mirror of mememage/rarity.py's score computation. When the scoring
+// algorithm changes in Python, mirror it here.
+// =====================================================================
+
+(function (root) {
+  function compute(rarity) {
+    if (!rarity) return 0;
+    var sum = 0;
+    ['celestial', 'machine', 'entropy'].forEach(function (group) {
+      var arr = rarity[group];
+      if (!arr) return;
+      for (var i = 0; i < arr.length; i++) {
+        var t = arr[i];
+        if (t && typeof t.points === 'number') sum += t.points;
+      }
+    });
+    if (typeof rarity.machine_signature === 'number') sum += rarity.machine_signature;
+    if (rarity.halo && typeof rarity.halo.points === 'number') sum += rarity.halo.points;
+    if (sum < 0) sum = 0;
+    if (sum > 255) sum = 255;
+    return sum;
+  }
+
+  // Convenience wrapper: read .rarity_score off the record (V4-era
+  // back-compat for any legacy test souls still floating around) OR
+  // compute from .rarity dict (V1 records).
+  function fromRecord(record) {
+    if (!record) return 0;
+    if (typeof record.rarity_score === 'number') return record.rarity_score;
+    return compute(record.rarity);
+  }
+
+  root.RarityScore = { compute: compute, fromRecord: fromRecord };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+// =====================================================================
 // RENDER CERTIFICATE (HTML/CSS + Canvas sky band)
 //
 // Layout order (trading card style):
@@ -7115,7 +7165,10 @@ function renderCert(meta, options) {
   }
 
   // Rarity tier
-  var rarityScore = meta.rarity_score || 0;
+  // V1: rarity_score is derived from the dice dict, not persisted.
+  // RarityScore.fromRecord also reads any legacy persisted value.
+  var rarityScore = (typeof RarityScore !== 'undefined')
+    ? RarityScore.fromRecord(meta) : (meta.rarity_score || 0);
   var tier = getRarityTier(rarityScore);
   var tierName = tier.name;
   var tierColor = tier.color;
@@ -7429,7 +7482,8 @@ function renderCert(meta, options) {
   // Brand + Title + Rarity (integrated header)
   var header = _div('plate-header');
   var headerHtml = '<div class="plate-brand">M E M E M A G E</div><div class="plate-title">Certificate of Origin</div>';
-  if (meta.rarity_score !== undefined) {
+  // V1: derive from rarity dict; rarityScore already computed up top.
+  if (meta.rarity) {
     // Lighten rarity color toward white for readability against drop shadow
     var _rc = _hexToRgb(tierColor);
     var _lR = Math.min(255, _rc[0] + Math.round((255 - _rc[0]) * 0.4));
@@ -7705,7 +7759,7 @@ function renderCert(meta, options) {
             // Denormalize to meta.heart_rarity in production; until then
             // default to 0 so the heart glows K-class orange.
             heartRarity: meta.heart_rarity || 0,
-            currentRarity: meta.rarity_score || 0,
+            currentRarity: rarityScore,
             meta: meta
           });
         } else if (meta.heart_star_id && meta.heart_star_id !== meta._identifier) {
@@ -11496,7 +11550,8 @@ var CosmicPlayer = (function() {
     var _bt = (typeof BirthText !== 'undefined' && meta.birth_traits)
       ? BirthText.read(meta.birth_traits) : null;
     var temperament = parseTemperament((_bt && _bt.temperament) || meta.birth_temperament);
-    var rarityScore = meta.rarity_score || 0;
+    var rarityScore = (typeof RarityScore !== 'undefined')
+      ? RarityScore.fromRecord(meta) : (meta.rarity_score || 0);
     var tier = getRarityTier(rarityScore);
     var rKey = rarityKey(tier.name);
 

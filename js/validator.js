@@ -1141,10 +1141,12 @@ async function _renderObservatoryFromCache() {
       }
     }
 
-    // Rarity
-    if(r.rarity_score!==undefined){
+    // Rarity — V1 derives the score from the dice dict.
+    var _rs = (typeof RarityScore !== 'undefined')
+      ? RarityScore.fromRecord(r) : (r.rarity_score || 0);
+    if(r.rarity || r.rarity_score!==undefined){
       html+='<div class="ev-sec">Rarity</div><div class="ev-g">';
-      var rs=r.rarity_score;var rTier=rs>=80?'Legendary':rs>=70?'Epic':rs>=60?'Very Rare':rs>=46?'Rare':rs>=35?'Uncommon':'Common';
+      var rs=_rs;var rTier=rs>=80?'Legendary':rs>=70?'Epic':rs>=60?'Very Rare':rs>=46?'Rare':rs>=35?'Uncommon':'Common';
       var rCol=rs>=80?'#f87171':rs>=70?'#facc15':rs>=60?'#c084fc':rs>=46?'#60a5fa':rs>=35?'#4ade80':'#a0a0a0';
       html+='<div class="ev-m"><div class="ev-ml">Score</div><div class="ev-mv" style="color:'+rCol+';font-weight:700;">'+rs+' \u2014 '+rTier+'</div></div>';
       if(r.machine_fingerprint)html+='<div class="ev-m"><div class="ev-ml">Fingerprint</div><div class="ev-mv">'+_h(r.machine_fingerprint)+'</div></div>';
@@ -2828,7 +2830,9 @@ function renderAudit(rec, identifier, out) {
   } else if (rec.birth_traits) {
     machRows += auditRow('Traits', rec.birth_traits.join(' \u00b7 '));
   }
-  machRows += auditRow('Rarity', rec.rarity_score !== undefined ? rec.rarity_score + '' : '?');
+  var _recRs = (typeof RarityScore !== 'undefined')
+    ? RarityScore.fromRecord(rec) : (rec.rarity_score);
+  machRows += auditRow('Rarity', (typeof _recRs === 'number') ? (_recRs + '') : '?');
   html += auditSection('Machine', machRows);
 
   // === SONG FORENSICS ===
