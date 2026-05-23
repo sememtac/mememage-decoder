@@ -1116,9 +1116,9 @@ async function _renderObservatoryFromCache() {
 
       // GPS Time-Lock — present only when the chain captured GPS.
       // Chains with gps_source: none publish records without
-      // gps_locked; show an honest placeholder rather than skip.
-      if(birth.gps_locked){
-        var gps=birth.gps_locked;
+      // gps_time_locked; show an honest placeholder rather than skip.
+      if(r.gps_time_locked){
+        var gps=r.gps_time_locked;
         html+='<div class="ev-sec">Birthplace \u2014 Time-Locked</div><div class="ev-g">';
         if(gps.ct)html+='<div class="ev-m w"><div class="ev-ml">Ciphertext</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+_h(gps.ct)+'</div></div>';
         if(gps.N)html+='<div class="ev-m w"><div class="ev-ml">RSA Modulus N</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+_h(gps.N)+'</div></div>';
@@ -1131,7 +1131,7 @@ async function _renderObservatoryFromCache() {
       }
 
       // GPS Password Unlock
-      if(r.gps_encrypted){
+      if(r.gps_password_locked){
         html+='<div class="ev-sec">GPS \u2014 Password Unlock</div>';
         html+='<div style="display:flex;gap:0.5rem;align-items:center;">';
         html+='<input type="password" class="gps-pw-input" id="gps-pw-'+ri+'" placeholder="Creator password" style="flex:1;background:#0a0a12;color:#c8c8d4;border:1px solid #2a2a40;border-radius:4px;padding:0.3rem 0.5rem;font-size:0.75rem;font-family:inherit;">';
@@ -3607,10 +3607,10 @@ link.addEventListener('click', function(e) {
 // GPS Password Unlock — AES-256-GCM decryption via Access helper.
 var _gpsRecords=[];
 async function unlockGPS(idx){
-  var r=_gpsRecords[idx];if(!r||!r.gps_encrypted)return;
+  var r=_gpsRecords[idx];if(!r||!r.gps_password_locked)return;
   var pw=document.getElementById('gps-pw-'+idx);if(!pw)return;
   var out=document.getElementById('gps-result-'+idx);if(!out)return;
-  var res = await Access.decryptGps(r.gps_encrypted, pw.value);
+  var res = await Access.decryptGps(r.gps_password_locked, pw.value);
   if (res.ok) {
     out.innerHTML='<div class="ev-g"><div class="ev-m"><div class="ev-ml">Latitude</div><div class="ev-mv pass">'+escapeHtml(res.lat)+'</div></div><div class="ev-m"><div class="ev-ml">Longitude</div><div class="ev-mv pass">'+escapeHtml(res.lon)+'</div></div></div>';
   } else {

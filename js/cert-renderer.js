@@ -454,7 +454,7 @@ function renderCert(meta, options) {
     // Chunks / chain
     chunks: 1, decoder_hash: 1, outer_position: 1, outer_cycle: 1,
     // Visibility / encryption
-    chain_visibility: 1, encrypted_soul: 1, encrypted_chunks: 1, gps_encrypted: 1,
+    chain_visibility: 1, encrypted_soul: 1, encrypted_chunks: 1, gps_password_locked: 1,
     // Distribution — set by the channels framework, not declared by
     // the creator. `url` is the primary-channel URL (used by the
     // Discord-message link / legacy bar); `distribution` is the full
@@ -555,9 +555,9 @@ function renderCert(meta, options) {
   // GPS data
   var GPS_CIPHER = '';
   var GPS_MODULUS = '';
-  if (birth.gps_locked) {
-    GPS_CIPHER = birth.gps_locked.ct || birth.gps_locked.ciphertext || '';
-    if (birth.gps_locked.N) GPS_MODULUS = birth.gps_locked.N;
+  if (meta.gps_time_locked) {
+    GPS_CIPHER = meta.gps_time_locked.ct || meta.gps_time_locked.ciphertext || '';
+    if (meta.gps_time_locked.N) GPS_MODULUS = meta.gps_time_locked.N;
   }
 
   // ===================================================================
@@ -1474,8 +1474,8 @@ function renderCert(meta, options) {
     }
 
     var footnote = _div('gps-footnote');
-    var tExp = birth.gps_locked && birth.gps_locked.t ? birth.gps_locked.t.toExponential(0) : '?';
-    var pLen = birth.gps_locked && (birth.gps_locked.len || birth.gps_locked.plaintext_length) || '?';
+    var tExp = meta.gps_time_locked && meta.gps_time_locked.t ? meta.gps_time_locked.t.toExponential(0) : '?';
+    var pLen = meta.gps_time_locked && (meta.gps_time_locked.len || meta.gps_time_locked.plaintext_length) || '?';
     footnote.innerHTML = '* ' + escapeHtml('' + tExp) + ' sequential squarings of 2 mod N, SHA-256 the result, XOR with ciphertext. First ' + escapeHtml('' + pLen) + ' bytes = GPS.';
     gpsContainer.appendChild(footnote);
 
@@ -1483,7 +1483,7 @@ function renderCert(meta, options) {
     // GPS instantly by entering the password set at conception time,
     // no need to wait 10 years for the time-lock puzzle to finish.
     // Only rendered when the record actually carries an AES envelope.
-    if (meta.gps_encrypted) {
+    if (meta.gps_password_locked) {
       var unlockWrap = _div('gps-unlock');
       var unlockLabel = _div('gps-mod-label');
       unlockLabel.textContent = 'Creator password \u2014 unlock instantly';
@@ -1507,7 +1507,7 @@ function renderCert(meta, options) {
       unlockWrap.appendChild(resultSlot);
       gpsContainer.appendChild(unlockWrap);
 
-      var envRef = meta.gps_encrypted;
+      var envRef = meta.gps_password_locked;
       async function doUnlock() {
         var pw = pwInput.value;
         if (!pw) { resultSlot.innerHTML = '<span class="gps-unlock-err">Enter password</span>'; return; }
@@ -1532,7 +1532,7 @@ function renderCert(meta, options) {
     plate.appendChild(gpsContainer);
   } else if (!isSample && birth && Object.keys(birth).length > 0) {
     // Honest placeholder for records minted on chains with
-    // ``gps_source: none`` (or any record lacking ``gps_locked``).
+    // ``gps_source: none`` (or any record lacking ``gps_time_locked``).
     // The cert acknowledges the absence rather than silently hiding
     // the section — like a camera that didn't write location to EXIF.
     plate.appendChild(_sectionLabel('BIRTHPLACE \u2014 NOT RECORDED'));
