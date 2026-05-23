@@ -6623,6 +6623,20 @@ function rarityCellColors(tierColor) {
 // (encodeFrame + embedBits) makes the saved PNG independently
 // verifiable.
 // =====================================================================
+function _saveViaAnchor(blob, filename) {
+  // Desktop fallback path — synthesizes an <a download> click. On iOS
+  // this dumps the file into the Files app (not Photos), which is why
+  // the primary path tries Web Share first.
+  var u = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = u;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(u); }, 1000);
+}
+
 function _saveLivePlate(plate, barId, barHash) {
   var SCALE = 2; // 2x for retina output
 
@@ -6734,14 +6748,33 @@ function _saveLivePlate(plate, barId, barHash) {
 
         out.toBlob(function(blob) {
           if (!blob) { reject(new Error('toBlob returned null')); return; }
-          var u = URL.createObjectURL(blob);
-          var a = document.createElement('a');
-          a.href = u;
-          a.download = barId + '.certificate.png';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function() { URL.revokeObjectURL(u); }, 1000);
+          var filename = barId + '.certificate.png';
+
+          // Prefer the Web Share API on mobile — iOS Safari opens the
+          // OS Share Sheet which has "Save Image" as a real option
+          // (writes to Photos), instead of dumping to Files like
+          // <a download> does. Android Chrome similarly hooks into
+          // Save / Share. Desktop browsers usually don't implement
+          // canShare for files; they fall through to the anchor path.
+          var canShareFile = false;
+          try {
+            var probe = new File([blob], filename, { type: 'image/png' });
+            canShareFile = !!(navigator.canShare && navigator.canShare({ files: [probe] }));
+            if (canShareFile) {
+              navigator.share({ files: [probe], title: 'Mememage Certificate' })
+                .then(resolve)
+                .catch(function(err) {
+                  // AbortError = user dismissed sheet — not a failure.
+                  if (err && err.name === 'AbortError') { resolve(); return; }
+                  // Real error — fall back to download anchor.
+                  _saveViaAnchor(blob, filename);
+                  resolve();
+                });
+              return;
+            }
+          } catch (e) { /* File ctor or canShare unsupported — fall through */ }
+
+          _saveViaAnchor(blob, filename);
           resolve();
         }, 'image/png');
       } catch (err) {
@@ -6865,16 +6898,21 @@ function renderCert(meta, options) {
   }
   if (meta.seed !== undefined) _push('seed', 'Seed', meta.seed, 3);
   if (meta.width && meta.height) GEN_PARAMS.push({l: 'Size', v: meta.width + ' \u00d7 ' + meta.height, span: 3});
+  // mode was dropped in V1 — kept only for legacy V4 dev-era records
   if (meta.mode) _push('mode', 'Mode', meta.mode, 3);
   // Numeric row (keep Steps / CFG / Guidance together visually)
   if (meta.steps !== undefined) _push('steps', 'Steps', meta.steps);
-  if (meta.cfg !== undefined) _push('cfg', 'CFG', meta.cfg);
+  // cfg_scale (V1) — fall back to legacy `cfg` for V4 dev-era records
+  var _cfgVal = (meta.cfg_scale !== undefined) ? meta.cfg_scale : meta.cfg;
+  if (_cfgVal !== undefined) { _push('cfg_scale', 'CFG', _cfgVal); _claimedKeys['cfg'] = 1; }
   if (meta.guidance !== undefined) _push('guidance', 'Guidance', meta.guidance);
   // Second short row
   if (meta.denoise !== undefined) _push('denoise', 'Denoise', meta.denoise);
   if (meta.sampler) _push('sampler', 'Sampler', meta.sampler);
   if (meta.scheduler) _push('scheduler', 'Scheduler', meta.scheduler);
-  if (meta.unet) _push('unet', 'Model', meta.unet, 3);
+  // model (V1) — fall back to legacy `unet` for V4 dev-era records
+  var _modelVal = meta.model || meta.unet;
+  if (_modelVal) { _push('model', 'Model', _modelVal, 3); _claimedKeys['unet'] = 1; }
   if (meta.lora) _push('lora', 'LoRA', meta.lora, 3);
   if (meta.lora_strength !== undefined) _push('lora_strength', 'LoRA Str', meta.lora_strength);
 
@@ -6909,6 +6947,8 @@ function renderCert(meta, options) {
     url: 1, distribution: 1,
     // Misc
     thumbnail: 1, song_name: 1,
+    // Rosetta Stone — system-owned doc string, never a generation param
+    about: 1,
   };
   var _origKeys = Object.keys(meta).sort();
   for (var _ki = 0; _ki < _origKeys.length; _ki++) {
