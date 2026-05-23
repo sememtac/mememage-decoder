@@ -96,6 +96,56 @@ function _saveViaAnchor(blob, filename) {
   setTimeout(function() { URL.revokeObjectURL(u); }, 1000);
 }
 
+function _saveViaLongPress(blob) {
+  // iOS fallback for when navigator.share isn't available or has
+  // lost user-activation (html2canvas can take longer than the 5-second
+  // activation window, which causes the share API to refuse silently).
+  // Long-press on an <img> is iOS's universal "Save to Photos" gesture
+  // and works regardless of activation state.
+  var url = URL.createObjectURL(blob);
+  var overlay = document.createElement('div');
+  overlay.style.cssText =
+    'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+    'padding:1rem;gap:0.8rem;';
+  var instr = document.createElement('p');
+  instr.textContent = 'Long-press the certificate, then "Save to Photos."';
+  instr.style.cssText =
+    'color:#e8e8e8;font:600 0.9rem/1.35 system-ui,-apple-system,sans-serif;' +
+    'text-align:center;margin:0;max-width:30rem;';
+  var img = document.createElement('img');
+  img.src = url;
+  img.alt = 'Mememage Certificate';
+  img.style.cssText =
+    'max-width:92vw;max-height:75vh;object-fit:contain;border-radius:6px;' +
+    'box-shadow:0 6px 32px rgba(0,0,0,0.5);' +
+    // Crucially: leave default touch behavior + long-press save enabled.
+    '-webkit-touch-callout:default;user-select:none;';
+  var close = document.createElement('button');
+  close.textContent = 'Done';
+  close.style.cssText =
+    'background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.35);' +
+    'border-radius:999px;padding:0.5rem 1.4rem;font:600 0.82rem/1 system-ui,sans-serif;' +
+    'letter-spacing:0.04em;cursor:pointer;';
+  var dismiss = function() {
+    overlay.remove();
+    setTimeout(function() { URL.revokeObjectURL(url); }, 500);
+  };
+  close.addEventListener('click', dismiss);
+  // Tap the empty backdrop (not the image) to dismiss
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) dismiss();
+  });
+  overlay.appendChild(instr);
+  overlay.appendChild(img);
+  overlay.appendChild(close);
+  document.body.appendChild(overlay);
+}
+
+function _isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent || '') && !window.MSStream;
+}
+
 function _saveLivePlate(plate, barId, barHash) {
   var SCALE = 2; // 2x for retina output
 
@@ -208,13 +258,21 @@ function _saveLivePlate(plate, barId, barHash) {
         out.toBlob(function(blob) {
           if (!blob) { reject(new Error('toBlob returned null')); return; }
           var filename = barId + '.certificate.png';
+          var ios = _isIOS();
 
-          // Prefer the Web Share API on mobile — iOS Safari opens the
-          // OS Share Sheet which has "Save Image" as a real option
-          // (writes to Photos), instead of dumping to Files like
-          // <a download> does. Android Chrome similarly hooks into
-          // Save / Share. Desktop browsers usually don't implement
-          // canShare for files; they fall through to the anchor path.
+          // iOS path: html2canvas often takes longer than the 5-second
+          // transient-user-activation window, so navigator.share silently
+          // refuses by the time we get here. Skip straight to the
+          // long-press overlay — that's iOS's native "save image"
+          // gesture and works regardless of activation state.
+          if (ios) {
+            _saveViaLongPress(blob);
+            resolve();
+            return;
+          }
+
+          // Non-iOS mobile (Android Chrome) — Web Share API works and
+          // gives users a proper "save image" / "share" option.
           var canShareFile = false;
           try {
             var probe = new File([blob], filename, { type: 'image/png' });
@@ -223,9 +281,7 @@ function _saveLivePlate(plate, barId, barHash) {
               navigator.share({ files: [probe], title: 'Mememage Certificate' })
                 .then(resolve)
                 .catch(function(err) {
-                  // AbortError = user dismissed sheet — not a failure.
                   if (err && err.name === 'AbortError') { resolve(); return; }
-                  // Real error — fall back to download anchor.
                   _saveViaAnchor(blob, filename);
                   resolve();
                 });
@@ -233,6 +289,7 @@ function _saveLivePlate(plate, barId, barHash) {
             }
           } catch (e) { /* File ctor or canShare unsupported — fall through */ }
 
+          // Desktop fallback — synthetic anchor click.
           _saveViaAnchor(blob, filename);
           resolve();
         }, 'image/png');

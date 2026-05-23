@@ -345,6 +345,54 @@
   // honor cert acceptance for programmatic <a download> clicks, and
   // we want consistent behavior across channels regardless of whose
   // cert they're using.
+  //
+  // For image blobs, prefer navigator.share on mobile so iOS opens
+  // its Share Sheet (which exposes "Save Image" → Photos library).
+  // The plain anchor-download path drops images into the Files app
+  // on iOS, which isn't where users expect their minted photos.
+  function _imageLongPressOverlay(blob) {
+    // iOS fallback for image saving. navigator.share requires the
+    // 5-second transient-user-activation window, which fetch+toBlob
+    // can blow past on a slow network. Long-press on an <img> is
+    // iOS's universal "Save to Photos" gesture and works regardless.
+    var url = URL.createObjectURL(blob);
+    var overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);' +
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+      'padding:1rem;gap:0.8rem;';
+    var instr = document.createElement('p');
+    instr.textContent = 'Long-press the image, then "Save to Photos."';
+    instr.style.cssText =
+      'color:#e8e8e8;font:600 0.9rem/1.35 system-ui,-apple-system,sans-serif;' +
+      'text-align:center;margin:0;max-width:30rem;';
+    var img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Conceived image';
+    img.style.cssText =
+      'max-width:92vw;max-height:75vh;object-fit:contain;border-radius:6px;' +
+      'box-shadow:0 6px 32px rgba(0,0,0,0.5);' +
+      '-webkit-touch-callout:default;user-select:none;';
+    var close = document.createElement('button');
+    close.textContent = 'Done';
+    close.style.cssText =
+      'background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.35);' +
+      'border-radius:999px;padding:0.5rem 1.4rem;font:600 0.82rem/1 system-ui,sans-serif;' +
+      'letter-spacing:0.04em;cursor:pointer;';
+    var dismiss = function() {
+      overlay.remove();
+      setTimeout(function() { URL.revokeObjectURL(url); }, 500);
+    };
+    close.addEventListener('click', dismiss);
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) dismiss();
+    });
+    overlay.appendChild(instr);
+    overlay.appendChild(img);
+    overlay.appendChild(close);
+    document.body.appendChild(overlay);
+  }
+
   function _wireBlobDownload(btn, srcUrl, filename) {
     if (!btn) return;
     btn.onclick = async function() {
@@ -355,6 +403,41 @@
         var r = await fetch(srcUrl);
         if (!r.ok) throw new Error('HTTP ' + r.status);
         var blob = await r.blob();
+
+        // Image path: iOS uses a long-press overlay (works regardless
+        // of user-activation state, which Web Share API loses if the
+        // fetch takes too long); Android Chrome / other mobile uses
+        // navigator.share for the system save sheet; desktop falls
+        // through to the anchor download below.
+        var isImage = (blob.type || '').indexOf('image/') === 0;
+        var iosUA = /iPad|iPhone|iPod/.test(navigator.userAgent || '') && !window.MSStream;
+        if (isImage && iosUA) {
+          _imageLongPressOverlay(blob);
+          btn.textContent = prev;
+          btn.disabled = false;
+          return;
+        }
+        if (isImage) {
+          try {
+            var file = new File([blob], filename, { type: blob.type });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: 'Mememage' });
+              btn.textContent = 'Shared';
+              setTimeout(function() { btn.textContent = prev; btn.disabled = false; }, 1500);
+              return;
+            }
+          } catch (shareErr) {
+            // AbortError = user dismissed the sheet — leave the button
+            // alone and let them try again. Any other error falls
+            // through to the anchor download.
+            if (shareErr && shareErr.name === 'AbortError') {
+              btn.textContent = prev;
+              btn.disabled = false;
+              return;
+            }
+          }
+        }
+
         var bUrl = URL.createObjectURL(blob);
         var a = document.createElement('a');
         a.href = bUrl;
