@@ -386,8 +386,8 @@ function renderCert(meta, options) {
     certWrap.classList.remove('visible', 'dismissing');
   }
 
-  var born = meta.born || {};
-  var m = born.machine || {};
+  var birth = meta.birth || {};
+  var m = birth.machine || {};
   var rarity = meta.rarity || {};
 
   // --- Build data arrays from meta ---
@@ -444,7 +444,7 @@ function renderCert(meta, options) {
     identifier: 1, content_hash: 1, signature: 1, public_key: 1,
     key_fingerprint: 1, creator_name: 1, hash_version: 1, parent_id: 1,
     // Birth certificate / celestial
-    born: 1, conceived: 1, rendered: 1, timestamp: 1,
+    birth: 1, conceived: 1, rendered: 1, timestamp: 1,
     constellation_name: 1, constellation_hash: 1, constellation_star: 1,
     heart_star_id: 1,
     rarity: 1, rarity_score: 1,
@@ -480,13 +480,13 @@ function renderCert(meta, options) {
     GEN_PARAMS.push({l: _label, v: '' + _v, span: 3});
   }
 
-  // Build PLANET_DATA from born
+  // Build PLANET_DATA from birth
   var planetSymbols = {sun:'\u2609', moon:'\u263D', mercury:'\u263F', venus:'\u2640', mars:'\u2642', jupiter:'\u2643', saturn:'\u2644'};
   var planetLabels = {sun:'Sun', moon:'Moon', mercury:'Mercury', venus:'Venus', mars:'Mars', jupiter:'Jupiter', saturn:'Saturn'};
   var PLANET_DATA = [];
   for (var bi = 0; bi < BODIES.length; bi++) {
     var bk = BODIES[bi].k;
-    var val = born[bk];
+    var val = birth[bk];
     if (!val) continue;
     var parts = val.split(' ');
     var sign = parts[0];
@@ -494,12 +494,12 @@ function renderCert(meta, options) {
     var lon = parseDegrees(val);
     if (lon === null) continue;
     var pd = {name: bk, sym: planetSymbols[bk] || '', label: planetLabels[bk] || bk, sign: sign, deg: deg, lon: lon};
-    if (bk === 'moon' && born.moon_phase) pd.phase = born.moon_phase;
+    if (bk === 'moon' && birth.moon_phase) pd.phase = birth.moon_phase;
     PLANET_DATA.push(pd);
   }
   var hasSky = PLANET_DATA.length > 0;
 
-  // Build MACHINE from born.machine. `span` controls the grid layout
+  // Build MACHINE from birth.machine. `span` controls the grid layout
   // downstream in machine-band — 3 = full width, 1.5 = half row,
   // 1 = one of three. Row totals must sum to 3.
   //   [ CPU                           ] span 3
@@ -555,9 +555,9 @@ function renderCert(meta, options) {
   // GPS data
   var GPS_CIPHER = '';
   var GPS_MODULUS = '';
-  if (born.gps_locked) {
-    GPS_CIPHER = born.gps_locked.ct || born.gps_locked.ciphertext || '';
-    if (born.gps_locked.N) GPS_MODULUS = born.gps_locked.N;
+  if (birth.gps_locked) {
+    GPS_CIPHER = birth.gps_locked.ct || birth.gps_locked.ciphertext || '';
+    if (birth.gps_locked.N) GPS_MODULUS = birth.gps_locked.N;
   }
 
   // ===================================================================
@@ -1429,8 +1429,8 @@ function renderCert(meta, options) {
         var sp = PLANET_DATA[si];
         skyMeta[sp.name] = sp.sign + ' ' + sp.deg.toFixed(1) + '\u00b0';
       }
-      if (born.moon_phase) skyMeta.moon_phase = born.moon_phase;
-      if (born.angular_spread) skyMeta.angular_spread = '' + born.angular_spread;
+      if (birth.moon_phase) skyMeta.moon_phase = birth.moon_phase;
+      if (birth.angular_spread) skyMeta.angular_spread = '' + birth.angular_spread;
       enableCanvasSave(skyCanvas, {
         celestial_positions: JSON.stringify(skyMeta),
         bar_spec: JSON.stringify(BAR_SPEC),
@@ -1474,8 +1474,8 @@ function renderCert(meta, options) {
     }
 
     var footnote = _div('gps-footnote');
-    var tExp = born.gps_locked && born.gps_locked.t ? born.gps_locked.t.toExponential(0) : '?';
-    var pLen = born.gps_locked && (born.gps_locked.len || born.gps_locked.plaintext_length) || '?';
+    var tExp = birth.gps_locked && birth.gps_locked.t ? birth.gps_locked.t.toExponential(0) : '?';
+    var pLen = birth.gps_locked && (birth.gps_locked.len || birth.gps_locked.plaintext_length) || '?';
     footnote.innerHTML = '* ' + escapeHtml('' + tExp) + ' sequential squarings of 2 mod N, SHA-256 the result, XOR with ciphertext. First ' + escapeHtml('' + pLen) + ' bytes = GPS.';
     gpsContainer.appendChild(footnote);
 
@@ -1530,7 +1530,7 @@ function renderCert(meta, options) {
     }
 
     plate.appendChild(gpsContainer);
-  } else if (!isSample && born && Object.keys(born).length > 0) {
+  } else if (!isSample && birth && Object.keys(birth).length > 0) {
     // Honest placeholder for records minted on chains with
     // ``gps_source: none`` (or any record lacking ``gps_locked``).
     // The cert acknowledges the absence rather than silently hiding
@@ -1653,7 +1653,7 @@ function renderCert(meta, options) {
   // Inject cosmic audio player as the plate's bottom edge. Skipped in
   // sample mode — the example cert is a truncated preview, the full song
   // belongs with the full cert.
-  if (injectPlayer && !isSample && typeof CosmicPlayer !== 'undefined' && born && born.sun) {
+  if (injectPlayer && !isSample && typeof CosmicPlayer !== 'undefined' && birth && birth.sun) {
     CosmicPlayer.inject(plate, meta);
   }
 

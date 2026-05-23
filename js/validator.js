@@ -1091,22 +1091,22 @@ async function _renderObservatoryFromCache() {
     }
 
     // Birth Certificate — Celestial
-    if(r.born){
-      var born=r.born;
+    if(r.birth){
+      var birth=r.birth;
       var bodies=['sun','moon','mercury','venus','mars','jupiter','saturn'];
       var bNames={sun:'Sun',moon:'Moon',mercury:'Mercury',venus:'Venus',mars:'Mars',jupiter:'Jupiter',saturn:'Saturn'};
-      var hasCelestial=bodies.some(function(b){return !!born[b];});
+      var hasCelestial=bodies.some(function(b){return !!birth[b];});
       if(hasCelestial){
         html+='<div class="ev-sec">Celestial State at Birth</div><div class="ev-g">';
-        for(var ci2=0;ci2<bodies.length;ci2++){var cb=bodies[ci2];if(born[cb]){var extra=cb==='moon'&&born.moon_phase?' ('+_h(born.moon_phase)+')':'';html+='<div class="ev-m"><div class="ev-ml">'+bNames[cb]+'</div><div class="ev-mv">'+_h(born[cb])+extra+'</div></div>';}}
-        if(born.angular_spread)html+='<div class="ev-m"><div class="ev-ml">Angular Spread</div><div class="ev-mv">'+_h(born.angular_spread)+'\u00b0</div></div>';
+        for(var ci2=0;ci2<bodies.length;ci2++){var cb=bodies[ci2];if(birth[cb]){var extra=cb==='moon'&&birth.moon_phase?' ('+_h(birth.moon_phase)+')':'';html+='<div class="ev-m"><div class="ev-ml">'+bNames[cb]+'</div><div class="ev-mv">'+_h(birth[cb])+extra+'</div></div>';}}
+        if(birth.angular_spread)html+='<div class="ev-m"><div class="ev-ml">Angular Spread</div><div class="ev-mv">'+_h(birth.angular_spread)+'\u00b0</div></div>';
         if(r.constellation_hash)html+='<div class="ev-m"><div class="ev-ml">Constellation Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.constellation_hash)+'</div></div>';
         html+='</div>';
       }
 
       // Machine State
-      if(born.machine){
-        var m=born.machine;
+      if(birth.machine){
+        var m=birth.machine;
         html+='<div class="ev-sec">Machine State at Birth</div><div class="ev-g">';
         var mF=[['cpu','CPU'],['cores','Cores'],['gpu_cores','GPU'],['ram','RAM'],['mem_active','Active'],['mem_compressed','Compressed'],['mem_free','Free'],['load','Load'],['power','Power'],['disk_io','Disk I/O'],['net_rx','Net \u2193'],['net_tx','Net \u2191'],['uptime','Uptime']];
         for(var mi=0;mi<mF.length;mi++){if(m[mF[mi][0]]!==undefined)html+='<div class="ev-m"><div class="ev-ml">'+mF[mi][1]+'</div><div class="ev-mv" style="font-size:0.7rem;">'+_h(m[mF[mi][0]])+'</div></div>';}
@@ -1117,8 +1117,8 @@ async function _renderObservatoryFromCache() {
       // GPS Time-Lock — present only when the chain captured GPS.
       // Chains with gps_source: none publish records without
       // gps_locked; show an honest placeholder rather than skip.
-      if(born.gps_locked){
-        var gps=born.gps_locked;
+      if(birth.gps_locked){
+        var gps=birth.gps_locked;
         html+='<div class="ev-sec">Birthplace \u2014 Time-Locked</div><div class="ev-g">';
         if(gps.ct)html+='<div class="ev-m w"><div class="ev-ml">Ciphertext</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+_h(gps.ct)+'</div></div>';
         if(gps.N)html+='<div class="ev-m w"><div class="ev-ml">RSA Modulus N</div><div class="ev-mv" style="font-size:0.52rem;word-break:break-all;">'+_h(gps.N)+'</div></div>';
@@ -2793,16 +2793,16 @@ function renderAudit(rec, identifier, out) {
   html += auditSection('Generation', genRows);
 
   // === CELESTIAL ===
-  var born = rec.born || {};
+  var birth = rec.birth || {};
   var celRows = '';
-  if (born.sun) celRows += auditRow('Sun', born.sun);
-  if (born.moon) celRows += auditRow('Moon', born.moon);
-  if (born.moon_phase) celRows += auditRow('Phase', born.moon_phase);
-  if (born.mercury) celRows += auditRow('Mercury', born.mercury);
-  if (born.venus) celRows += auditRow('Venus', born.venus);
-  if (born.mars) celRows += auditRow('Mars', born.mars);
-  if (born.jupiter) celRows += auditRow('Jupiter', born.jupiter);
-  if (born.saturn) celRows += auditRow('Saturn', born.saturn);
+  if (birth.sun) celRows += auditRow('Sun', birth.sun);
+  if (birth.moon) celRows += auditRow('Moon', birth.moon);
+  if (birth.moon_phase) celRows += auditRow('Phase', birth.moon_phase);
+  if (birth.mercury) celRows += auditRow('Mercury', birth.mercury);
+  if (birth.venus) celRows += auditRow('Venus', birth.venus);
+  if (birth.mars) celRows += auditRow('Mars', birth.mars);
+  if (birth.jupiter) celRows += auditRow('Jupiter', birth.jupiter);
+  if (birth.saturn) celRows += auditRow('Saturn', birth.saturn);
   if (rec.constellation_hash) celRows += auditRow('Constellation Hash', rec.constellation_hash);
   if (celRows) html += auditSection('Celestial', celRows);
 
@@ -2842,7 +2842,7 @@ function renderAudit(rec, identifier, out) {
   if (songName) songRows += auditRow('Song Name', songName, 'audit-info');
 
   // Derive musical properties from the record
-  var sunStr = born.sun || '';
+  var sunStr = birth.sun || '';
   var sign = sunStr.split(' ')[0] || '?';
   var FIRE = {Aries:1,Leo:1,Sagittarius:1};
   var WATER = {Cancer:1,Scorpio:1,Pisces:1};
@@ -2928,7 +2928,7 @@ function renderAudit(rec, identifier, out) {
   songRows += auditRow('Temperament Effect', modDesc);
 
   // Moon influence
-  var moonPhase = born.moon_phase || '';
+  var moonPhase = birth.moon_phase || '';
   var moonPct = moonPhase.match(/\((\d+\.?\d*)%\)/);
   var moonBright = moonPct ? parseFloat(moonPct[1]) / 100 : 0.5;
   songRows += auditRow('Moon Brightness', (moonBright * 100).toFixed(0) + '% \u2192 filter cutoff & dust density');
@@ -2937,7 +2937,10 @@ function renderAudit(rec, identifier, out) {
 
   // === FIELD COMPLETENESS ===
   var totalKeys = Object.keys(rec).length;
-  var expected = ['identifier', 'content_hash', 'conceived', 'prompt', 'seed', 'width', 'height', 'born', 'rarity_score', 'birth_temperament', 'machine_fingerprint'];
+  // V1 expected fields. birth_temperament is no longer persisted
+  // (derived at display from birth_traits); rarity_score is derived
+  // from the rarity dict.
+  var expected = ['identifier', 'content_hash', 'conceived', 'prompt', 'seed', 'width', 'height', 'birth', 'rarity', 'birth_traits', 'machine_fingerprint'];
   // parent_id is only expected on non-genesis records
   if (rec.parent_id) expected.push('parent_id');
   var missing = expected.filter(function(k) { return rec[k] === undefined || rec[k] === null; });

@@ -5328,7 +5328,7 @@ setInterval(function() {
     // --- The model ---
     { id: 'soul', label: 'Soul',
       body: 'The metadata record — a structured JSON document carrying every fact about a conception. Stored as <code>.soul</code> files; lives wherever your channels carry it (peer mirror, archive, content-addressed network) plus your local disk. The soul is the meaning; the image is the body.' +
-        '<pre class="glossary-snippet">{\n  "identifier":   "mememage-\u2026",\n  "content_hash": "\u2026",\n  "prompt":       "\u2026",\n  "born":         { /* sky + machine + GPS */ },\n  "signature":    "\u2026",\n  /* \u2026more fields\u2026 */\n}</pre>' },
+        '<pre class="glossary-snippet">{\n  "identifier":   "mememage-\u2026",\n  "content_hash": "\u2026",\n  "prompt":       "\u2026",\n  "birth":        { /* sky + machine + GPS */ },\n  "signature":    "\u2026",\n  /* \u2026more fields\u2026 */\n}</pre>' },
     { id: 'bar', label: 'Bar',
       body: 'The 2-pixel-tall steganographic strip at the bottom of every conceived image. Carries the identifier (so any decoder can look up the soul) and the content hash (so tampering is detectable). Reed-Solomon FEC + color delimiter bands make it survive JPEG re-encoding and crops down to common social-media sizes.' },
     { id: 'conception', label: 'Conception',

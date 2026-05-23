@@ -410,9 +410,9 @@ var CosmicPlayer = (function() {
     cleanup();
 
     // Parse record data
-    var born = meta.born || {};
-    var sign = parseSunSign(born.sun);
-    var moonPhase = cleanMoonPhase(born.moon_phase);
+    var birth = meta.birth || {};
+    var sign = parseSunSign(birth.sun);
+    var moonPhase = cleanMoonPhase(birth.moon_phase);
     // V1 records carry only birth_traits; reconstruct the temperament
     // string via birth-text.js. Falls back to any inline persisted
     // string on V4-era records.
@@ -456,7 +456,7 @@ var CosmicPlayer = (function() {
     var resolvedHash = meta.content_hash || meta._content_hash || '';
     var audioParams = {
       sign: sign,
-      moonPhase: born.moon_phase || 'Full Moon',
+      moonPhase: birth.moon_phase || 'Full Moon',
       temperament: temperament,
       rarity: rarityScore,
       hash: resolvedHash

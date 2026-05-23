@@ -38,7 +38,7 @@ const HASH_INCLUDED_V1 = new Set([
   'prompt', 'seed', 'width', 'height', 'steps', 'cfg_scale', 'guidance',
   'denoise', 'sampler', 'scheduler', 'model', 'lora', 'lora_strength',
   'conceived', 'rendered',
-  'born', 'constellation_hash', 'machine_fingerprint',
+  'birth', 'constellation_hash', 'machine_fingerprint',
   // rarity dict is hashed; rarity_score is the derived sum — readers
   // reconstruct via rarity-helpers.js / RarityScore.fromRecord().
   'rarity',
