@@ -50,6 +50,33 @@
   // ===== Header populate =====
   if (fileEl) fileEl.textContent = imageName;
 
+  // ===== Staged thumbnail =====
+  // Fetch + display the staged image so the creator can verify
+  // they're conceiving the right thing before tapping the button.
+  // Server allows /api/mint/<token>/image in pending state.
+  var thumbBtnEl = document.getElementById('conceptionThumbBtn');
+  var thumbEl = document.getElementById('conceptionThumb');
+  if (thumbBtnEl && thumbEl && token) {
+    thumbEl.addEventListener('load', function() { thumbBtnEl.hidden = false; });
+    thumbEl.addEventListener('error', function() { thumbBtnEl.hidden = true; });
+    thumbEl.src = '/api/mint/' + encodeURIComponent(token) + '/image';
+    // Click → full-size lightbox (mirrors decoder ui.js:870 pattern).
+    thumbBtnEl.addEventListener('click', function() {
+      if (!thumbEl.src) return;
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:1.5rem;';
+      var fullImg = document.createElement('img');
+      fullImg.src = thumbEl.src;
+      fullImg.style.cssText = 'max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 40px rgba(0,0,0,0.6);';
+      overlay.appendChild(fullImg);
+      overlay.addEventListener('click', function() { overlay.remove(); });
+      document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+      });
+      document.body.appendChild(overlay);
+    });
+  }
+
   // ===== Origin fields render =====
   // Show prompt, seed, dimensions, sampler — anything in the staged
   // metadata. The full JSON would overwhelm a phone screen; pick the

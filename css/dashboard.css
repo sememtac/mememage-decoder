@@ -10,10 +10,14 @@
    parent section carries data-show-advanced="true". Per-section
    toggle state persists in localStorage (see dashboard.js).
    Power users flip everything on and never see the fold again. */
-.advanced-only { display: none !important; }
-.config-section[data-show-advanced="true"] .advanced-only { display: revert !important; }
-/* Edge case: flex / grid layouts where children are flex/grid items
-   need the parent's normal display. `revert` restores it. */
+/* Inverted-logic selector: hide only when the section is NOT in
+   advanced mode. The earlier approach (base hide + show-via-revert)
+   forced display:block on the element when toggled on, which
+   clobbered the author display:grid/flex on advanced containers
+   (e.g. .config-chain-gps, .config-channel-fields, .config-field). */
+.config-section:not([data-show-advanced="true"]) .advanced-only {
+  display: none !important;
+}
 
 .config-section-controls {
   display: flex;
@@ -69,24 +73,24 @@
   border-color: rgba(255, 255, 255, 0.45);
   color: white;
 }
-/* Command-palette open button — shows the platform hotkey hint
-   alongside a magnifying-glass icon. Discoverable affordance for
-   users who haven't learned ⌘K yet; also pure click-to-open. */
+/* Command-palette open button — circular icon-only to match the
+   glossary button next to it. Hotkey hint lives inside the palette
+   itself (footer line "⌘K / Ctrl-K to open · ↑/↓ · Enter"). */
 .page-header-palette {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+  width: 1.6rem;
   height: 1.6rem;
-  padding: 0 0.55rem;
-  border-radius: 999px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.7);
   font-family: inherit;
-  font-size: 0.72rem;
-  font-weight: 500;
+  font-size: 0.9rem;
   line-height: 1;
   cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 .page-header-palette:hover {
@@ -94,16 +98,7 @@
   border-color: rgba(255, 255, 255, 0.45);
   color: white;
 }
-.page-header-palette-icon { font-size: 0.85rem; line-height: 1; }
-.page-header-palette-hint {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  padding: 0.05rem 0.3rem;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-  color: rgba(255, 255, 255, 0.85);
-}
+.page-header-palette-icon { font-size: inherit; line-height: 1; }
 
 .glossary-link {
   display: inline-flex;
@@ -805,7 +800,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .mint-recent-list { display: flex; flex-direction: column; gap: 0.3rem; }
 .mint-recent-row {
   display: grid;
-  grid-template-columns: 6rem 1fr max-content max-content max-content;
+  grid-template-columns: 1fr max-content max-content max-content;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.7rem;
@@ -818,9 +813,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-weight: 600;
   letter-spacing: 0.06em;
   color: #1a1a20;
-}
-.mint-recent-image {
-  color: #3a3a44;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1117,12 +1109,24 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   justify-content: center;
 }
 .mint-handoff-btn:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
+/* "Open conception page" — the dashboard handoff's primary action.
+   Same brushed-gold treatment as .config-btn-primary so every "this
+   commits / opens the ceremony" button reads the same across pages. */
 .mint-handoff-btn-primary {
-  background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
-  color: white;
-  border-color: transparent;
+  background: linear-gradient(180deg, rgba(60, 50, 20, 0.92) 0%, rgba(18, 14, 8, 0.88) 50%, rgba(14, 10, 6, 0.92) 100%);
+  color: #c8a850;
+  border: 1px solid rgba(200, 170, 80, 0.5);
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.12), 0 1px 1px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.3);
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
-.mint-handoff-btn-primary:hover { filter: brightness(1.08); background: linear-gradient(to bottom, #dc50dc, #3cc8dc); }
+.mint-handoff-btn-primary:hover {
+  filter: none;
+  color: #e0c070;
+  border-color: rgba(224, 192, 112, 0.75);
+  background: linear-gradient(180deg, rgba(72, 60, 24, 0.95) 0%, rgba(24, 18, 10, 0.9) 50%, rgba(18, 14, 8, 0.95) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 6px rgba(0,0,0,0.35), 0 0 12px rgba(220, 190, 80, 0.18);
+}
 
 /* Pulsing dot to indicate "still listening". Slow + subtle — same
    cosmic tempo the validator + decoder use, never flashy. */
@@ -1306,7 +1310,22 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-size: 0.74rem; font-weight: 500;
   letter-spacing: 0.04em;
 }
-.payload-actions { display: flex; gap: 0.4rem; }
+.payload-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.payload-actions-preset { margin-top: 0.3rem; }
+.payload-actions-chain  { margin-top: 0.3rem; }
+.payload-actions-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+  min-width: 3.2rem;
+}
 .payload-btn {
   font-family: inherit; font-size: 0.72rem; font-weight: 600;
   letter-spacing: 0.04em; text-transform: uppercase;
@@ -1576,6 +1595,165 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border-color: rgba(0, 0, 0, 0.15);
 }
 
+/* Inline lock banner — appears under the action bar when Apply is
+   disabled because an Age is in progress. The lock badge is small;
+   the banner spells out *why* in one sentence so users who don't
+   hover the disabled Apply button still understand the gate. */
+.payload-apply-lock-banner {
+  font-size: 0.72rem;
+  color: #6a4a1c;
+  background: rgba(200, 150, 60, 0.12);
+  border-left: 3px solid rgba(200, 150, 60, 0.55);
+  border-radius: var(--radius-sm, 6px);
+  padding: 0.45rem 0.7rem;
+  margin: 0.4rem 0 0;
+  flex-basis: 100%;
+}
+.payload-apply-lock-banner[hidden] { display: none; }
+
+/* Age-length (M) editor — surfaced as a first-class field so users
+   don't have to crack open a preset JSON. Disabled while the chain
+   is mid-Age (M is locked at seal time). */
+.payload-m-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0;
+  flex-basis: 100%;
+  font-size: 0.78rem;
+}
+.payload-m-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #1a1a20;
+  white-space: nowrap;
+}
+.payload-m-input {
+  width: 5rem;
+  padding: 0.3rem 0.45rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255, 255, 255, 0.85);
+  color: #1a1a20;
+}
+.payload-m-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(0, 0, 0, 0.04);
+}
+.payload-m-hint {
+  font-size: 0.7rem;
+  color: rgba(0, 0, 0, 0.55);
+  font-style: italic;
+}
+
+/* Payload tab NUX — collapsible workflow guide. Auto-shows for fresh
+   chains (no preset + empty layers/frozen); dismissible via the ×
+   button and re-openable via the link below. Persistence: localStorage
+   key 'mememage-payload-nux-dismissed' = '1'. */
+.payload-nux {
+  margin: 0.4rem 0 0.2rem;
+  background: linear-gradient(180deg, rgba(245, 240, 220, 0.85), rgba(230, 222, 196, 0.9));
+  border: 1px solid rgba(160, 130, 60, 0.3);
+  border-radius: var(--radius-sm, 6px);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: #2a2014;
+}
+.payload-nux[hidden] { display: none; }
+.payload-nux summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+.payload-nux summary::-webkit-details-marker { display: none; }
+.payload-nux summary::before {
+  content: '\25b6';
+  display: inline-block;
+  font-size: 0.65rem;
+  color: rgba(120, 90, 30, 0.7);
+  transition: transform 0.18s ease;
+}
+.payload-nux[open] summary::before { transform: rotate(90deg); }
+.payload-nux-title {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 0.82rem;
+  color: #4a3818;
+}
+.payload-nux-hint {
+  font-size: 0.66rem;
+  color: rgba(74, 56, 24, 0.6);
+  flex: 1;
+}
+.payload-nux-dismiss {
+  background: transparent;
+  border: 1px solid rgba(120, 90, 30, 0.3);
+  border-radius: 50%;
+  width: 1.4rem; height: 1.4rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: rgba(74, 56, 24, 0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.payload-nux-dismiss:hover {
+  background: rgba(120, 90, 30, 0.1);
+  color: #4a3818;
+}
+.payload-nux-steps {
+  margin: 0.7rem 0 0.2rem 1.3rem;
+  padding: 0;
+  counter-reset: nuxstep;
+}
+.payload-nux-steps li {
+  margin: 0.5rem 0;
+  padding-left: 0.3rem;
+}
+.payload-nux-steps li strong { color: #3a2a10; }
+.payload-nux-steps em {
+  font-style: normal;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(120, 90, 30, 0.12);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  font-size: 0.92em;
+}
+.payload-nux-steps code,
+.payload-nux-tip code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.payload-nux-tip {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.7rem;
+  background: rgba(60, 200, 220, 0.08);
+  border-left: 3px solid rgba(60, 160, 200, 0.5);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.74rem;
+  color: #1a3a4a;
+}
+.payload-nux-reopen-row { margin: 0.2rem 0 0; }
+.payload-nux-reopen {
+  font-size: 0.72rem;
+  color: rgba(74, 56, 24, 0.7);
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(74, 56, 24, 0.4);
+}
+.payload-nux-reopen:hover { color: #2a2014; border-bottom-color: rgba(74, 56, 24, 0.8); }
+
 /* Static banner under the action bar explaining the draft / apply model. */
 .payload-template-banner {
   font-size: 0.74rem; line-height: 1.5;
@@ -1587,15 +1765,24 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   margin: 0.4rem 0 0.2rem;
 }
 .payload-template-banner p { margin: 0; }
+/* Payload primary (Save / Build) — brushed gold to match the rest
+   of the dashboard's confirmation buttons. */
 .payload-btn-primary {
-  background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
-  color: white; border-color: transparent;
+  background: linear-gradient(180deg, rgba(60, 50, 20, 0.92) 0%, rgba(18, 14, 8, 0.88) 50%, rgba(14, 10, 6, 0.92) 100%);
+  color: #c8a850;
+  border: 1px solid rgba(200, 170, 80, 0.5);
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.12), 0 1px 1px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.3);
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
 .payload-btn-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-  background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
-  border-color: transparent;
+  filter: none;
+  color: #e0c070;
+  border-color: rgba(224, 192, 112, 0.75);
+  background: linear-gradient(180deg, rgba(72, 60, 24, 0.95) 0%, rgba(24, 18, 10, 0.9) 50%, rgba(18, 14, 8, 0.95) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 6px rgba(0,0,0,0.35), 0 0 12px rgba(220, 190, 80, 0.18);
 }
 
 /* Validation panel — errors block save; warnings allow save */
@@ -2260,15 +2447,33 @@ label > input[type="checkbox"] {
 }
 .config-btn:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
 .config-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Primary action — brushed gold to match the Save Certificate button
+   on the decoder and the Conceive button on the conception page. The
+   one button that says "this commits something." Dark body + gold
+   border + gold text, with a hint of inset highlight. No idle breath
+   here — that's reserved for the conception page; on the dashboard
+   the button just sits cleanly until clicked. */
 .config-btn-primary {
-  background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
-  color: white; border-color: transparent;
+  background: linear-gradient(180deg, rgba(60, 50, 20, 0.92) 0%, rgba(18, 14, 8, 0.88) 50%, rgba(14, 10, 6, 0.92) 100%);
+  color: #c8a850;
+  border: 1px solid rgba(200, 170, 80, 0.5);
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.12), 0 1px 1px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.3);
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
-.config-btn-primary:hover {
-  filter: brightness(1.08);
-  background: linear-gradient(to bottom, #dc50dc, #3cc8dc);
-  border-color: transparent;
+.config-btn-primary:hover:not(:disabled) {
+  color: #e0c070;
+  border-color: rgba(224, 192, 112, 0.75);
+  background: linear-gradient(180deg, rgba(72, 60, 24, 0.95) 0%, rgba(24, 18, 10, 0.9) 50%, rgba(18, 14, 8, 0.95) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 6px rgba(0,0,0,0.35), 0 0 12px rgba(220, 190, 80, 0.18);
+  filter: none;
+}
+.config-btn-primary:disabled {
+  opacity: 0.45;
+  filter: saturate(0.4);
+  cursor: not-allowed;
 }
 /* Danger button — rotate/revoke and other irreversible actions. Tinted
    ruby so it reads visually distinct from primary actions; muted enough
@@ -2321,6 +2526,65 @@ label > input[type="checkbox"] {
 }
 .config-field-with-browse .config-input[readonly] {
   cursor: default;
+}
+
+/* API token row: input occupies its own row, the two buttons share a
+   row below it. Lives inside grid column 2 of its .config-field
+   parent so the input gets full available width. */
+.config-token-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.config-token-row .config-input {
+  width: 100%;
+  min-width: 0;
+}
+.config-token-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.config-token-buttons .config-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Password input with an eyeball reveal toggle. The wrapper keeps the
+   input + button on the same line; click flips type=password ↔ text
+   so the user can verify what they typed. */
+.config-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.config-password-wrap .config-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 2.6rem;
+}
+.config-password-toggle {
+  position: absolute;
+  right: 0.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.45rem;
+  font-size: 1rem;
+  line-height: 1;
+  color: #54545c;
+  border-radius: 3px;
+}
+.config-password-toggle:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1a1a20;
+}
+.config-password-toggle:focus-visible {
+  outline: 2px solid rgba(40, 100, 200, 0.5);
+  outline-offset: 1px;
 }
 
 /* Inline confirmation zone for rotate/revoke. Shows beneath the
@@ -2460,6 +2724,13 @@ label > input[type="checkbox"] {
   margin-top: 0;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
+/* When the value is a secret-bearing header, the input is wrapped in
+   .config-password-wrap so the eyeball reveal button sits at the
+   right edge. The wrapper becomes the flex child — pass through the
+   sizing. */
+.config-webhook-hdr-val-wrap {
+  flex: 1 1 70%;
+}
 .config-webhook-hdr-del {
   font-size: 0.85rem;
   padding: 0.1rem 0.4rem;
@@ -2503,20 +2774,43 @@ label > input[type="checkbox"] {
 }
 .config-chain-row {
   display: grid;
-  grid-template-columns: 24px 1fr 1fr max-content max-content;
+  /* Four stacked rows, all content aligned past the leading mark
+     column so id / meta / actions / gps share the same left edge.
+     Mark (active badge or Switch button) anchors the row at the top. */
+  grid-template-columns: max-content 1fr;
+  grid-template-areas:
+    "mark    id"
+    ".       meta"
+    ".       actions"
+    ".       gps";
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.3rem;
+  gap: 0.25rem 0.5rem;
+  padding: 0.5rem 0.4rem;
   font-size: 0.78rem;
   color: #1a1a20;
   border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
 }
+.config-chain-row > .config-chain-active-mark { grid-area: mark; }
+.config-chain-row > .config-chain-id          { grid-area: id; }
+.config-chain-row > .config-chain-meta        { grid-area: meta; }
+.config-chain-row > .config-chain-actions     {
+  grid-area: actions;
+  justify-self: start;
+}
+.config-chain-row > .config-chain-gps-cell    { grid-area: gps; }
 .config-chain-row:last-child { border-bottom: none; }
 .config-chain-row[data-active="1"] { background: rgba(60, 200, 220, 0.08); }
 .config-chain-active-mark {
   font-size: 0.66rem; font-weight: 700;
   color: #2050a0;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.config-chain-active-mark .config-btn {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.66rem;
 }
 .config-chain-id {
   font-family: monospace; font-weight: 700;
@@ -2540,11 +2834,10 @@ label > input[type="checkbox"] {
   padding: 0.25rem 0.55rem;
   font-size: 0.66rem;
 }
-/* GPS source picker — per-row radio. Sits in the trailing grid column.
-   Wraps to a second line below the row's actions when narrow. */
+/* GPS source picker — per-row radio. Spans the full row width
+   (placed via grid-area: gps in .config-chain-row). */
 .config-chain-gps-cell {
-  grid-column: 1 / -1;
-  padding: 0.2rem 0 0.1rem 32px;  /* align past the 24px active-mark column + 8px gap */
+  padding: 0.2rem 0 0.1rem 0;
 }
 .config-chain-gps {
   display: inline-flex;
@@ -2928,17 +3221,15 @@ label > input[type="checkbox"] {
 
   /* --- Pending sessions list --- */
   .mint-recent-row {
-    grid-template-columns: max-content 1fr;
+    grid-template-columns: 1fr max-content;
     grid-template-areas:
-      "ticket image"
       "ticket meta"
       "actions actions";
     gap: 0.25rem 0.6rem;
     padding: 0.5rem 0.6rem;
   }
   .mint-recent-row > .mint-recent-ticket { grid-area: ticket; align-self: center; font-size: 0.78rem; }
-  .mint-recent-row > .mint-recent-image  { grid-area: image; font-size: 0.72rem; }
-  .mint-recent-row > .mint-recent-age    { grid-area: meta; }
+  .mint-recent-row > .mint-recent-age    { grid-area: meta; align-self: center; }
   .mint-recent-row > .mint-recent-btn:not(.mint-recent-btn-danger) {
     grid-area: actions; justify-self: stretch; padding: 0.45rem 0.6rem; font-size: 0.7rem;
   }
@@ -3030,16 +3321,19 @@ label > input[type="checkbox"] {
 
   /* --- Chain rows --- */
   .config-chain-row {
-    grid-template-columns: max-content 1fr;
+    grid-template-columns: 1fr max-content;
     grid-template-areas:
-      "mark id"
-      "mark meta"
+      "id   mark"
+      "meta meta"
       "actions actions"
       "gps gps";
     gap: 0.2rem 0.5rem;
     padding: 0.55rem 0.6rem;
   }
-  .config-chain-row > .config-chain-active-mark { grid-area: mark; }
+  .config-chain-row > .config-chain-active-mark {
+    grid-area: mark;
+    justify-self: end;
+  }
   .config-chain-row > .config-chain-id          { grid-area: id; }
   .config-chain-row > .config-chain-meta        { grid-area: meta; }
   .config-chain-row > .config-chain-actions     {
@@ -3049,7 +3343,10 @@ label > input[type="checkbox"] {
     gap: 0.35rem;
     margin-top: 0.3rem;
   }
-  .config-chain-row > .config-chain-gps-cell    { grid-area: gps; }
+  .config-chain-row > .config-chain-gps-cell    {
+    grid-area: gps;
+    padding-left: 0;
+  }
   .config-chain-actions .config-btn {
     padding: 0.4rem 0.7rem; font-size: 0.72rem;
   }

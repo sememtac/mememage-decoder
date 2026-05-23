@@ -21,9 +21,12 @@
 // use the set that applied when the record was minted, NOT whatever
 // the active version says today.
 //
+// v1 is the launch canon. Pre-launch dev iterations (v2/v3/v4 — yes
+// the dev numbering ran higher) are not honored here; any test souls
+// of those vintages are artifacts and don't round-trip cleanly.
+//
 // Adding a new version requires changes in lockstep here AND in
-// core.py. The Python side has the full checklist; the JS short
-// version:
+// core.py. JS short version:
 //   1. Add a new const HASH_INCLUDED_V{n} = new Set([...]) below.
 //   2. Add it to HASH_INCLUDED_BY_VERSION.
 //   3. Bump CURRENT_HASH_VERSION (only used by the Attack Lab — real
@@ -31,13 +34,15 @@
 //   4. Don't rename fields silently across versions. Don't change
 //      sortKeysDeep / sha256_16 serialization without bumping.
 
-const HASH_INCLUDED_V4 = new Set([
-  'prompt', 'seed', 'width', 'height', 'steps', 'cfg', 'guidance',
-  'denoise', 'sampler', 'scheduler', 'unet', 'lora', 'lora_strength', 'mode',
-  'timestamp', 'conceived', 'rendered',
+const HASH_INCLUDED_V1 = new Set([
+  'prompt', 'seed', 'width', 'height', 'steps', 'cfg_scale', 'guidance',
+  'denoise', 'sampler', 'scheduler', 'model', 'lora', 'lora_strength',
+  'conceived', 'rendered',
   'born', 'constellation_hash', 'machine_fingerprint',
   'rarity_score', 'rarity',
-  'birth_temperament', 'birth_traits', 'birth_readings', 'birth_summary',
+  // birth_traits are codes; birth_readings/temperament/summary are
+  // derived at display time via birth-text.js — not persisted, not hashed.
+  'birth_traits',
   'parent_id',
   // 'thumbnail' — post-mint, protected by Ed25519 signature instead
   'identifier',
@@ -46,12 +51,11 @@ const HASH_INCLUDED_V4 = new Set([
 ]);
 
 const HASH_INCLUDED_BY_VERSION = {
-  4: HASH_INCLUDED_V4,
-  // 5: new Set([...HASH_INCLUDED_V4, 'new_field']),  // future
+  1: HASH_INCLUDED_V1,
 };
 
-const CURRENT_HASH_VERSION = 4;
-const DEFAULT_HASH_VERSION = 4;
+const CURRENT_HASH_VERSION = 1;
+const DEFAULT_HASH_VERSION = 1;
 
 function _hashSetForRecord(record) {
   var v = (record && record.hash_version) || DEFAULT_HASH_VERSION;

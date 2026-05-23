@@ -413,7 +413,12 @@ var CosmicPlayer = (function() {
     var born = meta.born || {};
     var sign = parseSunSign(born.sun);
     var moonPhase = cleanMoonPhase(born.moon_phase);
-    var temperament = parseTemperament(meta.birth_temperament);
+    // V1 records carry only birth_traits; reconstruct the temperament
+    // string via birth-text.js. Falls back to any inline persisted
+    // string on V4-era records.
+    var _bt = (typeof BirthText !== 'undefined' && meta.birth_traits)
+      ? BirthText.read(meta.birth_traits) : null;
+    var temperament = parseTemperament((_bt && _bt.temperament) || meta.birth_temperament);
     var rarityScore = meta.rarity_score || 0;
     var tier = getRarityTier(rarityScore);
     var rKey = rarityKey(tier.name);

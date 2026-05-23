@@ -1114,18 +1114,27 @@ function renderCert(meta, options) {
   // ===================================================================
   // 2. BIRTH TEMPERAMENT
   // ===================================================================
-  if (meta.birth_temperament) {
+  // Records carry only birth_traits (codes); the human-readable
+  // temperament + summary are reconstructed from the lookup tables in
+  // birth-text.js. Falls back to any persisted birth_temperament for
+  // legacy V4 dev-era records that still have the strings inline.
+  var birthTexts = (typeof BirthText !== 'undefined' && meta.birth_traits)
+    ? BirthText.read(meta.birth_traits)
+    : null;
+  var derivedTemperament = (birthTexts && birthTexts.temperament) || meta.birth_temperament;
+  var derivedSummary     = (birthTexts && birthTexts.summary)     || meta.birth_summary;
+  if (derivedTemperament) {
     plate.appendChild(_sectionLabel('BIRTH TEMPERAMENT'));
 
     var tempCell = _div('temperament-cell');
 
     var tempName = _div('plate-temperament-name selectable');
-    tempName.textContent = meta.birth_temperament;
+    tempName.textContent = derivedTemperament;
     tempCell.appendChild(tempName);
 
-    if (meta.birth_summary) {
+    if (derivedSummary) {
       var tempSummary = _div('plate-temperament-summary selectable');
-      tempSummary.textContent = meta.birth_summary;
+      tempSummary.textContent = derivedSummary;
       tempCell.appendChild(tempSummary);
     }
 
@@ -1266,7 +1275,7 @@ function renderCert(meta, options) {
     setTimeout(function() {
       if (typeof initMachineBand !== 'function') return;
       var dims = _setupHiDpi(machCanvas, MACH_W, MACH_H);
-      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore, barId, barHash);
+      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta.about || '', rarityScore, barId, barHash);
     }, 0);
   }
 
@@ -1286,7 +1295,10 @@ function renderCert(meta, options) {
     plate.appendChild(skyWrap);
 
     var celestialTraits = (rarity.celestial || []).map(function(t) { return t.trait; });
-    var birthTemp = meta.birth_temperament || '';
+    // Sky band picks an atmosphere from the temperament — reuse the
+    // derived value computed above (works for V1 trait-code records and
+    // V4-era records that still ship the string inline).
+    var birthTemp = derivedTemperament || '';
     // Sky-band height stays fixed at 390 regardless of canvas width.
     // Its graphical elements (zodiac wheel, orbit ring, meteor trails)
     // are positioned in absolute logical coordinates from the top —

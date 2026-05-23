@@ -71,6 +71,38 @@ body {
 }
 .conception-state[hidden] { display: none; }
 
+/* --- Staged thumbnail ---
+ * Sits at the top of the pre-conceive state. Tap to open the
+ * full-size lightbox (lets the creator zoom into details on a phone
+ * before committing). */
+.conception-thumb-btn {
+  display: block;
+  align-self: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(180, 180, 200, 0.18);
+  border-radius: var(--radius-sm);
+  cursor: zoom-in;
+  overflow: hidden;
+  max-width: 100%;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.conception-thumb-btn:hover {
+  border-color: rgba(200, 200, 220, 0.45);
+}
+.conception-thumb-btn:focus-visible {
+  outline: 2px solid rgba(100, 160, 220, 0.5);
+  outline-offset: 2px;
+}
+.conception-thumb {
+  display: block;
+  max-width: 100%;
+  max-height: 40vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
 /* --- GPS box ---
  * Reads like a celestial reading. Three lines: label, value, hint.
  * Border color shifts with mode (none = muted, acquiring = warm gold,

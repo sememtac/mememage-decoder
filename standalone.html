@@ -625,7 +625,7 @@ html.portal-transit .panel-footer { opacity: 0; }
     z-index: 0;
   }
 
-  body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-player) { position: relative; z-index: 1; }
+  body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-player):not(.config-modal):not(.payload-modal) { position: relative; z-index: 1; }
 
   /* --- Header (theme overrides; structure in layout.css) --- */
   .page-header h1 {
@@ -2034,6 +2034,100 @@ html.portal-transit .panel-footer { opacity: 0; }
     display: inline-block;
     margin: 0;
   }
+
+  /* Alias cluster reveal — inline expansion below the badge row,
+     toggled by clicking the AUTHENTICATED badge when it has a pip.
+     Default collapsed (max-height: 0) so the three-badge row stays
+     untouched until the user opts in. Hidden during save-cert PNG
+     render so the saved plate matches the default visual. */
+  .verify-alias-cluster {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.25s ease, opacity 0.25s ease;
+    opacity: 0;
+    padding: 0 12px;
+    margin: 0 auto;
+    max-width: 420px;
+    border-radius: 8px;
+    background: rgba(94, 168, 232, 0.06);
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+  }
+  .verify-alias-cluster.verify-alias-cluster-open {
+    max-height: 360px;
+    opacity: 1;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-color: rgba(94, 168, 232, 0.18);
+  }
+  .verify-alias-cluster-head {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #5ea8e8;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .verify-alias-cluster-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .verify-alias-row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto auto;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 4px;
+    font-family: ui-monospace, "JetBrains Mono", monospace;
+    font-size: 0.66rem;
+  }
+  .verify-alias-row.verify-alias-oneway { opacity: 0.55; }
+  .verify-alias-row.verify-alias-self {
+    background: rgba(94, 168, 232, 0.12);
+    border: 1px solid rgba(94, 168, 232, 0.25);
+  }
+  .verify-alias-glyph {
+    color: #5ea8e8;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .verify-alias-name {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-family: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .verify-alias-fp {
+    color: var(--text-muted);
+    font-size: 0.62rem;
+  }
+  .verify-alias-tag {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-family: inherit;
+  }
+  .verify-alias-tag-signer { color: #5ea8e8; background: rgba(94, 168, 232, 0.16); }
+  .verify-alias-tag-bi { color: #7bc4a0; background: rgba(123, 196, 160, 0.16); }
+  .verify-alias-tag-oneway { color: #a0a0a8; background: rgba(160, 160, 168, 0.12); }
+  .verify-alias-cluster-foot {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 8px 0 0;
+    line-height: 1.5;
+  }
   .verify-authenticated {
     color: #5ea8e8;
     background: rgba(10, 20, 35, 0.75);
@@ -2044,6 +2138,106 @@ html.portal-transit .panel-footer { opacity: 0; }
     background: rgba(20, 40, 60, 0.75);
     border-color: rgba(160, 200, 255, 0.5);
     box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(160, 200, 255, 0.15);
+  }
+  /* Pip count — superscript numeral appended to AUTHENTICATED when
+     the signer's key has confirmed sibling keys (alias records on IA
+     signed by both sides). Preserves the three-badge silhouette; the
+     number tells the viewer how many total keys belong to this human.
+     Click the badge to expand the cluster reveal below. */
+  .verify-badge-pip {
+    display: inline-block;
+    margin-left: 0.2rem;
+    font-size: 0.78em;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    vertical-align: super;
+  }
+  /* Mirrors cluster — reveals every surface the soul landed on
+     (record.distribution), toggled by clicking the WITNESSED badge.
+     Same collapse-on-default behavior as the alias cluster; tinted
+     with the WITNESSED green so the visual identifies which badge
+     opened it. Hidden during save-cert PNG render via the same
+     CSS-override list used for the alias cluster. */
+  .verify-mirrors-cluster {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.25s ease, opacity 0.25s ease;
+    opacity: 0;
+    padding: 0 12px;
+    margin: 0 auto;
+    max-width: 480px;
+    border-radius: 8px;
+    background: rgba(78, 200, 160, 0.06);
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+  }
+  .verify-mirrors-cluster.verify-mirrors-cluster-open {
+    max-height: 360px;
+    opacity: 1;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-color: rgba(78, 200, 160, 0.18);
+  }
+  .verify-mirrors-cluster-head {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #4ec8a0;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .verify-mirrors-cluster-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .verify-mirror-row {
+    display: grid;
+    grid-template-columns: 14px 1fr 2fr;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 4px;
+    font-family: ui-monospace, "JetBrains Mono", monospace;
+    font-size: 0.66rem;
+  }
+  .verify-mirror-glyph {
+    color: #4ec8a0;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .verify-mirror-name {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .verify-mirror-url {
+    color: #4ec8a0;
+    font-size: 0.62rem;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .verify-mirror-url:hover { text-decoration: underline; }
+  .verify-mirrors-cluster-foot {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 8px 0 0;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .verify-badge-expandable {
+    cursor: pointer;
+  }
+  .verify-badge-expandable:hover {
+    /* hover already lifts via .verify-authenticated:hover, this is
+       just a hint that the badge is interactive when expandable */
   }
   .verify-forged {
     color: #f06040;
@@ -2276,6 +2470,29 @@ html.portal-transit .panel-footer { opacity: 0; }
     border: 1px solid rgba(0,0,0,0.2);
     padding: 16px 14px;
     margin: 8px 0;
+  }
+  /* Empty-state birthplace — chains with gps_source: none. Lower
+     visual weight than the time-locked block; still occupies the
+     section slot so the cert layout stays consistent. */
+  .gps-container.gps-container-empty {
+    padding: 12px 14px;
+  }
+  .gps-empty-body {
+    text-align: center;
+  }
+  .gps-empty-line {
+    font-size: 9px;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 70%, #c8c8c8);
+    margin: 0 0 6px;
+    letter-spacing: 0.04em;
+  }
+  .gps-empty-hint {
+    font-size: 7px;
+    color: #888;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 40%, #888);
+    margin: 0;
+    line-height: 1.5;
+    font-style: italic;
   }
   .gps-cipher {
     font-size: 7px;
@@ -5561,22 +5778,57 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
 // =====================================================================
 
 // ----- Content hash computation -----
-// Canonical list of fields that contribute to content_hash. Mirrors
-// mememage/core.py's _HASH_INCLUDED. Adding a field to a record does
-// NOT add it to the hash — it must be added here.
-const HASH_INCLUDED = new Set([
-  'prompt', 'seed', 'width', 'height', 'steps', 'cfg', 'guidance',
-  'denoise', 'sampler', 'scheduler', 'unet', 'lora', 'lora_strength', 'mode',
-  'timestamp', 'conceived', 'rendered',
+//
+// Versioned inclusion sets — mirror mememage/core.py's
+// _HASH_INCLUDED_BY_VERSION. Verifiers walking historical records must
+// use the set that applied when the record was minted, NOT whatever
+// the active version says today.
+//
+// v1 is the launch canon. Pre-launch dev iterations (v2/v3/v4 — yes
+// the dev numbering ran higher) are not honored here; any test souls
+// of those vintages are artifacts and don't round-trip cleanly.
+//
+// Adding a new version requires changes in lockstep here AND in
+// core.py. JS short version:
+//   1. Add a new const HASH_INCLUDED_V{n} = new Set([...]) below.
+//   2. Add it to HASH_INCLUDED_BY_VERSION.
+//   3. Bump CURRENT_HASH_VERSION (only used by the Attack Lab — real
+//      records carry their own version field).
+//   4. Don't rename fields silently across versions. Don't change
+//      sortKeysDeep / sha256_16 serialization without bumping.
+
+const HASH_INCLUDED_V1 = new Set([
+  'prompt', 'seed', 'width', 'height', 'steps', 'cfg_scale', 'guidance',
+  'denoise', 'sampler', 'scheduler', 'model', 'lora', 'lora_strength',
+  'conceived', 'rendered',
   'born', 'constellation_hash', 'machine_fingerprint',
   'rarity_score', 'rarity',
-  'birth_temperament', 'birth_traits', 'birth_readings', 'birth_summary',
+  // birth_traits are codes; birth_readings/temperament/summary are
+  // derived at display time via birth-text.js — not persisted, not hashed.
+  'birth_traits',
   'parent_id',
   // 'thumbnail' — post-mint, protected by Ed25519 signature instead
   'identifier',
   'constellation_name', 'heart_star_id', 'constellation_star',
   'decoder_hash',
 ]);
+
+const HASH_INCLUDED_BY_VERSION = {
+  1: HASH_INCLUDED_V1,
+};
+
+const CURRENT_HASH_VERSION = 1;
+const DEFAULT_HASH_VERSION = 1;
+
+function _hashSetForRecord(record) {
+  var v = (record && record.hash_version) || DEFAULT_HASH_VERSION;
+  return HASH_INCLUDED_BY_VERSION[v] || HASH_INCLUDED_BY_VERSION[DEFAULT_HASH_VERSION];
+}
+
+// Back-compat alias for callers that read the active set directly
+// (Attack Lab, debug tools). New code should call _hashSetForRecord
+// (record) so it stays version-aware.
+const HASH_INCLUDED = HASH_INCLUDED_BY_VERSION[CURRENT_HASH_VERSION];
 
 function sortKeysDeep(obj) {
   if (Array.isArray(obj)) return obj.map(sortKeysDeep);
@@ -5601,8 +5853,9 @@ async function sha256_16(obj) {
 
 async function computeContentHash(record) {
   try {
+    var include = _hashSetForRecord(record);
     var hashable = {};
-    Object.keys(record).filter(function(k) { return HASH_INCLUDED.has(k); }).sort()
+    Object.keys(record).filter(function(k) { return include.has(k); }).sort()
       .forEach(function(k) { hashable[k] = record[k]; });
     return await sha256_16(hashable);
   } catch (e) {
@@ -5723,12 +5976,30 @@ function computeDHash(imageData, width, height) {
   return bits; // 64 bits
 }
 
+// Mirror the thumbnail generator's center-crop-to-square so both sides
+// of the dHash comparison see the same framing. Without this, a
+// 1216×832 dropped image gets compared to an 832×832 thumbnail crop
+// across mismatched grid cells — guaranteed mismatch on any non-square
+// source. The thumbnail (mememage/thumbnail.py:generate_thumbnail)
+// center-crops then resizes to 80×80; we center-crop the dropped
+// pixels to a square before the 9×8 downsample so the grid geometry
+// matches.
+function _readCenterCroppedSquare(getImageData, srcW, srcH) {
+  var sq = Math.min(srcW, srcH);
+  var left = (srcW - sq) >> 1;
+  var top  = (srcH - sq) >> 1;
+  return { data: getImageData(left, top, sq, sq), width: sq, height: sq };
+}
+
 function dHashFromCanvas(canvas) {
-  // Full image — thumbnail is post-mint (has bar + watermark), so both
-  // sides match. Area-average downsample handles watermark noise.
+  // Square-framed dHash: drop-and-verify image gets center-cropped
+  // to match the thumbnail's framing before the 9×8 downsample.
   var ctx = canvas.getContext('2d', {willReadFrequently: true});
-  var px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  return computeDHash(px, canvas.width, canvas.height);
+  var cropped = _readCenterCroppedSquare(
+    function(x, y, w, h) { return ctx.getImageData(x, y, w, h).data; },
+    canvas.width, canvas.height,
+  );
+  return computeDHash(cropped.data, cropped.width, cropped.height);
 }
 
 function dHashFromDataURI(dataURI) {
@@ -5739,7 +6010,16 @@ function dHashFromDataURI(dataURI) {
       c.width = img.width; c.height = img.height;
       var ctx = c.getContext('2d', {willReadFrequently: true});
       ctx.drawImage(img, 0, 0);
-      resolve(computeDHash(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height));
+      // The stored thumbnail is ALREADY a square (center-cropped by
+      // the server), so this is functionally a no-op for it. Going
+      // through the same path keeps the geometry handling identical
+      // for both sides — and protects against any future thumbnail
+      // shape change.
+      var cropped = _readCenterCroppedSquare(
+        function(x, y, w, h) { return ctx.getImageData(x, y, w, h).data; },
+        c.width, c.height,
+      );
+      resolve(computeDHash(cropped.data, cropped.width, cropped.height));
     };
     img.onerror = function() { resolve(null); };
     img.src = dataURI;
@@ -5759,13 +6039,32 @@ function keychainIdentifier(fingerprint) {
   return 'mememage-keychain-' + fingerprint.replace(/:/g, '');
 }
 
-async function fetchKeychainRecord(fingerprint, filename) {
-  // Try to fetch a keychain record (succession.json or revocation.json) from IA
+// Derive a peer keychain root from a soul's _source URL. When the
+// validator fetches a soul from a non-IA peer (e.g.
+// https://X/api/souls/mememage-Y.soul), the same peer's keychain
+// lives at https://X/api/keychain/. Returns null if the source URL
+// doesn't match the peer pattern (IA souls fall back to the IA
+// metadata API as before).
+function peerKeychainRoot(sourceUrl) {
+  if (!sourceUrl) return null;
+  var m = /^(https?:\/\/[^/]+)\/api\/souls\//.exec(sourceUrl);
+  if (m) return m[1] + '/api/keychain';
+  return null;
+}
+
+async function fetchKeychainRecord(fingerprint, filename, peerRoot) {
+  // Try IA first (canonical source for chains that publish there),
+  // then the peer root derived from the soul's source URL if given.
+  // First non-null record wins — both sides should agree on content
+  // since records are signed.
   var chainId = keychainIdentifier(fingerprint);
   var urls = [
     'https://archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now(),
     'https://cors.archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now(),
   ];
+  if (peerRoot) {
+    urls.push(peerRoot + '/' + chainId + '/' + filename + '?t=' + Date.now());
+  }
   for (var i = 0; i < urls.length; i++) {
     try {
       var resp = await fetch(urls[i], {cache: 'no-store'});
@@ -5779,10 +6078,17 @@ async function fetchKeychainRecord(fingerprint, filename) {
 }
 
 async function verifyKeychainSignature(record) {
-  // Verify a keychain record's Ed25519 signature
+  // Verify a keychain record's Ed25519 signature. The signing pubkey
+  // field name varies by record type:
+  //   - succession: signed by OLD key (old_public_key)
+  //   - revocation: signed by the key itself (public_key)
+  //   - alias:      signed by the SIGNER profile (signer_public_key)
   if (!record || !record.signature) return null;
   try {
-    var pubHex = record.action === 'succeed' ? record.old_public_key : record.public_key;
+    var pubHex;
+    if (record.action === 'succeed') pubHex = record.old_public_key;
+    else if (record.action === 'alias') pubHex = record.signer_public_key;
+    else pubHex = record.public_key;
     var sigHex = record.signature;
     var verifyObj = {};
     Object.keys(record).filter(function(k) { return k !== 'signature'; }).sort()
@@ -5797,13 +6103,125 @@ async function verifyKeychainSignature(record) {
   } catch (e) { return false; }
 }
 
-async function checkKeychain(fingerprint, publicKeyHex) {
-  // Check for revocation or succession of a key.
-  // Returns: {status: 'active'|'revoked'|'rotated', detail: string, successor: object|null}
+// ----- Alias discovery ----------------------------------------------------
+//
+// An alias record (alias-<other_fp_clean>.json in the signer's keychain)
+// claims that two profiles belong to the same human. Verifiers discover
+// aliases via the IA metadata API — listing the signer's keychain files
+// and pulling each alias-*.json. The strongest signal is BIDIRECTIONAL:
+// A claims B is its sibling AND B claims A is its sibling. One-way
+// aliases are still recognized but rendered with a softer label.
+
+async function fetchKeychainFileList(fingerprint, peerRoot) {
+  // IA metadata endpoint returns the file manifest of an item. We use
+  // it once per identity to discover any alias-*.json records, rather
+  // than guessing fingerprints. When the soul came from a non-IA peer,
+  // also probe the peer's /api/keychain/<chain_id> listing endpoint —
+  // returns the same {files:[...]} shape so the merged file list
+  // catches aliases regardless of where they were published.
+  // Returns [] on any failure — alias discovery is a soft enrichment,
+  // never blocks the verdict.
+  var chainId = keychainIdentifier(fingerprint);
+  var urls = [
+    'https://archive.org/metadata/' + chainId + '?t=' + Date.now(),
+    'https://cors.archive.org/metadata/' + chainId + '?t=' + Date.now(),
+  ];
+  if (peerRoot) {
+    urls.push(peerRoot + '/' + chainId + '?t=' + Date.now());
+  }
+  var merged = {};
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      var resp = await fetch(urls[i], {cache: 'no-store'});
+      if (!resp.ok) continue;
+      var data = await resp.json();
+      if (data && Array.isArray(data.files)) {
+        data.files.forEach(function(f) {
+          // IA returns {name: ...}, peer returns plain strings
+          var name = (typeof f === 'string') ? f : f.name;
+          if (name) merged[name] = true;
+        });
+      }
+    } catch (e) { continue; }
+  }
+  return Object.keys(merged);
+}
+
+async function discoverAliases(fingerprint, peerRoot) {
+  // Returns a list of verified alias records the named key has signed.
+  // peerRoot is the optional keychain root derived from the soul's
+  // _source URL — lets the verifier find aliases on chains that
+  // published only to peer surfaces, not IA. Both sides of the
+  // bidirectional check probe the same peer too.
+  if (!fingerprint) return [];
+  var files = await fetchKeychainFileList(fingerprint, peerRoot);
+  var aliasFiles = files.filter(function(n) {
+    return /^alias-[0-9a-f]{16}\.json$/i.test(n);
+  });
+  if (!aliasFiles.length) return [];
+  var out = [];
+  for (var i = 0; i < aliasFiles.length; i++) {
+    var rec = await fetchKeychainRecord(fingerprint, aliasFiles[i], peerRoot);
+    if (!rec || rec.action !== 'alias') continue;
+    var sigOk = await verifyKeychainSignature(rec);
+    if (sigOk !== true) continue;
+    var bi = false;
+    var reverseName = '';
+    try {
+      var theirFiles = await fetchKeychainFileList(rec.alias_fingerprint, peerRoot);
+      var ourClean = (rec.signer_fingerprint || fingerprint).replace(/:/g, '');
+      var expectedName = 'alias-' + ourClean + '.json';
+      if (theirFiles.indexOf(expectedName) >= 0) {
+        var reverse = await fetchKeychainRecord(rec.alias_fingerprint, expectedName, peerRoot);
+        if (reverse && reverse.action === 'alias'
+            && reverse.alias_fingerprint === (rec.signer_fingerprint || fingerprint)
+            && (await verifyKeychainSignature(reverse)) === true) {
+          bi = true;
+          // The reverse record was signed BY the other side, so its
+          // creator_name is that side's own self-declared name —
+          // exactly what we want to display. Captures the real name
+          // for older records that pre-date alias_creator_name.
+          reverseName = reverse.creator_name || '';
+        }
+      }
+    } catch (e) { /* one-way is still useful */ }
+
+    // Name resolution chain (other side's display name):
+    //   1. rec.alias_creator_name — new field (2026-05-18+), the
+    //      signer's local label for the target. Ideal.
+    //   2. reverseName — captured above for bidirectional records,
+    //      gives the other side's own self-declared name. Best
+    //      fallback for older records.
+    //   3. Truncated fingerprint — readable last resort. Beats
+    //      showing the signer's own name as if it were the target's.
+    var targetName = rec.alias_creator_name || reverseName || '';
+    if (!targetName && rec.alias_fingerprint) {
+      var fpClean = rec.alias_fingerprint.replace(/:/g, '');
+      targetName = 'key ' + fpClean.slice(0, 8);
+    }
+    out.push({
+      alias_fingerprint: rec.alias_fingerprint,
+      alias_public_key: rec.alias_public_key,
+      // Name of the OTHER key (the sibling we're naming):
+      creator_name: targetName,
+      // Name of the SIGNER (kept for back-compat / future use):
+      signer_name: rec.creator_name || '',
+      timestamp: rec.timestamp || '',
+      bidirectional: bi,
+    });
+  }
+  return out;
+}
+
+async function checkKeychain(fingerprint, publicKeyHex, peerRoot) {
+  // Check for revocation or succession of a key. peerRoot is the
+  // optional keychain root derived from the soul's _source URL —
+  // ensures revocations/rotations on chains that publish only to
+  // peer surfaces are still discoverable.
   if (!fingerprint) return {status: 'active', detail: '', successor: null};
 
   // Check revocation first
-  var revocation = await fetchKeychainRecord(fingerprint, 'revocation.json');
+  var revocation = await fetchKeychainRecord(fingerprint, 'revocation.json', peerRoot);
   if (revocation && revocation.action === 'revoke') {
     var revOk = await verifyKeychainSignature(revocation);
     if (revOk === true) {
@@ -5816,7 +6234,7 @@ async function checkKeychain(fingerprint, publicKeyHex) {
   }
 
   // Check succession
-  var succession = await fetchKeychainRecord(fingerprint, 'succession.json');
+  var succession = await fetchKeychainRecord(fingerprint, 'succession.json', peerRoot);
   if (succession && succession.action === 'succeed') {
     var sucOk = await verifyKeychainSignature(succession);
     if (sucOk === true) {
@@ -5966,6 +6384,162 @@ var Access = (function() {
 </script>
 <script>
 // =====================================================================
+// BIRTH TEXT LOOKUPS — reconstruct readable strings from trait codes.
+// =====================================================================
+// The soul stores only `birth_traits` (an array of code strings, e.g.
+// ["speculative", "loosening_grip", "night_owl"]). The reading per
+// trait, the overall temperament, and the one-line summary are all
+// derived at display time from these tables — never persisted.
+//
+// Mirror of mememage/temperament.py (BIRTH_CONDITIONS, TEMPERAMENT_COMBOS,
+// TEMPERAMENT_SINGLES). When trait codes change in Python, mirror them
+// here. APPEND-ONLY: removing or renaming an existing code would mute
+// historical records that reference it.
+// =====================================================================
+
+(function (root) {
+
+  // code → reading string
+  var BIRTH_READINGS = {
+    contested:      'The CPU was contested — threads jostling at the moment of birth',
+    yielding:       'The CPU was yielding — a brief window of cooperation',
+    uncontested:    'The CPU was at ease — a calm moment between storms',
+    stumbling:      'The machine stumbled — a page fault at the exact moment of conception',
+    sure_footed:    'Sure-footed — the memory was aligned',
+    reaching:       'The machine was reaching — hard faults echoed through the birth',
+    speculative:    'Speculative surge — the OS was racing ahead of the program',
+    cautious:       'The OS was cautious — taking no risks with memory',
+    restless:       'The OS was restless — speculating but unsure',
+    loosening_grip: 'Loosening grip — the machine was letting go of memory',
+    holding_tight:  'Holding tight — every page was precious, nothing to spare',
+    in_flux:        'Memory in flux — the machine was deciding what to keep',
+    entangled:      'Entangled — the file descriptors aligned at a round number',
+    unraveled:      'Unraveled — the connections were fraying at the edges',
+    forged_in_fire: 'Forged in fire — the machine was overwhelmed',
+    under_pressure: 'Born under pressure — the system was straining',
+    in_silence:     'Born in silence — the machine was barely conscious',
+    last_light:     'Born in the last light — power was fading',
+    untethered:     'Born untethered — free from the wall',
+    night_owl:      'Born in the small hours — the world was asleep',
+    dawn:           'Born at first light',
+  };
+
+  // Trait-combination → (temperament, summary). First match wins.
+  // Each entry: [Set<requiredTraitCodes>, temperament, summary].
+  var TEMPERAMENT_COMBOS = [
+    // Turbulent
+    [['contested','stumbling','speculative'], 'A violent birth',     'CPU contested, memory stumbling, OS speculating — chaos at every level'],
+    [['contested','stumbling'],                'A turbulent birth',   'The CPU fought for time while the machine stumbled on its memory'],
+    [['contested','speculative'],              'A reckless birth',    'The CPU was contested and the OS was gambling on every page'],
+    [['stumbling','loosening_grip'],           'A birth in collapse', 'Memory was faulting and the OS was letting go — the floor giving way'],
+    [['forged_in_fire','contested'],           'Born in the furnace', 'Load was crushing and every thread fighting for survival'],
+    [['speculative','loosening_grip'],         'An unstable birth',   'The OS was speculating while releasing memory — a system on the edge'],
+    [['reaching','in_flux'],                   'A grasping birth',    'Hard faults and shifting memory — the machine was reaching for something'],
+    [['under_pressure','holding_tight'],       'A clenched birth',    'Under pressure but refusing to release — every page held in a fist'],
+    [['contested','reaching'],                 'A strained birth',    'CPU contested and hard faults rippling — two pressures at once'],
+    // Calm
+    [['uncontested','sure_footed','cautious'], 'A perfect birth',     'CPU clear, memory solid, OS confident — everything aligned'],
+    [['uncontested','sure_footed'],            'A clean birth',       'No contention, no faults — the machine was certain'],
+    [['uncontested','cautious'],               'A deliberate birth',  'CPU clear and OS cautious — nothing left to chance'],
+    [['sure_footed','holding_tight'],          'A steadfast birth',   'Memory aligned and nothing released — the machine was solid'],
+    [['in_silence','sure_footed'],             'A meditative birth',  'The machine was barely awake and every page was ready'],
+    [['yielding','restless'],                  'A restless birth',    'The CPU was yielding but the OS was restless — a quiet tension'],
+    [['yielding','cautious'],                  'A patient birth',     'The CPU yielded and the OS held back — both waiting for the right moment'],
+    // Night
+    [['night_owl','contested'],                'A fever dream',       'The small hours with the CPU contested — a restless machine at night'],
+    [['night_owl','uncontested'],              'A lucid dream',       'The small hours with a clear CPU — a dreaming machine at peace'],
+    [['night_owl','stumbling'],                'A nightmare',         'The small hours with the machine stumbling — tossing in its sleep'],
+    [['dawn','sure_footed'],                   'A first breath',      "Born at dawn with every page in place — the day's first creation"],
+    [['dawn','speculative'],                   'An eager dawn',       'Born at first light with the OS already racing ahead'],
+    // Frequent real-world pairs
+    [['contested','restless'],                 'An agitated birth',   "CPU contested and OS restless — the machine couldn't settle"],
+    [['contested','unraveled'],                'A fraying birth',     'CPU contested and connections fraying — pressure from all sides'],
+    [['sure_footed','yielding'],               'A graceful birth',    'Memory solid and CPU yielding — a moment of elegant coordination'],
+    [['in_flux','restless'],                   'A shifting birth',    'Memory in flux and OS restless — nothing was fixed in place'],
+    [['reaching','restless'],                  'A searching birth',   'Hard faults and a restless OS — the machine was reaching for something'],
+    [['contested','in_flux'],                  'A roiling birth',     'CPU contested while memory shifted beneath — turbulence at every layer'],
+    [['sure_footed','restless'],               'A paradox birth',     'Memory was solid but the OS was restless — certainty and unease at once'],
+    [['uncontested','restless'],               'A watchful birth',    'CPU clear but the OS restless — calm on the surface, stirring below'],
+    // Entanglement
+    [['entangled','contested'],                'A knotted birth',     'Connections aligned and threads contested — deeply tangled'],
+    [['unraveled','loosening_grip'],           'An unraveling birth', 'Connections fraying and memory releasing — the machine was coming apart'],
+    [['entangled','holding_tight'],            'A taut birth',        'Everything connected and nothing released — a system wound tight'],
+    [['unraveled','restless'],                 'A dissolving birth',  'Connections fraying and OS restless — the machine was losing its shape'],
+  ];
+
+  // Single-trait temperament fallbacks (when no combo matches).
+  var TEMPERAMENT_SINGLES = {
+    contested:      'A contested birth',
+    yielding:       'A yielding birth',
+    uncontested:    'An uncontested birth',
+    stumbling:      'A stumbling birth',
+    sure_footed:    'A sure-footed birth',
+    reaching:       'A reaching birth',
+    speculative:    'A speculative birth',
+    cautious:       'A cautious birth',
+    restless:       'A restless birth',
+    loosening_grip: 'A loosening birth',
+    holding_tight:  'A clenched birth',
+    in_flux:        'A birth in flux',
+    entangled:      'An entangled birth',
+    unraveled:      'An unraveled birth',
+    forged_in_fire: 'A volatile birth',
+    under_pressure: 'A strained birth',
+    in_silence:     'A silent birth',
+    last_light:     'A dying birth',
+    untethered:     'An untethered birth',
+    night_owl:      'A nocturnal birth',
+    dawn:           'A dawn birth',
+  };
+
+  // Reconstruct {readings, temperament, summary} from a trait code array.
+  // Returns the same shape the old persisted fields had, so any code
+  // path that consumed them keeps working with a one-line substitution.
+  function readBirthTexts(traits) {
+    traits = (traits || []).filter(function (t) { return typeof t === 'string'; });
+    var readings = traits.map(function (t) { return BIRTH_READINGS[t]; })
+                         .filter(function (r) { return !!r; });
+    var traitSet = {};
+    traits.forEach(function (t) { traitSet[t] = true; });
+    var temperament = null;
+    var summary = null;
+    for (var i = 0; i < TEMPERAMENT_COMBOS.length; i++) {
+      var combo = TEMPERAMENT_COMBOS[i];
+      var required = combo[0];
+      var allMatch = true;
+      for (var j = 0; j < required.length; j++) {
+        if (!traitSet[required[j]]) { allMatch = false; break; }
+      }
+      if (allMatch) {
+        temperament = combo[1];
+        summary = combo[2];
+        break;
+      }
+    }
+    if (!temperament && traits.length) {
+      temperament = TEMPERAMENT_SINGLES[traits[0]] || null;
+    }
+    if (!temperament) {
+      temperament = 'A serene birth';
+      summary = 'All was calm — the machine had nothing to prove';
+    }
+    if (!summary) {
+      summary = readings[0] || 'All was calm — the machine had nothing to prove';
+    }
+    return { readings: readings, temperament: temperament, summary: summary };
+  }
+
+  root.BirthText = {
+    READINGS: BIRTH_READINGS,
+    COMBOS: TEMPERAMENT_COMBOS,
+    SINGLES: TEMPERAMENT_SINGLES,
+    read: readBirthTexts,
+  };
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+// =====================================================================
 // RENDER CERTIFICATE (HTML/CSS + Canvas sky band)
 //
 // Layout order (trading card style):
@@ -6085,6 +6659,8 @@ function _saveLivePlate(plate, barId, barHash) {
       '.verify-badge { box-shadow: none !important; }' +
       '.gps-unlock { display: none !important; }' +
       '.save-cert-btn { display: none !important; }' +
+      '.verify-alias-cluster { display: none !important; }' +
+      '.verify-mirrors-cluster { display: none !important; }' +
       '.cosmic-player { display: none !important; }' +
       // Live plate has 28px bottom padding to breathe with the player
       // sticky-snapped above it. With the player hidden in the saved
@@ -6279,20 +6855,74 @@ function renderCert(meta, options) {
   //   [ DENOISE | SAMPLER | SCHEDULER ] numeric/label row
   //   [ MODEL           full ]
   //   [ LoRA            full ]
-  if (meta.seed !== undefined) GEN_PARAMS.push({l: 'Seed', v: '' + meta.seed, span: 3});
+  // Canonical AI-gen fields get curated labels + layout (Seed full-width,
+  // Steps/CFG/Guidance on one numeric row, etc.). Tracks which fields
+  // we consumed so we don't double-render them below in the catch-all.
+  var _claimedKeys = {prompt: 1, width: 1, height: 1};
+  function _push(key, label, value, span) {
+    GEN_PARAMS.push({l: label, v: '' + value, span: span || undefined});
+    _claimedKeys[key] = 1;
+  }
+  if (meta.seed !== undefined) _push('seed', 'Seed', meta.seed, 3);
   if (meta.width && meta.height) GEN_PARAMS.push({l: 'Size', v: meta.width + ' \u00d7 ' + meta.height, span: 3});
-  if (meta.mode) GEN_PARAMS.push({l: 'Mode', v: meta.mode, span: 3});
+  if (meta.mode) _push('mode', 'Mode', meta.mode, 3);
   // Numeric row (keep Steps / CFG / Guidance together visually)
-  if (meta.steps !== undefined) GEN_PARAMS.push({l: 'Steps', v: '' + meta.steps});
-  if (meta.cfg !== undefined) GEN_PARAMS.push({l: 'CFG', v: '' + meta.cfg});
-  if (meta.guidance !== undefined) GEN_PARAMS.push({l: 'Guidance', v: '' + meta.guidance});
+  if (meta.steps !== undefined) _push('steps', 'Steps', meta.steps);
+  if (meta.cfg !== undefined) _push('cfg', 'CFG', meta.cfg);
+  if (meta.guidance !== undefined) _push('guidance', 'Guidance', meta.guidance);
   // Second short row
-  if (meta.denoise !== undefined) GEN_PARAMS.push({l: 'Denoise', v: '' + meta.denoise});
-  if (meta.sampler) GEN_PARAMS.push({l: 'Sampler', v: meta.sampler});
-  if (meta.scheduler) GEN_PARAMS.push({l: 'Scheduler', v: meta.scheduler});
-  if (meta.unet) GEN_PARAMS.push({l: 'Model', v: meta.unet, span: 3});
-  if (meta.lora) GEN_PARAMS.push({l: 'LoRA', v: meta.lora, span: 3});
-  if (meta.lora_strength !== undefined) GEN_PARAMS.push({l: 'LoRA Str', v: '' + meta.lora_strength});
+  if (meta.denoise !== undefined) _push('denoise', 'Denoise', meta.denoise);
+  if (meta.sampler) _push('sampler', 'Sampler', meta.sampler);
+  if (meta.scheduler) _push('scheduler', 'Scheduler', meta.scheduler);
+  if (meta.unet) _push('unet', 'Model', meta.unet, 3);
+  if (meta.lora) _push('lora', 'LoRA', meta.lora, 3);
+  if (meta.lora_strength !== undefined) _push('lora_strength', 'LoRA Str', meta.lora_strength);
+
+  // Adaptive Origin panel: any extra string/number top-level fields
+  // the creator chose to declare get rendered alongside the canonical
+  // AI-gen fields. Lets non-AI mints (photographers, digital artists,
+  // anyone bringing their own image) describe their origin without
+  // pretending to be an AI gen. The exclusion list below holds the
+  // system-owned namespaces — identity, birth cert, machine, chunks,
+  // visibility, signing — so they don't get rendered as "origin".
+  var _systemKeys = {
+    // Identity
+    identifier: 1, content_hash: 1, signature: 1, public_key: 1,
+    key_fingerprint: 1, creator_name: 1, hash_version: 1, parent_id: 1,
+    // Birth certificate / celestial
+    born: 1, conceived: 1, rendered: 1, timestamp: 1,
+    constellation_name: 1, constellation_hash: 1, constellation_star: 1,
+    heart_star_id: 1,
+    rarity: 1, rarity_score: 1,
+    birth_temperament: 1, birth_traits: 1, birth_readings: 1, birth_summary: 1,
+    // Machine
+    machine_fingerprint: 1,
+    // Chunks / chain
+    chunks: 1, decoder_hash: 1, outer_position: 1, outer_cycle: 1,
+    // Visibility / encryption
+    chain_visibility: 1, encrypted_soul: 1, encrypted_chunks: 1, gps_encrypted: 1,
+    // Distribution — set by the channels framework, not declared by
+    // the creator. `url` is the primary-channel URL (used by the
+    // Discord-message link / legacy bar); `distribution` is the full
+    // {channel_id: url} mirror map (already filtered by the typeof
+    // object guard, but listed explicitly so intent is unambiguous).
+    url: 1, distribution: 1,
+    // Misc
+    thumbnail: 1, song_name: 1,
+  };
+  var _origKeys = Object.keys(meta).sort();
+  for (var _ki = 0; _ki < _origKeys.length; _ki++) {
+    var _k = _origKeys[_ki];
+    if (_systemKeys[_k]) continue;     // system-owned, skip
+    if (_claimedKeys[_k]) continue;    // already rendered above
+    if (_k[0] === '_') continue;       // private/transient
+    var _v = meta[_k];
+    if (_v === null || _v === undefined || _v === '') continue;
+    if (typeof _v === 'object') continue;  // dicts/arrays don't fit a single cell
+    // Title-case the key for display ("camera_model" → "Camera Model")
+    var _label = _k.replace(/[_-]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+    GEN_PARAMS.push({l: _label, v: '' + _v, span: 3});
+  }
 
   // Build PLANET_DATA from born
   var planetSymbols = {sun:'\u2609', moon:'\u263D', mercury:'\u263F', venus:'\u2640', mars:'\u2642', jupiter:'\u2643', saturn:'\u2644'};
@@ -6484,11 +7114,23 @@ function renderCert(meta, options) {
   // produces a different celestial snapshot, so every constellation is unique.
   // Fallback chain: constellation_hash → constellation_name → content_hash (legacy)
   var conSeed = meta.constellation_hash || meta.constellation_name || meta.content_hash || meta._content_hash || '';
-  // Read decoder chunk index from new nested shape, fall back to flat
-  // (legacy records pre-chunks-spec migration).
+  // Record's position within its constellation cycle ("which Bayer
+  // letter is this record"). Prefer the canonical decoder layer's index
+  // when present; for chains without a decoder, fall back to any
+  // non-schematic layer's index (any layer K-cycle works as a
+  // constellation indexer).
   var _dec = (meta.chunks && meta.chunks.decoder) || null;
   var myChunkIdx = _dec && _dec.index !== undefined ? _dec.index
                  : (meta.decoder_chunk_index !== undefined ? meta.decoder_chunk_index : -1);
+  if (myChunkIdx < 0 && meta.chunks && typeof meta.chunks === 'object') {
+    var _roles = Object.keys(meta.chunks);
+    for (var _ri = 0; _ri < _roles.length; _ri++) {
+      var _role = _roles[_ri];
+      if (_role === 'schematic') continue;
+      var _e = meta.chunks[_role];
+      if (_e && typeof _e.index === 'number') { myChunkIdx = _e.index; break; }
+    }
+  }
   var isHeartStar = meta.heart_star_id && meta.heart_star_id === meta._identifier;
   if (isHeartStar) myChunkIdx = 0;
 
@@ -6548,9 +7190,11 @@ function renderCert(meta, options) {
     // Save the line canvas state (lines don't change)
     var lineSnapshot = conCtx.getImageData(0, 0, CON_W, CON_H);
 
-    // Star twinkle parameters — each star gets a random phase and period
+    // Star twinkle parameters — each star gets a random phase and period.
+    // Drives off cStars.length so a layout function that returns fewer
+    // or more stars still animates correctly.
     var twinklePhase = [], twinklePeriod = [];
-    for (var tsi = 0; tsi < 12; tsi++) {
+    for (var tsi = 0; tsi < cStars.length; tsi++) {
       twinklePhase.push(Math.random() * 6.2832);
       twinklePeriod.push(2000 + Math.random() * 4000); // 2-6 second cycle
     }
@@ -6560,7 +7204,7 @@ function renderCert(meta, options) {
       conCtx.putImageData(lineSnapshot, 0, 0);
 
       var now = Date.now();
-      for (var csi = 0; csi < 12; csi++) {
+      for (var csi = 0; csi < cStars.length; csi++) {
         var cs = cStars[csi];
         var twinkle = 0.85 + 0.15 * Math.sin(now / twinklePeriod[csi] * 6.2832 + twinklePhase[csi]); // 0.85-1.0
 
@@ -6720,13 +7364,74 @@ function renderCert(meta, options) {
       badge.innerHTML = '<span class="verify-icon">&#x25CB;</span> BODILESS';
       badge.title = 'No spirit \u2014 soul only, bring body to witness';
     }
+
+    // Distribution surfacing: every soul records the channels it
+    // landed on as ``record.distribution`` ({channel_id: url}). Add
+    // the channel list to the WITNESSED tooltip and make the badge
+    // expandable (click → reveal full URL list below). The mirror
+    // count is the sovereignty signal — "this soul exists in N
+    // places, no platform owns it" — surfaced compactly without
+    // adding a fourth badge.
+    var distribution = meta.distribution || {};
+    var channelIds = Object.keys(distribution).filter(function(k) {
+      return distribution[k];
+    });
+    if (channelIds.length && (vf.status === 'verified' || vf.status === 'bar_verified')) {
+      badge.title += '\nDistributed via: ' + channelIds.join(', ');
+      badge.classList.add('verify-badge-expandable');
+      badge.addEventListener('click', function() {
+        var ex = badge.parentNode.parentNode.querySelector('.verify-mirrors-cluster');
+        if (ex) ex.classList.toggle('verify-mirrors-cluster-open');
+      });
+    }
+
     badgeWrap.appendChild(badge);
 
     // AUTHENTICATED badge (Ed25519 signature)
     if (vf.signature === true) {
       var sigBadge = _div('verify-badge verify-authenticated');
       sigBadge.innerHTML = '<span class="verify-icon">&#x1F511;</span> AUTHENTICATED';
-      sigBadge.title = vf.signatureDetail || 'Ed25519 signature verified';
+
+      // Tooltip "Also known as": comma-separated names only. People
+      // identify each other by names, not key directionality. Only
+      // bidirectional aliases qualify — those are mutual handshakes
+      // (both private keys signed). One-way claims are soft data that
+      // could mislead a viewer if rendered the same as confirmed ones
+      // (anyone can publish "I'm also Anthropic" unilaterally), so
+      // they stay confined to the expanded cluster panel below where
+      // the forensic context makes the distinction legible.
+      var aliases = (vf.aliases || []);
+      var aliasTooltip = '';
+      if (aliases.length) {
+        var seen = {};
+        var labels = [];
+        var selfName = (meta.creator_name || '').trim().toLowerCase();
+        aliases.forEach(function(a) {
+          if (!a.bidirectional) return;
+          var fp = a.alias_fingerprint || '';
+          if (seen[fp]) return;
+          seen[fp] = true;
+          var rawName = (a.creator_name || '').trim();
+          var isStub = /^key [0-9a-f]{6,16}$/i.test(rawName);
+          var isSelfLabel = rawName && selfName && rawName.toLowerCase() === selfName;
+          if (isStub || isSelfLabel || !rawName) return;
+          labels.push(rawName);
+        });
+        if (labels.length) {
+          aliasTooltip = '\nAlso known as: ' + labels.join(', ');
+        }
+      }
+      sigBadge.title = (vf.signatureDetail || 'Ed25519 signature verified') + aliasTooltip;
+
+      // Click → toggle an inline alias-cluster expansion below the
+      // badge row. Hidden by default; ::after the badge row in DOM.
+      if (aliases.length) {
+        sigBadge.classList.add('verify-badge-expandable');
+        sigBadge.addEventListener('click', function() {
+          var ex = sigBadge.parentNode.parentNode.querySelector('.verify-alias-cluster');
+          if (ex) ex.classList.toggle('verify-alias-cluster-open');
+        });
+      }
       badgeWrap.appendChild(sigBadge);
     } else if (vf.signature === false) {
       var sigBadge2 = _div('verify-badge verify-forged');
@@ -6764,6 +7469,96 @@ function renderCert(meta, options) {
     }
 
     plate.appendChild(badgeWrap);
+
+    // Alias cluster reveal — sibling-key list, toggled by clicking
+    // the AUTHENTICATED badge when it has a count pip. Lives outside
+    // the badge row so the three-badge silhouette stays clean; opens
+    // inline only when explicitly requested. Hidden during save-cert
+    // PNG render (see _saveLivePlate's CSS override list).
+    if (vf.signature === true && vf.aliases && vf.aliases.length) {
+      var cluster = _div('verify-alias-cluster');
+      // Dedupe by alias_fingerprint (same logic as the pip count
+      // above) so the panel matches the badge's stated total.
+      var seenAliasFp2 = {};
+      var uniqAliases2 = [];
+      vf.aliases.forEach(function(a) {
+        var fp = a.alias_fingerprint || '';
+        if (!fp || seenAliasFp2[fp]) return;
+        seenAliasFp2[fp] = true;
+        uniqAliases2.push(a);
+      });
+      var bi2 = uniqAliases2.filter(function(a) { return a.bidirectional; });
+      var oneWay2 = uniqAliases2.filter(function(a) { return !a.bidirectional; });
+      var rows = [];
+      // The signer itself, anchoring the cluster.
+      rows.push(
+        '<div class="verify-alias-row verify-alias-self">' +
+          '<span class="verify-alias-glyph">\u29bf</span>' +  // ⦿ filled dot
+          '<span class="verify-alias-name">' + escapeHtml(meta.creator_name || '(signer)') + '</span>' +
+          '<span class="verify-alias-fp">' + escapeHtml(meta.key_fingerprint || '') + '</span>' +
+          '<span class="verify-alias-tag verify-alias-tag-signer">this signer</span>' +
+        '</div>'
+      );
+      bi2.forEach(function(a) {
+        rows.push(
+          '<div class="verify-alias-row">' +
+            '<span class="verify-alias-glyph">\u29bf</span>' +
+            '<span class="verify-alias-name">' + escapeHtml(a.creator_name || '(sibling)') + '</span>' +
+            '<span class="verify-alias-fp">' + escapeHtml(a.alias_fingerprint || '') + '</span>' +
+            '<span class="verify-alias-tag verify-alias-tag-bi">bidirectional</span>' +
+          '</div>'
+        );
+      });
+      oneWay2.forEach(function(a) {
+        rows.push(
+          '<div class="verify-alias-row verify-alias-oneway">' +
+            '<span class="verify-alias-glyph">\u25cb</span>' +  // ○ empty dot
+            '<span class="verify-alias-name">' + escapeHtml(a.creator_name || '(claimed sibling)') + '</span>' +
+            '<span class="verify-alias-fp">' + escapeHtml(a.alias_fingerprint || '') + '</span>' +
+            '<span class="verify-alias-tag verify-alias-tag-oneway">one-way</span>' +
+          '</div>'
+        );
+      });
+      cluster.innerHTML =
+        '<div class="verify-alias-cluster-head">Keys recognized for this human</div>' +
+        '<div class="verify-alias-cluster-rows">' + rows.join('') + '</div>' +
+        '<p class="verify-alias-cluster-foot">Bidirectional aliases are signed by both keys (strongest signal). One-way claims are recognized but unconfirmed by the other side.</p>';
+      plate.appendChild(cluster);
+    }
+
+    // Mirrors cluster — reveals every surface the soul landed on
+    // when the WITNESSED badge is clicked. Mirrors the alias-cluster
+    // pattern (same collapse-on-default, same scroll fallback) but
+    // tinted with the WITNESSED green so the visual stays consistent
+    // with which badge opened it. Hidden during save-cert PNG render.
+    if ((vf.status === 'verified' || vf.status === 'bar_verified')) {
+      var mirrors = meta.distribution || {};
+      var mirrorIds = Object.keys(mirrors).filter(function(k) {
+        return mirrors[k];
+      });
+      if (mirrorIds.length) {
+        var mirrorCluster = _div('verify-mirrors-cluster');
+        var mirrorRows = mirrorIds.map(function(id) {
+          var url = mirrors[id];
+          var safeId = escapeHtml(id);
+          var safeUrl = escapeHtml(url);
+          return (
+            '<div class="verify-mirror-row">' +
+              '<span class="verify-mirror-glyph">\u29bf</span>' +
+              '<span class="verify-mirror-name">' + safeId + '</span>' +
+              '<a class="verify-mirror-url" href="' + safeUrl + '" target="_blank" rel="noopener">' + safeUrl + '</a>' +
+            '</div>'
+          );
+        });
+        mirrorCluster.innerHTML =
+          '<div class="verify-mirrors-cluster-head">Distributed across ' +
+            mirrorIds.length + ' surface' + (mirrorIds.length === 1 ? '' : 's') +
+          '</div>' +
+          '<div class="verify-mirrors-cluster-rows">' + mirrorRows.join('') + '</div>' +
+          '<p class="verify-mirrors-cluster-foot">No platform owns this soul. Any surface going offline doesn\u2019t erase it \u2014 the others still answer.</p>';
+        plate.appendChild(mirrorCluster);
+      }
+    }
   }
 
   plate.appendChild(_div('plate-divider-short'));
@@ -6822,10 +7617,13 @@ function renderCert(meta, options) {
         }
       });
     }
-    // Bayer designation — Greek letters by birth order
-    // Letter navigates to parent (one step back), name navigates to heart star
-    var BAYER = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
-    if (myChunkIdx >= 0 && myChunkIdx < 12) {
+    // Bayer designation — Greek letters by birth order.
+    // Letter navigates to parent (one step back), name navigates to
+    // heart star. Full 24-letter Greek alphabet covers K up to 24;
+    // beyond that, no letter is drawn (rare for any practical chain).
+    var BAYER = ('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
+               + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
+    if (myChunkIdx >= 0 && myChunkIdx < BAYER.length) {
       if (meta.parent_id && !isHeartStar) {
         // Greek letter links to parent (previous star in chain)
         var bayerLink = document.createElement('a');
@@ -6857,18 +7655,27 @@ function renderCert(meta, options) {
   // ===================================================================
   // 2. BIRTH TEMPERAMENT
   // ===================================================================
-  if (meta.birth_temperament) {
+  // Records carry only birth_traits (codes); the human-readable
+  // temperament + summary are reconstructed from the lookup tables in
+  // birth-text.js. Falls back to any persisted birth_temperament for
+  // legacy V4 dev-era records that still have the strings inline.
+  var birthTexts = (typeof BirthText !== 'undefined' && meta.birth_traits)
+    ? BirthText.read(meta.birth_traits)
+    : null;
+  var derivedTemperament = (birthTexts && birthTexts.temperament) || meta.birth_temperament;
+  var derivedSummary     = (birthTexts && birthTexts.summary)     || meta.birth_summary;
+  if (derivedTemperament) {
     plate.appendChild(_sectionLabel('BIRTH TEMPERAMENT'));
 
     var tempCell = _div('temperament-cell');
 
     var tempName = _div('plate-temperament-name selectable');
-    tempName.textContent = meta.birth_temperament;
+    tempName.textContent = derivedTemperament;
     tempCell.appendChild(tempName);
 
-    if (meta.birth_summary) {
+    if (derivedSummary) {
       var tempSummary = _div('plate-temperament-summary selectable');
-      tempSummary.textContent = meta.birth_summary;
+      tempSummary.textContent = derivedSummary;
       tempCell.appendChild(tempSummary);
     }
 
@@ -6966,7 +7773,7 @@ function renderCert(meta, options) {
   // 4. MACHINE DIE: vitals canvas band, machine rarity traits
   // ===================================================================
   if (MACHINE.length > 0 && !isSample) {
-    plate.appendChild(_sectionLabel('MACHINE AT BIRTH'));
+    plate.appendChild(_sectionLabel('MACHINE AT CONCEPTION'));
 
     var machWrap = _div('sky-band-wrap');
     var machContainer = _div('sky-band-container');
@@ -7009,7 +7816,7 @@ function renderCert(meta, options) {
     setTimeout(function() {
       if (typeof initMachineBand !== 'function') return;
       var dims = _setupHiDpi(machCanvas, MACH_W, MACH_H);
-      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta._about || '', rarityScore, barId, barHash);
+      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta.about || '', rarityScore, barId, barHash);
     }, 0);
   }
 
@@ -7029,7 +7836,10 @@ function renderCert(meta, options) {
     plate.appendChild(skyWrap);
 
     var celestialTraits = (rarity.celestial || []).map(function(t) { return t.trait; });
-    var birthTemp = meta.birth_temperament || '';
+    // Sky band picks an atmosphere from the temperament — reuse the
+    // derived value computed above (works for V1 trait-code records and
+    // V4-era records that still ship the string inline).
+    var birthTemp = derivedTemperament || '';
     // Sky-band height stays fixed at 390 regardless of canvas width.
     // Its graphical elements (zodiac wheel, orbit ring, meteor trails)
     // are positioned in absolute logical coordinates from the top —
@@ -7160,6 +7970,27 @@ function renderCert(meta, options) {
     }
 
     plate.appendChild(gpsContainer);
+  } else if (!isSample && born && Object.keys(born).length > 0) {
+    // Honest placeholder for records minted on chains with
+    // ``gps_source: none`` (or any record lacking ``gps_locked``).
+    // The cert acknowledges the absence rather than silently hiding
+    // the section — like a camera that didn't write location to EXIF.
+    plate.appendChild(_sectionLabel('BIRTHPLACE \u2014 NOT RECORDED'));
+    var noGps = _div('gps-container gps-container-empty');
+    var gtc2 = _hexToRgb(tierColor || '#a0a0a0');
+    noGps.style.background = 'linear-gradient(180deg, rgb(' +
+      Math.floor(gtc2[0]*0.05) + ',' + Math.floor(gtc2[1]*0.05) + ',' + Math.floor(gtc2[2]*0.05) +
+      ') 0%, rgb(' +
+      Math.floor(gtc2[0]*0.08) + ',' + Math.floor(gtc2[1]*0.08) + ',' + Math.floor(gtc2[2]*0.08) +
+      ') 100%)';
+    var noGpsBody = _div('gps-empty-body');
+    noGpsBody.innerHTML =
+      '<p class="gps-empty-line">No GPS coordinates were captured at conception.</p>' +
+      '<p class="gps-empty-hint">This soul carries the sky but not the place. ' +
+      'The creator\u2019s chain is configured to omit location data \u2014 ' +
+      'like a camera that doesn\u2019t write GPS to EXIF.</p>';
+    noGps.appendChild(noGpsBody);
+    plate.appendChild(noGps);
   }
 
   // ===================================================================
@@ -10562,7 +11393,12 @@ var CosmicPlayer = (function() {
     var born = meta.born || {};
     var sign = parseSunSign(born.sun);
     var moonPhase = cleanMoonPhase(born.moon_phase);
-    var temperament = parseTemperament(meta.birth_temperament);
+    // V1 records carry only birth_traits; reconstruct the temperament
+    // string via birth-text.js. Falls back to any inline persisted
+    // string on V4-era records.
+    var _bt = (typeof BirthText !== 'undefined' && meta.birth_traits)
+      ? BirthText.read(meta.birth_traits) : null;
+    var temperament = parseTemperament((_bt && _bt.temperament) || meta.birth_temperament);
     var rarityScore = meta.rarity_score || 0;
     var tier = getRarityTier(rarityScore);
     var rKey = rarityKey(tier.name);
@@ -11766,16 +12602,27 @@ var ButtonLoading = (function() {
   }
 
   function position(target) {
+    // Toast-style positioning: bottom-right on desktop, bottom-center
+    // on mobile. Independent of the trigger element's geometry so
+    // hidden / scrolled / state-changing triggers don't lead to
+    // off-screen tooltips. The hint fades after 2.5s so floating
+    // overlap with footer content is fine.
     var t = tooltipEl;
     requestAnimationFrame(function() {
-      var rect = target.getBoundingClientRect();
       var ttRect = t.getBoundingClientRect();
-      var left = rect.left + rect.width / 2 - ttRect.width / 2;
-      var top = rect.top - ttRect.height - 10;
-      left = Math.max(8, Math.min(left, window.innerWidth - ttRect.width - 8));
-      if (top < 8) top = rect.bottom + 10;
-      t.style.left = left + 'px';
-      t.style.top = top + 'px';
+      var pad = 16;
+      var left, top;
+      if (window.innerWidth < 768) {
+        // Mobile: bottom-center, near the bottom safe area.
+        left = Math.max(pad, (window.innerWidth - ttRect.width) / 2);
+        top = window.innerHeight - ttRect.height - pad;
+      } else {
+        // Desktop: bottom-right.
+        left = window.innerWidth - ttRect.width - pad;
+        top = window.innerHeight - ttRect.height - pad;
+      }
+      t.style.left = Math.max(pad, left) + 'px';
+      t.style.top = Math.max(pad, top) + 'px';
     });
   }
 
@@ -12028,9 +12875,18 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
       if (sigOk === true) {
         result.signatureDetail = 'Ed25519 signature valid';
 
-        // Keychain check — revocation or succession
+        // Keychain check — revocation or succession.
+        //
+        // peerRoot lets us also walk the keychain on the peer surface
+        // the soul came from, not just IA. Chains that publish only
+        // to peer mirrors (IA disabled in channels.json) still get
+        // their keychain records discovered. peerKeychainRoot() returns
+        // null for IA-sourced souls — those fall back to the existing
+        // IA-only flow with no change.
+        var peerRoot = (typeof peerKeychainRoot === 'function')
+          ? peerKeychainRoot(record._source) : null;
         if (record.key_fingerprint) {
-          var kc = await checkKeychain(record.key_fingerprint, record.public_key);
+          var kc = await checkKeychain(record.key_fingerprint, record.public_key, peerRoot);
           result.keychain = kc;
           if (kc.status === 'revoked') {
             result.signature = false;
@@ -12038,18 +12894,66 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
           } else if (kc.status === 'rotated') {
             result.signatureDetail += ' (key rotated — ' + kc.detail + ')';
           }
+          // Alias discovery — soft enrichment, never blocks verdict.
+          // Probes both IA AND the soul's source peer (if non-IA),
+          // merging alias-*.json file lists from each side.
+          try {
+            if (typeof discoverAliases === 'function') {
+              result.aliases = await discoverAliases(record.key_fingerprint, peerRoot);
+            } else {
+              result.aliases = [];
+            }
+          } catch (e) {
+            result.aliases = [];
+          }
         }
 
-        // TOFU check (skip if revoked)
+        // TOFU check (skip if revoked).
+        //
+        // Alias bridge: if this key is bidirectionally aliased to a key
+        // already in TOFU, treat the new key as trusted under the same
+        // name. The bidirectional alias is a cryptographic claim by
+        // both sides — strong enough to extend trust without prompting.
+        // One-way aliases do NOT auto-trust (B claims sibling-of-A
+        // but A hasn't confirmed) — they're rendered with a softer
+        // signal via the badge tooltip and stay 'new' here.
         if (result.signature === true && record.key_fingerprint) {
           var tofu = tofuStore();
           var tofuStatus = tofu.check(record.key_fingerprint, record.public_key);
           result.tofu = tofuStatus;
           if (tofuStatus === 'trusted') {
             var entry = tofu.get(record.key_fingerprint);
+            // Self-rename: same pubkey, different declared name in the
+            // record (e.g., dashboard "Save Name" changed the profile
+            // label after first sighting). Pubkey is unchanged so this
+            // isn't impersonation — the key updates its own display
+            // name. The fingerprint+pubkey lock still anchors trust.
+            var declared = (record.creator_name || '').trim();
+            if (declared && declared !== entry.name) {
+              tofu.set(record.key_fingerprint, declared, record.public_key);
+              entry = tofu.get(record.key_fingerprint);
+            }
             result.signatureDetail += ' — ' + entry.name + ' (trusted)';
           } else if (tofuStatus === 'new') {
-            result.signatureDetail += ' — new key, not yet named';
+            var trustedViaAlias = null;
+            if (result.aliases && result.aliases.length) {
+              for (var ai = 0; ai < result.aliases.length; ai++) {
+                var a = result.aliases[ai];
+                if (!a.bidirectional) continue;
+                var sibling = tofu.get(a.alias_fingerprint);
+                if (sibling) { trustedViaAlias = sibling; break; }
+              }
+            }
+            if (trustedViaAlias) {
+              // Pin the new fingerprint under the sibling's display
+              // name so subsequent visits skip this check too. Inherits
+              // trust via cryptographic alias chain, not a fresh TOFU.
+              tofu.set(record.key_fingerprint, trustedViaAlias.name, record.public_key);
+              result.tofu = 'trusted';
+              result.signatureDetail += ' — ' + trustedViaAlias.name + ' (trusted via alias)';
+            } else {
+              result.signatureDetail += ' — new key, not yet named';
+            }
           } else if (tofuStatus === 'conflict') {
             result.signatureDetail += ' — WARNING: different key for this fingerprint!';
           }
@@ -12955,7 +13859,16 @@ function tryVerifyPair() {
             var tofu = tofuStore();
             var ts = tofu.check(meta.key_fingerprint, meta.public_key);
             vf.tofu = ts;
-            if (ts === 'trusted') { var e = tofu.get(meta.key_fingerprint); vf.signatureDetail += ' — ' + e.name + ' (trusted)'; }
+            if (ts === 'trusted') {
+              var e = tofu.get(meta.key_fingerprint);
+              // Self-rename: same pubkey can update its own display name.
+              var declared2 = (meta.creator_name || '').trim();
+              if (declared2 && declared2 !== e.name) {
+                tofu.set(meta.key_fingerprint, declared2, meta.public_key);
+                e = tofu.get(meta.key_fingerprint);
+              }
+              vf.signatureDetail += ' — ' + e.name + ' (trusted)';
+            }
             else if (ts === 'new') {
               var sName = meta.creator_name || '';
               if (sName) { tofu.set(meta.key_fingerprint, sName, meta.public_key); vf.signatureDetail += ' — ' + sName + ' (trusted)'; vf.tofu = 'trusted'; }

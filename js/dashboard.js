@@ -581,6 +581,27 @@ setInterval(function() {
     renderMetaEditor();
   }
 
+  // Click thumbnail → full-size lightbox overlay. Matches the
+  // conception page + decoder ui.js:870 pattern so the creator can
+  // verify image details before committing.
+  if (els.thumb) {
+    els.thumb.style.cursor = 'zoom-in';
+    els.thumb.addEventListener('click', function() {
+      if (!els.thumb.src) return;
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:1.5rem;';
+      var fullImg = document.createElement('img');
+      fullImg.src = els.thumb.src;
+      fullImg.style.cssText = 'max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 40px rgba(0,0,0,0.6);';
+      overlay.appendChild(fullImg);
+      overlay.addEventListener('click', function() { overlay.remove(); });
+      document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+      });
+      document.body.appendChild(overlay);
+    });
+  }
+
   // Shared rehydration path — used by both the fresh-upload flow and
   // the resume-by-ticket flow. The two have slightly different inputs:
   //
@@ -600,11 +621,27 @@ setInterval(function() {
     state.qrDataUri = data.qr_data_uri || '';
     if (file) {
       renderReview(file);
+      // Once the session has a token, swap the FileReader data-URL
+      // for the streamed endpoint so the lightbox + thumbnail show
+      // the full-resolution staged image instead of holding it all
+      // in browser memory as base64. Server allows pending-state
+      // image fetches.
+      if (state.token) {
+        els.thumb.src = '/api/mint/' + encodeURIComponent(state.token) + '/image';
+      }
     } else {
-      // Resume path — server provided filename + thumb data URI.
+      // Resume path — server provided filename + a 256x256 thumb
+      // data URI as a fast first paint, but we then swap to the
+      // full-res streamed endpoint so the lightbox isn't pixelated.
       els.filename.textContent = data.filename || '(unknown filename)';
       els.size.textContent = '';
       if (data.thumb_data_uri) els.thumb.src = data.thumb_data_uri;
+      if (state.token) {
+        var fullSrc = '/api/mint/' + encodeURIComponent(state.token) + '/image';
+        var hiRes = new Image();
+        hiRes.onload = function() { els.thumb.src = fullSrc; };
+        hiRes.src = fullSrc;
+      }
       renderMetaEditor();
     }
     loadActiveChain();   // refresh chain banner (may have changed since)
@@ -1247,10 +1284,12 @@ setInterval(function() {
       }
       els.recentBlock.hidden = false;
       els.recentList.innerHTML = rows.map(function(r) {
-        return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '">' +
+        // Image filename omitted — it truncated to ellipsis on mobile
+        // and the ticket alone is enough to identify the session.
+        // Filename is kept as a title attribute on the row for desktop
+        // hover.
+        return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '" title="' + escapeHtml(r.image) + '">' +
           '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
-          '<span class="mint-recent-image" title="' + escapeHtml(r.image) + '">' +
-            escapeHtml(r.image) + '</span>' +
           '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
             (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
           '<button type="button" class="mint-recent-btn" data-recent-action="resume">Resume</button>' +
@@ -1343,6 +1382,11 @@ setInterval(function() {
     discardBtn:   document.getElementById('payloadDiscardBtn'),
     sealBtn:      document.getElementById('payloadSealBtn'),
     lockBadge:    document.getElementById('payloadLockBadge'),
+    applyLockBanner: document.getElementById('payloadApplyLockBanner'),
+    nux:          document.getElementById('payloadNux'),
+    nuxDismiss:   document.getElementById('payloadNuxDismiss'),
+    nuxReopen:    document.getElementById('payloadNuxReopen'),
+    mInput:       document.getElementById('payloadM'),
     addEntryBtn:  document.getElementById('addEntryBtn'),
     addLayerBtn:  document.getElementById('addLayerBtn'),
     addFrozenBtn: document.getElementById('addFrozenBtn'),
@@ -1372,7 +1416,9 @@ setInterval(function() {
     loaded: false,
     chainLocked: undefined, // true if active chain is mid-Age; refreshed via /api/site-pack/status
     chainLockedReason: '',
+    chainLockInfo: null,    // {age, age_name, outer_position, outer_total, …}
     lastPresetName: '',   // remembered preset name for the next save prompt
+    touched: false,       // user has interacted with the editor since last load/apply/discard
   };
 
   // ===== Utilities =====
@@ -1426,8 +1472,37 @@ setInterval(function() {
     var errors = validate(state.working);
     var hasErrors = errors.some(function(e) { return e.severity === 'error'; });
     var dirty = isDirty();
-    els.dirty.hidden = !dirty;
+    // Visual marker only shows after the user has actually touched the
+    // editor since the last load/apply/discard. Avoids the "you have
+    // unsaved changes" warning firing the moment a tab opens with an
+    // empty default against a chain that already has applied content.
+    els.dirty.hidden = !(dirty && state.touched);
     els.discardBtn.disabled = !dirty;
+    // Inline lock banner — visible message when the chain is mid-Age
+    // and Apply is therefore disabled. Repaints whenever lock state or
+    // cycle progress changes.
+    if (els.applyLockBanner) {
+      if (state.chainLocked === true) {
+        var info = state.chainLockInfo || {};
+        var pos = info.outer_position;
+        var total = info.outer_total;
+        var ageLabel = info.age_name
+          ? info.age_name + (info.age ? ' (Age ' + info.age + ')' : '')
+          : 'an Age';
+        // Use "conception" — each mint advances the outer position by
+        // 1, regardless of the chain's layer K values. "chunk" was
+        // misleading on chains whose layers have small K (suggested
+        // the count should be 0/K, not 0/M).
+        var progress = (typeof pos === 'number' && typeof total === 'number')
+          ? ' \u00b7 conception ' + pos + '/' + total : '';
+        els.applyLockBanner.textContent =
+          'Apply is locked: ' + ageLabel + ' in progress' + progress +
+          '. Changes commit when this Age completes.';
+        els.applyLockBanner.hidden = false;
+      } else {
+        els.applyLockBanner.hidden = true;
+      }
+    }
     // Apply to chain: needs unsaved edits, no validation errors, the
     // chain to be in EDITABLE state, AND a non-empty template (at least
     // one layer or frozen entry — the server's chain_config.validate()
@@ -1481,6 +1556,28 @@ setInterval(function() {
     if (maxK > (cfg.M || 0)) {
       msgs.push({severity: 'error',
                  text: 'M=' + cfg.M + ' is smaller than the longest layer cycle K=' + maxK + '.'});
+    }
+    // Uneven tiling — M is not a whole multiple of a layer's K. The
+    // chain still works, but the layer's last cycle is partial: its
+    // chunks 0..K-1 don't all get the same number of turns across
+    // the Age. Demo uses exact tiling on purpose (M=360 / K=12 = 30
+    // full cycles). Friendly explanation, no math jargon.
+    if (cfg.M && cfg.M > 0) {
+      (cfg.layers || []).forEach(function(ly, i) {
+        if (!ly.K || ly.K < 1) return;
+        if (cfg.M % ly.K !== 0) {
+          var fullCycles = Math.floor(cfg.M / ly.K);
+          var leftover = cfg.M - fullCycles * ly.K;
+          var name = ly.name || ('#' + (i + 1));
+          msgs.push({severity: 'warning',
+                     text: 'Layer "' + name + '" doesn\u2019t fit evenly into the Age. ' +
+                           'With M=' + cfg.M + ' and K=' + ly.K + ', its chunks cycle ' +
+                           fullCycles + ' full time(s) and then ' + leftover + ' more position(s) ' +
+                           'use chunks 0..' + (leftover - 1) + ' again. Some chunks get one extra turn ' +
+                           'than the rest. Pick an M that\u2019s a whole multiple of ' + ly.K +
+                           ' for even tiling (e.g. ' + (fullCycles * ly.K) + ' or ' + ((fullCycles + 1) * ly.K) + ').'});
+        }
+      });
     }
     // Soft cap on M. Beyond ~10k, the validator's grid renders sluggishly
     // (no virtualization yet) and per-Age completion takes generations
@@ -1565,13 +1662,28 @@ setInterval(function() {
   }
 
   // ===== Rendering: top chain bar =====
+  // Identity (id/name/visibility) reflects the active chain — those
+  // can't differ between draft and applied. M is rendered as its own
+  // input below the chain bar; here we only annotate when the draft's
+  // M differs from the chain's applied M (e.g. user loaded a preset
+  // with a different M) so the user understands the discrepancy
+  // between header / status line.
   function renderChainBar() {
     if (!state.working) return;
     els.chainId.textContent = state.working.id || '?';
     var meta = state.working.name || '';
     if (state.working.visibility) meta += (meta ? ' \u00b7 ' : '') + state.working.visibility;
-    if (state.working.M != null) meta += (meta ? ' \u00b7 ' : '') + 'M=' + state.working.M;
+    var draftM = state.working.M;
+    var appliedM = state.saved && state.saved.M;
+    if (draftM != null && appliedM != null && appliedM !== draftM) {
+      meta += (meta ? ' \u00b7 ' : '') +
+              'M=' + draftM + ' (draft, applied: ' + appliedM + ')';
+    }
     els.chainMeta.textContent = meta;
+    if (els.mInput) {
+      els.mInput.value = (draftM != null) ? draftM : '';
+      els.mInput.disabled = state.chainLocked === true;
+    }
   }
 
   // ===== Rendering: entries =====
@@ -1593,8 +1705,8 @@ setInterval(function() {
       var sources = e.sources || [];
       var sourceInputs = sources.map(function(src, idx) {
         return '<div class="entry-source-row">' +
-          '<input class="payload-edit-input monospace" data-field="source-' + idx + '" type="text" value="' + escapeHtml(src) + '" placeholder="path/to/file (or click Browse)">' +
-          '<button class="source-browse" data-action="browse-source" data-source-idx="' + idx + '" data-fs-browse title="Pick a file from the server">Browse</button>' +
+          '<input class="payload-edit-input monospace" data-field="source-' + idx + '" type="text" value="' + escapeHtml(src) + '" placeholder="server-relative path \u2014 or click Upload">' +
+          '<button class="source-browse" data-action="upload-source" data-source-idx="' + idx + '" title="Upload a file from this computer to the server (saves under the active chain\u2019s uploads/ folder)">Upload\u2026</button>' +
           '<button class="payload-edit-delete" data-action="remove-source" data-source-idx="' + idx + '" title="Remove this source">\u00d7</button>' +
           '</div>';
       }).join('');
@@ -1778,28 +1890,63 @@ setInterval(function() {
           e2.sources = (e2.sources || []).filter(function(_, i) { return i !== srcIdx; });
           renderAll();
         }
-      } else if (action === 'browse-source') {
+      } else if (action === 'upload-source') {
         var entryName3 = row.getAttribute('data-entry');
         var srcIdx3 = parseInt(btn.getAttribute('data-source-idx'), 10);
-        if (!window.FilePicker) return;
         showError('');
-        btn.disabled = true;
-        var prevLabel = btn.textContent;
-        btn.textContent = 'Picking\u2026';
-        window.FilePicker.pick({type: 'file'}).then(function(picked) {
-          btn.disabled = false;
-          btn.textContent = prevLabel;
-          if (picked == null) return; // user cancelled
-          var ent = state.working.entries[entryName3];
-          if (!ent) return;
-          ent.sources = ent.sources || [];
-          ent.sources[srcIdx3] = picked;
-          renderAll();
-        }).catch(function(err) {
-          btn.disabled = false;
-          btn.textContent = prevLabel;
-          showError('Browse failed: ' + err.message);
+        var picker = document.createElement('input');
+        picker.type = 'file';
+        picker.style.display = 'none';
+        picker.addEventListener('change', function() {
+          var file = picker.files && picker.files[0];
+          if (!file) { document.body.removeChild(picker); return; }
+          // Hard cap: server enforces 50 MiB too, but reject early for
+          // a clearer error and to avoid base64-ing a huge file.
+          if (file.size > 50 * 1024 * 1024) {
+            showError('Upload failed: file exceeds 50 MiB cap (got ' + Math.round(file.size / 1024 / 1024) + ' MiB).');
+            document.body.removeChild(picker);
+            return;
+          }
+          var prevLabel = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = 'Uploading\u2026';
+          var reader = new FileReader();
+          reader.onload = async function() {
+            try {
+              // FileReader gives us a "data:<mime>;base64,<bytes>"
+              // URL — strip the prefix to get the base64 payload the
+              // server expects.
+              var dataUrl = reader.result || '';
+              var b64 = dataUrl.split(',')[1] || '';
+              var resp = await fetchJson('/api/payload/upload', {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({filename: file.name, content: b64}),
+              });
+              var ent = state.working.entries[entryName3];
+              if (!ent) return;
+              ent.sources = ent.sources || [];
+              ent.sources[srcIdx3] = resp.path;
+              state.touched = true;
+              renderAll();
+            } catch (e) {
+              showError('Upload failed: ' + e.message);
+            } finally {
+              btn.disabled = false;
+              btn.textContent = prevLabel;
+              if (picker.parentNode) picker.parentNode.removeChild(picker);
+            }
+          };
+          reader.onerror = function() {
+            showError('Upload failed: could not read file.');
+            btn.disabled = false;
+            btn.textContent = prevLabel;
+            if (picker.parentNode) picker.parentNode.removeChild(picker);
+          };
+          reader.readAsDataURL(file);
         });
+        document.body.appendChild(picker);
+        picker.click();
       } else if (action === 'delete-layer') {
         var idx = parseInt(row.getAttribute('data-layer'), 10);
         state.working.layers.splice(idx, 1);
@@ -1886,12 +2033,14 @@ setInterval(function() {
       });
       state.working = cfg;
       state.saved = deepClone(cfg);
-      // Loading the chain's own config is not "loading a preset" — clear
-      // lastPresetName so the Save button goes back to prompting for a
-      // new name on first save.
-      state.lastPresetName = '';
+      state.touched = false;
+      // If the chain advertises a preset_name in its extras, treat
+      // this load as a preset load (so Save overwrites that preset).
+      // Otherwise clear lastPresetName — Save will prompt for a name.
+      state.lastPresetName = cfg.preset_name || '';
       refreshPresetButtonLabel();
       renderAll();
+      refreshNuxVisibility();
     } catch (e) {
       showError('Failed to load chain config: ' + e.message);
     }
@@ -1911,13 +2060,26 @@ setInterval(function() {
     var prev = els.applyBtn.textContent;
     els.applyBtn.textContent = 'Applying\u2026';
     try {
+      // Stamp the active preset name (or empty string to clear) onto
+      // the chain so future sessions / other devices know which
+      // preset this chain is using. ChainConfig.extras round-trips it.
+      var body = Object.assign({}, state.working, {
+        preset_name: state.lastPresetName || '',
+      });
       var resp = await fetchJson('/api/chain/config', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify(state.working),
+        body: JSON.stringify(body),
       });
       state.saved = deepClone(resp.config || state.working);
       state.working = deepClone(state.saved);
+      state.touched = false;
+      // Apply succeeded → the in-progress draft now matches the
+      // chain. Clear the localStorage pointer so we read the
+      // chain's canonical preset_name on next visit.
+      if (state.working && state.working.id) {
+        _rememberChainPreset(state.working.id, '');
+      }
       renderAll();
       showError('');
     } catch (e) {
@@ -1932,6 +2094,13 @@ setInterval(function() {
     if (!state.saved) return;
     if (isDirty() && !window.confirm('Discard your unsaved changes?')) return;
     state.working = deepClone(state.saved);
+    // Sync the preset-button label to whatever the saved baseline
+    // claims its preset is. Otherwise loading preset Y, then
+    // discarding back to a chain whose preset_name is X leaves the
+    // Save button pointing at the wrong preset.
+    state.lastPresetName = (state.saved && state.saved.preset_name) || '';
+    state.touched = false;
+    refreshPresetButtonLabel();
     renderAll();
   }
 
@@ -1939,20 +2108,28 @@ setInterval(function() {
     if (!info || info.sealed === false) {
       els.ageStatus.textContent = 'No Age sealed yet \u2014 click Seal Age to begin.';
       state.chainLocked = false;
+      state.chainLockInfo = null;
       renderLockBadge();
       refreshDirtyUI();
       return;
     }
-    els.ageStatus.textContent =
-      info.age_name + ' (Age ' + info.age + ') \u00b7 ' +
-      'outer ' + info.outer_position + '/' + info.outer_total + ' \u00b7 ' +
-      'inner ' + info.inner_position + '/' + info.inner_total + ' \u00b7 ' +
-      'decoder hash ' + (info.decoder_hash || '?');
+    // Build status line, omitting decoder fields for chains that have
+    // no decoder layer (inner_total=0 / decoder_hash=null).
+    var statusParts = [info.age_name + ' (Age ' + info.age + ')'];
+    statusParts.push('outer ' + info.outer_position + '/' + info.outer_total);
+    if (info.inner_total) {
+      statusParts.push('inner ' + info.inner_position + '/' + info.inner_total);
+    }
+    if (info.decoder_hash) {
+      statusParts.push('decoder hash ' + info.decoder_hash);
+    }
+    els.ageStatus.textContent = statusParts.join(' \u00b7 ');
     // Cycle complete = ready to advance to next Age — editing is allowed
     // again. Mid-cycle = locked.
     state.chainLocked = !info.cycle_complete;
     state.chainLockedReason = info.cycle_complete
       ? '' : ('Age in progress: outer ' + info.outer_position + '/' + info.outer_total);
+    state.chainLockInfo = info.cycle_complete ? null : info;
     renderLockBadge();
     refreshDirtyUI();
   }
@@ -2018,7 +2195,13 @@ setInterval(function() {
         body: JSON.stringify({confirm: 'SEAL'}),
       });
       await loadConfig();
-      showError('Sealed: ' + resp.info.age_name + ' (Age ' + resp.info.age + '). Decoder hash ' + resp.info.decoder_hash);
+      // Only mention decoder hash when the chain actually defines a
+      // decoder layer — otherwise users see "Decoder hash null" which
+      // reads like an error.
+      var msg = 'Sealed: ' + resp.info.age_name + ' (Age ' + resp.info.age + ')';
+      if (resp.info.decoder_hash) msg += '. Decoder hash ' + resp.info.decoder_hash;
+      msg += '.';
+      showError(msg);
     } catch (e) {
       showError('Seal failed: ' + e.message);
     } finally {
@@ -2095,6 +2278,11 @@ setInterval(function() {
         body: JSON.stringify({name: name, config: state.working}),
       });
       state.lastPresetName = name;
+      // Pin this preset to the active chain so the next Payload tab
+      // open restores it as the draft baseline.
+      if (state.working && state.working.id) {
+        _rememberChainPreset(state.working.id, name);
+      }
       refreshPresetButtonLabel();
       // Brief inline confirmation via the dirty marker slot.
       flashSaved(name);
@@ -2107,16 +2295,15 @@ setInterval(function() {
 
   function refreshPresetButtonLabel() {
     if (!els.presetSavePresetBtn) return;
-    if (state.lastPresetName) {
-      els.presetSavePresetBtn.textContent = 'Save to ' + state.lastPresetName;
-      els.presetSavePresetBtn.title =
-        'Overwrite the loaded preset "' + state.lastPresetName + '" with the current draft. ' +
-        'Use "Save as new\u2026" in the Presets menu to create a different preset instead.';
-    } else {
-      els.presetSavePresetBtn.textContent = 'Save preset\u2026';
-      els.presetSavePresetBtn.title =
-        'Save the current draft as a new named preset.';
-    }
+    // Always read "Save preset…" — the previous dynamic relabel
+    // ("Save to <name>") confused users about which preset would be
+    // overwritten. The tooltip still spells out the intent.
+    els.presetSavePresetBtn.textContent = 'Save preset\u2026';
+    els.presetSavePresetBtn.title = state.lastPresetName
+      ? ('Overwrite the loaded preset "' + state.lastPresetName +
+         '" with the current draft. Use "Save as new\u2026" in the ' +
+         'Presets menu to fork into a different preset.')
+      : 'Save the current draft as a new named preset.';
   }
 
   function flashSaved(label) {
@@ -2165,6 +2352,9 @@ setInterval(function() {
       });
       // Remember which preset is loaded so Save overwrites it silently.
       state.lastPresetName = name;
+      // Persist per-chain so the next Payload tab open restores this
+      // preset as the draft baseline.
+      _rememberChainPreset(state.working.id, name);
       refreshPresetButtonLabel();
       renderAll();
       // Loaded preset != saved state → dirty
@@ -2186,6 +2376,12 @@ setInterval(function() {
       if (state.lastPresetName === name) {
         state.lastPresetName = '';
         refreshPresetButtonLabel();
+      }
+      // Also clear any chain-association pointing at this preset.
+      if (state.working && state.working.id) {
+        if (_recallChainPreset(state.working.id) === name) {
+          _rememberChainPreset(state.working.id, '');
+        }
       }
       await loadPresetList();
     } catch (e) {
@@ -2228,22 +2424,227 @@ setInterval(function() {
   }
 
   // ===== Initial load + event wiring =====
-  window.__loadPayloadTab = function() {
+  // Default state for the Payload tab is EMPTY — the editor opens as
+  // a clean draft. If the user previously loaded a preset for this
+  // chain, we auto-restore it (per-chain memory in localStorage).
+  // Either way the editor is treated as a draft of a future Apply;
+  // the chain's currently-applied config is no longer the auto-loaded
+  // baseline. Click Refresh in the toolbar to fetch chain config
+  // explicitly.
+  function _chainPresetKey(chainId) {
+    return 'mememage-chain-preset-' + chainId;
+  }
+  function _rememberChainPreset(chainId, name) {
+    if (!chainId) return;
+    try {
+      if (name) localStorage.setItem(_chainPresetKey(chainId), name);
+      else localStorage.removeItem(_chainPresetKey(chainId));
+    } catch (e) { /* private mode etc. */ }
+  }
+  function _recallChainPreset(chainId) {
+    if (!chainId) return '';
+    try { return localStorage.getItem(_chainPresetKey(chainId)) || ''; }
+    catch (e) { return ''; }
+  }
+  function _emptyConfigFor(identity) {
+    // Keep M from the active chain (orbital scaffolding) so a fresh
+    // draft validates without prompting the user to set it; everything
+    // else starts blank.
+    return {
+      id: identity.id,
+      name: identity.name,
+      visibility: identity.visibility,
+      M: identity.M,
+      layers: [],
+      frozen: [],
+      entries: {},
+    };
+  }
+  window.__loadPayloadTab = async function() {
     if (state.loaded) return;
     state.loaded = true;
-    loadConfig();
+    state.touched = false;
+    showError('');
+    try {
+      var chainCfg = await fetchJson('/api/chain/config');
+      // Normalize legacy fields the same way loadConfig does so the
+      // saved baseline is comparable to the working draft.
+      (chainCfg.layers || []).forEach(function(ly) {
+        if ('chunk_type' in ly) delete ly.chunk_type;
+        if ('type' in ly) delete ly.type;
+      });
+      Object.keys(chainCfg.entries || {}).forEach(function(name) {
+        var e = chainCfg.entries[name];
+        if (!e.sources && e.source) e.sources = [e.source];
+        if ('type' in e) delete e.type;
+      });
+      // state.saved tracks the chain's actually-applied config — the
+      // dirty marker compares working vs. saved, so Apply lights up
+      // whenever the draft differs from what's committed.
+      state.saved = deepClone(chainCfg);
+      var identity = {
+        id: chainCfg.id, name: chainCfg.name, visibility: chainCfg.visibility,
+      };
+      // Preset selection priority:
+      //   1. localStorage (user's in-progress draft for this chain)
+      //   2. chainCfg.preset_name (what the chain reports as applied)
+      //   3. empty default
+      var presetName = _recallChainPreset(identity.id)
+                    || chainCfg.preset_name || '';
+      if (presetName) {
+        try {
+          var pd = await fetchJson('/api/payload/presets/' + encodeURIComponent(presetName));
+          var preset = pd.config || {};
+          // Preset wins for layers/frozen/entries/M; chain identity
+          // wins for id/name/visibility (those are per-chain, not
+          // portable). Identity does NOT include M — stamping chain's
+          // M onto a preset designed for a different M breaks
+          // validation (M-smaller-than-K, frozen-out-of-range).
+          state.working = Object.assign({}, preset, identity);
+          (state.working.layers || []).forEach(function(ly) {
+            if ('chunk_type' in ly) delete ly.chunk_type;
+            if ('type' in ly) delete ly.type;
+          });
+          Object.keys(state.working.entries || {}).forEach(function(n) {
+            var e = state.working.entries[n];
+            if (!e.sources && e.source) e.sources = [e.source];
+            if ('type' in e) delete e.type;
+          });
+          state.lastPresetName = presetName;
+        } catch (e) {
+          // Preset gone (deleted on disk) — drop the stale pointer,
+          // fall back to empty.
+          _rememberChainPreset(identity.id, '');
+          state.working = _emptyConfigFor({id: identity.id, name: identity.name,
+                                            visibility: identity.visibility, M: chainCfg.M});
+          state.lastPresetName = '';
+        }
+      } else {
+        state.working = _emptyConfigFor({id: identity.id, name: identity.name,
+                                          visibility: identity.visibility, M: chainCfg.M});
+        state.lastPresetName = '';
+      }
+      refreshPresetButtonLabel();
+      renderAll();
+      refreshDirtyUI();
+      refreshNuxVisibility();
+    } catch (e) {
+      showError('Failed to initialize Payload tab: ' + e.message);
+    }
+    // Age status (separate, ok if it fails).
+    try {
+      var age = await fetchJson('/api/site-pack/status');
+      renderAgeStatus(age);
+    } catch (e) {
+      els.ageStatus.textContent = '(site-pack status unavailable: ' + e.message + ')';
+    }
   };
   // Called by the Config tab after a chain switch so the next visit to
-  // the Payload tab refetches the new chain's config.
+  // the Payload tab re-initializes against the new chain (and its own
+  // remembered preset, if any).
   window.__resetPayloadTab = function() {
     state.loaded = false;
     state.working = null;
     state.saved = null;
     state.lastPresetName = '';
+    state.touched = false;
     refreshPresetButtonLabel();
   };
 
-  els.refreshBtn.addEventListener('click', loadConfig);
+  // Mark the editor "touched" on any user input — text typing, select
+  // change, +Add buttons. The visual dirty marker stays hidden until
+  // this fires (avoids the warning showing the moment a tab opens
+  // with empty default ≠ chain's applied config).
+  function markTouched() {
+    if (!state.touched) {
+      state.touched = true;
+      refreshDirtyUI();
+    }
+  }
+
+  // NUX workflow card — auto-shows for fresh chains, dismissible per
+  // browser. Re-openable via the link below the card. Reads/writes
+  // localStorage('mememage-payload-nux-dismissed').
+  var NUX_KEY = 'mememage-payload-nux-dismissed';
+  function _nuxDismissed() {
+    try { return localStorage.getItem(NUX_KEY) === '1'; } catch (e) { return false; }
+  }
+  function _setNuxDismissed(v) {
+    try {
+      if (v) localStorage.setItem(NUX_KEY, '1');
+      else localStorage.removeItem(NUX_KEY);
+    } catch (e) {}
+  }
+  function refreshNuxVisibility() {
+    if (!els.nux) return;
+    var dismissed = _nuxDismissed();
+    var w = state.working || {};
+    var hasContent = (w.layers && w.layers.length)
+                  || (w.frozen && w.frozen.length)
+                  || (w.entries && Object.keys(w.entries).length);
+    // Auto-show when: not dismissed AND the chain is in a fresh state
+    // (no layers/frozen/entries on disk yet). Once content exists, the
+    // user has graduated past the NUX; hide unless they explicitly
+    // re-open it.
+    var savedHasContent = state.saved && (
+      (state.saved.layers && state.saved.layers.length) ||
+      (state.saved.frozen && state.saved.frozen.length) ||
+      (state.saved.entries && Object.keys(state.saved.entries).length)
+    );
+    var shouldShow = !dismissed && !savedHasContent;
+    els.nux.hidden = !shouldShow;
+    if (shouldShow && !els.nux.open) els.nux.open = true;  // expanded on first display
+    if (els.nuxReopen) els.nuxReopen.hidden = shouldShow;
+  }
+  if (els.nuxDismiss) {
+    els.nuxDismiss.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      _setNuxDismissed(true);
+      if (els.nux) els.nux.hidden = true;
+      if (els.nuxReopen) els.nuxReopen.hidden = false;
+    });
+  }
+  if (els.nuxReopen) {
+    els.nuxReopen.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      _setNuxDismissed(false);
+      if (els.nux) { els.nux.hidden = false; els.nux.open = true; }
+      els.nuxReopen.hidden = true;
+    });
+  }
+  var payloadRoot = document.querySelector('.payload-panel');
+  if (payloadRoot) {
+    payloadRoot.addEventListener('input', markTouched);
+    payloadRoot.addEventListener('change', markTouched);
+  }
+  [els.addEntryBtn, els.addLayerBtn, els.addFrozenBtn].forEach(function(btn) {
+    if (btn) btn.addEventListener('click', markTouched);
+  });
+
+  // M editor — first-class field for the chain's Age length. Reads
+  // and writes state.working.M directly. Locked while mid-Age (M is
+  // part of the seal's snapshot).
+  if (els.mInput) {
+    els.mInput.addEventListener('input', function() {
+      if (!state.working) return;
+      var v = parseInt(els.mInput.value, 10);
+      if (isNaN(v) || v < 1) return;  // invalid keystroke — refreshDirtyUI revalidates
+      state.working.M = v;
+      markTouched();
+      refreshDirtyUI();
+    });
+  }
+
+  els.refreshBtn.addEventListener('click', function() {
+    // Explicit Refresh = "show me the chain's actual applied config"
+    // which means dropping the chain-preset pointer (otherwise the
+    // next tab reopen would silently swap us back to the preset).
+    if (state.working && state.working.id) {
+      _rememberChainPreset(state.working.id, '');
+    }
+    loadConfig();
+  });
   els.buildBtn.addEventListener('click', rebuild);
   if (els.applyBtn) els.applyBtn.addEventListener('click', onApplyToChain);
   els.discardBtn.addEventListener('click', onDiscard);
@@ -2608,18 +3009,20 @@ setInterval(function() {
       // localhost (server-side guardrail warns on public-domain bind).
       '<div class="config-field">' +
       '  <span class="config-field-label">API token <span class="config-channel-field-state" data-set="' + (tokenSet ? '1' : '0') + '">' + (tokenSet ? 'set' : 'unset') + '</span></span>' +
-      '  <input class="config-input" id="configServerToken" type="text" autocomplete="off" spellcheck="false" readonly placeholder="' + (tokenSet ? '(set \u2014 click Generate phrase to replace)' : '(unset \u2014 click Generate phrase)') + '">' +
-      '  <button class="config-btn config-btn-primary" id="configServerTokenGen" title="Generate a readable word-phrase token (~108 bits of entropy)">Generate phrase</button>' +
-      '  <button class="config-btn" id="configServerTokenSet" disabled title="Generate or paste a token first">Save token</button>' +
+      // Token row: input on its own line, the two buttons share a
+      // line below it. Wrapper takes column 2 of the .config-field
+      // grid so the input gets the full available width.
+      '  <div class="config-token-row">' +
+      '    <input class="config-input" id="configServerToken" type="text" autocomplete="off" spellcheck="false" readonly placeholder="' + (tokenSet ? '(set \u2014 click Generate phrase to replace)' : '(unset \u2014 click Generate phrase)') + '">' +
+      '    <div class="config-token-buttons">' +
+      '      <button class="config-btn config-btn-primary" id="configServerTokenGen" title="Generate a readable word-phrase token (~108 bits of entropy)">Generate phrase</button>' +
+      '      <button class="config-btn" id="configServerTokenSet" disabled title="Generate or paste a token first">Save token</button>' +
+      '    </div>' +
+      '  </div>' +
       '</div>' +
-      '<div class="config-field advanced-only">' +
-      '  <span class="config-field-label">Custom token</span>' +
-      '  <input class="config-input" id="configServerTokenCustom" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a token here (rarely needed)">' +
-      '  <button class="config-btn" id="configServerTokenUseCustom">Use this</button>' +
-      '</div>' +
-      '<p class="config-note" style="margin-top:-0.3rem;">Word-phrase tokens are easier to read than hex blobs. Either works \u2014 server auth is plain string equality. Changing the token kicks every other dashboard session.</p>' +
+      '<p class="config-note" style="margin-top:-0.3rem;">Word-phrase tokens are easier to read and dictate aloud than random characters. Changing the token kicks every other dashboard session.</p>' +
       '<div class="config-row">' +
-      '  <button class="config-btn" id="configServerSave">Save server.json</button>' +
+      '  <button class="config-btn" id="configServerSave" title="Write changes to ~/.mememage/server.json on this host">Save server settings</button>' +
       '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
       '</div>' +
       '<p class="config-note">Cert/key paths use the native file picker — OS-agnostic, no copy-paste of long paths. Empty = auto-detect from <code>~/.mememage/certs/</code> at startup. Cert/key + API token changes require a server restart to take effect for new sessions.</p>' +
@@ -2643,8 +3046,6 @@ setInterval(function() {
       if (inp) inp.value = '';
       var saveBtn = document.getElementById('configServerTokenSet');
       if (saveBtn) saveBtn.disabled = true;
-      var customInp = document.getElementById('configServerTokenCustom');
-      if (customInp) customInp.value = '';
     }
     document.getElementById('configServerTokenSet').addEventListener('click', function() {
       var v = (document.getElementById('configServerToken') || {}).value || '';
@@ -2674,25 +3075,6 @@ setInterval(function() {
           tokenGenBtn.textContent = prev;
           tokenGenBtn.disabled = false;
         }
-      });
-    }
-    // Advanced-fold custom-token entry: paste-then-Use-this fills the
-    // primary readonly field with the typed value, then the same Save
-    // path commits it. Lets users restore a known token or paste one
-    // generated elsewhere without making the primary input editable.
-    var useCustomBtn = document.getElementById('configServerTokenUseCustom');
-    if (useCustomBtn) {
-      useCustomBtn.addEventListener('click', function() {
-        var custom = (document.getElementById('configServerTokenCustom') || {}).value || '';
-        custom = custom.trim();
-        if (!custom) {
-          showError('Paste a token in the field above before clicking Use this.');
-          return;
-        }
-        var inp = document.getElementById('configServerToken');
-        var saveBtn = document.getElementById('configServerTokenSet');
-        if (inp) inp.value = custom;
-        if (saveBtn) saveBtn.disabled = false;
       });
     }
     document.getElementById('configServerCertBrowse').addEventListener('click', function() {
@@ -2761,7 +3143,7 @@ setInterval(function() {
     } catch (e) {
       showError('Server save failed: ' + e.message);
     } finally {
-      btn.disabled = false; btn.textContent = 'Save server.json';
+      btn.disabled = false; btn.textContent = 'Save server settings';
     }
   }
 
@@ -2798,11 +3180,33 @@ setInterval(function() {
           // those with empty key/value inputs — user fills in the real
           // name; _syncHeadersForRow rewrites the dict on input.
           function _isSentinel(k) { return typeof k === 'string' && k.indexOf('\u00a0new-') === 0; }
+          // Mirrors server.py _is_secret_header — names containing
+          // any of these keywords get rendered as type=password +
+          // eyeball reveal toggle. Plain headers like Content-Type
+          // stay type=text.
+          function _isSecretHdrName(name) {
+            var lower = (name || '').toLowerCase();
+            var kws = ['authorization', 'token', 'secret', 'key', 'bearer', 'api-key', 'auth'];
+            for (var ki = 0; ki < kws.length; ki++) {
+              if (lower.indexOf(kws[ki]) >= 0) return true;
+            }
+            return false;
+          }
           var headersRowsHtml = headerEntries.map(function(hk, hi) {
             var displayKey = _isSentinel(hk) ? '' : hk;
+            var rawVal = w.headers[hk];
+            var secret = _isSecretHdrName(displayKey);
+            var valInput =
+              '<input class="config-input config-webhook-hdr-val" data-webhook-hdr-val="' + i + ':' + hi + '" type="' + (secret ? 'password' : 'text') + '" value="' + escapeHtml(rawVal) + '" placeholder="value">';
+            var valCell = secret
+              ? '<span class="config-password-wrap config-webhook-hdr-val-wrap">' +
+                  valInput +
+                  '<button type="button" class="config-password-toggle" data-pw-toggle aria-label="Show value" title="Show value">\ud83d\udc41</button>' +
+                '</span>'
+              : valInput;
             return '<div class="config-webhook-hdr-row">' +
               '<input class="config-input config-webhook-hdr-key" data-webhook-hdr-key="' + i + ':' + hi + '" type="text" value="' + escapeHtml(displayKey) + '" placeholder="Header-Name">' +
-              '<input class="config-input config-webhook-hdr-val" data-webhook-hdr-val="' + i + ':' + hi + '" type="text" value="' + escapeHtml(w.headers[hk]) + '" placeholder="value">' +
+              valCell +
               '<button class="config-btn config-webhook-hdr-del" data-webhook-hdr-del="' + i + ':' + hi + '" title="Remove header">\u00d7</button>' +
             '</div>';
           }).join('');
@@ -4179,8 +4583,11 @@ setInterval(function() {
             '<label class="config-channel-field-label">' + escapeHtml(f.label) + (f.secret ? ' \u2022' : '') +
               ' <span class="config-channel-field-state" data-set="' + (isSet ? '1' : '0') + '">' + (isSet ? 'set' : 'unset') + '</span>' +
             '</label>' +
-            '<input class="config-input config-channel-field-input" data-channel-secret="' + escapeHtml(envVar) + '" type="password" autocomplete="off" ' +
-                   'placeholder="' + (isSet ? '(set \u2014 type to replace)' : '(unset)') + '">' +
+            '<span class="config-password-wrap">' +
+              '<input class="config-input config-channel-field-input" data-channel-secret="' + escapeHtml(envVar) + '" type="password" autocomplete="off" ' +
+                     'placeholder="' + (isSet ? '(set \u2014 type to replace)' : '(unset)') + '">' +
+              '<button type="button" class="config-password-toggle" data-pw-toggle aria-label="Show password" title="Show password">\ud83d\udc41</button>' +
+            '</span>' +
             '<span class="config-channel-field-hint">stored in env var <code>' + escapeHtml(envVar) + '</code>' + escapeHtml(helpText) + '</span>' +
           '</div>';
       }).join('');
@@ -4523,17 +4930,24 @@ setInterval(function() {
           var removeBtn = isActive
             ? '<button class="config-btn advanced-only" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '" disabled title="Switch to a different chain first">Remove</button>'
             : '<button class="config-btn advanced-only" data-chain-action="remove" data-chain-id="' + escapeHtml(c.id) + '">Remove</button>';
-          var actions = isActive
-            ? '<span class="config-chain-active-badge">active</span>' +
-              renameBtn + pwBtn + removeBtn
-            : '<button class="config-btn" data-chain-action="switch" data-chain-id="' + escapeHtml(c.id) + '">Switch</button>' +
-              renameBtn + pwBtn + removeBtn;
+          // The leftmost "mark" cell carries the active state for
+          // active chains (replaces the ▶ triangle); non-active chains
+          // get the Switch button there instead. Pushes Rename / Set
+          // password / Remove into a single tight actions row no
+          // matter the chain's state.
+          var markCell = isActive
+            ? '<span class="config-chain-active-badge">active</span>'
+            : '<button class="config-btn" data-chain-action="switch" data-chain-id="' + escapeHtml(c.id) + '">Switch</button>';
+          var actions = renameBtn + pwBtn + removeBtn;
           // GPS source radio: three modes, persisted to chain.json on
           // change. Kept inline with the chain row so the Mint tab can
           // stay "drop image here" — the source decision lives here,
           // once, per chain.
+          // advanced-only lives on the outer cell — putting it on
+          // .config-chain-gps would trigger display: revert (block)
+          // and break the flex layout that stacks the radios on mobile.
           var gpsRadio =
-            '<div class="config-chain-gps advanced-only" data-chain-id="' + escapeHtml(c.id) + '">' +
+            '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
               '<span class="config-chain-gps-label">GPS source</span>' +
               '<label><input type="radio" name="gps-' + escapeHtml(c.id) + '" value="phone" ' +
                 (gpsSource === 'phone' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> phone</label>' +
@@ -4543,13 +4957,13 @@ setInterval(function() {
                 (gpsSource === 'none' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> none</label>' +
             '</div>';
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
-            '<span class="config-chain-active-mark">' + (isActive ? '\u25b6' : '') + '</span>' +
+            '<span class="config-chain-active-mark">' + markCell + '</span>' +
             '<span class="config-chain-id" title="' + escapeHtml(c.id) + '">' + escapeHtml(c.id) + '</span>' +
             '<span class="config-chain-meta" title="' + escapeHtml(c.name || '') + '">' +
               escapeHtml(c.name || '') + '<br><span class="config-chain-state" data-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>' +
             '</span>' +
             '<span class="config-chain-actions">' + actions + '</span>' +
-            '<span class="config-chain-gps-cell">' + gpsRadio + '</span>' +
+            '<span class="config-chain-gps-cell advanced-only">' + gpsRadio + '</span>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -4566,7 +4980,10 @@ setInterval(function() {
       '    <label style="margin-right:1rem"><input type="radio" name="newChainVis" value="light_energy" checked> light</label>' +
       '    <label><input type="radio" name="newChainVis" value="dark_matter"> dark</label></span></div>' +
       '  <div class="config-field advanced-only"><span class="config-field-label">Password</span>' +
-      '    <input class="config-input" id="configChainNewPw" type="password" autocomplete="off" placeholder="(optional for light, required for dark)"></div>' +
+      '    <span class="config-password-wrap">' +
+      '      <input class="config-input" id="configChainNewPw" type="password" autocomplete="off" placeholder="(optional for light, required for dark)">' +
+      '      <button type="button" class="config-password-toggle" data-pw-toggle aria-label="Show password" title="Show password">\ud83d\udc41</button>' +
+      '    </span></div>' +
       '  <p class="config-note" id="configChainNewPwHint" style="margin-top:0;">' +
       '    Light + no password: every field public, including GPS. ' +
       '    Light + password: GPS sealed for personal time-lock; soul fields stay public. ' +
@@ -4676,7 +5093,10 @@ setInterval(function() {
       '<p style="font-size:0.72rem;margin:0 0 0.5rem;line-height:1.5;">' + nature + '</p>' +
       '<div class="config-field">' +
       '  <span class="config-field-label">New password</span>' +
-      '  <input class="config-input" id="configChainPwInput" type="password" autocomplete="off" placeholder="' + (currentlySet ? 'type new password to change' : 'leave empty to skip') + '">' +
+      '  <span class="config-password-wrap">' +
+      '    <input class="config-input" id="configChainPwInput" type="password" autocomplete="off" placeholder="' + (currentlySet ? 'type new password to change' : 'leave empty to skip') + '">' +
+      '    <button type="button" class="config-password-toggle" data-pw-toggle aria-label="Show password" title="Show password">\ud83d\udc41</button>' +
+      '  </span>' +
       '</div>' +
       '<div class="config-row">' +
       '  <button class="config-btn config-btn-primary" id="configChainPwSave">Save</button>' +
@@ -5036,6 +5456,25 @@ setInterval(function() {
   });
 })();
 
+// Password eyeball toggle — delegated so it works for any input
+// wrapped in .config-password-wrap, including dynamically rendered
+// rows (channel secrets, chain password drawer, new-chain form).
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-pw-toggle]');
+  if (!btn) return;
+  e.preventDefault();
+  var wrap = btn.closest('.config-password-wrap');
+  if (!wrap) return;
+  var input = wrap.querySelector('input');
+  if (!input) return;
+  var showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  // \ud83d\udc41 (eye) when hidden, \ud83d\ude48 (see-no-evil) when shown
+  btn.textContent = showing ? '\ud83d\udc41' : '\ud83d\ude48';
+  btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  btn.setAttribute('title', showing ? 'Show password' : 'Hide password');
+});
+
 
 // =====================================================================
 // COMMAND PALETTE — ⌘K / Ctrl-K opens a fuzzy search across every
@@ -5272,15 +5711,6 @@ setInterval(function() {
   // know the hotkey. Lives in the page header next to the glossary.
   var openBtnHeader = document.getElementById('paletteOpenBtn');
   if (openBtnHeader) openBtnHeader.addEventListener('click', open);
-
-  // Show the platform-correct shortcut hint inside the header button.
-  // navigator.platform is loosely "MacIntel" / "MacPPC" / "Mac68K" on
-  // macOS Safari + Chrome; fall back to Ctrl on everything else.
-  var hint = document.querySelector('.page-header-palette-hint');
-  if (hint) {
-    var isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
-    hint.textContent = isMac ? '\u2318K' : 'Ctrl K';
-  }
 
   searchEl.addEventListener('input', function() { _filter(searchEl.value); });
   searchEl.addEventListener('keydown', function(e) {

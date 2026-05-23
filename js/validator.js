@@ -1153,10 +1153,17 @@ async function _renderObservatoryFromCache() {
     }
 
     // Birth Temperament + Trait Medals
-    if(r.birth_temperament){
+    // V1 records carry only birth_traits (codes); readings/summary/
+    // temperament are reconstructed from birth-text.js. Fall back to
+    // any persisted strings on V4-era records.
+    var rBirth = (typeof BirthText !== 'undefined' && r.birth_traits)
+      ? BirthText.read(r.birth_traits) : null;
+    var rTemp = (rBirth && rBirth.temperament) || r.birth_temperament;
+    var rSummary = (rBirth && rBirth.summary) || r.birth_summary;
+    if(rTemp){
       html+='<div class="ev-sec">Birth Temperament</div><div class="ev-g">';
       var hasMedals=r.birth_traits&&r.birth_traits.length&&typeof BIRTH_TRAITS!=='undefined';
-      html+='<div class="ev-m w"><div class="ev-ml">'+_h(r.birth_temperament)+'</div>'+(!hasMedals&&r.birth_summary?'<div class="ev-mv" style="font-style:italic;font-size:0.72rem;">'+_h(r.birth_summary)+'</div>':'')+'</div>';
+      html+='<div class="ev-m w"><div class="ev-ml">'+_h(rTemp)+'</div>'+(!hasMedals&&rSummary?'<div class="ev-mv" style="font-style:italic;font-size:0.72rem;">'+_h(rSummary)+'</div>':'')+'</div>';
       if(hasMedals){
         html+='<div class="ev-m w" style="padding:0.5rem;">';
         for(var bti=0;bti<r.birth_traits.length;bti++){
@@ -2800,7 +2807,10 @@ function renderAudit(rec, identifier, out) {
   // === MACHINE ===
   var machRows = '';
   machRows += auditRow('Fingerprint', rec.machine_fingerprint || '?');
-  machRows += auditRow('Temperament', rec.birth_temperament || '?');
+  var recBirth = (typeof BirthText !== 'undefined' && rec.birth_traits)
+    ? BirthText.read(rec.birth_traits) : null;
+  machRows += auditRow('Temperament',
+    (recBirth && recBirth.temperament) || rec.birth_temperament || '?');
   if (rec.birth_traits && rec.birth_traits.length && typeof BIRTH_TRAITS !== 'undefined') {
     var traitHtml = '';
     for (var bti = 0; bti < rec.birth_traits.length; bti++) {
@@ -2899,8 +2909,11 @@ function renderAudit(rec, identifier, out) {
   songRows += '<div class="audit-row"><span class="audit-label">Speaker Mode</span><span class="audit-val"><span class="audit-note" data-freq="' + speakerRoot.toFixed(2) + '" onclick="playAuditNote(this)" title="Click to hear">' + speakerNote + speakerOctave + ' (' + speakerRoot.toFixed(1) + ' Hz)</span></span></div>';
   songRows += '<div class="audit-row"><span class="audit-label">Cosmic Mode</span><span class="audit-val"><span class="audit-note" data-freq="' + rootFreq.toFixed(2) + '" onclick="playAuditNote(this)" title="Click to hear">' + rootNote + rootOctave + ' (' + rootFreq.toFixed(1) + ' Hz)</span> + sub ' + (rootFreq/2).toFixed(1) + ' Hz</span></div>';
 
-  // Temperament influence on audio
-  var temp = rec.birth_temperament || '';
+  // Temperament influence on audio — reconstruct from trait codes if
+  // the persisted string isn't there (V1 records).
+  var recBirth2 = (typeof BirthText !== 'undefined' && rec.birth_traits)
+    ? BirthText.read(rec.birth_traits) : null;
+  var temp = (recBirth2 && recBirth2.temperament) || rec.birth_temperament || '';
   var tempWord = temp.match(/^A\s+(.+?)\s+birth$/i);
   var audioTemp = tempWord ? tempWord[1] : temp;
   var modDesc = 'default';
