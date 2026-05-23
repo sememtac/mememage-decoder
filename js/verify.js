@@ -35,10 +35,15 @@
 //      sortKeysDeep / sha256_16 serialization without bumping.
 
 const HASH_INCLUDED_V1 = new Set([
-  'prompt', 'seed', 'width', 'height', 'steps', 'cfg_scale', 'guidance',
-  'denoise', 'sampler', 'scheduler', 'model', 'lora', 'lora_strength',
+  // Creator-declared origin metadata — free-form dict (prompt/seed/
+  // model for AI gens; camera/lens/ISO for photos; whatever for other
+  // workflows). Hashed wholesale so any tampering breaks WITNESSED.
+  'origin',
+  // Width / height live top-level — physical properties used by the
+  // bar encoder + identifier hash.
+  'width', 'height',
   'conceived', 'rendered',
-  // birth now contains celestial + machine (no GPS). GPS lives at
+  // birth contains celestial + machine (no GPS). GPS lives at
   // top-level: gps_time_locked is hashed; gps_password_locked is
   // added post-hash by access.py and stays out of the set.
   'birth', 'gps_time_locked',

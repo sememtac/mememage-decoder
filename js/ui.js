@@ -250,7 +250,10 @@ async function resolveMetadata(identifier, contentHash) {
       if (!resp.ok) continue;
       var record = await resp.json();
       if (!record || typeof record !== 'object') continue;
-      if (!record.prompt && !record.seed) continue;
+      // V1 records keep gen params under `origin`; fall back to flat
+      // fields for legacy records. "Has origin metadata" is the marker.
+      var _ro = record.origin || {};
+      if (!_ro.prompt && !_ro.seed && !record.prompt && !record.seed) continue;
 
       if (contentHash) {
         var computed = await computeContentHash(record);
@@ -519,7 +522,8 @@ async function fetchFromSource(baseUrl, identifier, contentHash) {
       // Accept any record with a recognizable Mememage field — don't
       // reject on missing `prompt` (protected records strip it, and
       // some flows have it behind the password layer).
-      if (!record.prompt && !record.seed && !record.content_hash) continue;
+      var _ro2 = record.origin || {};
+      if (!_ro2.prompt && !_ro2.seed && !record.prompt && !record.seed && !record.content_hash) continue;
       if (contentHash) {
         var computed = await computeContentHash(record);
         if (computed && computed !== contentHash) continue;

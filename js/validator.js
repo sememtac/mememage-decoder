@@ -1035,7 +1035,8 @@ async function _renderObservatoryFromCache() {
     html+='<div class="ev-m"><div class="ev-ml">Conceived</div><div class="ev-mv">'+_h(r.conceived||r.timestamp||'\u2014')+'</div></div>';
     html+='<div class="ev-m"><div class="ev-ml">Parent</div><div class="ev-mv">'+_h(r.parent_id||'none (genesis)')+'</div></div>';
     if(r.chain_visibility)html+='<div class="ev-m"><div class="ev-ml">Chain</div><div class="ev-mv" style="color:'+(r.chain_visibility==='dark_matter'?'#8080a0':'#d4b87b')+';">'+(r.chain_visibility==='dark_matter'?'Dark Matter (private)':'Light Energy (public)')+'</div></div>';
-    if(r.prompt)html+='<div class="ev-m w"><div class="ev-ml">Prompt</div><div class="ev-mv" style="font-style:italic;font-size:0.72rem;word-break:break-word;">'+_h(r.prompt)+'</div></div>';
+    var _rPrompt = (r.origin && r.origin.prompt) || r.prompt;   // V1 reads from origin
+    if(_rPrompt)html+='<div class="ev-m w"><div class="ev-ml">Prompt</div><div class="ev-mv" style="font-style:italic;font-size:0.72rem;word-break:break-word;">'+_h(_rPrompt)+'</div></div>';
     html+='</div>';
 
     // Hash verification
@@ -2785,11 +2786,20 @@ function renderAudit(rec, identifier, out) {
 
   // === GENERATION ===
   var genRows = '';
-  genRows += auditRow('Prompt', rec.prompt || 'encrypted/missing', rec.prompt ? '' : 'audit-dim');
-  genRows += auditRow('Seed', rec.seed || '?');
+  var _recOrigin = rec.origin || {};
+  var _recPrompt = _recOrigin.prompt || rec.prompt;   // V1 reads from origin
+  genRows += auditRow('Prompt', _recPrompt || 'encrypted/missing', _recPrompt ? '' : 'audit-dim');
+  // V1 reads from rec.origin; fall back to flat fields for legacy records.
+  var _ro = rec.origin || {};
+  var _gSeed = _ro.seed !== undefined ? _ro.seed : rec.seed;
+  var _gSteps = _ro.steps !== undefined ? _ro.steps : rec.steps;
+  var _gCfg = _ro.cfg_scale !== undefined ? _ro.cfg_scale : (rec.cfg_scale !== undefined ? rec.cfg_scale : rec.cfg);
+  var _gGuide = _ro.guidance !== undefined ? _ro.guidance : rec.guidance;
+  var _gModel = _ro.model || rec.model || rec.unet;
+  genRows += auditRow('Seed', _gSeed != null ? _gSeed : '?');
   genRows += auditRow('Size', (rec.width || '?') + ' \u00d7 ' + (rec.height || '?'));
-  genRows += auditRow('Model', rec.unet || '?');
-  genRows += auditRow('Steps / CFG / Guidance', (rec.steps || '?') + ' / ' + (rec.cfg || '?') + ' / ' + (rec.guidance || '?'));
+  genRows += auditRow('Model', _gModel || '?');
+  genRows += auditRow('Steps / CFG / Guidance', (_gSteps != null ? _gSteps : '?') + ' / ' + (_gCfg != null ? _gCfg : '?') + ' / ' + (_gGuide != null ? _gGuide : '?'));
   html += auditSection('Generation', genRows);
 
   // === CELESTIAL ===
@@ -2940,7 +2950,8 @@ function renderAudit(rec, identifier, out) {
   // V1 expected fields. birth_temperament is no longer persisted
   // (derived at display from birth_traits); rarity_score is derived
   // from the rarity dict.
-  var expected = ['identifier', 'content_hash', 'conceived', 'prompt', 'seed', 'width', 'height', 'birth', 'rarity', 'birth_traits', 'machine_fingerprint'];
+  // V1 expected: origin (free-form dict) replaces flat prompt/seed/etc.
+  var expected = ['identifier', 'content_hash', 'conceived', 'origin', 'width', 'height', 'birth', 'rarity', 'birth_traits', 'machine_fingerprint'];
   // parent_id is only expected on non-genesis records
   if (rec.parent_id) expected.push('parent_id');
   var missing = expected.filter(function(k) { return rec[k] === undefined || rec[k] === null; });

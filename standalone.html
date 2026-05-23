@@ -5801,10 +5801,15 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
 //      sortKeysDeep / sha256_16 serialization without bumping.
 
 const HASH_INCLUDED_V1 = new Set([
-  'prompt', 'seed', 'width', 'height', 'steps', 'cfg_scale', 'guidance',
-  'denoise', 'sampler', 'scheduler', 'model', 'lora', 'lora_strength',
+  // Creator-declared origin metadata — free-form dict (prompt/seed/
+  // model for AI gens; camera/lens/ISO for photos; whatever for other
+  // workflows). Hashed wholesale so any tampering breaks WITNESSED.
+  'origin',
+  // Width / height live top-level — physical properties used by the
+  // bar encoder + identifier hash.
+  'width', 'height',
   'conceived', 'rendered',
-  // birth now contains celestial + machine (no GPS). GPS lives at
+  // birth contains celestial + machine (no GPS). GPS lives at
   // top-level: gps_time_locked is hashed; gps_password_locked is
   // added post-hash by access.py and stays out of the set.
   'birth', 'gps_time_locked',
@@ -6986,91 +6991,48 @@ function renderCert(meta, options) {
   var rarity = meta.rarity || {};
 
   // --- Build data arrays from meta ---
-  var PROMPT = meta.prompt || '';
+  // The creator-declared metadata now lives in `meta.origin` (free-form
+  // dict). Anything outside origin is system-managed (identity, birth,
+  // rarity, chunks, etc.) and gets rendered in its own dedicated panel.
+  var origin = meta.origin || {};
+  var PROMPT = origin.prompt || meta.prompt || '';   // meta.prompt fallback for legacy V4-era records
   var TIMESTAMP = meta.conceived || meta.timestamp || '';
 
   var GEN_PARAMS = [];
   // span: 3 = full width, 2 = two-thirds, 1 = one-third of the grid.
-  // Order below builds the desired layout:
-  //   [ SEED            full ]
-  //   [ SIZE            full ]
-  //   [ MODE            full ]
-  //   [ STEPS | CFG | GUIDANCE ]      numeric row
-  //   [ DENOISE | SAMPLER | SCHEDULER ] numeric/label row
-  //   [ MODEL           full ]
-  //   [ LoRA            full ]
-  // Canonical AI-gen fields get curated labels + layout (Seed full-width,
-  // Steps/CFG/Guidance on one numeric row, etc.). Tracks which fields
-  // we consumed so we don't double-render them below in the catch-all.
-  var _claimedKeys = {prompt: 1, width: 1, height: 1};
+  // Canonical AI-gen layout (Seed/Size full-width, Steps|CFG|Guidance on
+  // one row, etc). Anything in origin that's NOT one of these canonical
+  // keys gets rendered after as a generic title-cased label/value pair —
+  // photographer/screenshot/drawing pipelines can drop any custom field.
+  var _claimedKeys = {prompt: 1};   // prompt is rendered separately above the panel
   function _push(key, label, value, span) {
     GEN_PARAMS.push({l: label, v: '' + value, span: span || undefined});
     _claimedKeys[key] = 1;
   }
-  if (meta.seed !== undefined) _push('seed', 'Seed', meta.seed, 3);
+  if (origin.seed !== undefined) _push('seed', 'Seed', origin.seed, 3);
   if (meta.width && meta.height) GEN_PARAMS.push({l: 'Size', v: meta.width + ' \u00d7 ' + meta.height, span: 3});
-  // mode was dropped in V1 — kept only for legacy V4 dev-era records
-  if (meta.mode) _push('mode', 'Mode', meta.mode, 3);
   // Numeric row (keep Steps / CFG / Guidance together visually)
-  if (meta.steps !== undefined) _push('steps', 'Steps', meta.steps);
-  // cfg_scale (V1) — fall back to legacy `cfg` for V4 dev-era records
-  var _cfgVal = (meta.cfg_scale !== undefined) ? meta.cfg_scale : meta.cfg;
-  if (_cfgVal !== undefined) { _push('cfg_scale', 'CFG', _cfgVal); _claimedKeys['cfg'] = 1; }
-  if (meta.guidance !== undefined) _push('guidance', 'Guidance', meta.guidance);
+  if (origin.steps !== undefined) _push('steps', 'Steps', origin.steps);
+  if (origin.cfg_scale !== undefined) _push('cfg_scale', 'CFG', origin.cfg_scale);
+  if (origin.guidance !== undefined) _push('guidance', 'Guidance', origin.guidance);
   // Second short row
-  if (meta.denoise !== undefined) _push('denoise', 'Denoise', meta.denoise);
-  if (meta.sampler) _push('sampler', 'Sampler', meta.sampler);
-  if (meta.scheduler) _push('scheduler', 'Scheduler', meta.scheduler);
-  // model (V1) — fall back to legacy `unet` for V4 dev-era records
-  var _modelVal = meta.model || meta.unet;
-  if (_modelVal) { _push('model', 'Model', _modelVal, 3); _claimedKeys['unet'] = 1; }
-  if (meta.lora) _push('lora', 'LoRA', meta.lora, 3);
-  if (meta.lora_strength !== undefined) _push('lora_strength', 'LoRA Str', meta.lora_strength);
+  if (origin.denoise !== undefined) _push('denoise', 'Denoise', origin.denoise);
+  if (origin.sampler) _push('sampler', 'Sampler', origin.sampler);
+  if (origin.scheduler) _push('scheduler', 'Scheduler', origin.scheduler);
+  if (origin.model) _push('model', 'Model', origin.model, 3);
+  if (origin.lora) _push('lora', 'LoRA', origin.lora, 3);
+  if (origin.lora_strength !== undefined) _push('lora_strength', 'LoRA Str', origin.lora_strength);
 
-  // Adaptive Origin panel: any extra string/number top-level fields
-  // the creator chose to declare get rendered alongside the canonical
-  // AI-gen fields. Lets non-AI mints (photographers, digital artists,
-  // anyone bringing their own image) describe their origin without
-  // pretending to be an AI gen. The exclusion list below holds the
-  // system-owned namespaces — identity, birth cert, machine, chunks,
-  // visibility, signing — so they don't get rendered as "origin".
-  var _systemKeys = {
-    // Identity
-    identifier: 1, content_hash: 1, signature: 1, public_key: 1,
-    key_fingerprint: 1, creator_name: 1, hash_version: 1, parent_id: 1,
-    // Birth certificate / celestial
-    birth: 1, conceived: 1, rendered: 1, timestamp: 1,
-    constellation_name: 1, constellation_hash: 1, constellation_star: 1,
-    heart_star_id: 1,
-    rarity: 1, rarity_score: 1,
-    birth_temperament: 1, birth_traits: 1, birth_readings: 1, birth_summary: 1,
-    // Machine
-    machine_fingerprint: 1,
-    // Chunks / chain
-    chunks: 1, decoder_hash: 1, outer_position: 1, outer_cycle: 1,
-    // Visibility / encryption
-    chain_visibility: 1, encrypted_soul: 1, encrypted_chunks: 1, gps_password_locked: 1,
-    // Distribution — set by the channels framework, not declared by
-    // the creator. `url` is the primary-channel URL (used by the
-    // Discord-message link / legacy bar); `distribution` is the full
-    // {channel_id: url} mirror map (already filtered by the typeof
-    // object guard, but listed explicitly so intent is unambiguous).
-    url: 1, distribution: 1,
-    // Misc
-    thumbnail: 1, song_name: 1,
-    // Rosetta Stone — system-owned doc string, never a generation param
-    about: 1,
-  };
-  var _origKeys = Object.keys(meta).sort();
+  // Generic catch-all: any other origin key the creator declared
+  // (photographer / drawing / screenshot pipelines populate whatever
+  // makes sense for their workflow — camera, lens, ISO, software, …).
+  var _origKeys = Object.keys(origin).sort();
   for (var _ki = 0; _ki < _origKeys.length; _ki++) {
     var _k = _origKeys[_ki];
-    if (_systemKeys[_k]) continue;     // system-owned, skip
-    if (_claimedKeys[_k]) continue;    // already rendered above
-    if (_k[0] === '_') continue;       // private/transient
-    var _v = meta[_k];
+    if (_claimedKeys[_k]) continue;
+    var _v = origin[_k];
     if (_v === null || _v === undefined || _v === '') continue;
     if (typeof _v === 'object') continue;  // dicts/arrays don't fit a single cell
-    // Title-case the key for display ("camera_model" → "Camera Model")
     var _label = _k.replace(/[_-]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
     GEN_PARAMS.push({l: _label, v: '' + _v, span: 3});
   }
@@ -13225,7 +13187,10 @@ async function resolveMetadata(identifier, contentHash) {
       if (!resp.ok) continue;
       var record = await resp.json();
       if (!record || typeof record !== 'object') continue;
-      if (!record.prompt && !record.seed) continue;
+      // V1 records keep gen params under `origin`; fall back to flat
+      // fields for legacy records. "Has origin metadata" is the marker.
+      var _ro = record.origin || {};
+      if (!_ro.prompt && !_ro.seed && !record.prompt && !record.seed) continue;
 
       if (contentHash) {
         var computed = await computeContentHash(record);
@@ -13494,7 +13459,8 @@ async function fetchFromSource(baseUrl, identifier, contentHash) {
       // Accept any record with a recognizable Mememage field — don't
       // reject on missing `prompt` (protected records strip it, and
       // some flows have it behind the password layer).
-      if (!record.prompt && !record.seed && !record.content_hash) continue;
+      var _ro2 = record.origin || {};
+      if (!_ro2.prompt && !_ro2.seed && !record.prompt && !record.seed && !record.content_hash) continue;
       if (contentHash) {
         var computed = await computeContentHash(record);
         if (computed && computed !== contentHash) continue;
