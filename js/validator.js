@@ -1358,7 +1358,11 @@ async function _renderObservatoryFromCache() {
                      : (cr2._gridPos != null ? cr2._gridPos
                      : (typeof cr2.decoder_chunk_index === 'number' ? cr2.decoder_chunk_index : cri));
             var letterIdx = ((pos2 % conK) + conK) % conK;
-            var starLetter = cr2.constellation_star || _panelLabel(letterIdx);
+            // V1 records carry constellation_index (int); fall back to
+            // computed letterIdx for sibling records that don't have it
+            // (e.g. records before they were minted with the new field).
+            var idxFromRec = (typeof cr2.constellation_index === 'number') ? cr2.constellation_index : letterIdx;
+            var starLetter = _panelLabel(idxFromRec);
             html += '<span style="font-size:0.52rem;padding:0.05rem 0.25rem;border-radius:2px;background:rgba(80,80,100,0.12);color:' + (isH ? '#d4b87b' : '#4a4a60') + ';">' + escapeHtml(starLetter) + '</span>';
           }
           html += '</div></div>';
@@ -2754,7 +2758,13 @@ function renderAudit(rec, identifier, out) {
   chainRows += auditRow('Parent', rec.parent_id || 'genesis (no parent)', rec.parent_id ? '' : 'audit-info');
   if (rec.constellation_name) {
     chainRows += auditRow('Constellation', rec.constellation_name, 'audit-info');
-    chainRows += auditRow('Star', rec.constellation_star || '?');
+    // V1 records carry constellation_index (int 0-11); map to Bayer letter.
+    var _BAYER = '\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc';
+    var _ci = rec.constellation_index;
+    var _starLabel = (typeof _ci === 'number' && _ci >= 0 && _ci < _BAYER.length)
+      ? _BAYER[_ci] + ' (' + _ci + ')'
+      : '?';
+    chainRows += auditRow('Star', _starLabel);
     chainRows += auditRow('Heart Star', rec.heart_star_id || '?');
     var isHeart = rec.heart_star_id === rec.identifier;
     chainRows += auditRow('Role', isHeart ? '\u03B1 Heart Star (first in constellation)' : 'Sibling', isHeart ? 'audit-info' : '');

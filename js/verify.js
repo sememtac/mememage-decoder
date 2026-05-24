@@ -57,7 +57,7 @@ const HASH_INCLUDED_V1 = new Set([
   'parent_id',
   // 'thumbnail' — post-mint, protected by Ed25519 signature instead
   'identifier',
-  'constellation_name', 'heart_star_id', 'constellation_star',
+  'constellation_name', 'heart_star_id', 'constellation_index',
   'decoder_hash',
 ]);
 
