@@ -882,25 +882,11 @@ function renderCert(meta, options) {
       badge.title = 'No spirit \u2014 soul only, bring body to witness';
     }
 
-    // Distribution surfacing: every soul records the channels it
-    // landed on as ``record.distribution`` ({channel_id: url}). Add
-    // the channel list to the WITNESSED tooltip and make the badge
-    // expandable (click → reveal full URL list below). The mirror
-    // count is the sovereignty signal — "this soul exists in N
-    // places, no platform owns it" — surfaced compactly without
-    // adding a fourth badge.
-    var distribution = meta.distribution || {};
-    var channelIds = Object.keys(distribution).filter(function(k) {
-      return distribution[k];
-    });
-    if (channelIds.length && (vf.status === 'verified' || vf.status === 'bar_verified')) {
-      badge.title += '\nDistributed via: ' + channelIds.join(', ');
-      badge.classList.add('verify-badge-expandable');
-      badge.addEventListener('click', function() {
-        var ex = badge.parentNode.parentNode.querySelector('.verify-mirrors-cluster');
-        if (ex) ex.classList.toggle('verify-mirrors-cluster-open');
-      });
-    }
+    // Souls are surface-agnostic — they no longer carry a list of
+    // every mirror they landed on. The badge stays focused on
+    // integrity / authenticity / embodiment; sovereignty is a
+    // property of the system (any number of mirrors can serve any
+    // soul) not something the soul itself advertises.
 
     badgeWrap.appendChild(badge);
 
@@ -1043,39 +1029,10 @@ function renderCert(meta, options) {
       plate.appendChild(cluster);
     }
 
-    // Mirrors cluster — reveals every surface the soul landed on
-    // when the WITNESSED badge is clicked. Mirrors the alias-cluster
-    // pattern (same collapse-on-default, same scroll fallback) but
-    // tinted with the WITNESSED green so the visual stays consistent
-    // with which badge opened it. Hidden during save-cert PNG render.
-    if ((vf.status === 'verified' || vf.status === 'bar_verified')) {
-      var mirrors = meta.distribution || {};
-      var mirrorIds = Object.keys(mirrors).filter(function(k) {
-        return mirrors[k];
-      });
-      if (mirrorIds.length) {
-        var mirrorCluster = _div('verify-mirrors-cluster');
-        var mirrorRows = mirrorIds.map(function(id) {
-          var url = mirrors[id];
-          var safeId = escapeHtml(id);
-          var safeUrl = escapeHtml(url);
-          return (
-            '<div class="verify-mirror-row">' +
-              '<span class="verify-mirror-glyph">\u29bf</span>' +
-              '<span class="verify-mirror-name">' + safeId + '</span>' +
-              '<a class="verify-mirror-url" href="' + safeUrl + '" target="_blank" rel="noopener">' + safeUrl + '</a>' +
-            '</div>'
-          );
-        });
-        mirrorCluster.innerHTML =
-          '<div class="verify-mirrors-cluster-head">Distributed across ' +
-            mirrorIds.length + ' surface' + (mirrorIds.length === 1 ? '' : 's') +
-          '</div>' +
-          '<div class="verify-mirrors-cluster-rows">' + mirrorRows.join('') + '</div>' +
-          '<p class="verify-mirrors-cluster-foot">No platform owns this soul. Any surface going offline doesn\u2019t erase it \u2014 the others still answer.</p>';
-        plate.appendChild(mirrorCluster);
-      }
-    }
+    // Distribution cluster removed: souls are surface-agnostic. The
+    // primary URL (meta.url, same as the bar pixel-encodes) still
+    // tells viewers where this record originally came from; mirror
+    // discovery is an operational concern, not part of the artifact.
   }
 
   plate.appendChild(_div('plate-divider-short'));

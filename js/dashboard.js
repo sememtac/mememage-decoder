@@ -5366,7 +5366,7 @@ setInterval(function() {
     { id: 'channel_scope', label: 'Channel scope (per-profile)',
       body: 'A profile can restrict which channels it publishes to. Privacy boundary: a VPS-only profile that shouldn\u2019t leak its rotations to a public archive marks itself scope=[peer-only]. Affects souls AND keychain records signed by that profile. None / empty = use every enabled channel (default).' },
     { id: 'distribution', label: 'Distribution',
-      body: 'The <code>record.distribution</code> field: <code>{channel_id → url}</code> listing every surface the soul landed on. Visible in the cert\u2019s WITNESSED expandable reveal. Sovereignty signal — no platform owns the soul; if one mirror goes dark, the others still answer.' },
+      body: 'The server-side publish-results map (<code>{channel_id \u2192 url}</code>) returned by <code>channels.blast()</code>. Surfaced in webhook templates as <code>{{distribution}}</code> and in the dashboard handoff card after a mint completes. Not written into the soul itself \u2014 the artifact is surface-agnostic; mirror discovery is an operational concern handled by whoever serves the soul. Sovereignty signal lives in the system\u2019s design (any number of mirrors can serve any soul), not in a list baked into every record.' },
 
     // --- Sessions + Tickets ---
     { id: 'session', label: 'Session',
