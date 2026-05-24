@@ -589,7 +589,7 @@ function chainDiscriminator(r) {
 // soul before row HTML is generated, so filter/grid lookups match.
 function assignAgeKey(r) {
   var rDec = (typeof getChunk === 'function') ? getChunk(r, 'decoder') : null;
-  var displayName = (rDec && rDec.age_name) || r.decoder_age_name || '_';
+  var displayName = AgeNames.name(r.age) || '_';
   r._ageName = displayName;
   r._ageKey = chainDiscriminator(r) + '#' + displayName;
 }
@@ -980,7 +980,7 @@ async function _renderObservatoryFromCache() {
     var rEgg  = getChunk(r,'easter_egg');
     var ti = rTruth ? rTruth.index : (r.truth_chunk_index !== undefined ? r.truth_chunk_index : null);
     var di_ = rDec ? rDec.index : (r.decoder_chunk_index !== undefined ? r.decoder_chunk_index : null);
-    var ageName = (rDec && rDec.age_name) || r.decoder_age_name || '';
+    var ageName = AgeNames.name(r.age) || '';
     var isDk2=ti!=null&&ti>=360&&ti<=363,isEp2=ti===364;
 
     // Compact row — white labels, green only for verified badge
@@ -1080,7 +1080,7 @@ async function _renderObservatoryFromCache() {
       if(rDec && rDec.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Decoder</div><div class="ev-mv">'+_h(rDec.index)+' / '+_h(rDec.total||12)+'</div></div>';
       if(rTruth && rTruth.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Truth</div><div class="ev-mv">'+_h(rTruth.index)+' / '+_h(rTruth.total||365)+'</div></div>';
       if(rProof && rProof.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Proof</div><div class="ev-mv">'+_h(rProof.index)+(rProof.day==='sunday'?' (sunday)':'')+'</div></div>';
-      if(rDec && rDec.age_name)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(rDec.age_name)+'</div></div>';
+      var _ageN=AgeNames.name(r.age); if(_ageN)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(_ageN)+'</div></div>';
       if(r.decoder_hash)html+='<div class="ev-m"><div class="ev-ml">Decoder Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_hash)+'</div></div>';
       if(rDec && rDec.version)html+='<div class="ev-m"><div class="ev-ml">Decoder Version</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(rDec.version)+'</div></div>';
       if(r.constellation_name)html+='<div class="ev-m"><div class="ev-ml">Constellation</div><div class="ev-mv">'+_h(r.constellation_name)+'</div></div>';
@@ -1373,14 +1373,14 @@ async function _renderObservatoryFromCache() {
       var ageNames = {};
       chainRecs.forEach(function(r2) {
         var d2 = getChunk(r2, 'decoder');
-        var an = (d2 && d2.age_name) || r2.decoder_age_name;
+        var an = AgeNames.name(r2.age);
         if (an) ageNames[an] = true;
       });
       var ageList = Object.keys(ageNames);
       var ageColor, ageSuffix, ageLabel;
       if (ageList.length === 0) {
         ageColor = '#8a8a9a';
-        ageSuffix = ' (no age_name declared)';
+        ageSuffix = ' (no age declared)';
         ageLabel = displayName;
       } else if (ageList.length === 1) {
         ageColor = '#4ade80';
@@ -2778,7 +2778,7 @@ function renderAudit(rec, identifier, out) {
   var cycleRows = '';
   var auDec = getChunk(rec, 'decoder');
   var auProof = getChunk(rec, 'proof');
-  var auAgeName = (auDec && auDec.age_name) || rec.decoder_age_name;
+  var auAgeName = AgeNames.name(rec.age);
   var auAge = (auDec && auDec.age) || rec.decoder_age;
   if (auAgeName) cycleRows += auditRow('Age', auAgeName + (auAge ? ' (' + auAge + ')' : ''));
   if (auDec && auDec.index !== undefined) {
