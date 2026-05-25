@@ -50,7 +50,8 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
     var identifier = record.identifier || knownIdentifier || record._identifier;
     var hash = record.content_hash || barContentHash;
     if (identifier && hash) {
-      var sigOk = await verifySignature(identifier, hash, record.signature, record.public_key);
+      var thumbHash = await _thumbnailHashForSig(record);
+      var sigOk = await verifySignature(identifier, hash, record.signature, record.public_key, thumbHash);
       result.signature = sigOk;
       result.keychain = null;
       if (sigOk === true) {
@@ -1036,7 +1037,8 @@ function tryVerifyPair() {
       var id = meta.identifier || verifyState.barIdentifier;
       var hash = meta.content_hash || barHash;
       if (id && hash) {
-        var sigOk = await verifySignature(id, hash, meta.signature, meta.public_key);
+        var thumbHash = await _thumbnailHashForSig(meta);
+        var sigOk = await verifySignature(id, hash, meta.signature, meta.public_key, thumbHash);
         vf.signature = sigOk;
         if (sigOk === true) {
           vf.signatureDetail = 'Ed25519 signature valid';

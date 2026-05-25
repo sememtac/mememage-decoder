@@ -1,20 +1,53 @@
 // =====================================================================
 // BIRTH TEXT LOOKUPS — reconstruct readable strings from trait codes.
 // =====================================================================
-// The soul stores only `birth_traits` (an array of code strings, e.g.
-// ["speculative", "loosening_grip", "night_owl"]). The reading per
-// trait, the overall temperament, and the one-line summary are all
-// derived at display time from these tables — never persisted.
+// The soul stores `birth_traits` as an array of *integer codes* — the
+// positions in the TRAIT_NAMES table below. The reading per trait, the
+// overall temperament, and the one-line summary are all derived at
+// display time from these tables — never persisted.
 //
-// Mirror of mememage/temperament.py (BIRTH_CONDITIONS, TEMPERAMENT_COMBOS,
-// TEMPERAMENT_SINGLES). When trait codes change in Python, mirror them
-// here. APPEND-ONLY: removing or renaming an existing code would mute
-// historical records that reference it.
+// Mirror of mememage/temperament.py (BIRTH_TRAIT_CODES, BIRTH_CONDITIONS,
+// TEMPERAMENT_COMBOS, TEMPERAMENT_SINGLES). When trait codes change in
+// Python, mirror them here. APPEND-ONLY: removing or reordering an
+// existing entry would mute historical records that reference it by
+// integer position.
 // =====================================================================
 
 (function (root) {
 
-  // code → reading string
+  // Integer code → trait name. Position IS the soul record's value.
+  // APPEND-ONLY. Mirrors mememage/temperament.py:BIRTH_TRAIT_CODES.
+  var TRAIT_NAMES = [
+    'contested',       // 0
+    'yielding',        // 1
+    'uncontested',     // 2
+    'stumbling',       // 3
+    'sure_footed',     // 4
+    'reaching',        // 5
+    'speculative',     // 6
+    'cautious',        // 7
+    'restless',        // 8
+    'loosening_grip',  // 9
+    'holding_tight',   // 10
+    'in_flux',         // 11
+    'entangled',       // 12
+    'unraveled',       // 13
+    'forged_in_fire',  // 14
+    'under_pressure',  // 15
+    'in_silence',      // 16
+    'last_light',      // 17
+    'untethered',      // 18
+    'night_owl',       // 19
+    'dawn',            // 20
+  ];
+
+  function traitName(code) {
+    if (typeof code === 'string') return code; // tolerate legacy/test data
+    if (typeof code !== 'number') return null;
+    return TRAIT_NAMES[code] || null;
+  }
+
+  // name → reading string
   var BIRTH_READINGS = {
     contested:      'The CPU was contested — threads jostling at the moment of birth',
     yielding:       'The CPU was yielding — a brief window of cooperation',
@@ -108,14 +141,15 @@
   };
 
   // Reconstruct {readings, temperament, summary} from a trait code array.
-  // Returns the same shape the old persisted fields had, so any code
-  // path that consumed them keeps working with a one-line substitution.
+  // Accepts ints (current soul format) or strings (legacy/test data).
+  // Returns the same shape the old persisted fields had.
   function readBirthTexts(traits) {
-    traits = (traits || []).filter(function (t) { return typeof t === 'string'; });
-    var readings = traits.map(function (t) { return BIRTH_READINGS[t]; })
-                         .filter(function (r) { return !!r; });
+    var names = (traits || []).map(traitName)
+                              .filter(function (n) { return !!n; });
+    var readings = names.map(function (n) { return BIRTH_READINGS[n]; })
+                        .filter(function (r) { return !!r; });
     var traitSet = {};
-    traits.forEach(function (t) { traitSet[t] = true; });
+    names.forEach(function (n) { traitSet[n] = true; });
     var temperament = null;
     var summary = null;
     for (var i = 0; i < TEMPERAMENT_COMBOS.length; i++) {
@@ -131,8 +165,8 @@
         break;
       }
     }
-    if (!temperament && traits.length) {
-      temperament = TEMPERAMENT_SINGLES[traits[0]] || null;
+    if (!temperament && names.length) {
+      temperament = TEMPERAMENT_SINGLES[names[0]] || null;
     }
     if (!temperament) {
       temperament = 'A serene birth';
@@ -145,9 +179,11 @@
   }
 
   root.BirthText = {
+    TRAIT_NAMES: TRAIT_NAMES,
     READINGS: BIRTH_READINGS,
     COMBOS: TEMPERAMENT_COMBOS,
     SINGLES: TEMPERAMENT_SINGLES,
+    name: traitName,
     read: readBirthTexts,
   };
 })(typeof window !== 'undefined' ? window : this);

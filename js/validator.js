@@ -1170,17 +1170,18 @@ async function _renderObservatoryFromCache() {
       if(hasMedals){
         html+='<div class="ev-m w" style="padding:0.5rem;">';
         for(var bti=0;bti<r.birth_traits.length;bti++){
-          var btKey=r.birth_traits[bti],btDef=BIRTH_TRAITS[btKey];
-          if(btDef){
+          var btName=(typeof BirthText!=='undefined')?BirthText.name(r.birth_traits[bti]):null;
+          var btDef=btName?BIRTH_TRAITS[btName]:null;
+          if(btDef&&btName){
             html+='<div style="display:flex;align-items:center;gap:0.5rem;margin:0.25rem 0;">';
-            // btKey is from r.birth_traits (user-controllable). btDef
-            // values come from BIRTH_TRAITS constant — already trusted —
-            // but escape on principle in case the constant grows.
-            html+='<img src="img/traits/'+encodeURIComponent(btKey)+'.png" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" alt="'+_h(btDef.name)+'">';
+            // btName is resolved from the trait code via the trusted
+            // BIRTH_TRAITS table; values are constants. Escape on
+            // principle in case the table grows.
+            html+='<img src="img/traits/'+encodeURIComponent(btName)+'.png" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;" alt="'+_h(btDef.name)+'">';
             html+='<span style="font-size:0.72rem;color:#c0c0cc;"><strong style="color:#d0d0d8;">'+_h(btDef.name)+'</strong> \u2014 '+_h(btDef.desc)+'</span>';
             html+='</div>';
           }else{
-            html+='<div style="font-size:0.72rem;color:#8a8a94;margin:0.25rem 0;">'+_h(btKey.replace(/_/g,' '))+'</div>';
+            html+='<div style="font-size:0.72rem;color:#8a8a94;margin:0.25rem 0;">'+_h(btName?btName.replace(/_/g,' '):'trait #'+r.birth_traits[bti])+'</div>';
           }
         }
         html+='</div>';
@@ -2736,7 +2737,9 @@ function renderAudit(rec, identifier, out) {
     sigRows += '<div id="auditSigResult">' + auditRow('Verifying...', '', 'audit-dim') + '</div>';
     var sigId = rec.identifier || identifier;
     var sigHash = rec.content_hash || '';
-    verifySignature(sigId, sigHash, rec.signature, rec.public_key).then(function(valid) {
+    _thumbnailHashForSig(rec).then(function(thumbHash) {
+      return verifySignature(sigId, sigHash, rec.signature, rec.public_key, thumbHash);
+    }).then(function(valid) {
       var sigEl = document.getElementById('auditSigResult');
       if (!sigEl) return;
       if (valid === true) {
@@ -2836,12 +2839,13 @@ function renderAudit(rec, identifier, out) {
   if (rec.birth_traits && rec.birth_traits.length && typeof BIRTH_TRAITS !== 'undefined') {
     var traitHtml = '';
     for (var bti = 0; bti < rec.birth_traits.length; bti++) {
-      var btKey = rec.birth_traits[bti], btDef = BIRTH_TRAITS[btKey];
-      if (btDef) {
+      var btName = (typeof BirthText !== 'undefined') ? BirthText.name(rec.birth_traits[bti]) : null;
+      var btDef = btName ? BIRTH_TRAITS[btName] : null;
+      if (btDef && btName) {
         traitHtml += '<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">';
-        // btKey is from rec.birth_traits (user-controllable). Use
-        // encodeURIComponent for the URL slot, escapeHtml for attrs/text.
-        traitHtml += '<img src="img/traits/' + encodeURIComponent(btKey) + '.png" style="width:20px;height:20px;object-fit:contain;" alt="' + escapeHtml(btDef.name) + '">';
+        // btName resolved from trait code via trusted lookup; values
+        // are constants. Escape on principle.
+        traitHtml += '<img src="img/traits/' + encodeURIComponent(btName) + '.png" style="width:20px;height:20px;object-fit:contain;" alt="' + escapeHtml(btDef.name) + '">';
         traitHtml += '<span style="font-size:0.68rem;color:#c0c0cc;">' + escapeHtml(btDef.name) + ' \u2014 <span style="color:#8a8a94;">' + escapeHtml(btDef.desc) + '</span></span>';
         traitHtml += '</div>';
       }
@@ -3456,8 +3460,12 @@ async function recompute() {
   if (!witnessed) {
     authenticated = false;
   } else if (/^[0-9a-f]+$/i.test(current.sig) && /^[0-9a-f]+$/i.test(current.pub)) {
+    // Signature payload binds the thumbnail too — see verify.js.
+    // Lab uses the current (possibly tampered) thumbnail field so the
+    // user can see AUTHENTICATED break when they swap the portrait.
+    var attackThumbHash = await _thumbnailHashForSig(rec);
     authenticated = await verifySignature(
-      ATTACK_IDENTIFIER, original.hash, current.sig, current.pub
+      ATTACK_IDENTIFIER, original.hash, current.sig, current.pub, attackThumbHash
     );
   }
 

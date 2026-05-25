@@ -35,6 +35,11 @@
 //      sortKeysDeep / sha256_16 serialization without bumping.
 
 const HASH_INCLUDED_V1 = new Set([
+  'identifier',
+  // Version dispatch — IN the hash (downgrade defense). Without it, an
+  // attacker could change hash_version and dispatch the verifier to a
+  // different inclusion set.
+  'hash_version',
   // Creator-declared origin metadata — free-form dict (prompt/seed/
   // model for AI gens; camera/lens/ISO for photos; whatever for other
   // workflows). Hashed wholesale so any tampering breaks WITNESSED.
@@ -56,9 +61,20 @@ const HASH_INCLUDED_V1 = new Set([
   'birth_traits',
   'parent_id',
   // 'thumbnail' — post-mint, protected by Ed25519 signature instead
-  'identifier',
   'constellation_name', 'heart_star_id', 'constellation_index',
-  'decoder_hash',
+  'decoder_hash', 'age',
+  // Signer identity — IN the hash (signer-swap defense). Stripping
+  // signature+public_key, dropping in an attacker's own key, and
+  // re-signing the existing id+hash now breaks WITNESSED instead of
+  // succeeding silently. key_fingerprint included for the same reason
+  // and so verifiers don't have to re-derive it (async SubtleCrypto).
+  'public_key', 'key_fingerprint',
+  // Chunk integrity without bulk — SHA-256 over the canonical map
+  // of {layer_name: chunk.hash}, first 16 hex. Lightweight verify
+  // (no chunk download) catches chunk swaps. Absent on pre-seal
+  // records (no chunks → no chunks_root, same shape as gps_time_locked
+  // on gps_source: none chains).
+  'chunks_root',
 ]);
 
 const HASH_INCLUDED_BY_VERSION = {
@@ -113,14 +129,48 @@ async function computeContentHash(record) {
 
 // ----- Ed25519 signature verification -----
 
-async function verifySignature(identifier, contentHash, signatureHex, publicKeyHex) {
+async function _sha256Hex(str) {
+  // Full 64-char SHA-256 hex of a UTF-8 string. Used for the
+  // thumbnail hash that participates in the signature payload.
+  var bytes = new TextEncoder().encode(str);
+  var digest = await crypto.subtle.digest('SHA-256', bytes);
+  var hexArr = [];
+  var view = new Uint8Array(digest);
+  for (var i = 0; i < view.length; i++) {
+    hexArr.push(view[i].toString(16).padStart(2, '0'));
+  }
+  return hexArr.join('');
+}
+
+async function _thumbnailHashForSig(record) {
+  // Mirror of mememage/signing.py:_build_signature_message — the
+  // thumbnail field, if present, is hashed (SHA-256 hex, full 64
+  // chars) and that hash is concatenated into the signature payload.
+  // Empty string when there's no thumbnail (keychain records,
+  // dry-runs that skipped Pillow, etc.). Encrypted thumbnails
+  // (dark_matter chains): we can't reproduce the plaintext, so we
+  // verify the ciphertext — Python signs the plaintext, so
+  // dark_matter records can only AUTHENTICATE once decrypted.
+  if (!record || typeof record.thumbnail !== 'string' || !record.thumbnail) {
+    return '';
+  }
+  return await _sha256Hex(record.thumbnail);
+}
+
+async function verifySignature(identifier, contentHash, signatureHex, publicKeyHex, thumbnailHash) {
   // Returns: true (valid), false (invalid), null (can't verify)
+  // ``thumbnailHash`` is the SHA-256 hex of the record's thumbnail
+  // field (empty string if no thumbnail). Use _thumbnailHashForSig()
+  // to compute it from a record.
   if (!signatureHex || !publicKeyHex) return null;
 
   try {
     var pubBytes = hexToBytes(publicKeyHex);
     var sigBytes = hexToBytes(signatureHex);
-    var message = new TextEncoder().encode(identifier + '\x00' + contentHash);
+    var thumbPart = thumbnailHash || '';
+    var message = new TextEncoder().encode(
+      identifier + '\x00' + contentHash + '\x00' + thumbPart
+    );
 
     // Path 1 — native SubtleCrypto Ed25519. Fastest where supported
     // (Chrome 137+, Safari 17+, Firefox 128+).

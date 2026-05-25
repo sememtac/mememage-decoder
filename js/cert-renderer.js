@@ -1156,13 +1156,16 @@ function renderCert(meta, options) {
     if (meta.birth_traits && meta.birth_traits.length) {
       var tempTraits = _div('trait-badge-group');
       for (var ti = 0; ti < meta.birth_traits.length; ti++) {
-        var traitKey = meta.birth_traits[ti];
-        var traitDef = (typeof BIRTH_TRAITS !== 'undefined') ? BIRTH_TRAITS[traitKey] : null;
+        // Soul stores integer codes; resolve to name via BirthText.
+        var traitName = (typeof BirthText !== 'undefined')
+          ? BirthText.name(meta.birth_traits[ti])
+          : null;
+        var traitDef = (traitName && typeof BIRTH_TRAITS !== 'undefined') ? BIRTH_TRAITS[traitName] : null;
         var badge = document.createElement('span');
         badge.className = 'trait-badge';
-        if (traitDef) {
+        if (traitDef && traitName) {
           badge.dataset.metal = traitDef.metal || 'silver';
-          var imgUrl = assetUrl('img/traits/' + traitKey + '.png');
+          var imgUrl = assetUrl('img/traits/' + traitName + '.png');
           var img = document.createElement('img');
           img.src = imgUrl;
           img.alt = traitDef.name;
@@ -1186,9 +1189,12 @@ function renderCert(meta, options) {
           badge.appendChild(img);
           badge.title = traitDef.name + ' \u2014 ' + traitDef.desc;
         } else {
-          // Trait isn't in BIRTH_TRAITS at all — show the key humanized.
+          // Unknown code (newer record from a future trait list) —
+          // surface the raw code so it's at least visible.
           badge.classList.add('trait-badge-text');
-          badge.textContent = traitKey.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+          badge.textContent = traitName
+            ? traitName.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();})
+            : ('trait #' + meta.birth_traits[ti]);
           badge.title = badge.textContent;
         }
         tempTraits.appendChild(badge);
