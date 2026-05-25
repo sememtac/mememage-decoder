@@ -1553,6 +1553,21 @@ function buildOrbitInspector(records, collected) {
            : (rTruth && rTruth.index != null ? rTruth.index
            : (rDec && rDec.index != null ? rDec.index
               : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index)));
+    // Chains that don't author 'decoder' or 'truth' layers (custom
+    // single-layer chains, demo configurations) still need a grid
+    // position. Fall back to any non-schematic, non-frozen layer's
+    // index — same pattern cert-renderer.js uses for constellation
+    // indexing. Layer name is irrelevant; what matters is the
+    // chunk's position within its cycle.
+    if (ti == null && r.chunks && typeof r.chunks === 'object') {
+      var _names = Object.keys(r.chunks);
+      for (var _ni = 0; _ni < _names.length; _ni++) {
+        var _n = _names[_ni];
+        if (_n === 'schematic' || _n === 'claim' || _n === 'easter_egg') continue;
+        var _e = r.chunks[_n];
+        if (_e && typeof _e.index === 'number') { ti = _e.index; break; }
+      }
+    }
     if (ti != null) ages[key].byPos[ti] = r;
     r._gridPos = ti;
   });
