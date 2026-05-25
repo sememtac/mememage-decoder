@@ -978,8 +978,29 @@ async function _renderObservatoryFromCache() {
     var rSch  = getChunk(r,'schematic');
     var rClm  = getChunk(r,'claim');
     var rEgg  = getChunk(r,'easter_egg');
+    // Generic layer iteration for the cycle-position panel — every layer
+    // a chain authored gets its own row, regardless of name. Canonical
+    // names (decoder/truth/proof) keep their curated labels via roleMeta;
+    // anything else gets title-cased fallback. Frozen roles (schematic/
+    // claim/easter_egg) are excluded — they have their own dedicated rows.
+    var _FROZEN_ROLES = {schematic:1, claim:1, easter_egg:1};
+    var rLayers = [];
+    if (r.chunks && typeof r.chunks === 'object') {
+      Object.keys(r.chunks).sort().forEach(function(role) {
+        if (_FROZEN_ROLES[role]) return;
+        var e = r.chunks[role];
+        if (!e || typeof e !== 'object' || e.index === undefined) return;
+        rLayers.push({role: role, entry: e});
+      });
+    }
     var ti = rTruth ? rTruth.index : (r.truth_chunk_index !== undefined ? r.truth_chunk_index : null);
     var di_ = rDec ? rDec.index : (r.decoder_chunk_index !== undefined ? r.decoder_chunk_index : null);
+    // Fallback compact-label indices for chains that authored neither
+    // decoder nor truth (custom-layer chains). Use the first layer's
+    // index so the row label has SOMETHING informative.
+    if (ti == null && di_ == null && rLayers.length) {
+      di_ = rLayers[0].entry.index;
+    }
     var ageName = AgeNames.name(r.age) || '';
     var isDk2=ti!=null&&ti>=360&&ti<=363,isEp2=ti===364;
 
@@ -992,7 +1013,20 @@ async function _renderObservatoryFromCache() {
     html+='<div class="meta-row" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="padding:0.35rem 0.8rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'none\'">';
     html+='<span style="font-size:0.72rem;color:'+rBadgeCol+';min-width:1rem;">'+rBadge+'</span>';
     html+='<span style="font-size:0.7rem;font-family:monospace;min-width:10rem;color:#d0d0d8;">'+_h(r.identifier?r.identifier.slice(-16):(r._fn||'').slice(-16))+'</span>';
-    if(ti!=null)html+='<span style="font-size:0.6rem;color:'+(isEp2?'#d4b87b':isDk2?'#8a7050':'#6a6a80')+';">T'+(+ti)+(di_!=null?' D'+(+di_):'')+'</span>';
+    // Compact position label. Canonical chains show "T<truth> D<decoder>";
+    // custom-layer chains show "<X><idx>" for each layer using the first
+    // letter of the layer name (so "test" layer at position 0 → "T0").
+    // The 'T'-as-truth convention only applies when a truth chunk exists.
+    var _posLabel = '';
+    if (rTruth || rDec) {
+      if (ti != null) _posLabel = 'T' + (+ti);
+      if (di_ != null) _posLabel += (ti != null ? ' ' : '') + 'D' + (+di_);
+    } else if (rLayers.length) {
+      _posLabel = rLayers.map(function(l) {
+        return (l.role.charAt(0).toUpperCase() || '?') + l.entry.index;
+      }).join(' ');
+    }
+    if (_posLabel) html+='<span style="font-size:0.6rem;color:'+(isEp2?'#d4b87b':isDk2?'#8a7050':'#6a6a80')+';">'+_h(_posLabel)+'</span>';
     if(r.constellation_name)html+='<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+_h(r.constellation_name)+'</span>';
     html+='</div>';
 
@@ -1073,16 +1107,23 @@ async function _renderObservatoryFromCache() {
       html+='</div>';
     }
 
-    // Cycle position (chunk metadata read via getChunk; works for both
-    // nested + legacy flat shapes)
-    if(rDec || rTruth){
+    // Cycle position — one row per authored layer, plus frozen-role
+    // overlays + Age / decoder_hash / constellation. Generalized: any
+    // chain whose layers aren't decoder/truth/proof still gets rendered;
+    // the row label comes from roleMeta() (curated for canonical names,
+    // title-cased fallback for everything else).
+    if(rLayers.length || rSch || rClm || rEgg){
       html+='<div class="ev-sec">Cycle Position</div><div class="ev-g">';
-      if(rDec && rDec.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Decoder</div><div class="ev-mv">'+_h(rDec.index)+' / '+_h(rDec.total||12)+'</div></div>';
-      if(rTruth && rTruth.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Truth</div><div class="ev-mv">'+_h(rTruth.index)+' / '+_h(rTruth.total||365)+'</div></div>';
-      if(rProof && rProof.index!==undefined)html+='<div class="ev-m"><div class="ev-ml">Proof</div><div class="ev-mv">'+_h(rProof.index)+(rProof.day==='sunday'?' (sunday)':'')+'</div></div>';
+      rLayers.forEach(function(l) {
+        var lbl = (typeof roleMeta === 'function') ? (roleMeta(l.role).label || l.role) : l.role;
+        var total = l.entry.total || '?';
+        html+='<div class="ev-m"><div class="ev-ml">'+_h(lbl)+'</div><div class="ev-mv">'+_h(l.entry.index)+' / '+_h(total)+'</div></div>';
+        if (l.entry.version) {
+          html+='<div class="ev-m"><div class="ev-ml">'+_h(lbl)+' Version</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(l.entry.version)+'</div></div>';
+        }
+      });
       var _ageN=AgeNames.name(r.age); if(_ageN)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(_ageN)+'</div></div>';
       if(r.decoder_hash)html+='<div class="ev-m"><div class="ev-ml">Decoder Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_hash)+'</div></div>';
-      if(rDec && rDec.version)html+='<div class="ev-m"><div class="ev-ml">Decoder Version</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(rDec.version)+'</div></div>';
       if(r.constellation_name)html+='<div class="ev-m"><div class="ev-ml">Constellation</div><div class="ev-mv">'+_h(r.constellation_name)+'</div></div>';
       if(r.heart_star_id)html+='<div class="ev-m"><div class="ev-ml">Heart Star</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.heart_star_id)+'</div></div>';
       if(rSch)html+='<div class="ev-m"><div class="ev-ml">Schematic</div><div class="ev-mv" style="color:#8a7050;">Dark day '+_h((rSch.index||0)+1)+'</div></div>';
@@ -1373,7 +1414,6 @@ async function _renderObservatoryFromCache() {
       // Age — single line for this chain
       var ageNames = {};
       chainRecs.forEach(function(r2) {
-        var d2 = getChunk(r2, 'decoder');
         var an = AgeNames.name(r2.age);
         if (an) ageNames[an] = true;
       });
@@ -2792,23 +2832,26 @@ function renderAudit(rec, identifier, out) {
   html += auditSection('Chain Position', chainRows);
 
   // === CYCLE INTEGRITY ===
-  // Chunks pulled via getChunk so both nested + legacy flat shapes work.
+  // One row per authored layer (any name), plus Age + decoder_hash +
+  // chain_visibility. Canonical layers (decoder/truth/proof) keep their
+  // curated labels via roleMeta; custom layers render as title-cased
+  // fallback. Frozen roles (schematic/claim/easter_egg) are listed
+  // elsewhere — skip here to avoid duplication.
   var cycleRows = '';
-  var auDec = getChunk(rec, 'decoder');
-  var auProof = getChunk(rec, 'proof');
   var auAgeName = AgeNames.name(rec.age);
-  var auAge = (auDec && auDec.age) || rec.decoder_age;
-  if (auAgeName) cycleRows += auditRow('Age', auAgeName + (auAge ? ' (' + auAge + ')' : ''));
-  if (auDec && auDec.index !== undefined) {
-    cycleRows += auditRow('Decoder Chunk', (auDec.index + 1) + ' of ' + (auDec.total || 12));
-    cycleRows += auditRow('Decoder Hash', rec.decoder_hash ? rec.decoder_hash.slice(0, 12) + '...' : 'missing', rec.decoder_hash ? '' : 'audit-warn');
-    cycleRows += auditRow('Decoder Version', auDec.version || '?');
+  if (auAgeName) cycleRows += auditRow('Age', auAgeName);
+  if (rec.chunks && typeof rec.chunks === 'object') {
+    var _FROZEN = {schematic:1, claim:1, easter_egg:1};
+    Object.keys(rec.chunks).sort().forEach(function(role) {
+      if (_FROZEN[role]) return;
+      var e = rec.chunks[role];
+      if (!e || typeof e !== 'object' || e.index === undefined) return;
+      var lbl = (typeof roleMeta === 'function') ? (roleMeta(role).label || role) : role;
+      cycleRows += auditRow(lbl + ' Chunk', (e.index + 1) + ' of ' + (e.total || '?'));
+      if (e.version) cycleRows += auditRow(lbl + ' Version', e.version);
+    });
   }
-  if (auProof && auProof.index !== undefined) {
-    cycleRows += auditRow('Proof Chunk', (auProof.index + 1) + ' of ' + (auProof.total || 7));
-    cycleRows += auditRow('Proof Day', auProof.day || '?');
-    cycleRows += auditRow('Proof Version', auProof.version || '?');
-  }
+  if (rec.decoder_hash) cycleRows += auditRow('Decoder Hash', rec.decoder_hash.slice(0, 12) + '...');
   if (rec.chain_visibility) cycleRows += auditRow('Visibility', rec.chain_visibility, rec.chain_visibility === 'dark_matter' ? 'audit-warn' : '');
   if (cycleRows) html += auditSection('Cycle Position', cycleRows);
 
