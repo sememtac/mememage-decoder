@@ -75,6 +75,9 @@ const HASH_INCLUDED_V1 = new Set([
   // records (no chunks → no chunks_root, same shape as gps_time_locked
   // on gps_source: none chains).
   'chunks_root',
+  // Visibility tier — int code (0=light_energy public, 1=dark_matter
+  // sealed). IN the hash so a record can't be silently re-tiered.
+  'chain_visibility',
 ]);
 
 const HASH_INCLUDED_BY_VERSION = {

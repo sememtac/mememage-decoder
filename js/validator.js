@@ -569,6 +569,17 @@ function getRoleColor(name) {
   return Math.round((r1 + m) * 255) + ',' + Math.round((g1 + m) * 255) + ',' + Math.round((b1 + m) * 255);
 }
 
+// Visibility helpers — soul stores int codes (0=light_energy public,
+// 1=dark_matter sealed) but legacy records / programmatic callers may
+// still pass strings. Accept both shapes.
+function _isDark(v)  { return v === 1 || v === 'dark_matter'; }
+function _isLight(v) { return v === 0 || v === 'light_energy' || v == null; }
+function _visName(v) {
+  if (v === 1 || v === 'dark_matter') return 'dark_matter';
+  if (v === 0 || v === 'light_energy') return 'light_energy';
+  return '';
+}
+
 // Group records by their chain identity. Two independently sealed
 // chains can both call their first Age "Age of Aries"; without a
 // discriminator they collide. Prefers decoder_hash when present;
@@ -689,7 +700,7 @@ var _chainPasswords = {};
 // if no password is stored or decryption fails. Does not mutate the
 // caller's record — the cache stays the encrypted ciphertext shell.
 async function maybeUnlockRecord(record) {
-  if (!record || record.chain_visibility !== 'dark_matter') return record;
+  if (!record || !_isDark(record.chain_visibility)) return record;
   var key = chainDiscriminator(record);
   var pw = _chainPasswords[key];
   if (!pw || typeof Access === 'undefined') return record;
@@ -865,7 +876,7 @@ async function _renderObservatoryFromCache() {
     // sealed record is expected (the stored hash covers plaintext we
     // can't see) — flag it separately so the UI can distinguish
     // "we can't tell" from "we verified tampering".
-    r._sealed = r.chain_visibility === 'dark_matter'
+    r._sealed = _isDark(r.chain_visibility)
                 && !r._unlocked
                 && (!!r.encrypted_soul || !!r.encrypted_chunks);
   }
@@ -1068,7 +1079,7 @@ async function _renderObservatoryFromCache() {
     html+='<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv">'+(r.identifier?'<a href="#" class="audit-link" data-id="'+safeRid+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeRid+'</a>':'\u2014')+'</div></div>';
     html+='<div class="ev-m"><div class="ev-ml">Conceived</div><div class="ev-mv">'+_h(r.conceived||r.timestamp||'\u2014')+'</div></div>';
     html+='<div class="ev-m"><div class="ev-ml">Parent</div><div class="ev-mv">'+_h(r.parent_id||'none (genesis)')+'</div></div>';
-    if(r.chain_visibility)html+='<div class="ev-m"><div class="ev-ml">Chain</div><div class="ev-mv" style="color:'+(r.chain_visibility==='dark_matter'?'#8080a0':'#d4b87b')+';">'+(r.chain_visibility==='dark_matter'?'Dark Matter (private)':'Light Energy (public)')+'</div></div>';
+    if(r.chain_visibility!==undefined&&r.chain_visibility!==null)html+='<div class="ev-m"><div class="ev-ml">Chain</div><div class="ev-mv" style="color:'+(_isDark(r.chain_visibility)?'#8080a0':'#d4b87b')+';">'+(_isDark(r.chain_visibility)?'Dark Matter (private)':'Light Energy (public)')+'</div></div>';
     var _rPrompt = (r.origin && r.origin.prompt) || r.prompt;   // V1 reads from origin
     if(_rPrompt)html+='<div class="ev-m w"><div class="ev-ml">Prompt</div><div class="ev-mv" style="font-style:italic;font-size:0.72rem;word-break:break-word;">'+_h(_rPrompt)+'</div></div>';
     html+='</div>';
@@ -1271,9 +1282,9 @@ async function _renderObservatoryFromCache() {
       // instead of the input, so the section doesn't reset between
       // re-renders. Input value isn't persisted across re-renders; the
       // password lives in the in-memory _chainPasswords map.
-      var anyDark = chainRecs.some(function(r) { return r.chain_visibility === 'dark_matter'; });
+      var anyDark = chainRecs.some(function(r) { return _isDark(r.chain_visibility); });
       if (anyDark) {
-        var unlocked = chainRecs.every(function(r) { return r._unlocked || r.chain_visibility !== 'dark_matter'; });
+        var unlocked = chainRecs.every(function(r) { return r._unlocked || !_isDark(r.chain_visibility); });
         html += '<div class="ev-sec">Dark Matter</div>';
         if (unlocked) {
           html += '<div style="display:flex;gap:0.4rem;align-items:center;font-size:0.65rem;color:#c8b080;">'
@@ -1482,7 +1493,7 @@ async function _renderObservatoryFromCache() {
           // before we burn the re-render. Without this the chain just
           // re-renders unchanged and the user has no signal.
           var probe = _observatoryCache.find(function(r) {
-            return !r._err && r.chain_visibility === 'dark_matter'
+            return !r._err && _isDark(r.chain_visibility)
                 && chainDiscriminator(r) === chainKey;
           });
           var probeOk = false;
@@ -2852,7 +2863,9 @@ function renderAudit(rec, identifier, out) {
     });
   }
   if (rec.decoder_hash) cycleRows += auditRow('Decoder Hash', rec.decoder_hash.slice(0, 12) + '...');
-  if (rec.chain_visibility) cycleRows += auditRow('Visibility', rec.chain_visibility, rec.chain_visibility === 'dark_matter' ? 'audit-warn' : '');
+  if (rec.chain_visibility !== undefined && rec.chain_visibility !== null) {
+    cycleRows += auditRow('Visibility', _visName(rec.chain_visibility) || String(rec.chain_visibility), _isDark(rec.chain_visibility) ? 'audit-warn' : '');
+  }
   if (cycleRows) html += auditSection('Cycle Position', cycleRows);
 
   // === GENERATION ===
