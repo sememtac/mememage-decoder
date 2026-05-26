@@ -674,8 +674,11 @@ function sortRoles(roles) {
 
 async function verifyChunkHash(data,expectedHash){
   if(!expectedHash||!data)return null;
-  try{var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(data));
-    var hex=Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('').slice(0,12);
+  // _sha256_bytes (verify.js) gracefully falls back to a pure-JS
+  // SHA-256 when crypto.subtle is unavailable (iOS Safari with
+  // self-signed cert, file://, etc.).
+  try{var view=await _sha256_bytes(new TextEncoder().encode(data));
+    var hex=Array.from(view).map(function(b){return b.toString(16).padStart(2,'0');}).join('').slice(0,12);
     return hex===expectedHash;}catch(e){return null;}
 }
 
