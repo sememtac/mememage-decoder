@@ -827,13 +827,16 @@ function renderCert(meta, options) {
     plate.appendChild(conCanvas);
   }
 
-  // Portrait — the face is only revealed when the image was present (verified).
-  // Navigating by word alone = stargazing. You see the fingerprint, not the source.
-  // Bring the body (By Sight or By Soul) and the face is the reward.
-  var vfEarly = meta._verification;
-  var imageWasPresent = vfEarly && (vfEarly.status === 'verified' || vfEarly.status === 'bar_verified' || vfEarly.status === 'tampered');
+  // Portrait — always shown when the record carries a thumbnail.
+  // Earlier this was gated on "image was present" (only revealed on
+  // By Sight / By Soul drops, hidden on By Word lookups). That made
+  // chain traversal feel like reading text. The thumbnail is part of
+  // the soul anyway — there's nothing to gate, and showing it makes
+  // walking a lineage actually feel like visiting stars. The
+  // mystery is "what's behind this letter, this name" — answer with
+  // the face.
   var safeThumb = _safeThumbnail(meta.thumbnail);
-  if (safeThumb && imageWasPresent) {
+  if (safeThumb) {
     var portraitWrap = _div();
     portraitWrap.style.cssText = 'text-align:center;margin-bottom:12px;position:relative;z-index:3';
     var portraitRing = _div();
