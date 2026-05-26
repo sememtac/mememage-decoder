@@ -1493,99 +1493,6 @@
     margin: 0;
   }
 
-  /* Alias cluster reveal — inline expansion below the badge row,
-     toggled by clicking the AUTHENTICATED badge when it has a pip.
-     Default collapsed (max-height: 0) so the three-badge row stays
-     untouched until the user opts in. Hidden during save-cert PNG
-     render so the saved plate matches the default visual. */
-  .verify-alias-cluster {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.35s ease, padding 0.25s ease, opacity 0.25s ease;
-    opacity: 0;
-    padding: 0 12px;
-    margin: 0 auto;
-    max-width: 420px;
-    border-radius: 8px;
-    background: rgba(94, 168, 232, 0.06);
-    border: 1px solid transparent;
-    color: var(--text-secondary);
-    font-size: 0.7rem;
-  }
-  .verify-alias-cluster.verify-alias-cluster-open {
-    max-height: 360px;
-    opacity: 1;
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    border-color: rgba(94, 168, 232, 0.18);
-  }
-  .verify-alias-cluster-head {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #5ea8e8;
-    margin-bottom: 6px;
-    text-align: center;
-  }
-  .verify-alias-cluster-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .verify-alias-row {
-    display: grid;
-    grid-template-columns: 14px 1fr auto auto;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 6px;
-    background: rgba(0, 0, 0, 0.18);
-    border-radius: 4px;
-    font-family: ui-monospace, "JetBrains Mono", monospace;
-    font-size: 0.66rem;
-  }
-  .verify-alias-row.verify-alias-oneway { opacity: 0.55; }
-  .verify-alias-row.verify-alias-self {
-    background: rgba(94, 168, 232, 0.12);
-    border: 1px solid rgba(94, 168, 232, 0.25);
-  }
-  .verify-alias-glyph {
-    color: #5ea8e8;
-    text-align: center;
-    font-size: 0.9rem;
-    line-height: 1;
-  }
-  .verify-alias-name {
-    color: var(--text-primary);
-    font-weight: 500;
-    font-family: inherit;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .verify-alias-fp {
-    color: var(--text-muted);
-    font-size: 0.62rem;
-  }
-  .verify-alias-tag {
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-family: inherit;
-  }
-  .verify-alias-tag-signer { color: #5ea8e8; background: rgba(94, 168, 232, 0.16); }
-  .verify-alias-tag-bi { color: #7bc4a0; background: rgba(123, 196, 160, 0.16); }
-  .verify-alias-tag-oneway { color: #a0a0a8; background: rgba(160, 160, 168, 0.12); }
-  .verify-alias-cluster-foot {
-    font-size: 0.6rem;
-    color: var(--text-muted);
-    font-style: italic;
-    margin: 8px 0 0;
-    line-height: 1.5;
-  }
   .verify-authenticated {
     color: #5ea8e8;
     background: rgba(10, 20, 35, 0.75);
@@ -1596,19 +1503,6 @@
     background: rgba(20, 40, 60, 0.75);
     border-color: rgba(160, 200, 255, 0.5);
     box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3), 0 0 12px rgba(160, 200, 255, 0.15);
-  }
-  /* Pip count — superscript numeral appended to AUTHENTICATED when
-     the signer's key has confirmed sibling keys (alias records on IA
-     signed by both sides). Preserves the three-badge silhouette; the
-     number tells the viewer how many total keys belong to this human.
-     Click the badge to expand the cluster reveal below. */
-  .verify-badge-pip {
-    display: inline-block;
-    margin-left: 0.2rem;
-    font-size: 0.78em;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.85);
-    vertical-align: super;
   }
   /* Mirrors cluster — reveals every surface the soul landed on
      (record.distribution), toggled by clicking the WITNESSED badge.
@@ -1690,13 +1584,6 @@
     text-align: center;
   }
 
-  .verify-badge-expandable {
-    cursor: pointer;
-  }
-  .verify-badge-expandable:hover {
-    /* hover already lifts via .verify-authenticated:hover, this is
-       just a hint that the badge is interactive when expandable */
-  }
   .verify-forged {
     color: #f06040;
     background: rgba(35, 10, 8, 0.75);

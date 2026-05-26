@@ -182,7 +182,6 @@ function _saveLivePlate(plate, barId, barHash) {
       '.verify-badge { box-shadow: none !important; }' +
       '.gps-unlock { display: none !important; }' +
       '.save-cert-btn { display: none !important; }' +
-      '.verify-alias-cluster { display: none !important; }' +
       '.verify-mirrors-cluster { display: none !important; }' +
       '.cosmic-player { display: none !important; }' +
       // Live plate has 28px bottom padding to breathe with the player
@@ -925,16 +924,9 @@ function renderCert(meta, options) {
         }
       }
       sigBadge.title = (vf.signatureDetail || 'Ed25519 signature verified') + aliasTooltip;
-
-      // Click → toggle an inline alias-cluster expansion below the
-      // badge row. Hidden by default; ::after the badge row in DOM.
-      if (aliases.length) {
-        sigBadge.classList.add('verify-badge-expandable');
-        sigBadge.addEventListener('click', function() {
-          var ex = sigBadge.parentNode.parentNode.querySelector('.verify-alias-cluster');
-          if (ex) ex.classList.toggle('verify-alias-cluster-open');
-        });
-      }
+      // No expandable alias panel — aliases live in the badge tooltip
+      // ("Also known as: …") only. Keys + fingerprints are a system
+      // concern, not a viewer concern.
       badgeWrap.appendChild(sigBadge);
     } else if (vf.signature === false) {
       var sigBadge2 = _div('verify-badge verify-forged');
@@ -973,61 +965,11 @@ function renderCert(meta, options) {
 
     plate.appendChild(badgeWrap);
 
-    // Alias cluster reveal — sibling-key list, toggled by clicking
-    // the AUTHENTICATED badge when it has a count pip. Lives outside
-    // the badge row so the three-badge silhouette stays clean; opens
-    // inline only when explicitly requested. Hidden during save-cert
-    // PNG render (see _saveLivePlate's CSS override list).
-    if (vf.signature === true && vf.aliases && vf.aliases.length) {
-      var cluster = _div('verify-alias-cluster');
-      // Dedupe by alias_fingerprint (same logic as the pip count
-      // above) so the panel matches the badge's stated total.
-      var seenAliasFp2 = {};
-      var uniqAliases2 = [];
-      vf.aliases.forEach(function(a) {
-        var fp = a.alias_fingerprint || '';
-        if (!fp || seenAliasFp2[fp]) return;
-        seenAliasFp2[fp] = true;
-        uniqAliases2.push(a);
-      });
-      var bi2 = uniqAliases2.filter(function(a) { return a.bidirectional; });
-      var oneWay2 = uniqAliases2.filter(function(a) { return !a.bidirectional; });
-      var rows = [];
-      // The signer itself, anchoring the cluster.
-      rows.push(
-        '<div class="verify-alias-row verify-alias-self">' +
-          '<span class="verify-alias-glyph">\u29bf</span>' +  // ⦿ filled dot
-          '<span class="verify-alias-name">' + escapeHtml(meta.creator_name || '(signer)') + '</span>' +
-          '<span class="verify-alias-fp">' + escapeHtml(meta.key_fingerprint || '') + '</span>' +
-          '<span class="verify-alias-tag verify-alias-tag-signer">this signer</span>' +
-        '</div>'
-      );
-      bi2.forEach(function(a) {
-        rows.push(
-          '<div class="verify-alias-row">' +
-            '<span class="verify-alias-glyph">\u29bf</span>' +
-            '<span class="verify-alias-name">' + escapeHtml(a.creator_name || '(sibling)') + '</span>' +
-            '<span class="verify-alias-fp">' + escapeHtml(a.alias_fingerprint || '') + '</span>' +
-            '<span class="verify-alias-tag verify-alias-tag-bi">bidirectional</span>' +
-          '</div>'
-        );
-      });
-      oneWay2.forEach(function(a) {
-        rows.push(
-          '<div class="verify-alias-row verify-alias-oneway">' +
-            '<span class="verify-alias-glyph">\u25cb</span>' +  // ○ empty dot
-            '<span class="verify-alias-name">' + escapeHtml(a.creator_name || '(claimed sibling)') + '</span>' +
-            '<span class="verify-alias-fp">' + escapeHtml(a.alias_fingerprint || '') + '</span>' +
-            '<span class="verify-alias-tag verify-alias-tag-oneway">one-way</span>' +
-          '</div>'
-        );
-      });
-      cluster.innerHTML =
-        '<div class="verify-alias-cluster-head">Keys recognized for this human</div>' +
-        '<div class="verify-alias-cluster-rows">' + rows.join('') + '</div>' +
-        '<p class="verify-alias-cluster-foot">Bidirectional aliases are signed by both keys (strongest signal). One-way claims are recognized but unconfirmed by the other side.</p>';
-      plate.appendChild(cluster);
-    }
+    // Alias-cluster panel removed — aliases surface only as the
+    // AUTHENTICATED badge's tooltip ("Also known as: …"). Keys and
+    // fingerprints are system mechanics, not part of what the viewer
+    // is asked to read. The cert's job is three badges: WITNESSED,
+    // AUTHENTICATED, EMBODIED. Anything else clutters the surface.
 
     // Distribution cluster removed: souls are surface-agnostic. The
     // primary URL (meta.url, same as the bar pixel-encodes) still
