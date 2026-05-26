@@ -2684,8 +2684,10 @@ function runAudit() {
   // Source config — single URL field with {id} templating. Expand
   // {id} before probing so "https://archive.org/download/{id}/" and
   // "https://yourhost.com/" share one code path.
+  // Empty field → placeholder default (SOURCE_DEFAULT). The greyed
+  // hint the user sees IS the value they get when they clear the field.
   var sourceEl = document.getElementById('auditSource');
-  var base = (sourceEl ? sourceEl.value.trim() : SOURCE_DEFAULT);
+  var base = (sourceEl && sourceEl.value.trim()) || SOURCE_DEFAULT;
   var expanded = base.replace(/\{id\}/g, identifier).replace(/\/+$/, '');
   var isArchiveOrg = /archive\.org/.test(base);
   var offlineMode = SourceConfig.getMode('source') === 'offline';

@@ -481,6 +481,89 @@ setInterval(function() {
     return h;
   }
 
+  // JS-driven download for the Witnessed view's image + soul buttons.
+  // Plain <a download> tags are unreliable on Safari (desktop and iOS,
+  // especially against the self-signed VPS cert) — Safari often
+  // navigates to the URL inline instead of saving. Fetching the bytes
+  // and triggering an anchor click against a blob URL is deterministic.
+  // Mirror of docs/js/conception.js:_wireBlobDownload; kept in-file
+  // (not pulled into a shared util) because dashboard is the only
+  // other surface with these buttons and a shared helper would mean
+  // a new script load.
+  function _wireBlobDownload(btn, srcUrl, filename) {
+    if (!btn) return;
+    // <a> tags carry their href to native browser action on click —
+    // remove it so our onclick is the only path. Keep the visible
+    // href for "Open in new tab" right-click affordance via a data attr.
+    btn.removeAttribute('href');
+    btn.removeAttribute('download');
+    btn.setAttribute('role', 'button');
+    btn.style.cursor = 'pointer';
+    btn.dataset.fetchUrl = srcUrl;
+    btn.onclick = async function(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      var prev = btn.textContent;
+      var prevAria = btn.getAttribute('aria-disabled') || '';
+      btn.setAttribute('aria-disabled', 'true');
+      btn.textContent = 'Preparing\u2026';
+      try {
+        var r = await fetch(srcUrl);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var blob = await r.blob();
+        var ua = navigator.userAgent || '';
+        var iosUA = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        var androidUA = /Android/i.test(ua);
+        var isImage = (blob.type || '').indexOf('image/') === 0;
+        // Mobile non-iOS: try native share. Desktop and iOS: anchor
+        // download (iOS save-to-Files via the download attribute is
+        // reliable when the URL is a blob: scheme; the macOS Safari
+        // share-sheet WEBP re-encoding only happens via navigator.share,
+        // which we skip on desktop).
+        if (isImage && androidUA && !iosUA) {
+          try {
+            var file = new File([blob], filename, { type: blob.type });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: 'Mememage' });
+              btn.textContent = 'Shared';
+              setTimeout(function() {
+                btn.textContent = prev;
+                btn.setAttribute('aria-disabled', prevAria);
+              }, 1500);
+              return;
+            }
+          } catch (shareErr) {
+            if (shareErr && shareErr.name === 'AbortError') {
+              btn.textContent = prev;
+              btn.setAttribute('aria-disabled', prevAria);
+              return;
+            }
+          }
+        }
+        var bUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = bUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+          URL.revokeObjectURL(bUrl);
+          a.remove();
+        }, 1000);
+        btn.textContent = 'Downloaded';
+        setTimeout(function() {
+          btn.textContent = prev;
+          btn.setAttribute('aria-disabled', prevAria);
+        }, 1500);
+      } catch (err) {
+        btn.textContent = 'Failed: ' + (err.message || err);
+        setTimeout(function() {
+          btn.textContent = prev;
+          btn.setAttribute('aria-disabled', prevAria);
+        }, 2500);
+      }
+    };
+  }
+
   // ---- empty → reviewing: handle drop / pick ----
   function fileToBase64(file) {
     return new Promise(function(resolve, reject) {
@@ -972,18 +1055,29 @@ setInterval(function() {
     // externally-reachable host via _external_host) so the link is
     // shareable across devices on the same tailnet. Fall back to a
     // relative path for any older server that doesn't return it.
-    els.download.href = s.download_url || ('/api/mint/' + state.token + '/image');
+    //
+    // Route both buttons through _wireBlobDownload so the download
+    // is JS-driven (fetch → blob → anchor click with explicit
+    // filename) instead of a raw <a download>. Safari (desktop +
+    // iOS, especially against the self-signed VPS cert) often
+    // ignores the download attribute on plain anchors and navigates
+    // to the URL inline, leaving the user with no actual file. The
+    // blob path is deterministic — fetch returns the bytes, anchor
+    // click with explicit download attribute saves with the right
+    // name. Same fix the conception page uses.
+    var imgUrl = s.download_url || ('/api/mint/' + state.token + '/image');
+    _wireBlobDownload(els.download, imgUrl, (s.identifier || 'image') + '.png');
     // Soul download — points at our /api/mint/<token>/soul endpoint
     // which streams the local .soul file regardless of whether IA
     // received it. Works for both real mints (records/<id>.soul) and
     // dry-runs (records/dryrun/<id>.soul). Falls back to the IA URL
     // if the server didn't supply download_soul_url (older builds).
     if (els.downloadSoul) {
-      els.downloadSoul.setAttribute('download', s.identifier + '.soul');
-      els.downloadSoul.href = s.download_soul_url || s.url || '#';
       els.downloadSoul.classList.remove('mint-action-disabled');
       els.downloadSoul.textContent = 'Download soul';
       els.downloadSoul.title = '';
+      var soulUrl = s.download_soul_url || s.url || ('/api/mint/' + state.token + '/soul');
+      _wireBlobDownload(els.downloadSoul, soulUrl, (s.identifier || 'soul') + '.soul');
     }
     // Dry-run badge in the Witnessed header
     if (els.resultHead) {

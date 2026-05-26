@@ -771,8 +771,11 @@ function processImage(file){
 
     // Source config — shared across By Sight + By Word via the
     // 'source' prefix. Single URL field; fetchFromSource expands {id}.
+    // Empty field → fall back to the placeholder default. The greyed-out
+    // text the user sees IS the value they get when they clear the field;
+    // leaving the value as "" would silently break the lookup.
     var imgSourceEl = document.getElementById('imageSource');
-    var imgSourceBase = imgSourceEl ? imgSourceEl.value.trim() : SOURCE_DEFAULT;
+    var imgSourceBase = (imgSourceEl && imgSourceEl.value.trim()) || SOURCE_DEFAULT;
 
     // Swap the drop-hint to "Fetching…" for the network wait — same
     // pattern as By Word's .lookup-hint + validator's .how. Visible on
@@ -836,8 +839,9 @@ function lookupById(input, pushHistory){
     // URL, parseSoulInput already set directUrl and that wins. If they
     // only typed an identifier, use the configured Source base URL.
     // {id} templating in the base is expanded by fetchFromSource.
+    // Empty field → placeholder default. See note at imgSourceBase above.
     var sourceEl = document.getElementById('lookupSource');
-    var base = sourceEl ? sourceEl.value.trim() : SOURCE_DEFAULT;
+    var base = (sourceEl && sourceEl.value.trim()) || SOURCE_DEFAULT;
 
     var directUrl = parsed.directUrl;
     var sourceBase = parsed.sourceBase;
