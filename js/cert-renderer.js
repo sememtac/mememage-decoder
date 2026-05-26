@@ -630,13 +630,15 @@ function renderCert(meta, options) {
   // Fallback chain: constellation_hash → constellation_name → content_hash (legacy)
   var conSeed = meta.constellation_hash || meta.constellation_name || meta.content_hash || meta._content_hash || '';
   // Record's position within its constellation cycle ("which Bayer
-  // letter is this record"). Prefer the canonical decoder layer's index
-  // when present; for chains without a decoder, fall back to any
-  // non-schematic layer's index (any layer K-cycle works as a
-  // constellation indexer).
-  var _dec = (meta.chunks && meta.chunks.decoder) || null;
-  var myChunkIdx = _dec && _dec.index !== undefined ? _dec.index
-                 : (meta.decoder_chunk_index !== undefined ? meta.decoder_chunk_index : -1);
+  // letter is this record"). V1 stores constellation_index as a
+  // top-level int (0..11) — the canonical source. Fall back to chunk
+  // indices for any pre-V1 / weird-shape records that don't carry it.
+  var myChunkIdx = (typeof meta.constellation_index === 'number') ? meta.constellation_index : -1;
+  if (myChunkIdx < 0) {
+    var _dec = (meta.chunks && meta.chunks.decoder) || null;
+    if (_dec && _dec.index !== undefined) myChunkIdx = _dec.index;
+    else if (meta.decoder_chunk_index !== undefined) myChunkIdx = meta.decoder_chunk_index;
+  }
   if (myChunkIdx < 0 && meta.chunks && typeof meta.chunks === 'object') {
     var _roles = Object.keys(meta.chunks);
     for (var _ri = 0; _ri < _roles.length; _ri++) {
