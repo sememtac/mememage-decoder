@@ -736,6 +736,13 @@
     padding: 0.6rem 1.2rem 0.8rem;
     border-top: 1px solid rgba(0,0,0,0.04);
   }
+  /* When the Download Soul button is slotted in just above
+     #tryExample, hide the border-top — it would otherwise render as a
+     dark line directly beneath the button, looking like an unrelated
+     divider. The example link still reads fine without the rule. */
+  .download-soul-btn + .console-example {
+    border-top: none;
+  }
   .console-example a {
     color: #5a5a64;
     text-decoration: none;
