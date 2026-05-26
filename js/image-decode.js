@@ -70,16 +70,50 @@ async function decodeImageBar(file) {
     height: img.height
   };
 
-  if (!detectBar(px, img.width, img.height)) {
-    return Object.assign({ ok: false, detected: false, frame: null, decoded: null, error: 'No Mememage bar in this image.' }, base);
-  }
-
+  // Try the cheap 1:1 fast path first (no resize). Bands detected at
+  // the canonical pixel positions; extract at ppb=3 then ppb=2.
+  var detected = detectBar(px, img.width, img.height);
   var frame = null, usedPpb = 3;
-  var ppbCandidates = [3, 2];
-  for (var i = 0; i < ppbCandidates.length; i++) {
-    var ppb = ppbCandidates[i];
-    var f = decodeFrame(extractBits(px, img.width, img.height, ppb));
-    if (f) { frame = f; usedPpb = ppb; break; }
+  if (detected) {
+    var ppbCandidates = [3, 2];
+    for (var i = 0; i < ppbCandidates.length; i++) {
+      var ppb = ppbCandidates[i];
+      var f = decodeFrame(extractBits(px, img.width, img.height, ppb));
+      if (f) { frame = f; usedPpb = ppb; break; }
+    }
+  }
+  // If 1:1 didn't find bands OR couldn't decode, fall through to the
+  // scale-aware sweep. detectBarBands measures actual band widths and
+  // tolerates resampled images (e.g. mememage.art receiving an image
+  // that a platform downscaled). Mirrors Python's extract_bar.
+  if (!frame) {
+    var bands = detectBarBands(px, img.width, img.height);
+    if (bands) {
+      detected = true;
+      var avg = (bands.m + bands.y + bands.c) / 3;
+      var raw_scale = avg / HEADER_BAND;
+      var scales = [];
+      if (Math.abs(raw_scale - 1.0) >= 0.05) {
+        for (var off = -8; off <= 8; off++) {
+          var s = Math.round((raw_scale + off * 0.01) * 1000) / 1000;
+          if (s > 0.3 && s < 3.0 && Math.abs(s - 1.0) >= 0.005 && scales.indexOf(s) < 0) {
+            scales.push(s);
+          }
+        }
+      }
+      outer:
+      for (var si = 0; si < scales.length; si++) {
+        for (var pi = 0; pi < 2; pi++) {
+          var pb = [3, 2][pi];
+          var bits = extractBitsAtScale(px, img.width, img.height, scales[si], pb);
+          var fr = decodeFrame(bits);
+          if (fr) { frame = fr; usedPpb = pb; break outer; }
+        }
+      }
+    }
+  }
+  if (!detected) {
+    return Object.assign({ ok: false, detected: false, frame: null, decoded: null, error: 'No Mememage bar in this image.' }, base);
   }
   if (!frame) {
     return Object.assign({ ok: false, detected: true, frame: null, decoded: null, error: 'Bar detected but the payload is unreadable.' }, base);

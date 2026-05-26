@@ -400,29 +400,89 @@ function analyze(file){
         o+='</div>';
       }
 
-      // Scale Survival
-      o+='<div class="ev-sec">Scale Survival</div>';
-      o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Simulates platform resizing. Solid=survived, dashed=lost.</div>';
-      for(var sf of[0.90,0.75,0.50,0.25]){
-        var sw=Math.round(w*sf),sh=Math.round(h*sf);if(sw<16||sh<16)continue;
-        var sc=document.createElement('canvas');sc.width=sw;sc.height=sh;sc.getContext('2d').drawImage(res.canvas,0,0,sw,sh);
-        var spx=sc.getContext('2d').getImageData(0,0,sw,sh).data;
-        var sBarOk=false;if(detectBar(spx,sw,sh)){for(var sppb of[3,2]){var sb=extractBits(spx,sw,sh,sppb);var sf2=decodeFrame(sb);if(sf2&&decodePayload(sf2.payload)){sBarOk=true;break;}}}
-        // Bar region at scale
-        var sBarH=Math.min(4,sh);var sbc=document.createElement('canvas');sbc.width=sw;sbc.height=sBarH*4;var sbx=sbc.getContext('2d');sbx.imageSmoothingEnabled=false;sbx.drawImage(sc,0,sh-sBarH,sw,sBarH,0,0,sw,sBarH*4);
-        var sPct=Math.round(sf*100)+'%';
-        var sRowBg=sBarOk?'rgba(74,158,74,0.08)':'rgba(180,60,60,0.06)';
-        var sRowBdr=sBarOk?'rgba(74,158,74,0.5)':'rgba(180,60,60,0.4)';
-        o+='<div style="padding:0.4rem 0.5rem;background:'+sRowBg+';border-left:3px solid '+sRowBdr+';border-radius:4px;margin-bottom:0.3rem;">';
-        o+='<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">';
-        o+='<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">'+sPct+'</span>';
-        o+='<span style="font-size:0.65rem;color:#8a8a9a;">'+sw+'\u00d7'+sh+'</span>';
-        o+='<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;background:'+(sBarOk?'rgba(74,158,74,0.15)':'rgba(180,60,60,0.15)')+';color:'+(sBarOk?'#4ade80':'#f87171')+';font-weight:600;">Bar '+(sBarOk?'SURVIVED':'LOST')+'</span>';
-        o+='</div>';
-        o+='<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Bar region</div>';
-        o+='<img src="'+sbc.toDataURL('image/png')+'" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
-        o+='</div>';
+      // JPEG Survival — tests what the bar is actually designed to survive.
+      //
+      // The previous Scale Survival panel tested arbitrary downscaling,
+      // which Gen I bars genuinely don't survive (luminance bits are too
+      // narrow — adjacent bits' values blur into the threshold under any
+      // resampling kernel). Reporting LOST on every scale was honest but
+      // useless. JPEG Survival tests the real-world envelope: M/Y/C
+      // bands are DCT-block-aligned (8 px = exactly one JPEG block), and
+      // the 3-px luminance-modulated data bits survive q50+ because JPEG
+      // keeps the luminance channel at full resolution.
+      //
+      // For each quality level we re-encode the image as JPEG and try to
+      // extract the bar. Q95/q85/q70 should always pass; q50 typically
+      // passes; q30 is on the edge.
+      o+='<div class="ev-sec">JPEG Survival</div>';
+      o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Re-encodes the image as JPEG at each quality and tries to read the bar. Solid=survived, dashed=lost. Every social platform JPEG-encodes uploads \u2014 this is what the bar is built to survive.</div>';
+      var jpegLevels = [95, 85, 70, 50, 30];
+      var jpegDone = 0;
+      function jpegOneLevel(q, slotId) {
+        // Async — canvas.toBlob is async on Safari. Process sequentially.
+        return new Promise(function(resolve){
+          res.canvas.toBlob(function(blob){
+            if (!blob) { resolve({q:q, ok:false, dataUrl:null, dims:null}); return; }
+            var url = URL.createObjectURL(blob);
+            var im = new Image();
+            im.onload = function(){
+              var jc = document.createElement('canvas');
+              jc.width = im.width; jc.height = im.height;
+              jc.getContext('2d').drawImage(im, 0, 0);
+              var jpx = jc.getContext('2d').getImageData(0, 0, im.width, im.height).data;
+              var ok = detectBar(jpx, im.width, im.height);
+              if (ok) {
+                var f = decodeFrame(extractBits(jpx, im.width, im.height, 3))
+                     || decodeFrame(extractBits(jpx, im.width, im.height, 2));
+                ok = !!(f && decodePayload(f.payload));
+              }
+              // Bar region preview (4x zoom on bottom 4 rows)
+              var bH = Math.min(4, im.height);
+              var bc = document.createElement('canvas');
+              bc.width = im.width; bc.height = bH * 4;
+              var bx = bc.getContext('2d');
+              bx.imageSmoothingEnabled = false;
+              bx.drawImage(jc, 0, im.height - bH, im.width, bH, 0, 0, im.width, bH * 4);
+              URL.revokeObjectURL(url);
+              resolve({q:q, ok:ok, dataUrl:bc.toDataURL('image/png'), dims:[im.width, im.height], blobSize:blob.size});
+            };
+            im.src = url;
+          }, 'image/jpeg', q / 100);
+        });
       }
+      // Render placeholder rows; fill them in async.
+      jpegLevels.forEach(function(q){
+        o += '<div id="jpegRow-' + q + '" style="padding:0.4rem 0.5rem;background:rgba(40,40,60,0.05);border-left:3px solid rgba(120,120,140,0.3);border-radius:4px;margin-bottom:0.3rem;">';
+        o += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">';
+        o += '<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">q' + q + '</span>';
+        o += '<span style="font-size:0.65rem;color:#8a8a9a;">analyzing\u2026</span>';
+        o += '</div></div>';
+      });
+      // Defer the actual rendering until after the panel is in the DOM.
+      setTimeout(async function(){
+        for (var qi = 0; qi < jpegLevels.length; qi++) {
+          var r = await jpegOneLevel(jpegLevels[qi]);
+          var row = document.getElementById('jpegRow-' + r.q);
+          if (!row) continue;
+          var rowBg = r.ok ? 'rgba(74,158,74,0.08)' : 'rgba(180,60,60,0.06)';
+          var rowBdr = r.ok ? 'rgba(74,158,74,0.5)' : 'rgba(180,60,60,0.4)';
+          var html = '';
+          html += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">';
+          html += '<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">q' + r.q + '</span>';
+          if (r.blobSize) {
+            html += '<span style="font-size:0.65rem;color:#8a8a9a;">' + Math.round(r.blobSize / 1024) + ' KB</span>';
+          }
+          html += '<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;background:' + (r.ok ? 'rgba(74,158,74,0.15)' : 'rgba(180,60,60,0.15)') + ';color:' + (r.ok ? '#4ade80' : '#f87171') + ';font-weight:600;">Bar ' + (r.ok ? 'SURVIVED' : 'LOST') + '</span>';
+          html += '</div>';
+          if (r.dataUrl) {
+            html += '<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Bar region (post-JPEG q' + r.q + ')</div>';
+            html += '<img src="' + r.dataUrl + '" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
+          }
+          row.style.background = rowBg;
+          row.style.borderLeftColor = rowBdr;
+          row.innerHTML = html;
+        }
+      }, 0);
 
       // Image thumbnail
       o+='<div class="ev-sec">Image</div>';

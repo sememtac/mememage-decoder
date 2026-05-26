@@ -4,7 +4,10 @@
 function crc16(d){let c=0xFFFF;for(const b of d){c^=b<<8;for(let i=0;i<8;i++)c=(c&0x8000)?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF;}return c;}
 
 function detectBar(px,w,h){
-  // 8px-wide M/Y/C bands — sample center of each band
+  // Presence-only check — does the bottom row start with the M/Y/C
+  // sequence at the original pixel scale? Cheap; used as a fast
+  // gate before the more expensive band-width measurement. For a
+  // scale-aware presence + measurement, use detectBarBands().
   if(h<2||w<50)return false;
   const y=h-1;
   const mid=Math.floor(HEADER_BAND/2);
@@ -17,7 +20,61 @@ function detectBar(px,w,h){
   return true;
 }
 
+// Scale-aware band-width detector. Mirrors mememage/bar.py:_detect_bar.
+// Walks the bottom row left→right looking for magenta → yellow → cyan
+// runs, returning each run's pixel width. The widths reveal the scale
+// factor — at 1:1 the bands are HEADER_BAND (8) px wide each; at a
+// 0.75× resize they're ~6 px each; at 1.5× they're ~12 px each.
+// Returns {m,y,c} or null if the M/Y/C sequence isn't present.
+function detectBarBands(px,w,h){
+  if(h<2||w<20) return null;
+  const y=h-1;
+  function rgbAt(x){var i=(y*w+x)*4;return [px[i],px[i+1],px[i+2]];}
+  function isMagenta(x){var c=rgbAt(x);return c[0]>130&&c[1]<120&&c[2]>130;}
+  function isYellow(x){var c=rgbAt(x);return c[0]>130&&c[1]>130&&c[2]<120;}
+  function isCyan(x){var c=rgbAt(x);return c[0]<120&&c[1]>130&&c[2]>130;}
+
+  // Scan magenta run from the left edge. The original bar is 8 px;
+  // at 2× upscale it can run to 16, at 0.3× downscale to ~3. Stop at
+  // 32 — beyond that we'd run into the data section even on a
+  // pathologically upscaled image.
+  var magenta_w=0;
+  for(var x=0;x<Math.min(32,w);x++){
+    if(isMagenta(x)) magenta_w++;
+    else break;
+  }
+  if(magenta_w<3) return null;
+
+  // Skip a 1-2px transition zone (JPEG smear / interpolation halo)
+  // between bands, then measure yellow.
+  var yellow_start=magenta_w;
+  for(var x2=magenta_w;x2<Math.min(magenta_w+3,w);x2++){
+    if(isYellow(x2)){ yellow_start=x2; break; }
+  }
+  var yellow_w=0;
+  for(var x3=yellow_start;x3<Math.min(yellow_start+32,w);x3++){
+    if(isYellow(x3)) yellow_w++;
+    else break;
+  }
+  if(yellow_w<3) return null;
+
+  var cyan_start=yellow_start+yellow_w;
+  for(var x4=cyan_start;x4<Math.min(cyan_start+3,w);x4++){
+    if(isCyan(x4)){ cyan_start=x4; break; }
+  }
+  var cyan_w=0;
+  for(var x5=cyan_start;x5<Math.min(cyan_start+32,w);x5++){
+    if(isCyan(x5)) cyan_w++;
+    else break;
+  }
+  if(cyan_w<3) return null;
+
+  return {m:magenta_w,y:yellow_w,c:cyan_w};
+}
+
 function extractBits(px,w,h,ppb){
+  // 1:1 (native pixel-scale) extraction. Use extractBitsAtScale for
+  // scale-aware reading on resized images.
   ppb=ppb||PIXELS_PER_BIT;
   const bits=[],dataPerRow=w-HEADER_PIXELS-FOOTER_PIXELS,bitsPerRow=Math.floor(dataPerRow/ppb);
   for(let row=0;row<SIG_ROWS;row++){const y=h-1-row;
@@ -25,6 +82,72 @@ function extractBits(px,w,h,ppb){
       const cx=HEADER_PIXELS+b*ppb+Math.floor(ppb/2);
       const i=(y*w+cx)*4;bits.push(((px[i]+px[i+1]+px[i+2])/3)>=RGB_THRESHOLD?1:0);}}
   return bits;
+}
+
+// Scale-aware bit extraction. Mirrors mememage/bar.py:_decode_bits_at_scale.
+// Given an assumed scale factor, infer where each bit's center pixel
+// would have landed in the original layout, then map back to a pixel
+// in the current (scaled) image and read its luminance.
+function extractBitsAtScale(px,w,h,scale,ppb){
+  ppb=ppb||PIXELS_PER_BIT;
+  if(Math.abs(scale-1.0)<0.01) return extractBits(px,w,h,ppb);
+  var orig_w=Math.round(w/scale);
+  var orig_data_per_row=orig_w-HEADER_PIXELS-FOOTER_PIXELS;
+  var orig_bits_per_row=Math.floor(orig_data_per_row/ppb);
+  var bits=[];
+  for(var row=0;row<SIG_ROWS;row++){
+    var y=h-1-row;
+    for(var b=0;b<orig_bits_per_row;b++){
+      var orig_cx=HEADER_PIXELS+b*ppb+ppb/2;
+      var sx=Math.round(orig_cx*scale);
+      if(sx<0||sx>=w) break;
+      var i=(y*w+sx)*4;
+      bits.push(((px[i]+px[i+1]+px[i+2])/3)>=RGB_THRESHOLD?1:0);
+    }
+  }
+  return bits;
+}
+
+// Top-level scale-aware extractor. Tries 1:1 first, then sweeps
+// candidate scales derived from the measured band widths. Returns the
+// first {identifier, content_hash} that decodes cleanly, or null.
+// Mirrors the candidate-sweep logic in mememage/bar.py:extract_bar.
+function extractBarScaleAware(px,w,h){
+  // Fast 1:1 path — by far the common case (no resize).
+  if(detectBar(px,w,h)){
+    for(var ppb0 of [PIXELS_PER_BIT,2]){
+      var b0=extractBits(px,w,h,ppb0);
+      var f0=decodeFrame(b0);
+      if(f0){ var p0=decodePayload(f0.payload); if(p0) return p0; }
+    }
+  }
+  // Scale-aware path — measure band widths, estimate scale, sweep.
+  var bands=detectBarBands(px,w,h);
+  if(!bands) return null;
+  var avg=(bands.m+bands.y+bands.c)/3;
+  var raw_scale=avg/HEADER_BAND;
+  var candidates=[];
+  if(Math.abs(raw_scale-1.0)>=0.05){
+    // Band-width measurement has ±5% noise from JPEG / interpolation,
+    // so sweep ±8% in 1% steps around the estimate. CRC self-selects
+    // the right one.
+    for(var off=-8;off<=8;off++){
+      var s=Math.round((raw_scale+off*0.01)*1000)/1000;
+      if(s>0.3 && s<3.0 && Math.abs(s-1.0)>=0.005 && candidates.indexOf(s)<0){
+        candidates.push(s);
+      }
+    }
+  }
+  for(var ci=0;ci<candidates.length;ci++){
+    for(var ppb of [PIXELS_PER_BIT,2]){
+      var bits=extractBitsAtScale(px,w,h,candidates[ci],ppb);
+      var frame=decodeFrame(bits);
+      if(!frame) continue;
+      var p=decodePayload(frame.payload);
+      if(p) return p;
+    }
+  }
+  return null;
 }
 
 function decodeFrame(bits){

@@ -1106,16 +1106,20 @@ async function processVerifyImage(file) {
   var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
   var px = ctx.getImageData(0, 0, img.width, img.height).data;
 
-  if (!detectBar(px, img.width, img.height)) {
-    updateVerifyStatus('No bar detected in image.', true);
+  // Scale-aware extraction: handles 1:1 fast path, and if the image
+  // was resized by a platform, measures the M/Y/C band widths to
+  // derive the scale factor and resamples bit positions accordingly.
+  // Mirrors Python's extract_bar.
+  var decoded = extractBarScaleAware(px, img.width, img.height);
+  if (!decoded) {
+    if (!detectBarBands(px, img.width, img.height)) {
+      updateVerifyStatus('No bar detected in image.', true);
+    } else {
+      updateVerifyStatus('Bands present but data unreadable.', true);
+    }
     return;
   }
-  var frame = decodeFrame(extractBits(px, img.width, img.height, 3));
-  if (!frame) frame = decodeFrame(extractBits(px, img.width, img.height, 2));
-  if (!frame) { updateVerifyStatus('Bar decode failed.', true); return; }
-
-  var decoded = decodePayload(frame.payload);
-  if (!decoded || !decoded.content_hash) { updateVerifyStatus('No content hash in bar.', true); return; }
+  if (!decoded.content_hash) { updateVerifyStatus('No content hash in bar.', true); return; }
 
   verifyState.barHash = decoded.content_hash;
   verifyState.barIdentifier = decoded.identifier;
