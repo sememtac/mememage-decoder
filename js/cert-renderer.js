@@ -369,6 +369,28 @@ function renderCert(meta, options) {
   var activateLayout = options.activateLayout !== false;
   var injectPlayer = options.injectPlayer !== false;
 
+  // Anchor this record's identifier in history state so the browser
+  // back button can traverse the chain. Without this, clicking β to
+  // walk to the parent pushes a new entry but the previous entry
+  // (the cert we just left) had no .state.id — popstate's handler
+  // would skip it and the back button would feel broken.
+  //
+  // replaceState (not pushState) — every cert render REPLACES the
+  // current entry's state. New pushState entries layer above. The
+  // navigation flow then becomes:
+  //   1. Cert A renders → replaceState({id: A})
+  //   2. Click β → lookupById(B) → pushState({id: B})
+  //   3. Cert B renders → replaceState({id: B}) (no-op, same value)
+  //   4. Back button → popstate { id: A } → lookupById(A, false)
+  //   5. Cert A renders again → replaceState({id: A})
+  // Both backward and forward navigation now traverse the chain.
+  try {
+    var anchorId = meta._identifier || meta.identifier;
+    if (anchorId && history.replaceState) {
+      history.replaceState({id: anchorId}, '', '#');
+    }
+  } catch (e) { /* history API failures shouldn't block the cert */ }
+
   // Fade out any playing audio before destroying the certificate
   if (typeof CosmicPlayer !== 'undefined') CosmicPlayer.dismiss();
 
