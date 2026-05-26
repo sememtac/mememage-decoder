@@ -1382,6 +1382,7 @@ setInterval(function() {
     discardBtn:   document.getElementById('payloadDiscardBtn'),
     sealBtn:      document.getElementById('payloadSealBtn'),
     lockBadge:    document.getElementById('payloadLockBadge'),
+    buildBadge:   document.getElementById('payloadBuildBadge'),
     applyLockBanner: document.getElementById('payloadApplyLockBanner'),
     nux:          document.getElementById('payloadNux'),
     nuxDismiss:   document.getElementById('payloadNuxDismiss'),
@@ -1419,6 +1420,8 @@ setInterval(function() {
     chainLockInfo: null,    // {age, age_name, outer_position, outer_total, …}
     lastPresetName: '',   // remembered preset name for the next save prompt
     touched: false,       // user has interacted with the editor since last load/apply/discard
+    buildStatus: null,    // {manifest_missing, statuses: {<artifact>: {status, source_path?, error?}}}
+                          // populated by /api/payload/status. null = unknown / not yet fetched.
   };
 
   // ===== Utilities =====
@@ -1699,7 +1702,7 @@ setInterval(function() {
       return;
     }
     var header = '<div class="payload-edit-header entry-header">' +
-      '<span>Name</span><span>Sources (concatenated in order at build time)</span><span></span></div>';
+      '<span></span><span>Name</span><span>Sources (concatenated in order at build time)</span><span></span></div>';
     var rows = names.map(function(name) {
       var e = state.working.entries[name];
       var sources = e.sources || [];
@@ -1710,7 +1713,23 @@ setInterval(function() {
           '<button class="payload-edit-delete" data-action="remove-source" data-source-idx="' + idx + '" title="Remove this source">\u00d7</button>' +
           '</div>';
       }).join('');
+      // Per-entry build-status dot. State source: state.buildStatus.statuses[name].
+      // Vocabulary: in_sync (green) / drifted (amber) / missing_payload (gray)
+      // / missing_source (red) / unknown (transparent — manifest not fetched yet
+      // OR this entry isn't an artifact target).
+      var entryStat = (state.buildStatus && state.buildStatus.statuses && state.buildStatus.statuses[name]) || null;
+      var dotState = entryStat ? (entryStat.status || 'unknown') : 'unknown';
+      var dotTitle = entryStat
+        ? (dotState === 'in_sync'
+            ? 'In sync with source. Ready to use.'
+            : (dotState === 'drifted'
+              ? 'Source changed since last build. Click Build to refresh.'
+              : (dotState === 'missing_source'
+                ? ('Source unreadable' + (entryStat.error ? ': ' + entryStat.error : '.'))
+                : 'Not built yet. Click Build.')))
+        : (state.buildStatus ? 'Not an artifact target yet — applied + built once to track.' : 'Build state unknown.');
       return '<div class="payload-edit-row entry-row" data-entry="' + escapeHtml(name) + '">' +
+        '<span class="entry-status-dot" data-state="' + escapeHtml(dotState) + '" title="' + escapeHtml(dotTitle) + '"></span>' +
         '<input class="payload-edit-input" data-field="name" type="text" value="' + escapeHtml(name) + '">' +
         '<div class="entry-sources">' +
           sourceInputs +
@@ -1800,6 +1819,7 @@ setInterval(function() {
     renderFrozen();
     renderValidation();
     refreshDirtyUI();
+    renderBuildBadge();
   }
 
   // ===== Event delegation: handle every input/select change in one place =====
@@ -2051,6 +2071,10 @@ setInterval(function() {
     } catch (e) {
       els.ageStatus.textContent = '(site-pack status unavailable: ' + e.message + ')';
     }
+    // Build status — populates the BUILT/DRIFTED/NOT BUILT badge + the
+    // per-entry status dots. Independent of chain-config fetch; failure
+    // just leaves the badge in its "unknown" state.
+    fetchBuildStatus();
   }
 
   async function onApplyToChain() {
@@ -2082,6 +2106,10 @@ setInterval(function() {
       }
       renderAll();
       showError('');
+      // Apply changed which artifacts the chain expects — re-poll
+      // build status so the badge correctly shows NOT BUILT for any
+      // newly-added entries until the user clicks Build.
+      fetchBuildStatus();
     } catch (e) {
       showError('Apply to chain failed: ' + e.message);
     } finally {
@@ -2154,6 +2182,110 @@ setInterval(function() {
     }
   }
 
+  // ===== Build state =====
+  //
+  // /api/payload/status returns either {manifest_missing: true, statuses: {}}
+  // (chain config applied but `mememage build` / payload.build() never ran)
+  // or {statuses: {<target>: {status, source_path?, error?}}} where status
+  // is one of: in_sync, drifted, missing_payload, missing_source.
+  //
+  // The aggregate badge collapses per-artifact states to one of four:
+  //   built     — all in_sync
+  //   drifted   — at least one drifted (and no missing_source)
+  //   not_built — manifest missing OR some artifact has no payload yet
+  //   missing   — at least one source unreadable (gates Seal)
+  //
+  // Severity precedence (highest wins): missing > drifted > not_built > built.
+  function _aggregateBuildState(s) {
+    if (!s) return 'unknown';
+    if (s.manifest_missing) return 'not_built';
+    var statuses = s.statuses || {};
+    var names = Object.keys(statuses);
+    if (names.length === 0) return 'not_built';
+    var anyMissingSrc = false, anyDrifted = false, anyMissingPayload = false, anyOk = false;
+    names.forEach(function(n) {
+      var st = (statuses[n] || {}).status;
+      if (st === 'missing_source') anyMissingSrc = true;
+      else if (st === 'drifted') anyDrifted = true;
+      else if (st === 'missing_payload') anyMissingPayload = true;
+      else if (st === 'in_sync') anyOk = true;
+    });
+    if (anyMissingSrc) return 'missing';
+    if (anyDrifted) return 'drifted';
+    if (anyMissingPayload) return 'not_built';
+    if (anyOk) return 'built';
+    return 'unknown';
+  }
+
+  function _buildBadgeText(stateKey) {
+    return ({
+      built:     'BUILT',
+      drifted:   'DRIFTED',
+      not_built: 'NOT BUILT',
+      missing:   'MISSING SRC',
+      unknown:   'build\u2026',
+    })[stateKey] || 'build\u2026';
+  }
+
+  function _buildBadgeTooltip(stateKey, s) {
+    if (stateKey === 'unknown') return 'Build state not yet known.';
+    if (stateKey === 'built') return 'All artifacts in sync with their sources. Ready to seal.';
+    if (stateKey === 'not_built' && (s && s.manifest_missing)) {
+      return 'No build manifest yet. Click Build to compile Payload/<chain>/ from the current sources.';
+    }
+    var statuses = (s && s.statuses) || {};
+    var lines = [];
+    if (stateKey === 'missing') lines.push('Source file(s) unreadable — fix paths or upload, then Build.');
+    else if (stateKey === 'drifted') lines.push('Sources changed since last build — click Build to refresh.');
+    else if (stateKey === 'not_built') lines.push('Some artifacts not built yet — click Build.');
+    Object.keys(statuses).forEach(function(name) {
+      var st = statuses[name] || {};
+      if (st.status !== 'in_sync') lines.push('  \u2022 ' + name + ': ' + st.status + (st.error ? ' (' + st.error + ')' : ''));
+    });
+    return lines.join('\n');
+  }
+
+  function renderBuildBadge() {
+    if (!els.buildBadge) return;
+    var key = _aggregateBuildState(state.buildStatus);
+    els.buildBadge.textContent = _buildBadgeText(key);
+    els.buildBadge.setAttribute('data-state', key);
+    els.buildBadge.title = _buildBadgeTooltip(key, state.buildStatus);
+    // Build button: reflects current state in its label.
+    if (els.buildBtn && !els.buildBtn.disabled) {
+      if (key === 'built')       els.buildBtn.textContent = 'Rebuild \u2713';
+      else if (key === 'drifted') els.buildBtn.textContent = 'Rebuild \u26a0';
+      else if (key === 'missing') els.buildBtn.textContent = 'Rebuild';
+      else                        els.buildBtn.textContent = 'Build';
+    }
+    // Seal Age: disabled unless built. Stops the user sealing a stale
+    // or broken payload. Lock-state still has authority (mid-Age = seal
+    // does next-Age dance), so we only intercept the not-yet-built case.
+    if (els.sealBtn) {
+      var canSeal = (key === 'built');
+      // Don't override an Age-lock-driven disable from elsewhere.
+      if (!state.chainLocked && state.chainLocked !== undefined) {
+        // EDITABLE chain: gate seal on build state.
+        els.sealBtn.disabled = !canSeal;
+        els.sealBtn.title = canSeal
+          ? 'Begin a new Age (irreversible)'
+          : 'Build the payload first — Seal needs all artifacts in sync.';
+      }
+    }
+  }
+
+  async function fetchBuildStatus() {
+    if (!els.buildBadge) return;
+    try {
+      state.buildStatus = await fetchJson('/api/payload/status');
+    } catch (e) {
+      state.buildStatus = null;
+    }
+    renderBuildBadge();
+    // Per-entry dots live inside the entry rows — re-render to refresh them.
+    if (typeof renderEntries === 'function') renderEntries();
+  }
+
   // ===== Build / Seal =====
   async function rebuild() {
     showError('');
@@ -2170,11 +2302,18 @@ setInterval(function() {
       // draft the user was editing. Previously we called loadConfig()
       // here, which wiped state.working + state.lastPresetName.
       renderAll();
+      // Refresh the badge + per-entry dots — they're now BUILT (or
+      // MISSING if a source was unreadable).
+      fetchBuildStatus();
     } catch (e) {
       showError('Build failed: ' + e.message);
     } finally {
       els.buildBtn.disabled = false;
       els.buildBtn.textContent = prev;
+      // Let renderBuildBadge restamp the button label (Build / Rebuild
+      // / Rebuild ✓) based on the freshly-fetched state, overriding
+      // the saved-prev label.
+      renderBuildBadge();
     }
   }
   async function sealAge() {

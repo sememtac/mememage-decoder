@@ -406,18 +406,28 @@
 
         // Image path: iOS uses a long-press overlay (works regardless
         // of user-activation state, which Web Share API loses if the
-        // fetch takes too long); Android Chrome / other mobile uses
-        // navigator.share for the system save sheet; desktop falls
-        // through to the anchor download below.
+        // fetch takes too long); MOBILE non-iOS (Android Chrome, etc.)
+        // uses navigator.share for the system save sheet; desktop
+        // falls through to the anchor download below.
+        //
+        // navigator.share on DESKTOP (macOS Safari especially) has a
+        // history of re-encoding image blobs through the system share
+        // pipeline — Save to Photos/Files can rewrite a PNG as WEBP
+        // depending on macOS version. The anchor-download path is
+        // deterministic: server's Content-Type + Content-Disposition
+        // are honored as-is. Desktop should never hit the share API.
         var isImage = (blob.type || '').indexOf('image/') === 0;
-        var iosUA = /iPad|iPhone|iPod/.test(navigator.userAgent || '') && !window.MSStream;
+        var ua = navigator.userAgent || '';
+        var iosUA = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        var androidUA = /Android/i.test(ua);
+        var mobileUA = iosUA || androidUA;
         if (isImage && iosUA) {
           _imageLongPressOverlay(blob);
           btn.textContent = prev;
           btn.disabled = false;
           return;
         }
-        if (isImage) {
+        if (isImage && mobileUA) {
           try {
             var file = new File([blob], filename, { type: blob.type });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {

@@ -1595,6 +1595,67 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border-color: rgba(0, 0, 0, 0.15);
 }
 
+/* Payload build status — sits next to the lock badge. Tells the user
+   whether Payload/<chain>/ artifacts are up to date with sources.
+   Four states:
+     built    → green   — sources & artifacts in sync, ready to seal
+     drifted  → amber   — artifacts exist but source has changed since
+     not_built→ gray    — no manifest (chain applied but never built)
+     missing  → red     — at least one source file is unreadable */
+.payload-build-badge {
+  font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-family: ui-monospace, Menlo, monospace;
+  cursor: help;
+  margin-left: 0.25rem;
+}
+.payload-build-badge[data-state="built"] {
+  color: #1d6f2d;
+  background: rgba(60, 180, 90, 0.14);
+  border-color: rgba(60, 180, 90, 0.4);
+}
+.payload-build-badge[data-state="drifted"] {
+  color: #8a5a1a;
+  background: rgba(220, 160, 60, 0.14);
+  border-color: rgba(220, 160, 60, 0.5);
+}
+.payload-build-badge[data-state="not_built"] {
+  color: #54545c;
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.18);
+}
+.payload-build-badge[data-state="missing"] {
+  color: #8a2a2a;
+  background: rgba(200, 80, 80, 0.14);
+  border-color: rgba(200, 80, 80, 0.4);
+}
+.payload-build-badge[data-state="unknown"] {
+  color: #54545c;
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Per-entry status dot — same vocabulary as the aggregate badge,
+   shown inline in each entry row so users can see exactly which
+   entry is out of sync. */
+.entry-status-dot {
+  display: inline-block;
+  width: 0.55rem; height: 0.55rem;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  cursor: help;
+}
+.entry-status-dot[data-state="in_sync"]         { background: #4ade80; border-color: #1d6f2d; }
+.entry-status-dot[data-state="drifted"]         { background: #facc15; border-color: #8a5a1a; }
+.entry-status-dot[data-state="missing_payload"] { background: #c8c8c8; border-color: #54545c; }
+.entry-status-dot[data-state="missing_source"]  { background: #f87171; border-color: #8a2a2a; }
+.entry-status-dot[data-state="unknown"]         { background: transparent; border-color: rgba(0,0,0,0.25); }
+
 /* Inline lock banner — appears under the action bar when Apply is
    disabled because an Age is in progress. The lock badge is small;
    the banner spells out *why* in one sentence so users who don't
@@ -1864,10 +1925,15 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .payload-edit-row:last-child { border-bottom: none; }
 .payload-edit-row.has-error { background: rgba(220, 80, 80, 0.06); }
 
-/* Entries row: name | sources (stacked) | delete */
+/* Entries row: status dot | name | sources (stacked) | delete */
 .payload-edit-row.entry-row {
-  grid-template-columns: minmax(120px, 1fr) minmax(220px, 2.5fr) 28px;
+  grid-template-columns: 14px minmax(120px, 1fr) minmax(220px, 2.5fr) 28px;
   align-items: start;
+  gap: 0.4rem;
+}
+.payload-edit-row.entry-row .entry-status-dot {
+  margin-right: 0;
+  margin-top: 0.55rem; /* align dot vertically with the name input baseline */
 }
 .entry-sources {
   display: flex;
@@ -2006,7 +2072,11 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 }
 .payload-edit-header.entry-header {
-  grid-template-columns: minmax(120px, 1fr) minmax(220px, 2.5fr) 28px;
+  /* Leading 14px column matches the per-row status dot. Empty header
+     cell — the dot itself communicates the column's purpose via color
+     + hover tooltip. */
+  grid-template-columns: 14px minmax(120px, 1fr) minmax(220px, 2.5fr) 28px;
+  gap: 0.4rem;
 }
 .payload-edit-header.layer-header {
   grid-template-columns: minmax(110px, 1fr) 60px 60px minmax(140px, 1.5fr) 28px;
