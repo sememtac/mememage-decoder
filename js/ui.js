@@ -622,22 +622,27 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
     v.portrait = await comparePortrait(window._lastDecodedCanvas, meta.thumbnail);
   }
 
-  // TOFU naming — first time seeing a valid signature
+  // TOFU naming — first time seeing a valid signature. If the record
+  // carries a creator_name, auto-trust silently. If not, store the key
+  // as anonymous trust (no prompt). We don't interrogate the viewer
+  // for a name — the cert's job is to show the 3 badges (WITNESSED /
+  // AUTHENTICATED / EMBODIED), not pull them into key management.
+  // Native prompt() especially on iOS displays the fingerprint, which
+  // is exactly the "key display" the cert is designed to hide behind
+  // the AUTHENTICATED badge.
   if (v.signature === true && v.tofu === 'new' && meta.key_fingerprint) {
     var suggestedName = meta.creator_name || '';
     if (suggestedName) {
-      // Creator name travels with the record — auto-trust on first encounter
       tofuStore().set(meta.key_fingerprint, suggestedName, meta.public_key);
       v.signatureDetail = 'Ed25519 signature valid — ' + suggestedName + ' (trusted)';
       v.tofu = 'trusted';
     } else {
-      // No creator name in record — ask the user
-      var tName = prompt('New signing key detected.\nFingerprint: ' + meta.key_fingerprint + '\n\nName this creator (TOFU — Trust On First Use):');
-      if (tName && tName.trim()) {
-        tofuStore().set(meta.key_fingerprint, tName.trim(), meta.public_key);
-        v.signatureDetail = 'Ed25519 signature valid — ' + tName.trim() + ' (trusted)';
-        v.tofu = 'trusted';
-      }
+      // Unnamed key — silently TOFU-trust. The cert still renders the
+      // AUTHENTICATED badge; "(unnamed)" goes into the tooltip if a
+      // viewer hovers, no dialog.
+      tofuStore().set(meta.key_fingerprint, '', meta.public_key);
+      v.signatureDetail = 'Ed25519 signature valid (unnamed key — trusted on first use)';
+      v.tofu = 'trusted';
     }
   }
 
@@ -1057,13 +1062,15 @@ function tryVerifyPair() {
               vf.signatureDetail += ' — ' + e.name + ' (trusted)';
             }
             else if (ts === 'new') {
+              // Silent TOFU — see the same-named block in offlineVerify()
+              // above for rationale. No prompt(); the cert renders the 3
+              // badges without dragging the viewer into key management.
               var sName = meta.creator_name || '';
-              if (sName) { tofu.set(meta.key_fingerprint, sName, meta.public_key); vf.signatureDetail += ' — ' + sName + ' (trusted)'; vf.tofu = 'trusted'; }
-              else {
-                var tName = prompt('New signing key.\nFingerprint: ' + meta.key_fingerprint + '\n\nName this creator:');
-                if (tName && tName.trim()) { tofu.set(meta.key_fingerprint, tName.trim(), meta.public_key); vf.signatureDetail += ' — ' + tName.trim() + ' (trusted)'; vf.tofu = 'trusted'; }
-                else { vf.signatureDetail += ' — unnamed key'; }
-              }
+              tofu.set(meta.key_fingerprint, sName, meta.public_key);
+              vf.signatureDetail += sName
+                ? (' — ' + sName + ' (trusted)')
+                : ' — (unnamed key, trusted on first use)';
+              vf.tofu = 'trusted';
             } else { vf.signatureDetail += ' — WARNING: key conflict!'; }
           }
         } else if (sigOk === false) { vf.signatureDetail = 'Signature INVALID — possible forgery'; }
