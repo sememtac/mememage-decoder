@@ -470,21 +470,37 @@ function displaySource(sourceUrl, identifier, contentHash) {
 }
 
 function renderBar(data) {
-  // Show identifier + hash inside the console plate (not the separate bar card)
+  // Identifier + hash rendered as a single inline-pill badge. Previously
+  // these were two stacked centered lines; the user-facing read is that
+  // they're one chunk of identity (link to discover, fingerprint to
+  // verify), so one container with a separator dot reads cleaner than
+  // two horizontal lines that visually divide the space.
   var barInfo = document.getElementById('consoleBarInfo');
   if (!barInfo) {
     barInfo = document.createElement('div');
     barInfo.id = 'consoleBarInfo';
     barInfo.style.cssText = 'padding:0.5rem 1.2rem;border-top:1px solid rgba(0,0,0,0.06);text-align:center;';
-    // Insert after preview, before status
     statusEl.parentNode.insertBefore(barInfo, statusEl);
   }
   if (data.identifier) {
-    var idHtml = '<a href="#" class="lookup-link" data-id="' + data.identifier + '" style="color:inherit;text-decoration:none;border-bottom:1px dotted rgba(0,0,0,0.25);cursor:pointer;">' + data.identifier + '</a>';
-    var html = '<div style="font-family:monospace;font-size:0.82rem;font-weight:600;color:#2a2a32;text-shadow:0 1px 0 rgba(255,255,255,0.3);">' + idHtml + '</div>';
+    var idHtml = '<a href="#" class="lookup-link" data-id="' + data.identifier + '" style="color:#2a2a32;text-decoration:none;border-bottom:1px dotted rgba(0,0,0,0.3);cursor:pointer;font-weight:600;">' + data.identifier + '</a>';
+    var html =
+      '<span style="' +
+        'display:inline-flex;align-items:baseline;gap:0.55rem;' +
+        'padding:0.3rem 0.85rem;' +
+        'background:rgba(0,0,0,0.04);' +
+        'border:1px solid rgba(0,0,0,0.08);' +
+        'border-radius:999px;' +
+        'font-family:ui-monospace,Menlo,monospace;font-size:0.78rem;' +
+        'text-shadow:0 1px 0 rgba(255,255,255,0.35);' +
+        'max-width:100%;flex-wrap:wrap;justify-content:center;' +
+      '">' + idHtml;
     if (data.content_hash) {
-      html += '<div style="font-family:monospace;font-size:0.68rem;color:#5a5a64;margin-top:0.15rem;">' + data.content_hash + '</div>';
+      html +=
+        '<span style="color:rgba(0,0,0,0.2);font-weight:400;">·</span>' +
+        '<span style="font-size:0.7rem;color:#5a5a64;">' + data.content_hash + '</span>';
     }
+    html += '</span>';
     barInfo.innerHTML = html;
   }
   // Re-stamp tab ownership — barInfo may have been freshly created
