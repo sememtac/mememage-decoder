@@ -1141,7 +1141,11 @@ async function _renderObservatoryFromCache() {
     var safeRid = _h(r.identifier||'');
     html+='<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv">'+(r.identifier?'<a href="#" class="audit-link" data-id="'+safeRid+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeRid+'</a>':'\u2014')+'</div></div>';
     html+='<div class="ev-m"><div class="ev-ml">Conceived</div><div class="ev-mv">'+_h(r.conceived||r.timestamp||'\u2014')+'</div></div>';
-    html+='<div class="ev-m"><div class="ev-ml">Parent</div><div class="ev-mv">'+_h(r.parent_id||'none (genesis)')+'</div></div>';
+    var safeParent = _h(r.parent_id||'');
+    var parentCell = r.parent_id
+      ? '<a href="#" class="audit-link" data-id="'+safeParent+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeParent+'</a>'
+      : 'none (genesis)';
+    html+='<div class="ev-m"><div class="ev-ml">Parent</div><div class="ev-mv">'+parentCell+'</div></div>';
     if(r.chain_visibility!==undefined&&r.chain_visibility!==null)html+='<div class="ev-m"><div class="ev-ml">Chain</div><div class="ev-mv" style="color:'+(_isDark(r.chain_visibility)?'#8080a0':'#d4b87b')+';">'+(_isDark(r.chain_visibility)?'Dark Matter (private)':'Light Energy (public)')+'</div></div>';
     var _rPrompt = (r.origin && r.origin.prompt) || r.prompt;   // V1 reads from origin
     if(_rPrompt)html+='<div class="ev-m w"><div class="ev-ml">Prompt</div><div class="ev-mv" style="font-style:italic;font-size:0.72rem;word-break:break-word;">'+_h(_rPrompt)+'</div></div>';
@@ -1199,7 +1203,13 @@ async function _renderObservatoryFromCache() {
       var _ageN=AgeNames.name(r.age); if(_ageN)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(_ageN)+'</div></div>';
       if(r.decoder_hash)html+='<div class="ev-m"><div class="ev-ml">Decoder Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_hash)+'</div></div>';
       if(r.constellation_name)html+='<div class="ev-m"><div class="ev-ml">Constellation</div><div class="ev-mv">'+_h(r.constellation_name)+'</div></div>';
-      if(r.heart_star_id)html+='<div class="ev-m"><div class="ev-ml">Heart Star</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.heart_star_id)+'</div></div>';
+      if(r.heart_star_id){
+        var safeHS=_h(r.heart_star_id);
+        var hsCell=r.heart_star_id===r.identifier
+          ? safeHS
+          : '<a href="#" class="audit-link" data-id="'+safeHS+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeHS+'</a>';
+        html+='<div class="ev-m"><div class="ev-ml">Heart Star</div><div class="ev-mv" style="font-size:0.68rem;">'+hsCell+'</div></div>';
+      }
       if(rSch)html+='<div class="ev-m"><div class="ev-ml">Schematic</div><div class="ev-mv" style="color:#8a7050;">Dark day '+_h((rSch.index||0)+1)+'</div></div>';
       if(rClm)html+='<div class="ev-m"><div class="ev-ml">Claim</div><div class="ev-mv" style="color:#d4b87b;">Epagomenal</div></div>';
       if(rEgg)html+='<div class="ev-m"><div class="ev-ml">Easter Egg</div><div class="ev-mv" style="color:#c47bbb;">Madeline</div></div>';
@@ -2887,7 +2897,14 @@ function renderAudit(rec, identifier, out) {
 
   // === CHAIN POSITION ===
   var chainRows = '';
-  chainRows += auditRow('Parent', rec.parent_id || 'genesis (no parent)', rec.parent_id ? '' : 'audit-info');
+  if (rec.parent_id) {
+    // Inline link — auditRow's signature escapes its value, so build
+    // the row by hand to keep the audit-link wrapping the identifier.
+    var _pe = escapeHtml(rec.parent_id);
+    chainRows += '<div class="audit-row"><span class="audit-label">Parent</span><span class="audit-val selectable"><a href="#" class="audit-link" data-id="' + _pe + '" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">' + _pe + '</a></span></div>';
+  } else {
+    chainRows += auditRow('Parent', 'genesis (no parent)', 'audit-info');
+  }
   if (rec.constellation_name) {
     chainRows += auditRow('Constellation', rec.constellation_name, 'audit-info');
     // V1 records carry constellation_index (int 0-11); map to Bayer letter.
@@ -2897,7 +2914,12 @@ function renderAudit(rec, identifier, out) {
       ? _BAYER[_ci] + ' (' + _ci + ')'
       : '?';
     chainRows += auditRow('Star', _starLabel);
-    chainRows += auditRow('Heart Star', rec.heart_star_id || '?');
+    if (rec.heart_star_id && rec.heart_star_id !== rec.identifier) {
+      var _he = escapeHtml(rec.heart_star_id);
+      chainRows += '<div class="audit-row"><span class="audit-label">Heart Star</span><span class="audit-val selectable"><a href="#" class="audit-link" data-id="' + _he + '" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">' + _he + '</a></span></div>';
+    } else {
+      chainRows += auditRow('Heart Star', rec.heart_star_id || '?');
+    }
     var isHeart = rec.heart_star_id === rec.identifier;
     chainRows += auditRow('Role', isHeart ? '\u03B1 Heart Star (first in constellation)' : 'Sibling', isHeart ? 'audit-info' : '');
   } else {
