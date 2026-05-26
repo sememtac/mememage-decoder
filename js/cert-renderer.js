@@ -3,7 +3,9 @@
 //
 // Layout order (trading card style):
 //   1. Header: Portrait, Brand, Title, Rarity Badge, Verification, Timestamp, Prompt, Lineage
-//   2. Generation Parameters: grid
+//   2. Origin Parameters: grid (creator-declared metadata — anything
+//      goes; AI-gen pipelines fill in prompt/seed/model, photographers
+//      fill in camera/lens/iso, etc. Mirrors the soul's `origin` dict.)
 //   3. Birth Temperament: name, summary, traits
 //   4. Sky Die: celestial rarity traits, skyband visualization, GPS time-lock
 //   5. Machine Die: machine vitals grid, fingerprint, machine rarity traits
@@ -1182,10 +1184,10 @@ function renderCert(meta, options) {
   }
 
   // ===================================================================
-  // 3. GENERATION PARAMETERS (canvas band)
+  // 3. ORIGIN PARAMETERS (canvas band)
   // ===================================================================
   if (GEN_PARAMS.length > 0 && !isSample) {
-    plate.appendChild(_sectionLabel('GENERATION PARAMETERS'));
+    plate.appendChild(_sectionLabel('ORIGIN PARAMETERS'));
 
     var genWrap = _div('sky-band-wrap');
     var genContainer = _div('sky-band-container');
