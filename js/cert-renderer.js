@@ -1039,6 +1039,26 @@ function renderCert(meta, options) {
             var chunksRes = await Access.decryptChunks(meta.encrypted_chunks, pw);
             if (chunksRes.ok) unlocked.chunks = chunksRes.chunks;
           }
+          // EMBODIED dHash check — only meaningful when the viewer
+          // actually dropped an image (window._lastDecodedCanvas).
+          // Chain-traversal renders (no canvas) stay as partial certs
+          // with no EMBODIED, mirroring light-chain traversal. For
+          // image-drop renders the comparison runs now that we have
+          // the plaintext thumbnail and stamps verification.portrait
+          // so the badge renderer below picks it up.
+          if (window._lastDecodedCanvas && typeof unlocked.thumbnail === 'string'
+              && unlocked.thumbnail && typeof comparePortrait === 'function') {
+            try {
+              var portrait = await comparePortrait(window._lastDecodedCanvas, unlocked.thumbnail);
+              var vfCopy = Object.assign({}, (unlocked._verification || {}));
+              vfCopy.portrait = portrait;
+              unlocked._verification = vfCopy;
+            } catch (e) {
+              // Portrait comparison failure is non-fatal — leave the
+              // existing _verification untouched so WITNESSED /
+              // AUTHENTICATED still display.
+            }
+          }
           unlocked._unlocked = true;
           // Stash a reference to the pre-unlock record so the Re-lock
           // button can restore the encrypted view without rebuilding
