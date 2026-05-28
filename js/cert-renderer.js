@@ -958,6 +958,26 @@ function renderCert(meta, options) {
     // forgotten").
     var _isDarkChain = (meta.chain_visibility === 1 || meta.chain_visibility === 'dark_matter');
     var _alreadyUnlocked = !!meta._unlocked;
+    // Unlocked dark cert: small Re-lock control so the viewer can
+    // explicitly drop the cached password (and we can re-test the
+    // prompt without opening a fresh tab). Clicking it restores the
+    // original encrypted record and re-renders, putting the password
+    // prompt back.
+    if (!isSample && _isDarkChain && _alreadyUnlocked && meta._encryptedSource) {
+      var relockKey = (meta.decoder_hash || meta.heart_star_id || meta.identifier || '').slice(0, 24);
+      var relockRow = _div('dm-relock-row');
+      var relockBtn = document.createElement('button');
+      relockBtn.type = 'button';
+      relockBtn.className = 'dm-relock-btn';
+      relockBtn.title = 'Forget the chain password for this tab session';
+      relockBtn.textContent = '\u{1F512} Lock';
+      relockBtn.addEventListener('click', function() {
+        try { sessionStorage.removeItem('mememage-pw-' + relockKey); } catch (e) {}
+        renderCert(meta._encryptedSource, options);
+      });
+      relockRow.appendChild(relockBtn);
+      plate.appendChild(relockRow);
+    }
     if (!isSample && _isDarkChain && meta.encrypted_soul && !_alreadyUnlocked
         && typeof Access !== 'undefined') {
       var _chainKey = (meta.decoder_hash || meta.heart_star_id || meta.identifier || '').slice(0, 24);
@@ -1020,6 +1040,10 @@ function renderCert(meta, options) {
             if (chunksRes.ok) unlocked.chunks = chunksRes.chunks;
           }
           unlocked._unlocked = true;
+          // Stash a reference to the pre-unlock record so the Re-lock
+          // button can restore the encrypted view without rebuilding
+          // the envelope from scratch.
+          unlocked._encryptedSource = meta;
           // Cache the password for sibling records (sessionStorage —
           // per-tab, forgotten on close).
           try { sessionStorage.setItem('mememage-pw-' + _chainKey, pw); } catch (e) {}
