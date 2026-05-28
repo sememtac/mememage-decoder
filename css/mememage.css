@@ -207,6 +207,19 @@
     display: flex;
     flex-direction: column;
   }
+  /* Long-error escape hatch: when a non-empty error is showing AND we
+     aren't already in layout-active (cert-rendered) mode, release the
+     365px panel cap so multi-line error bodies (probe link + recovery
+     instructions + CORS hint) don't get clipped. Visual stability is
+     nice, but a half-visible error you can't read is worse than the
+     box growing a few rems. layout-active already releases the cap,
+     so this targets the verification-failed-without-cert path. */
+  .panel-layout:not(.layout-active) .input-panel.active:has(.drop-error:not(:empty)),
+  .panel-layout:not(.layout-active) .input-panel.active:has(.panel-error-body:not(:empty)) {
+    height: auto;
+    min-height: 365px;
+    overflow: visible;
+  }
 
   /* Example-active state mirrors the validator's attack-active: the
      tabs + their panels collapse, the example description panel takes
