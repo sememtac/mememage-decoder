@@ -78,6 +78,11 @@ const HASH_INCLUDED_V1 = new Set([
   // Visibility tier — int code (0=light_energy public, 1=dark_matter
   // sealed). IN the hash so a record can't be silently re-tiered.
   'chain_visibility',
+  // Position in the outer cycle + the chain's outer_total. Stamped at
+  // the top level so dark_matter records (encrypted chunks) can still
+  // be placed on the Observatory grid. Hashed so position tampering
+  // breaks WITNESSED.
+  'outer_position', 'outer_total',
 ]);
 
 const HASH_INCLUDED_BY_VERSION = {
