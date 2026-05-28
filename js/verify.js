@@ -243,18 +243,27 @@ async function _sha256Hex(str) {
 }
 
 async function _thumbnailHashForSig(record) {
-  // Mirror of mememage/signing.py:_build_signature_message — the
-  // thumbnail field, if present, is hashed (SHA-256 hex, full 64
-  // chars) and that hash is concatenated into the signature payload.
-  // Empty string when there's no thumbnail (keychain records,
-  // dry-runs that skipped Pillow, etc.). Encrypted thumbnails
-  // (dark_matter chains): we can't reproduce the plaintext, so we
-  // verify the ciphertext — Python signs the plaintext, so
-  // dark_matter records can only AUTHENTICATE once decrypted.
-  if (!record || typeof record.thumbnail !== 'string' || !record.thumbnail) {
-    return '';
+  // Mirror of mememage/mint.py post-mint signing block. The hash covers
+  // the STORED form of the thumbnail — plaintext string on light chains,
+  // canonical-JSON of the encrypted envelope on dark chains. Signing
+  // what's actually in the record lets verifiers reproduce the hash
+  // without needing the chain's password.
+  //
+  // The thumbnail-swap defense still holds for dark chains: an attacker
+  // can't substitute a different encrypted dict without breaking the
+  // signature (they don't have the password to re-encrypt the original
+  // plaintext, and any other ciphertext hashes differently).
+  if (!record || !record.thumbnail) return '';
+  if (typeof record.thumbnail === 'string') {
+    return await _sha256Hex(record.thumbnail);
   }
-  return await _sha256Hex(record.thumbnail);
+  // Object — encrypted envelope from dark-matter chains. Canonical
+  // JSON: sortKeysDeep + JSON.stringify, matching Python's
+  // json.dumps(sort_keys=True, separators=(",",":"), ensure_ascii=True).
+  // All values in the envelope are hex strings (no non-ASCII), so the
+  // ensure_ascii difference between platforms doesn't matter here.
+  var canonical = JSON.stringify(sortKeysDeep(record.thumbnail));
+  return await _sha256Hex(canonical);
 }
 
 async function verifySignature(identifier, contentHash, signatureHex, publicKeyHex, thumbnailHash) {

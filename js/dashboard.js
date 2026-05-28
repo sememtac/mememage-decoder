@@ -5812,7 +5812,12 @@ setInterval(function() {
     host.innerHTML = '<span class="config-cc-cap-label">' +
       escapeHtml(ch.name) + ' [' + escapeHtml(ch.type) + ']' + statusStr + ':</span> ' +
       parts.join(' ');
-    if (scanBtn) scanBtn.disabled = !(caps.search && ch.enabled && ch.configured);
+    // Cleanup only needs credentials, not the route-traffic flag. The
+    // `enabled` field decides whether NEW mints fire on this channel —
+    // orthogonal to "can we list / hide / purge what's already there".
+    // A channel deliberately disabled (e.g. IA off to keep test mints
+    // off the public archive) should still be cleanable from this UI.
+    if (scanBtn) scanBtn.disabled = !(caps.search && ch.configured);
     _ccUpdateActionVisibility();
   }
   function _ccRenderResults() {
@@ -5970,7 +5975,24 @@ setInterval(function() {
       if (section.open && !_ccChannels.length) _ccLoadChannels();
     });
     var sel = _ccEl('configCcChannel');
-    if (sel) sel.addEventListener('change', _ccRenderCaps);
+    if (sel) sel.addEventListener('change', function() {
+      // Channel switch wipes any prior channel's scan results and
+      // log lines — keeping them visible alongside the new channel's
+      // selection misleads (the screenshot from issue: switched to
+      // http_push but the table still showed "Found 19 items on IA").
+      _ccScanned = [];
+      var results = _ccEl('configCcResults');
+      var log = _ccEl('configCcLog');
+      var summary = _ccEl('configCcSummary');
+      if (results) results.innerHTML = '';
+      if (log) log.innerHTML = '';
+      if (summary) summary.textContent = '';
+      _ccEl('configCcSelectAll').disabled = true;
+      _ccEl('configCcSelectNone').disabled = true;
+      var actions = _ccEl('configCcActions');
+      if (actions) actions.hidden = true;
+      _ccRenderCaps();
+    });
     var scan = _ccEl('configCcScanBtn');
     if (scan) scan.addEventListener('click', _ccScan);
     var selAll = _ccEl('configCcSelectAll');
