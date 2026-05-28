@@ -1176,17 +1176,6 @@
        height regardless of content. */
     display: none;
   }
-  /* Brushed metal grain — canvas with radial fade */
-  .plate-grain {
-    position: absolute !important;
-    inset: 0;
-    width: 100% !important;
-    height: 100% !important;
-    border-radius: 16px;
-    z-index: 1 !important;
-    pointer-events: none;
-    opacity: 1;
-  }
   /* Glassy gradient rim — light rarity highlight at the top fading to a
      darker rarity shadow at the bottom. Sits over the flat rarity border
      so the pulse/box-shadow glow still breathes underneath. Color pair
@@ -1378,7 +1367,7 @@
      overlay); otherwise the selector's specificity (40) beats the
      .plate .shine rule (20) and relative-positions it inline, stuffing
      the band stack with a 2x-sized block. */
-  .plate > *:not(.plate-bg):not(.plate-grain):not(.cosmic-player):not(.shine) { position: relative; z-index: 2; }
+  .plate > *:not(.plate-bg):not(.cosmic-player):not(.shine) { position: relative; z-index: 2; }
   .plate > .plate-bg { position: absolute; z-index: 0; }
   .plate > canvas { z-index: 1; } /* constellation sits behind content */
   .plate-header {

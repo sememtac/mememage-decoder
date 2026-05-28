@@ -589,63 +589,12 @@ function renderCert(meta, options) {
   var plateBg = _div('plate-bg');
   plate.appendChild(plateBg);
 
-  // Brushed metal grain — drawn after plate is in the DOM so we know its size
-  var _grainCanvas = document.createElement('canvas');
-  _grainCanvas.className = 'plate-grain';
-  plate.appendChild(_grainCanvas);
-
-  // Deferred: draw grain after plate is rendered and has real dimensions
-  setTimeout(function() {
-    var rect = plate.getBoundingClientRect();
-    var dpr = window.devicePixelRatio || 1;
-    // Use scrollHeight (full content) instead of getBoundingClientRect
-    // height (visible viewport only). Without this the grain stops at
-    // the bottom of the first viewport when the cert scrolls.
-    var totalH = Math.max(plate.scrollHeight, rect.height);
-    var GW = Math.round(rect.width * dpr);
-    var GH = Math.round(totalH * dpr);
-    _grainCanvas.width = GW;
-    _grainCanvas.height = GH;
-    // Leave canvas display height alone (CSS .plate-grain { height: 100%
-    // !important } takes care of it). Setting an explicit pixel height
-    // here used to force the canvas to scrollHeight, which made the
-    // canvas overflow the plate's content area whenever the plate later
-    // shrank (player-collapse layout) — the absolutely-positioned canvas
-    // then re-inflated plate.scrollHeight back to the full viewport,
-    // defeating the auto-fit. CSS 100% height tracks the plate's current
-    // size, and the pixel buffer (canvas.height = totalH * dpr) keeps
-    // the brushed-metal pattern detailed when stretched to a tall plate.
-    var gc = _grainCanvas.getContext('2d');
-
-    // Draw horizontal hairlines
-    var spacing = Math.max(2, Math.round(2 * dpr));
-    for (var gy = 0; gy < GH; gy += spacing) {
-      gc.fillStyle = 'rgba(255,255,255,0.15)';
-      gc.fillRect(0, gy, GW, 0.5 * dpr);
-      gc.fillStyle = 'rgba(0,0,0,0.10)';
-      gc.fillRect(0, gy + dpr, GW, 0.5 * dpr);
-    }
-
-    // Erase center — large ellipse, grain only in the narrow edge margins.
-    // For tall scrollable plates the ellipse stretches vertically; the
-    // grain stays as a thin band on the left + right edges throughout.
-    gc.globalCompositeOperation = 'destination-out';
-    gc.save();
-    gc.translate(GW / 2, GH * 0.45);
-    gc.scale(1, GH / GW * 1.1);  // stretch to tall ellipse matching plate aspect
-    var maxR = GW * 0.56;
-    var grad = gc.createRadialGradient(0, 0, 0, 0, 0, maxR);
-    grad.addColorStop(0, 'rgba(0,0,0,1)');
-    grad.addColorStop(0.9, 'rgba(0,0,0,1)');
-    grad.addColorStop(0.97, 'rgba(0,0,0,0.5)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    gc.fillStyle = grad;
-    gc.fillRect(-GW, -GH, GW * 2, GH * 2);
-    gc.restore();
-    gc.globalCompositeOperation = 'source-over';
-  }, 100);
-
   // plate-inner-highlight removed — was drawing a white line across the top
+  // Brushed-metal grain canvas removed — the hairline pattern was a nice
+  // idea (cf. fountain-pen-on-foil) but too busy under the rest of the
+  // cert content. plateBg's rarity-tinted gradient carries the material
+  // alone now. The CSS class .plate-grain still exists but no element
+  // uses it; theme.css's L1 reskin lever remains structurally intact.
 
   // Constellation pattern — destiny map behind the header
   // Constellation pattern seed: constellation_hash (SHA-256 of celestial state, 64 bits)

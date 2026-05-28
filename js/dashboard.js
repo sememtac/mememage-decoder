@@ -417,6 +417,8 @@ setInterval(function() {
     resultUrl:     document.getElementById('mintResultUrl'),
     resultUrlCopy: document.getElementById('mintResultUrlCopy'),
     resultUrlOpen: document.getElementById('mintResultUrlOpen'),
+    resultChannels:     document.getElementById('mintResultChannels'),
+    resultChannelsList: document.getElementById('mintResultChannelsList'),
     download:      document.getElementById('mintDownload'),
     downloadSoul:  document.getElementById('mintDownloadSoul'),
     again:         document.getElementById('mintAgain'),
@@ -591,6 +593,15 @@ setInterval(function() {
     if (location.protocol === 'file:') {
       // The global-error notice already explains this; bail before
       // attempting the doomed fetch.
+      return;
+    }
+    // Pre-flight: the server refuses /api/mint/upload with 412 on an
+    // unsealed chain (and 4xx on a Dark-no-password chain). Refuse here
+    // too so the user doesn't watch a file upload only to fail server
+    // side. _refreshMintGuardrails has already shown the explainer.
+    if (state.chainSealed === false ||
+        (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet)) {
+      _refreshMintGuardrails();
       return;
     }
     showError('');
@@ -914,6 +925,7 @@ setInterval(function() {
   // hitting Conceive and getting an error.
   state.chainVisibility = null;
   state.chainPasswordSet = false;
+  state.chainSealed = null;  // tri-state: null = unknown, true/false once loaded
   async function loadActiveChain() {
     try {
       var resp = await fetch('/api/chain/current', {headers: authHeaders()});
@@ -928,31 +940,70 @@ setInterval(function() {
       state.chainPasswordSet = pwSet;
       els.chainId.textContent = id;
       els.chainName.textContent = name && name !== id ? ' \u00b7 ' + name : '';
-      // Compose the visibility chip text: "Light" / "Light · sealed" /
-      // "Dark · sealed" / "Dark · MISSING KEY". Single chip carries
-      // the full state so the user doesn't have to scan two indicators.
+      // Compose the visibility chip text. We avoid "sealed" here because
+      // "Seal Age" is the other primary use of that verb (site-pack) and
+      // people mistake one state for the other. "password set" is what
+      // the button labels say too — keep wording consistent.
       var visText;
       if (vis === 'dark_matter') {
-        visText = pwSet ? 'Dark · sealed' : 'Dark · NEEDS PASSWORD';
+        visText = pwSet ? 'Dark \u00b7 password set' : 'Dark \u00b7 NEEDS PASSWORD';
       } else {
-        visText = pwSet ? 'Light · GPS sealed' : 'Light · public';
+        visText = pwSet ? 'Light \u00b7 GPS password' : 'Light \u00b7 public';
       }
       els.chainVis.textContent = visText;
       els.chainVis.dataset.vis = vis;
       els.chainVis.dataset.pwSet = pwSet ? '1' : '0';
-      // Surface the dark-chain-missing-password case inline so the user
-      // sees the problem before clicking Conceive.
-      if (vis === 'dark_matter' && !pwSet) {
-        showError('This chain is Dark but has no stored password — set it in Config → Chains before conceiving.');
-      } else {
-        showError('');
-      }
     } catch (e) {
       els.chainId.textContent = '(could not load active chain)';
       els.chainName.textContent = '';
       els.chainVis.textContent = '';
       state.chainVisibility = null;
       state.chainPasswordSet = false;
+    }
+    // Seal check — the server refuses /api/mint/upload with 412 if no
+    // Age has been sealed yet on this chain, so we have to refuse the
+    // drop locally too. Tri-state until the fetch returns so we don't
+    // flash a false "unsealed" badge on first load.
+    try {
+      var sealResp = await fetch('/api/site-pack/status', {headers: authHeaders()});
+      if (sealResp.ok) {
+        var sealInfo = await sealResp.json();
+        state.chainSealed = !!(sealInfo && sealInfo.sealed);
+      }
+    } catch (e) { /* keep prior state; refresh will retry */ }
+    _refreshMintGuardrails();
+  }
+
+  // Aggregates the pre-flight checks that block a clean mint and writes
+  // the result to the mint tab's error slot + drop-zone state. Called
+  // after loadActiveChain — any state that changes the answer should
+  // call this directly afterwards. Single source of truth so the drop
+  // zone and error message never disagree.
+  function _refreshMintGuardrails() {
+    var blocked = false;
+    var msg = '';
+    if (state.chainSealed === false) {
+      blocked = true;
+      msg = 'This chain has no sealed Age yet. Open the <strong>Payload</strong> tab and click <strong>Seal Age</strong> before conceiving — minting against an unsealed chain would produce a record with no Age number, no decoder_hash, and no chunks.';
+    } else if (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet) {
+      blocked = true;
+      msg = 'This chain is Dark but has no stored password — set it in <strong>Config \u2192 Chains</strong> before conceiving.';
+    }
+    if (els.drop) {
+      els.drop.classList.toggle('mint-blocked', blocked);
+      // Reuse the busy attr to grey-out + disable pointer events. The
+      // existing CSS for [data-busy] already handles this; the only
+      // user-visible difference is the cursor and the message below.
+      if (blocked) {
+        els.drop.setAttribute('aria-disabled', 'true');
+      } else {
+        els.drop.removeAttribute('aria-disabled');
+      }
+    }
+    if (blocked) {
+      showError(msg, {html: true});
+    } else {
+      showError('');
     }
   }
   function humanSize(b) {
@@ -1082,6 +1133,54 @@ setInterval(function() {
     // Dry-run badge in the Witnessed header
     if (els.resultHead) {
       els.resultHead.setAttribute('data-dry-run', s.dry_run ? '1' : '0');
+    }
+    // Per-channel blast result. Show the list only when the blast hit
+    // more than one channel (or when at least one failed) — for a
+    // single-channel mint the soul URL above is the only signal worth
+    // surfacing. Failures get a red dot + the server's error text;
+    // successes get a green dot + the channel's URL (clickable).
+    if (els.resultChannels && els.resultChannelsList) {
+      var dist = s.distribution || {};
+      var distErr = s.distribution_errors || {};
+      var ids = Object.keys(dist).concat(Object.keys(distErr));
+      var seen = {};
+      var rows = [];
+      ids.forEach(function(id) {
+        if (seen[id]) return;
+        seen[id] = 1;
+        if (Object.prototype.hasOwnProperty.call(dist, id)) {
+          var url = dist[id];
+          rows.push(
+            '<li class="mint-result-channel mint-result-channel-ok">' +
+            '<span class="mint-result-channel-status" aria-hidden="true">\u2713</span>' +
+            '<span class="mint-result-channel-id">' + escapeHtml(id) + '</span>' +
+            '<a class="mint-result-channel-url" href="' + escapeHtml(url) +
+              '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>' +
+            '</li>'
+          );
+        } else {
+          rows.push(
+            '<li class="mint-result-channel mint-result-channel-fail">' +
+            '<span class="mint-result-channel-status" aria-hidden="true">\u2717</span>' +
+            '<span class="mint-result-channel-id">' + escapeHtml(id) + '</span>' +
+            '<span class="mint-result-channel-err" title="' + escapeHtml(distErr[id] || '') +
+              '">' + escapeHtml(distErr[id] || 'failed') + '</span>' +
+            '</li>'
+          );
+        }
+      });
+      var totalRows = rows.length;
+      var hasFail = Object.keys(distErr).length > 0;
+      // Suppress the block for trivial single-success blasts — the soul
+      // URL above conveys it. Show it whenever there's a failure or more
+      // than one channel involved.
+      if (totalRows > 1 || hasFail) {
+        els.resultChannelsList.innerHTML = rows.join('');
+        els.resultChannels.hidden = false;
+      } else {
+        els.resultChannelsList.innerHTML = '';
+        els.resultChannels.hidden = true;
+      }
     }
     setState('done');
   }
@@ -1350,6 +1449,10 @@ setInterval(function() {
 
   // Initial load. Run async so the tab paint isn't blocked.
   loadForecast();
+  // Load chain context so the banner + mint guardrails are populated
+  // before the user has a chance to drop a file (no chain banner on
+  // cold load before this; the unsealed-chain check would also miss).
+  loadActiveChain();
 
   // ---- Recent pending sessions ----
   // Top 5 by created desc, with Resume / Delete per row. Hidden when
@@ -1430,6 +1533,10 @@ setInterval(function() {
       if (panelId === 'tab-mint') {
         loadForecast();
         loadRecent();
+        // Re-check chain context — most importantly, the seal state can
+        // have flipped (user just sealed in the Payload tab). Refreshes
+        // the unsealed-chain guardrail without a full page reload.
+        loadActiveChain();
       }
     });
   }
@@ -1482,6 +1589,7 @@ setInterval(function() {
     nuxDismiss:   document.getElementById('payloadNuxDismiss'),
     nuxReopen:    document.getElementById('payloadNuxReopen'),
     mInput:       document.getElementById('payloadM'),
+    watermarkPresets: document.getElementById('payloadWatermarkPresets'),
     addEntryBtn:  document.getElementById('addEntryBtn'),
     addLayerBtn:  document.getElementById('addLayerBtn'),
     addFrozenBtn: document.getElementById('addFrozenBtn'),
@@ -1525,6 +1633,38 @@ setInterval(function() {
     if (token) h['Authorization'] = 'Bearer ' + token;
     return h;
   }
+
+  // Returns true iff some entry's sources still references `path`. Used
+  // to gate orphan deletion: only nuke the file when no entry/source
+  // slot still references it (cross-entry shared paths shouldn't get
+  // deleted out from under a still-active reference). Reads state.working
+  // — caller must mutate state BEFORE asking.
+  function _isPathReferencedInPayload(path) {
+    if (!path || !state.working) return false;
+    var entries = state.working.entries || {};
+    for (var name in entries) {
+      if (!Object.prototype.hasOwnProperty.call(entries, name)) continue;
+      var srcs = entries[name].sources || [];
+      for (var i = 0; i < srcs.length; i++) {
+        if (srcs[i] === path) return true;
+      }
+    }
+    return false;
+  }
+
+  // Fire-and-forget unlink of a payload upload. Server enforces that
+  // the path lives under the active chain's uploads/ — anything else
+  // (a user-typed system path, a stale Browse pick) returns 400 and we
+  // ignore. Idempotent: missing file is a no-op success.
+  function _deletePayloadUpload(path) {
+    if (!path) return;
+    fetchJson('/api/payload/upload/delete', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({path: path}),
+    }).catch(function() { /* best-effort — orphan stays at worst */ });
+  }
+
   function showError(msg, html) {
     if (!els.error) return;
     if (html) els.error.innerHTML = msg || '';
@@ -1781,6 +1921,15 @@ setInterval(function() {
       els.mInput.value = (draftM != null) ? draftM : '';
       els.mInput.disabled = state.chainLocked === true;
     }
+    if (els.watermarkPresets) {
+      // Server normalizes "off" → omitted, so absence means off.
+      var wmPreset = (state.working.watermark && state.working.watermark.preset) || 'off';
+      var radios = els.watermarkPresets.querySelectorAll('input[type="radio"]');
+      radios.forEach(function(r) {
+        r.checked = (r.value === wmPreset);
+        r.disabled = state.chainLocked === true;
+      });
+    }
   }
 
   // ===== Rendering: entries =====
@@ -1986,8 +2135,14 @@ setInterval(function() {
       if (action === 'delete-entry') {
         var name = row.getAttribute('data-entry');
         if (!window.confirm('Delete entry "' + name + '"? Any layers/frozen positions that reference it will be invalid.')) return;
+        // Capture the entry's source paths BEFORE deleting so we can
+        // sweep any now-orphaned uploads off disk.
+        var orphanCandidates = ((state.working.entries[name] || {}).sources || []).slice();
         delete state.working.entries[name];
         renderAll();
+        orphanCandidates.forEach(function(p) {
+          if (!_isPathReferencedInPayload(p)) _deletePayloadUpload(p);
+        });
       } else if (action === 'add-source') {
         var entryName = row.getAttribute('data-entry');
         var e = state.working.entries[entryName];
@@ -2001,8 +2156,10 @@ setInterval(function() {
         if (!e2) return;
         var srcIdx = parseInt(btn.getAttribute('data-source-idx'), 10);
         if (!isNaN(srcIdx)) {
+          var removedPath = (e2.sources || [])[srcIdx];
           e2.sources = (e2.sources || []).filter(function(_, i) { return i !== srcIdx; });
           renderAll();
+          if (!_isPathReferencedInPayload(removedPath)) _deletePayloadUpload(removedPath);
         }
       } else if (action === 'upload-source') {
         var entryName3 = row.getAttribute('data-entry');
@@ -2024,6 +2181,14 @@ setInterval(function() {
           var prevLabel = btn.textContent;
           btn.disabled = true;
           btn.textContent = 'Uploading\u2026';
+          // Swap the × button on this source row to a spinner so the user
+          // can't accidentally click it mid-upload and so the in-flight
+          // state is visible. CSS class .uploading hides × and draws a
+          // ring-spinner via ::before. Restored in finally.
+          var deleteBtn = btn.parentElement
+            ? btn.parentElement.querySelector('.payload-edit-delete[data-action="remove-source"]')
+            : null;
+          if (deleteBtn) deleteBtn.classList.add('uploading');
           var reader = new FileReader();
           reader.onload = async function() {
             try {
@@ -2040,14 +2205,25 @@ setInterval(function() {
               var ent = state.working.entries[entryName3];
               if (!ent) return;
               ent.sources = ent.sources || [];
+              // Capture the previous path BEFORE overwriting so we can
+              // sweep it if it's an orphaned upload (re-upload case).
+              var prevPath = ent.sources[srcIdx3];
               ent.sources[srcIdx3] = resp.path;
               state.touched = true;
               renderAll();
+              if (prevPath && prevPath !== resp.path &&
+                  !_isPathReferencedInPayload(prevPath)) {
+                _deletePayloadUpload(prevPath);
+              }
             } catch (e) {
               showError('Upload failed: ' + e.message);
             } finally {
               btn.disabled = false;
               btn.textContent = prevLabel;
+              // renderAll() on success path rebuilt deleteBtn — class on
+              // the detached node is harmless. On the error path the row
+              // is unchanged, so removing the class restores ×.
+              if (deleteBtn) deleteBtn.classList.remove('uploading');
               if (picker.parentNode) picker.parentNode.removeChild(picker);
             }
           };
@@ -2228,9 +2404,16 @@ setInterval(function() {
 
   function renderAgeStatus(info) {
     if (!info || info.sealed === false) {
-      els.ageStatus.textContent = 'No Age sealed yet \u2014 click Seal Age to begin.';
+      els.ageStatus.textContent = 'No Age sealed yet \u2014 click Seal to begin.';
       state.chainLocked = false;
       state.chainLockInfo = null;
+      // Unsealed: Seal is the user's primary path forward. Build-status
+      // logic in renderBuildBadge re-gates this on whether the payload
+      // is actually built (we can't seal a stale payload).
+      if (els.sealBtn) {
+        els.sealBtn.textContent = 'Seal';
+        els.sealBtn.title = 'Begin Age 1 (irreversible)';
+      }
       renderLockBadge();
       refreshDirtyUI();
       return;
@@ -2252,6 +2435,25 @@ setInterval(function() {
     state.chainLockedReason = info.cycle_complete
       ? '' : ('Age in progress: outer ' + info.outer_position + '/' + info.outer_total);
     state.chainLockInfo = info.cycle_complete ? null : info;
+    // Seal button: hard-disable while an Age is in progress so the user
+    // doesn't get the impression they can re-seal at will. The next
+    // legitimate Seal only happens when the outer cycle completes (365
+    // mints later), at which point it advances Age N → Age N+1.
+    if (els.sealBtn) {
+      if (info.cycle_complete) {
+        els.sealBtn.textContent = 'Seal';
+        els.sealBtn.disabled = false;
+        els.sealBtn.title =
+          'Outer cycle complete — Seal advances to Age ' + (info.age + 1) + '.';
+      } else {
+        els.sealBtn.textContent = 'Sealed';
+        els.sealBtn.disabled = true;
+        els.sealBtn.title =
+          'Already sealed: Age ' + info.age + ' in progress (outer ' +
+          info.outer_position + '/' + info.outer_total + '). The next Seal ' +
+          'unlocks when this Age\u2019s cycle completes.';
+      }
+    }
     renderLockBadge();
     refreshDirtyUI();
   }
@@ -2352,18 +2554,21 @@ setInterval(function() {
       else if (key === 'missing') els.buildBtn.textContent = 'Rebuild';
       else                        els.buildBtn.textContent = 'Build';
     }
-    // Seal Age: disabled unless built. Stops the user sealing a stale
+    // Seal: disabled unless built. Stops the user sealing a stale
     // or broken payload. Lock-state still has authority (mid-Age = seal
-    // does next-Age dance), so we only intercept the not-yet-built case.
+    // is the wrong action), so we only intercept the not-yet-built case
+    // when the chain is EDITABLE (unsealed or cycle complete).
     if (els.sealBtn) {
       var canSeal = (key === 'built');
-      // Don't override an Age-lock-driven disable from elsewhere.
       if (!state.chainLocked && state.chainLocked !== undefined) {
-        // EDITABLE chain: gate seal on build state.
         els.sealBtn.disabled = !canSeal;
-        els.sealBtn.title = canSeal
-          ? 'Begin a new Age (irreversible)'
-          : 'Build the payload first — Seal needs all artifacts in sync.';
+        if (!canSeal) {
+          els.sealBtn.title = 'Build the payload first — Seal needs all artifacts in sync.';
+        }
+        // When canSeal: leave the title alone. renderAgeStatus already
+        // set it contextually ("Begin Age 1" for fresh chain, "advances
+        // to Age N+1" for a cycle-complete chain). Re-clobbering here
+        // would lose that context.
       }
     }
   }
@@ -2411,12 +2616,19 @@ setInterval(function() {
     }
   }
   async function sealAge() {
-    var ok = window.prompt(
-      'Begin a new Age?\n\n' +
-      'This is irreversible. Re-seals if no Age yet, or starts the next Age ' +
-      'if the current cycle is complete.\n\n' +
-      'Type SEAL to confirm:'
-    );
+    // Personalize the prompt to whichever path we're on: first-ever seal
+    // (Age 1) vs. cycle-complete advance (Age N → N+1). Less ambiguous
+    // than the old "Re-seals if no Age yet, or starts the next Age."
+    var info = state.chainLockInfo;
+    var head, body;
+    if (info && info.cycle_complete) {
+      head = 'Advance to Age ' + (info.age + 1) + '?';
+      body = 'The current outer cycle is complete. Sealing begins the next Age — irreversible.';
+    } else {
+      head = 'Begin Age 1?';
+      body = 'This is irreversible. The chain becomes mintable once sealed; the next Seal won\u2019t unlock until this Age\u2019s outer cycle completes (365 conceptions).';
+    }
+    var ok = window.prompt(head + '\n\n' + body + '\n\nType SEAL to confirm:');
     if (ok !== 'SEAL') return;
     showError('');
     els.sealBtn.disabled = true;
@@ -2864,6 +3076,22 @@ setInterval(function() {
       var v = parseInt(els.mInput.value, 10);
       if (isNaN(v) || v < 1) return;  // invalid keystroke — refreshDirtyUI revalidates
       state.working.M = v;
+      markTouched();
+      refreshDirtyUI();
+    });
+  }
+
+  // Watermark preset — writes state.working.watermark. Omit the key
+  // entirely when off so chain.json stays clean. Server validates.
+  if (els.watermarkPresets) {
+    els.watermarkPresets.addEventListener('change', function(ev) {
+      if (!state.working || !ev.target || ev.target.name !== 'payload-watermark') return;
+      var preset = ev.target.value;
+      if (preset === 'off') {
+        delete state.working.watermark;
+      } else {
+        state.working.watermark = { preset: preset };
+      }
       markTouched();
       refreshDirtyUI();
     });
@@ -5144,15 +5372,15 @@ setInterval(function() {
           var isActive = c.id === currentId;
           var vis = c.visibility || 'light_energy';
           var pwSet = !!c.password_set;
-          // Password state phrasing surfaces the contract for the user:
-          // dark + no password is a configuration error; light + no
-          // password is a valid public-everything mode; both with
-          // passwords give partial/full sealing as appropriate.
+          // Password state phrasing surfaces the contract for the user.
+          // We say "password set" / "GPS password" rather than "sealed" —
+          // "Seal Age" is the other primary use of that verb (site-pack
+          // sealing) and people mistake one for the other.
           var pwLabel;
           if (vis === 'dark_matter') {
-            pwLabel = pwSet ? '\u00b7 sealed' : '\u00b7 NEEDS PASSWORD';
+            pwLabel = pwSet ? '\u00b7 password set' : '\u00b7 NEEDS PASSWORD';
           } else {
-            pwLabel = pwSet ? '\u00b7 GPS sealed' : '\u00b7 public';
+            pwLabel = pwSet ? '\u00b7 GPS password' : '\u00b7 public';
           }
           var gpsSource = c.gps_source || 'phone';
           var meta = vis + ' ' + pwLabel + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
@@ -5523,6 +5751,244 @@ setInterval(function() {
     }
   }
 
+  // ===== Channel cleanup (pre-genesis maintenance) =====
+  // Generic over any channel that implements search/hide/purge on its
+  // Channel plugin. The /api/channels/capabilities endpoint reports
+  // which operations each plugin supports — this UI greys out
+  // unsupported actions per channel. IA is the only fully-featured
+  // channel today; Zenodo and http_push declare no cleanup support
+  // and the action buttons stay disabled for them until they do.
+  var _ccChannels = [];   // [{id, type, name, capabilities, enabled, configured}]
+  var _ccScanned = [];    // last scan result for the selected channel
+  function _ccEl(id) { return document.getElementById(id); }
+  function _ccLog(line, isError) {
+    var log = _ccEl('configCcLog');
+    if (!log) return;
+    var div = document.createElement('div');
+    div.className = 'config-cc-log-line' + (isError ? ' config-cc-log-err' : '');
+    div.textContent = line;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+  function _ccActiveChannel() {
+    var id = (_ccEl('configCcChannel') || {}).value || '';
+    return _ccChannels.find(function(c) { return c.id === id; }) || null;
+  }
+  function _ccSelectedIds() {
+    return Array.prototype.slice.call(
+      document.querySelectorAll('input[data-cc-select]:checked')
+    ).map(function(c) { return c.getAttribute('data-cc-select'); });
+  }
+  function _ccUpdateActionVisibility() {
+    var any = _ccSelectedIds().length > 0;
+    var actions = _ccEl('configCcActions');
+    if (actions) actions.hidden = !any;
+    var ch = _ccActiveChannel();
+    var caps = (ch && ch.capabilities) || {};
+    var hideBtn = _ccEl('configCcHideBtn');
+    var purgeBtn = _ccEl('configCcPurgeBtn');
+    if (hideBtn)  hideBtn.disabled  = !(any && caps.hide);
+    if (purgeBtn) purgeBtn.disabled = !(any && caps.purge);
+  }
+  function _ccRenderCaps() {
+    var host = _ccEl('configCcCaps');
+    var scanBtn = _ccEl('configCcScanBtn');
+    if (!host) return;
+    var ch = _ccActiveChannel();
+    if (!ch) {
+      host.innerHTML = '';
+      if (scanBtn) scanBtn.disabled = true;
+      return;
+    }
+    var caps = ch.capabilities || {};
+    var parts = [];
+    parts.push('<span class="config-cc-cap config-cc-cap-' + (caps.search ? 'yes' : 'no') + '">scan ' + (caps.search ? '\u2713' : '\u2717') + '</span>');
+    parts.push('<span class="config-cc-cap config-cc-cap-' + (caps.hide ? 'yes' : 'no') + '">hide ' + (caps.hide ? '\u2713' : '\u2717') + '</span>');
+    parts.push('<span class="config-cc-cap config-cc-cap-' + (caps.purge ? 'yes' : 'no') + '">purge ' + (caps.purge ? '\u2713' : '\u2717') + '</span>');
+    var statusBits = [];
+    if (!ch.enabled) statusBits.push('disabled');
+    if (!ch.configured) statusBits.push('credentials missing');
+    var statusStr = statusBits.length ? ' (' + statusBits.join(', ') + ')' : '';
+    host.innerHTML = '<span class="config-cc-cap-label">' +
+      escapeHtml(ch.name) + ' [' + escapeHtml(ch.type) + ']' + statusStr + ':</span> ' +
+      parts.join(' ');
+    if (scanBtn) scanBtn.disabled = !(caps.search && ch.enabled && ch.configured);
+    _ccUpdateActionVisibility();
+  }
+  function _ccRenderResults() {
+    var host = _ccEl('configCcResults');
+    if (!host) return;
+    if (!_ccScanned.length) {
+      host.innerHTML = '<p class="config-note">No items matched. Try a different filter.</p>';
+      _ccEl('configCcSelectAll').disabled = true;
+      _ccEl('configCcSelectNone').disabled = true;
+      _ccUpdateActionVisibility();
+      return;
+    }
+    var rows = _ccScanned.map(function(it) {
+      var size = it.item_size || it.size || 0;
+      var sizeStr;
+      try {
+        var n = parseInt(size, 10);
+        if (isNaN(n) || n <= 0) sizeStr = '?';
+        else if (n > 1024 * 1024) sizeStr = (n / (1024 * 1024)).toFixed(1) + 'MB';
+        else if (n > 1024) sizeStr = (n / 1024).toFixed(1) + 'KB';
+        else sizeStr = n + 'B';
+      } catch (e) { sizeStr = '?'; }
+      var date = (it.publicdate || it.date || '').slice(0, 10);
+      var ident = it.identifier || '';
+      var url = it.url || '#';
+      return (
+        '<tr class="config-cc-row">' +
+        '<td><input type="checkbox" data-cc-select="' + escapeHtml(ident) + '"></td>' +
+        '<td><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="config-cc-ident">' + escapeHtml(ident) + '</a></td>' +
+        '<td>' + escapeHtml(date) + '</td>' +
+        '<td>' + escapeHtml(sizeStr) + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+    host.innerHTML =
+      '<table class="config-cc-table">' +
+      '<thead><tr><th></th><th>Identifier</th><th>Date</th><th>Size</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
+    _ccEl('configCcSelectAll').disabled = false;
+    _ccEl('configCcSelectNone').disabled = false;
+    host.querySelectorAll('input[data-cc-select]').forEach(function(c) {
+      c.addEventListener('change', _ccUpdateActionVisibility);
+    });
+    _ccUpdateActionVisibility();
+  }
+  async function _ccLoadChannels() {
+    try {
+      var resp = await fetchJson('/api/channels/capabilities');
+      _ccChannels = (resp && resp.channels) || [];
+    } catch (e) {
+      _ccChannels = [];
+    }
+    var sel = _ccEl('configCcChannel');
+    if (sel) {
+      if (!_ccChannels.length) {
+        sel.innerHTML = '<option value="">(no channels configured)</option>';
+      } else {
+        sel.innerHTML = _ccChannels.map(function(c) {
+          return '<option value="' + escapeHtml(c.id) + '">' +
+            escapeHtml(c.name) + ' [' + escapeHtml(c.type) + ']' +
+            '</option>';
+        }).join('');
+      }
+    }
+    _ccRenderCaps();
+  }
+  async function _ccScan() {
+    var ch = _ccActiveChannel();
+    if (!ch) return;
+    var btn = _ccEl('configCcScanBtn');
+    var summary = _ccEl('configCcSummary');
+    var prev = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Scanning\u2026';
+    if (summary) summary.textContent = '';
+    _ccEl('configCcResults').innerHTML = '';
+    _ccEl('configCcLog').innerHTML = '';
+    try {
+      var body = {
+        uploader: (_ccEl('configCcUploader').value || '').trim(),
+        collection: (_ccEl('configCcCollection').value || '').trim(),
+        pattern: (_ccEl('configCcPattern').value || 'mememage-*').trim(),
+        limit: parseInt(_ccEl('configCcLimit').value || '100', 10) || 100,
+      };
+      var resp = await fetchJson('/api/channel/' + encodeURIComponent(ch.id) + '/scan', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body),
+      });
+      _ccScanned = (resp && resp.items) || [];
+      if (summary) {
+        summary.textContent = 'Found ' + _ccScanned.length + ' item' +
+          (_ccScanned.length === 1 ? '' : 's') + ' on ' + ch.name + '.';
+      }
+      _ccRenderResults();
+    } catch (e) {
+      _ccEl('configCcResults').innerHTML =
+        '<p class="config-note config-cc-err">Scan failed: ' + escapeHtml(e.message) + '</p>';
+    } finally {
+      btn.disabled = false; btn.textContent = prev;
+    }
+  }
+  async function _ccAction(kind) {
+    var ch = _ccActiveChannel();
+    if (!ch) return;
+    var ids = _ccSelectedIds();
+    if (!ids.length) return;
+    var verb = kind === 'hide' ? 'HIDE' : 'PURGE';
+    var human = kind === 'hide'
+      ? 'HIDE ' + ids.length + ' item(s) on ' + ch.name + ' — invisible to public discovery (channel-specific semantics)'
+      : 'PURGE ' + ids.length + ' item(s) on ' + ch.name + ' — irreversible content removal';
+    var typed = window.prompt(
+      'About to ' + human + '.\n\n' +
+      'The identifier may remain reserved on the channel (e.g. IA never releases a namespace).\n\n' +
+      'Type ' + verb + ' to confirm:'
+    );
+    if (typed !== verb) return;
+    var route = '/api/channel/' + encodeURIComponent(ch.id) + '/' + kind;
+    var btn = _ccEl(kind === 'hide' ? 'configCcHideBtn' : 'configCcPurgeBtn');
+    var prev = btn.textContent;
+    btn.disabled = true; btn.textContent = (kind === 'hide' ? 'Hiding' : 'Purging') + '\u2026';
+    _ccEl('configCcLog').innerHTML = '';
+    try {
+      var resp = await fetchJson(route, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ identifiers: ids, confirm: verb }),
+      });
+      if (kind === 'hide') {
+        _ccLog('Hide: ' + resp.succeeded + ' / ' + resp.processed + ' succeeded.');
+      } else {
+        _ccLog('Purge: ' + resp.files_deleted + ' files deleted, ' + resp.files_failed + ' failed.');
+      }
+      (resp.results || []).forEach(function(r) {
+        if (kind === 'hide') {
+          _ccLog((r.ok ? '\u2713 ' : '\u2717 ') + r.identifier + (r.ok ? '' : ' \u2014 ' + (r.error || 'failed')), !r.ok);
+        } else {
+          var bad = (r.errors || []).length > 0 || r.failed > 0;
+          _ccLog((bad ? '\u26a0 ' : '\u2713 ') + r.identifier + ' \u2014 ' +
+                 (r.deleted || 0) + '/' + (r.files || 0) + ' files deleted', bad);
+          (r.errors || []).slice(0, 3).forEach(function(e) { _ccLog('    ' + e, true); });
+        }
+      });
+    } catch (e) {
+      _ccLog(verb + ' failed: ' + e.message, true);
+    } finally {
+      btn.disabled = false; btn.textContent = prev;
+      _ccUpdateActionVisibility();  // re-derive from capabilities
+    }
+  }
+  // Wire once. Lazy-load capabilities the first time the user opens
+  // the section (details/summary toggle event).
+  (function _wireChannelCleanup() {
+    var section = document.querySelector('[data-section="channel-cleanup"]');
+    if (section) section.addEventListener('toggle', function() {
+      if (section.open && !_ccChannels.length) _ccLoadChannels();
+    });
+    var sel = _ccEl('configCcChannel');
+    if (sel) sel.addEventListener('change', _ccRenderCaps);
+    var scan = _ccEl('configCcScanBtn');
+    if (scan) scan.addEventListener('click', _ccScan);
+    var selAll = _ccEl('configCcSelectAll');
+    if (selAll) selAll.addEventListener('click', function() {
+      document.querySelectorAll('input[data-cc-select]').forEach(function(c) { c.checked = true; });
+      _ccUpdateActionVisibility();
+    });
+    var selNone = _ccEl('configCcSelectNone');
+    if (selNone) selNone.addEventListener('click', function() {
+      document.querySelectorAll('input[data-cc-select]').forEach(function(c) { c.checked = false; });
+      _ccUpdateActionVisibility();
+    });
+    var h = _ccEl('configCcHideBtn');
+    if (h) h.addEventListener('click', function() { _ccAction('hide'); });
+    var p = _ccEl('configCcPurgeBtn');
+    if (p) p.addEventListener('click', function() { _ccAction('purge'); });
+  })();
+
   window.__loadConfigTab = function() {
     if (loaded) return;
     loaded = true;
@@ -5533,7 +5999,37 @@ setInterval(function() {
   // and the user tabs back to this dashboard, the profile list should
   // reflect the new peer profile without a manual reload.
   window.__refreshConfigTab = function() {
-    if (loaded) refresh();
+    if (!loaded) return;
+    // Skip refresh if the user is actively typing in a Config input —
+    // refresh() re-renders sections via innerHTML, which would yank focus
+    // from the field they're typing in. The 20s background poll just
+    // no-ops here; the user's edit completes, they blur, and the next
+    // tick picks up.
+    var ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
+      var configPanel = document.getElementById('tab-config');
+      if (configPanel && configPanel.contains(ae)) return;
+    }
+    // Skip refresh while a transient inline form is open. innerHTML
+    // re-render would close the form and drop whatever the user typed.
+    // The form has its own explicit Cancel/Submit buttons — those are
+    // the only legit ways to dismiss it.
+    //
+    // Detection: + New chain has a dedicated wrapper with `hidden`,
+    // while + New profile and Pair render directly into the danger
+    // zone (no wrapper). Check for the existence of their first input
+    // — present in the DOM iff the form is currently rendered.
+    var chainForm = document.getElementById('configChainNewForm');
+    if (chainForm && !chainForm.hidden) return;
+    var transientInputs = [
+      'configProfileNewId',     // + New profile
+      'configPairUrl',          // Pair with another server
+      'configProfileImportPath', // Import existing key
+    ];
+    for (var i = 0; i < transientInputs.length; i++) {
+      if (document.getElementById(transientInputs[i])) return;
+    }
+    refresh();
   };
 })();
 
