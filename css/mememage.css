@@ -2086,7 +2086,7 @@
      tab, and for viewers who want to explicitly drop the password
      from their session. */
   .dm-relock-row {
-    margin: 10px auto 0;
+    margin: 12px auto 22px;
     text-align: center;
   }
   .dm-relock-btn {

@@ -800,16 +800,18 @@ function renderCert(meta, options) {
     plate.appendChild(conCanvas);
   }
 
-  // Portrait — always shown when the record carries a thumbnail.
-  // Earlier this was gated on "image was present" (only revealed on
-  // By Sight / By Soul drops, hidden on By Word lookups). That made
-  // chain traversal feel like reading text. The thumbnail is part of
-  // the soul anyway — there's nothing to gate, and showing it makes
-  // walking a lineage actually feel like visiting stars. The
-  // mystery is "what's behind this letter, this name" — answer with
-  // the face.
+  // Portrait — gated on image-was-present (window._lastDecodedCanvas).
+  // Per CLAUDE.md's Constellations doctrine: "Chain traversal =
+  // stargazing — you see the fingerprint, not the face." Dropping an
+  // image is the gesture that earns the body view; By Word lookups
+  // and chain-link traversal show the soul (badges, identifier,
+  // public fields, decrypted dark data if unlocked) without the
+  // portrait. Three dimensions of mortal verification: body (the
+  // image), soul (the metadata), fingerprint (the hash). Traversal
+  // surfaces the latter two; the body stays in the user's hands.
+  var _imageWasPresent = !!window._lastDecodedCanvas;
   var safeThumb = _safeThumbnail(meta.thumbnail);
-  if (safeThumb) {
+  if (safeThumb && _imageWasPresent) {
     var portraitWrap = _div();
     portraitWrap.style.cssText = 'text-align:center;margin-bottom:12px;position:relative;z-index:3';
     var portraitRing = _div();
