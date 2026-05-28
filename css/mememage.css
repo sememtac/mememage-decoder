@@ -1995,6 +1995,89 @@
   }
   .gps-unlock-v { font-weight: 500; }
 
+  /* --- Dark-matter unlock (above the cert chrome) ---
+     Reuses the gps-unlock visual language but lives at the top of the
+     plate (right under the badges) because every other section on a
+     dark-matter cert is gated behind this one input. Padded a little
+     more generously since it's the only signal until unlock succeeds. */
+  .dm-unlock {
+    margin: 14px auto 4px;
+    max-width: 320px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: rgba(180, 180, 180, 0.04);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 5%, transparent);
+    border: 1px dashed rgba(180,180,180,0.18);
+    border: 1px dashed color-mix(in srgb, var(--rarity-color, #909090) 22%, transparent);
+    text-align: center;
+  }
+  .dm-unlock-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #b0b0b0;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 35%, #d0d0d0);
+    margin-bottom: 8px;
+  }
+  .dm-unlock-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .dm-unlock-pw {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 16px;
+    padding: 6px 10px;
+    background: rgba(180,180,180,0.06);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 8%, transparent);
+    color: #c8c8c8;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 35%, #e0e0e0);
+    border: 1px solid rgba(180,180,180,0.18);
+    border: 1px solid color-mix(in srgb, var(--rarity-color, #909090) 25%, transparent);
+    border-radius: 5px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+  .dm-unlock-pw:focus {
+    border-color: rgba(210,210,210,0.5);
+    border-color: color-mix(in srgb, var(--rarity-color, #909090) 60%, transparent);
+  }
+  .dm-unlock-pw::placeholder { color: rgba(160,160,160,0.4); }
+  .dm-unlock-btn {
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #a0a0a0;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 55%, #d8d8d8);
+    background: rgba(180,180,180,0.1);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 12%, transparent);
+    border: 1px solid rgba(180,180,180,0.25);
+    border: 1px solid color-mix(in srgb, var(--rarity-color, #909090) 30%, transparent);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .dm-unlock-btn:hover:not(:disabled) {
+    background: rgba(180,180,180,0.18);
+    background: color-mix(in srgb, var(--rarity-color, #909090) 22%, transparent);
+    color: #d0d0d0;
+    color: color-mix(in srgb, var(--rarity-color, #909090) 30%, #f0f0f0);
+  }
+  .dm-unlock-btn:disabled { opacity: 0.5; cursor: default; }
+  .dm-unlock-err {
+    margin-top: 8px;
+    min-height: 1em;
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    color: #e66b6b;
+  }
+  .dm-unlock-err:empty { display: none; }
+
   /* --- Birth Temperament --- */
   .temperament-cell {
     background: rgba(0,0,0,0.04);

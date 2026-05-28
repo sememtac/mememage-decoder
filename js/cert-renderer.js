@@ -943,6 +943,114 @@ function renderCert(meta, options) {
 
     plate.appendChild(badgeWrap);
 
+    // Dark-matter unlock — if the record's soul is encrypted AND the
+    // viewer hasn't provided a password yet, surface a single input
+    // right under the badges. The decoder cert is otherwise nearly
+    // empty for dark records (every section's data lives in
+    // encrypted_soul). One password unlocks: protected fields,
+    // encrypted_chunks, and the encrypted thumbnail (which re-enables
+    // the EMBODIED dHash comparison). Re-renders the cert in place.
+    //
+    // Password lives in sessionStorage keyed by decoder_hash so siblings
+    // in the same constellation auto-unlock during one tab's lifetime —
+    // never localStorage, forgotten on tab close (the CLAUDE.md contract:
+    // "Enter password → protected fields appear → close the page →
+    // forgotten").
+    var _isDarkChain = (meta.chain_visibility === 1 || meta.chain_visibility === 'dark_matter');
+    var _alreadyUnlocked = !!meta._unlocked;
+    if (!isSample && _isDarkChain && meta.encrypted_soul && !_alreadyUnlocked
+        && typeof Access !== 'undefined') {
+      var _chainKey = (meta.decoder_hash || meta.heart_star_id || meta.identifier || '').slice(0, 24);
+      var _storedPw = '';
+      try { _storedPw = sessionStorage.getItem('mememage-pw-' + _chainKey) || ''; }
+      catch (e) {}
+
+      var unlockSoulRow = _div('dm-unlock');
+      var unlockSoulLabel = _div('dm-unlock-label');
+      unlockSoulLabel.textContent = '\u{1F512} Dark matter \u2014 unlock with creator password';
+      unlockSoulRow.appendChild(unlockSoulLabel);
+
+      var pwRow = _div('dm-unlock-row');
+      var pwInput = document.createElement('input');
+      pwInput.type = 'password';
+      pwInput.className = 'dm-unlock-pw';
+      pwInput.placeholder = 'password';
+      pwInput.autocomplete = 'off';
+      pwRow.appendChild(pwInput);
+      var unlockBtn = document.createElement('button');
+      unlockBtn.type = 'button';
+      unlockBtn.className = 'dm-unlock-btn';
+      unlockBtn.textContent = 'Unlock';
+      pwRow.appendChild(unlockBtn);
+      unlockSoulRow.appendChild(pwRow);
+
+      var unlockErr = _div('dm-unlock-err');
+      unlockSoulRow.appendChild(unlockErr);
+
+      plate.appendChild(unlockSoulRow);
+
+      async function _doDmUnlock(pw) {
+        if (!pw) {
+          unlockErr.textContent = 'Enter the chain password.';
+          return;
+        }
+        unlockErr.textContent = '';
+        unlockBtn.disabled = true; var prev = unlockBtn.textContent;
+        unlockBtn.textContent = 'Decrypting\u2026';
+        try {
+          var soulRes = await Access.decryptSoul(meta.encrypted_soul, pw);
+          if (!soulRes.ok) {
+            unlockErr.textContent = soulRes.error || 'Wrong password.';
+            return;
+          }
+          var unlocked = Object.assign({}, meta);
+          Object.keys(soulRes.soul || {}).forEach(function(k) {
+            unlocked[k] = soulRes.soul[k];
+          });
+          // Encrypted thumbnail → swap in plaintext so EMBODIED can run.
+          if (meta.thumbnail && typeof meta.thumbnail === 'object' && meta.thumbnail.ct) {
+            var thumbRes = await Access.decryptEnvelope(meta.thumbnail, pw);
+            if (thumbRes.ok) unlocked.thumbnail = thumbRes.plaintext;
+          }
+          // Encrypted chunks (if present) — needed for any chain that
+          // distributes the canonical decoder/truth bytes through
+          // dark-matter records.
+          if (meta.encrypted_chunks) {
+            var chunksRes = await Access.decryptChunks(meta.encrypted_chunks, pw);
+            if (chunksRes.ok) unlocked.chunks = chunksRes.chunks;
+          }
+          unlocked._unlocked = true;
+          // Cache the password for sibling records (sessionStorage —
+          // per-tab, forgotten on close).
+          try { sessionStorage.setItem('mememage-pw-' + _chainKey, pw); } catch (e) {}
+          // Re-render into the same target. Same options the caller
+          // used; if none provided, defaults match the decoder.
+          renderCert(unlocked, options);
+        } catch (e) {
+          unlockErr.textContent = 'Decryption failed: ' + (e && e.message ? e.message : 'unknown error');
+        } finally {
+          unlockBtn.disabled = false;
+          unlockBtn.textContent = prev;
+        }
+      }
+      unlockBtn.addEventListener('click', function() { _doDmUnlock(pwInput.value); });
+      pwInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); _doDmUnlock(pwInput.value); }
+      });
+      // Auto-try the cached password from a previous sibling unlock in
+      // this tab. Quiet — if it fails (different chain that happens to
+      // share the same key prefix, password rotated), the input just
+      // sits there waiting for the viewer's input. No error toast.
+      if (_storedPw) {
+        setTimeout(function() {
+          (async function() {
+            var r = await Access.decryptSoul(meta.encrypted_soul, _storedPw);
+            if (r.ok) _doDmUnlock(_storedPw);
+          })();
+        }, 0);
+      }
+    }
+
     // Alias-cluster panel removed — aliases surface only as the
     // AUTHENTICATED badge's tooltip ("Also known as: …"). Keys and
     // fingerprints are system mechanics, not part of what the viewer
