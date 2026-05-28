@@ -1289,7 +1289,14 @@ function renderCert(meta, options) {
   // ===================================================================
   // 3. ORIGIN PARAMETERS (canvas band)
   // ===================================================================
-  if (GEN_PARAMS.length > 0 && !isSample) {
+  // The three canvas bands (ORIGIN PARAMETERS, MACHINE AT CONCEPTION,
+  // SKY AT THE MOMENT OF CREATION) are the body of the cert — visible
+  // only when the viewer dropped an image. Chain traversal (By Word /
+  // chain-link clicks / popstate back) gets the partial cert: badges,
+  // identifier, navigation, no bands. Mirrors the portrait gating
+  // above — stargazing shows fingerprint, not face / not vitals /
+  // not sky.
+  if (GEN_PARAMS.length > 0 && !isSample && _imageWasPresent) {
     plate.appendChild(_sectionLabel('ORIGIN PARAMETERS'));
 
     var genWrap = _div('sky-band-wrap');
@@ -1326,7 +1333,7 @@ function renderCert(meta, options) {
   // ===================================================================
   // 4. MACHINE DIE: vitals canvas band, machine rarity traits
   // ===================================================================
-  if (MACHINE.length > 0 && !isSample) {
+  if (MACHINE.length > 0 && !isSample && _imageWasPresent) {
     plate.appendChild(_sectionLabel('MACHINE AT CONCEPTION'));
 
     var machWrap = _div('sky-band-wrap');
@@ -1377,7 +1384,7 @@ function renderCert(meta, options) {
   // ===================================================================
   // 5. SKY DIE: celestial traits + skyband
   // ===================================================================
-  if (hasSky && !isSample) {
+  if (hasSky && !isSample && _imageWasPresent) {
     plate.appendChild(_sectionLabel('SKY AT THE MOMENT OF CREATION'));
 
     var skyWrap = _div('sky-band-wrap');
