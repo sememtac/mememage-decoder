@@ -1559,7 +1559,15 @@ function renderCert(meta, options) {
   // ===================================================================
   // SAVE CERTIFICATE — composite canvases + encode bar
   // ===================================================================
-  if (barId && barHash && !isSample) {
+  // Gate: don't render Save on a dark-matter cert that's still locked
+  // (badges + password prompt visible, every other section hidden).
+  // Saving a half-rendered plate would produce a confusing image —
+  // either the unlock prompt baked in or a near-empty cert. Once the
+  // viewer unlocks (meta._unlocked = true), Save reappears with the
+  // full plate to capture.
+  var _stillLocked = (meta.chain_visibility === 1 || meta.chain_visibility === 'dark_matter')
+                     && meta.encrypted_soul && !meta._unlocked;
+  if (barId && barHash && !isSample && !_stillLocked) {
     var saveBtn = document.createElement('button');
     saveBtn.textContent = 'Save Certificate';
     saveBtn.className = 'save-cert-btn save-cert-rarity-' + rarityTier;
