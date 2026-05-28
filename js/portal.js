@@ -1025,7 +1025,16 @@ var ButtonLoading = (function() {
   // they have cursor: pointer or an onclick, and touchend can be
   // consumed by pointer-event-based gesture handlers. Pairing them
   // catches every device path.
-  document.addEventListener('click', handle, true);
+  //
+  // Click is gated to hover-less devices: on desktop the browser-native
+  // title-attribute hover tooltip is already the right surface; firing
+  // the floating bottom-right toast on every badge click duplicates the
+  // info and looks janky. Touchscreen laptops (hover: hover + touch)
+  // still get the tap path via touchstart — no regression.
+  var hoverLess = false;
+  try { hoverLess = window.matchMedia('(hover: none)').matches; }
+  catch (e) { hoverLess = false; }
+  if (hoverLess) document.addEventListener('click', handle, true);
   document.addEventListener('touchstart', handle, true);
   document.addEventListener('touchend', handle, true);
 
