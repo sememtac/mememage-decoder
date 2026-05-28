@@ -83,6 +83,13 @@ const HASH_INCLUDED_V1 = new Set([
   // be placed on the Observatory grid. Hashed so position tampering
   // breaks WITNESSED.
   'outer_position', 'outer_total',
+  // Creator-access-layer envelopes — hashed when present so tampering
+  // with the ciphertext breaks WITNESSED. Hash is computed AFTER
+  // encryption (mirrors Python pipeline), so on dark_matter records
+  // these blobs are what remains and they're what we hash. On light
+  // chains, only gps_password_locked is typically present (when a
+  // creator password is set); the other two are absent and skipped.
+  'encrypted_soul', 'encrypted_chunks', 'gps_password_locked',
 ]);
 
 const HASH_INCLUDED_BY_VERSION = {
