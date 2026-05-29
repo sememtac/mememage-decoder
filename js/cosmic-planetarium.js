@@ -651,9 +651,18 @@ var CosmicPlanetarium = (function() {
       // moving to body changes the effective width without firing a
       // resize. Fire one manually so the visualization re-centers.
       window.dispatchEvent(new Event('resize'));
+    } else if (document.querySelector('.plate')) {
+      // A cert plate is rendered but didn't inject a player — that's
+      // a deliberate choice (chain-traversal partial cert, sample
+      // preview, locked dark cert). Respect it: opening the
+      // planetarium from one of those views shouldn't spawn the
+      // player we just decided to suppress on the source cert.
+      _movedPlayer = null;
+      _movedPlayerOriginalParent = null;
     } else if (typeof CosmicPlayer !== 'undefined') {
-      // No existing player (e.g., planetarium-preview page) — create
-      // one fresh. dismissPlayer will tear it down on close.
+      // No cert in the document at all — standalone planetarium
+      // page (planetarium-preview.html, etc.). Create one fresh;
+      // dismissPlayer will tear it down on close.
       CosmicPlayer.inject(document.body, openOpts.meta);
       var fresh = document.body.querySelector(':scope > .cosmic-player');
       if (!fresh) return;
