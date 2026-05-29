@@ -1285,6 +1285,14 @@ function renderCert(meta, options) {
     window._sampleMode = false; // consume flag
     plate.classList.add('plate-sample');
   }
+  // Chain-traversal partial cert (no image dropped) gets the same
+  // compact sizing as the sample cert — content is just badges +
+  // identifier + constellation + soul fields; no portrait, bands,
+  // BIRTHPLACE, or player. Without this the plate stretches to fill
+  // the viewport with a lot of empty space at the bottom.
+  if (!isSample && !_imageWasPresent) {
+    plate.classList.add('plate-traversal');
+  }
 
   // ===================================================================
   // 3. ORIGIN PARAMETERS (canvas band)
@@ -1666,9 +1674,12 @@ function renderCert(meta, options) {
   }
 
   // Inject cosmic audio player as the plate's bottom edge. Skipped in
-  // sample mode — the example cert is a truncated preview, the full song
-  // belongs with the full cert.
-  if (injectPlayer && !isSample && typeof CosmicPlayer !== 'undefined' && birth && birth.sun) {
+  // sample mode (truncated preview cert) and in chain-traversal
+  // partial certs (the song belongs with the body view — earned by
+  // dropping the image, not by clicking a chain link). Same gate as
+  // the three canvas bands + portrait + BIRTHPLACE block above.
+  if (injectPlayer && !isSample && _imageWasPresent
+      && typeof CosmicPlayer !== 'undefined' && birth && birth.sun) {
     CosmicPlayer.inject(plate, meta);
   }
 

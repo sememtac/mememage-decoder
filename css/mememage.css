@@ -1096,7 +1096,9 @@
        on the left column. Validator's attack lab and decoder's example
        land at the same size. */
     .panel-layout.layout-active .panel-right .plate.plate-sample,
-    .panel-layout.layout-active .panel-right-has-player .plate.plate-sample {
+    .panel-layout.layout-active .panel-right-has-player .plate.plate-sample,
+    .panel-layout.layout-active .panel-right .plate.plate-traversal,
+    .panel-layout.layout-active .panel-right-has-player .plate.plate-traversal {
       height: auto;
       min-height: 720px;
       padding-bottom: 28px;
@@ -1112,8 +1114,10 @@
     /* The plate bg is position:absolute so it sits outside the flex flow;
        the remaining children stack top-down with the footer margin-auto'd
        to the bottom of the plate. */
-    .plate.plate-sample > .plate-footer { margin-top: auto; }
-    .panel-layout.layout-active .panel-right:has(.plate-sample) {
+    .plate.plate-sample > .plate-footer,
+    .plate.plate-traversal > .plate-footer { margin-top: auto; }
+    .panel-layout.layout-active .panel-right:has(.plate-sample),
+    .panel-layout.layout-active .panel-right:has(.plate-traversal) {
       height: auto;
       max-height: calc(100vh - 3.5rem);
       overflow: hidden;
@@ -1139,10 +1143,10 @@
        wrap and suppress the one on the plate. Rarity vars bubble up via
        :has() so the ring picks up the right color. Only non-common
        rarities need overrides; common plate inherits default vars. */
-    .panel-layout.layout-active .panel-right-has-player .plate:not(.plate-sample)::before {
+    .panel-layout.layout-active .panel-right-has-player .plate:not(.plate-sample):not(.plate-traversal)::before {
       display: none;
     }
-    .panel-layout.layout-active .panel-right-has-player:not(:has(.plate-sample))::before {
+    .panel-layout.layout-active .panel-right-has-player:not(:has(.plate-sample)):not(:has(.plate-traversal))::before {
       content: '';
       display: block;
       position: absolute;
