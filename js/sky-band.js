@@ -71,11 +71,23 @@ function initSkyBand(canvas, SKY_W, SKY_H, PLANET_DATA, SKY_READING, KERNEL_ENTR
   // Driven from entropy (no born-data field for angular_spread yet).
   var dirSpread = 0.3 + (entropyBytes[2] || 128) / 255 * 0.7; // 0.3-1.0 (focused to scattered)
 
-  // 4. Machine state → behavior
-  var loadVal = parseFloat((machineData.load || '1').split('/')[0].trim()) || 1;
-  var freeMB = parseInt(machineData.mem_free) || 500;
-  var netRx = parseFloat(machineData.net_rx) || 50;
-  var netTx = parseFloat(machineData.net_tx) || 20;
+  // 4. Machine state → behavior. V1 stores load as [f,f,f] and
+  // net_rx/net_tx/mem_free as raw bytes; legacy strings still parse via
+  // bytesValue / formatLoad's parse path.
+  var loadRaw = machineData.load;
+  var loadVal = 1;
+  if (Array.isArray(loadRaw) && loadRaw.length) {
+    loadVal = parseFloat(loadRaw[0]) || 1;
+  } else if (typeof loadRaw === 'string' && loadRaw) {
+    loadVal = parseFloat(loadRaw.split('/')[0].trim()) || 1;
+  }
+  var freeBytes = (typeof bytesValue === 'function') ? bytesValue(machineData.mem_free)
+                                                     : (parseInt(machineData.mem_free) || 500);
+  var freeMB = freeBytes > 1000 ? freeBytes / (1024 * 1024) : freeBytes;  // legacy "500" was MB; bytes path divides
+  var netRx = (typeof bytesValue === 'function') ? bytesValue(machineData.net_rx)
+                                                  : (parseFloat(machineData.net_rx) || 50);
+  var netTx = (typeof bytesValue === 'function') ? bytesValue(machineData.net_tx)
+                                                  : (parseFloat(machineData.net_tx) || 20);
   var uptimeSec = parseInt(machineData.uptime_seconds) || 86400;
 
   // CPU load → turbulence (micro-oscillation amplitude)

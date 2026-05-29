@@ -468,13 +468,17 @@ function renderCert(meta, options) {
     var bk = BODIES[bi].k;
     var val = birth[bk];
     if (!val) continue;
-    var parts = val.split(' ');
-    var sign = parts[0];
-    var deg = parseFloat(parts[1]) || 0;
-    var lon = parseDegrees(val);
+    var lon = parseDegrees(val);  // handles dict + legacy string
     if (lon === null) continue;
-    var pd = {name: bk, sym: planetSymbols[bk] || '', label: planetLabels[bk] || bk, sign: sign, deg: deg, lon: lon};
-    if (bk === 'moon' && birth.moon_phase) pd.phase = birth.moon_phase;
+    var pd = {
+      name: bk, sym: planetSymbols[bk] || '', label: planetLabels[bk] || bk,
+      sign: signName(val), deg: signDegree(val), lon: lon
+    };
+    if (bk === 'moon' && birth.moon_phase) {
+      // Carry the formatted phase string ("First Quarter (81.2%)") so
+      // downstream sky-band code can render directly without re-parsing.
+      pd.phase = formatMoonPhase(birth.moon_phase);
+    }
     PLANET_DATA.push(pd);
   }
   var hasSky = PLANET_DATA.length > 0;
@@ -492,19 +496,19 @@ function renderCert(meta, options) {
   var MACHINE = [];
   var machineFields = [
     {k:'cpu', l:'CPU', span: 3},
-    {k:'cores', l:'Cores'},
-    {k:'mem_active', l:'Active'},
+    {k:'cores', l:'Cores', fmt: formatCores},
+    {k:'mem_active', l:'Active', fmt: formatBytes},
     {k:'gpu_cores', l:'GPU', fmt: function(v){return v + ' cores';}},
-    {k:'ram', l:'RAM'},
-    {k:'mem_compressed', l:'Compressed'},
-    {k:'mem_free', l:'Free'},
-    {k:'load', l:'Load', span: 3},
-    {k:'power', l:'Power'},
+    {k:'ram', l:'RAM', fmt: formatRam},
+    {k:'mem_compressed', l:'Compressed', fmt: formatBytes},
+    {k:'mem_free', l:'Free', fmt: formatBytes},
+    {k:'load', l:'Load', span: 3, fmt: formatLoad},
+    {k:'power', l:'Power', fmt: formatPower},
     {k:'speculative_pages', l:'Speculative'},
     {k:'purgeable_pages', l:'Purgeable'},
-    {k:'disk_io', l:'Disk I/O', span: 3},
-    {k:'net_tx', l:'Net \u2191', span: 1.5},
-    {k:'net_rx', l:'Net \u2193', span: 1.5}
+    {k:'disk_io', l:'Disk I/O', span: 3, fmt: formatDiskIO},
+    {k:'net_tx', l:'Net \u2191', span: 1.5, fmt: formatBytes},
+    {k:'net_rx', l:'Net \u2193', span: 1.5, fmt: formatBytes}
   ];
   for (var fi = 0; fi < machineFields.length; fi++) {
     var f = machineFields[fi];
@@ -1440,7 +1444,7 @@ function renderCert(meta, options) {
         var sp = PLANET_DATA[si];
         skyMeta[sp.name] = sp.sign + ' ' + sp.deg.toFixed(1) + '\u00b0';
       }
-      if (birth.moon_phase) skyMeta.moon_phase = birth.moon_phase;
+      if (birth.moon_phase) skyMeta.moon_phase = formatMoonPhase(birth.moon_phase);
       if (birth.angular_spread) skyMeta.angular_spread = '' + birth.angular_spread;
       enableCanvasSave(skyCanvas, {
         celestial_positions: JSON.stringify(skyMeta),

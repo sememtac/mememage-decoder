@@ -44,14 +44,21 @@ var CosmicPlayer = (function() {
     return e;
   }
 
-  function parseSunSign(sunStr) {
-    if (!sunStr) return 'Aries';
-    return sunStr.split(' ')[0] || 'Aries';
+  // V1 souls store birth.sun as {sign:int,deg:float} and
+  // birth.moon_phase as {phase:int,illum:float}. Legacy pre-V1 records
+  // still carry the old "Aries 24.3°" / "Full Moon (98.4%)" strings —
+  // the shared signName / moonPhaseName helpers in data.js handle
+  // both shapes, so these wrappers just delegate.
+  function parseSunSign(sun) {
+    if (!sun) return 'Aries';
+    return (typeof signName === 'function') ? signName(sun)
+      : (typeof sun === 'string' ? (sun.split(' ')[0] || 'Aries') : 'Aries');
   }
 
-  function cleanMoonPhase(phaseStr) {
-    if (!phaseStr) return 'Full Moon';
-    return phaseStr.split('(')[0].trim() || 'Full Moon';
+  function cleanMoonPhase(phase) {
+    if (!phase) return 'Full Moon';
+    return (typeof moonPhaseName === 'function') ? moonPhaseName(phase)
+      : (typeof phase === 'string' ? (phase.split('(')[0].trim() || 'Full Moon') : 'Full Moon');
   }
 
   function parseTemperament(tempStr) {
@@ -473,9 +480,13 @@ var CosmicPlayer = (function() {
     // Audio params for CosmicAudio.create()
     // hash individualizes the sound — without it, same params = same sound
     var resolvedHash = meta.content_hash || meta._content_hash || '';
+    // audioParams.moonPhase is the human STRING ("Full Moon"), not
+    // the V1 dict — CosmicAudio's mappings (element filter, dust
+    // density, etc.) key on the name. cleanMoonPhase normalizes
+    // either input shape to the bare name.
     var audioParams = {
       sign: sign,
-      moonPhase: birth.moon_phase || 'Full Moon',
+      moonPhase: moonPhase || 'Full Moon',
       temperament: temperament,
       rarity: rarityScore,
       hash: resolvedHash

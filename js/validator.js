@@ -1224,7 +1224,7 @@ async function _renderObservatoryFromCache() {
       var hasCelestial=bodies.some(function(b){return !!birth[b];});
       if(hasCelestial){
         html+='<div class="ev-sec">Celestial State at Birth</div><div class="ev-g">';
-        for(var ci2=0;ci2<bodies.length;ci2++){var cb=bodies[ci2];if(birth[cb]){var extra=cb==='moon'&&birth.moon_phase?' ('+_h(birth.moon_phase)+')':'';html+='<div class="ev-m"><div class="ev-ml">'+bNames[cb]+'</div><div class="ev-mv">'+_h(birth[cb])+extra+'</div></div>';}}
+        for(var ci2=0;ci2<bodies.length;ci2++){var cb=bodies[ci2];if(birth[cb]){var extra=cb==='moon'&&birth.moon_phase?' ('+_h(formatMoonPhase(birth.moon_phase))+')':'';html+='<div class="ev-m"><div class="ev-ml">'+bNames[cb]+'</div><div class="ev-mv">'+_h(formatPosition(birth[cb]))+extra+'</div></div>';}}
         if(birth.angular_spread)html+='<div class="ev-m"><div class="ev-ml">Angular Spread</div><div class="ev-mv">'+_h(birth.angular_spread)+'\u00b0</div></div>';
         if(r.constellation_hash)html+='<div class="ev-m"><div class="ev-ml">Constellation Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.constellation_hash)+'</div></div>';
         html+='</div>';
@@ -1234,8 +1234,31 @@ async function _renderObservatoryFromCache() {
       if(birth.machine){
         var m=birth.machine;
         html+='<div class="ev-sec">Machine State at Birth</div><div class="ev-g">';
-        var mF=[['cpu','CPU'],['cores','Cores'],['gpu_cores','GPU'],['ram','RAM'],['mem_active','Active'],['mem_compressed','Compressed'],['mem_free','Free'],['load','Load'],['power','Power'],['disk_io','Disk I/O'],['net_rx','Net \u2193'],['net_tx','Net \u2191'],['uptime','Uptime']];
-        for(var mi=0;mi<mF.length;mi++){if(m[mF[mi][0]]!==undefined)html+='<div class="ev-m"><div class="ev-ml">'+mF[mi][1]+'</div><div class="ev-mv" style="font-size:0.7rem;">'+_h(m[mF[mi][0]])+'</div></div>';}
+        var mF=[
+          ['cpu','CPU',null],
+          ['cores','Cores',formatCores],
+          ['gpu_cores','GPU',null],
+          ['ram','RAM',formatRam],
+          ['mem_active','Active',formatBytes],
+          ['mem_compressed','Compressed',formatBytes],
+          ['mem_free','Free',formatBytes],
+          ['load','Load',formatLoad],
+          ['power','Power',formatPower],
+          ['disk_io','Disk I/O',formatDiskIO],
+          ['net_rx','Net \u2193',formatBytes],
+          ['net_tx','Net \u2191',formatBytes],
+          ['uptime_seconds','Uptime',formatUptime],
+          ['page_faults','Page Faults',formatPageFaults],
+          ['ctx_switches','Ctx Switches',formatCtxSwitches]
+        ];
+        for(var mi=0;mi<mF.length;mi++){
+          var mk=mF[mi][0], ml=mF[mi][1], mfmt=mF[mi][2];
+          var mv=m[mk];
+          if(mv===undefined||mv===null) continue;
+          var disp = mfmt ? mfmt(mv) : ''+mv;
+          if(disp==='') continue;
+          html+='<div class="ev-m"><div class="ev-ml">'+ml+'</div><div class="ev-mv" style="font-size:0.7rem;">'+_h(disp)+'</div></div>';
+        }
         html+='</div>';
         if(m.entropy){html+='<div class="ev-sec">Kernel Entropy</div><div class="ev-m w" style="margin:0.3rem 0;"><div class="ev-mv" style="font-size:0.55rem;word-break:break-all;line-height:1.5;color:#8898b8;">'+_h(m.entropy)+'</div></div>';}
       }
@@ -2976,14 +2999,14 @@ function renderAudit(rec, identifier, out) {
   // === CELESTIAL ===
   var birth = rec.birth || {};
   var celRows = '';
-  if (birth.sun) celRows += auditRow('Sun', birth.sun);
-  if (birth.moon) celRows += auditRow('Moon', birth.moon);
-  if (birth.moon_phase) celRows += auditRow('Phase', birth.moon_phase);
-  if (birth.mercury) celRows += auditRow('Mercury', birth.mercury);
-  if (birth.venus) celRows += auditRow('Venus', birth.venus);
-  if (birth.mars) celRows += auditRow('Mars', birth.mars);
-  if (birth.jupiter) celRows += auditRow('Jupiter', birth.jupiter);
-  if (birth.saturn) celRows += auditRow('Saturn', birth.saturn);
+  if (birth.sun) celRows += auditRow('Sun', formatPosition(birth.sun));
+  if (birth.moon) celRows += auditRow('Moon', formatPosition(birth.moon));
+  if (birth.moon_phase) celRows += auditRow('Phase', formatMoonPhase(birth.moon_phase));
+  if (birth.mercury) celRows += auditRow('Mercury', formatPosition(birth.mercury));
+  if (birth.venus) celRows += auditRow('Venus', formatPosition(birth.venus));
+  if (birth.mars) celRows += auditRow('Mars', formatPosition(birth.mars));
+  if (birth.jupiter) celRows += auditRow('Jupiter', formatPosition(birth.jupiter));
+  if (birth.saturn) celRows += auditRow('Saturn', formatPosition(birth.saturn));
   if (rec.constellation_hash) celRows += auditRow('Constellation Hash', rec.constellation_hash);
   if (celRows) html += auditSection('Celestial', celRows);
 
@@ -3023,9 +3046,10 @@ function renderAudit(rec, identifier, out) {
   var songName = rec.song_name || (typeof CosmicAudio !== 'undefined' ? CosmicAudio.songName(rec.content_hash || '') : null);
   if (songName) songRows += auditRow('Song Name', songName, 'audit-info');
 
-  // Derive musical properties from the record
-  var sunStr = birth.sun || '';
-  var sign = sunStr.split(' ')[0] || '?';
+  // Derive musical properties from the record. birth.sun is a V1 dict
+  // {sign:int, deg:float} on new records, legacy "Aries 24.3°" string
+  // on old ones — signName handles both.
+  var sign = birth.sun ? signName(birth.sun) : '?';
   var FIRE = {Aries:1,Leo:1,Sagittarius:1};
   var WATER = {Cancer:1,Scorpio:1,Pisces:1};
   var EARTH = {Taurus:1,Virgo:1,Capricorn:1};
@@ -3109,10 +3133,9 @@ function renderAudit(rec, identifier, out) {
   else modDesc = 'moderate modulation';
   songRows += auditRow('Temperament Effect', modDesc);
 
-  // Moon influence
-  var moonPhase = birth.moon_phase || '';
-  var moonPct = moonPhase.match(/\((\d+\.?\d*)%\)/);
-  var moonBright = moonPct ? parseFloat(moonPct[1]) / 100 : 0.5;
+  // Moon influence — V1 stores illumination as 0..1 in birth.moon_phase.illum.
+  // Legacy "Full Moon (98.4%)" string still parses via moonIllumPct.
+  var moonBright = birth.moon_phase ? (moonIllumPct(birth.moon_phase) / 100) : 0.5;
   songRows += auditRow('Moon Brightness', (moonBright * 100).toFixed(0) + '% \u2192 filter cutoff & dust density');
 
   if (songRows) html += auditSection('Song Forensics', songRows);

@@ -40,17 +40,255 @@ const BODIES=[
 
 // =====================================================================
 // CELESTIAL HELPERS
+//
+// V1 souls store planetary positions as {sign: int(0-11), deg: float}
+// and moon phase as {phase: int(0-7), illum: float(0-1)}. Display
+// layers reconstruct the human strings ("Aries 24.3°", "First Quarter
+// (37.4%)") via the helpers below. For backwards compatibility with
+// pre-V1 dev records that stored these as strings, each helper accepts
+// either shape and Just Works — V4 vintage records still render even
+// though their content_hash won't verify.
 // =====================================================================
 const ZODIAC_NAMES = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const MOON_PHASE_NAMES = [
+  'New Moon','Waxing Crescent','First Quarter','Waxing Gibbous',
+  'Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'
+];
 
-function parseDegrees(posStr) {
-  if (!posStr) return null;
-  const parts = posStr.split(' ');
-  const sign = parts[0];
-  const deg = parseFloat(parts[1]);
-  const idx = ZODIAC_NAMES.indexOf(sign);
-  if (idx < 0 || isNaN(deg)) return null;
-  return idx * 30 + deg;
+// Resolve a position record (V1 dict OR legacy string) to its zodiac
+// sign name. Falls back to 'Aries' on anything malformed so callers
+// don't crash on garbage records.
+function signName(pos) {
+  if (pos && typeof pos === 'object' && typeof pos.sign === 'number') {
+    return ZODIAC_NAMES[pos.sign] || 'Aries';
+  }
+  if (typeof pos === 'string' && pos) {
+    return pos.split(' ')[0] || 'Aries';
+  }
+  return 'Aries';
+}
+
+// Degree within the sign (0.0–30.0). Returns 0 on garbage.
+function signDegree(pos) {
+  if (pos && typeof pos === 'object' && typeof pos.deg === 'number') {
+    return pos.deg;
+  }
+  if (typeof pos === 'string' && pos) {
+    var d = parseFloat(pos.split(' ')[1]);
+    return isNaN(d) ? 0 : d;
+  }
+  return 0;
+}
+
+// Full ecliptic longitude (0–360°) — sign_idx * 30 + deg_in_sign.
+// Returns null when the input is unrecognized so callers can skip.
+function parseDegrees(pos) {
+  if (pos && typeof pos === 'object' && typeof pos.sign === 'number'
+      && typeof pos.deg === 'number') {
+    return pos.sign * 30 + pos.deg;
+  }
+  if (typeof pos === 'string' && pos) {
+    var parts = pos.split(' ');
+    var sign = parts[0];
+    var deg = parseFloat(parts[1]);
+    var idx = ZODIAC_NAMES.indexOf(sign);
+    if (idx < 0 || isNaN(deg)) return null;
+    return idx * 30 + deg;
+  }
+  return null;
+}
+
+// Render a position as "Aries 24.3°" for display.
+function formatPosition(pos) {
+  var name = signName(pos);
+  var deg = signDegree(pos);
+  return name + ' ' + deg.toFixed(1) + '\u00b0';
+}
+
+// Resolve a moon-phase record (V1 dict OR legacy string) to its
+// phase name only ("First Quarter", no percentage).
+function moonPhaseName(mp) {
+  if (mp && typeof mp === 'object' && typeof mp.phase === 'number') {
+    return MOON_PHASE_NAMES[mp.phase] || 'New Moon';
+  }
+  if (typeof mp === 'string' && mp) {
+    return mp.split('(')[0].trim() || 'New Moon';
+  }
+  return 'New Moon';
+}
+
+// Illumination percentage (0–100) — present in V1 records (illum
+// stored as 0..1 float); for legacy strings parses the "(81.2%)"
+// suffix.
+function moonIllumPct(mp) {
+  if (mp && typeof mp === 'object' && typeof mp.illum === 'number') {
+    return mp.illum * 100;
+  }
+  if (typeof mp === 'string' && mp) {
+    var m = mp.match(/\(([\d.]+)%\)/);
+    if (m) return parseFloat(m[1]) || 0;
+  }
+  return 0;
+}
+
+// Combined display string: "First Quarter (81.2%)".
+function formatMoonPhase(mp) {
+  return moonPhaseName(mp) + ' (' + moonIllumPct(mp).toFixed(1) + '%)';
+}
+
+// =====================================================================
+// VITALS DISPLAY HELPERS
+//
+// V1 souls store vitals as compact numerics:
+//   bytes (int) — ram, mem_*, net_*
+//   list[3]     — load
+//   dict        — cores, cache, page_faults, ctx_switches, disk_io, power
+//   int code    — platform (0=darwin, 1=linux, 2=other)
+// Display helpers turn them back into human strings for the cert.
+// Each accepts legacy string passthrough so pre-V1 records still render.
+// =====================================================================
+var PLATFORM_NAMES = ['darwin', 'linux', 'other'];
+
+function platformName(code) {
+  if (typeof code === 'string') return code.toLowerCase();
+  if (typeof code === 'number') return PLATFORM_NAMES[code] || 'other';
+  return 'other';
+}
+
+// Format byte count to human-readable GB / MB / KB / B.
+function formatBytes(b) {
+  if (b === null || b === undefined) return '';
+  if (typeof b === 'string') return b;  // legacy passthrough
+  if (typeof b !== 'number') return '' + b;
+  var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  var i = 0;
+  var v = b;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  // GB+ → 1 decimal; MB/KB → 1 decimal; B → integer
+  return (i === 0 ? v.toFixed(0) : v.toFixed(1)) + ' ' + units[i];
+}
+
+// RAM is rounded to whole GB on the cert ("96 GB" not "95.4 GB").
+function formatRam(b) {
+  if (b === null || b === undefined) return '';
+  if (typeof b === 'string') return b;
+  if (typeof b !== 'number') return '' + b;
+  return (b / (1024 * 1024 * 1024)).toFixed(0) + ' GB';
+}
+
+// Cores — V1 dict {total, p, e} or legacy string "16P + 8E" / "24".
+function formatCores(c) {
+  if (c === null || c === undefined) return '';
+  if (typeof c === 'string') return c;
+  if (typeof c === 'number') return '' + c;
+  if (typeof c === 'object') {
+    if (typeof c.p === 'number' && typeof c.e === 'number') {
+      return c.p + 'P + ' + c.e + 'E';
+    }
+    if (typeof c.total === 'number') return '' + c.total;
+  }
+  return '';
+}
+
+// Cache — V1 dict {l1, l2} bytes; legacy string "L1 128K / L2 4M".
+function formatCache(c) {
+  if (!c) return '';
+  if (typeof c === 'string') return c;
+  if (typeof c === 'object') {
+    var parts = [];
+    if (typeof c.l1 === 'number') parts.push('L1 ' + (c.l1 / 1024).toFixed(0) + 'K');
+    if (typeof c.l2 === 'number') parts.push('L2 ' + (c.l2 / (1024 * 1024)).toFixed(0) + 'M');
+    return parts.join(' / ');
+  }
+  return '';
+}
+
+// Load — V1 list [1m, 5m, 15m]; legacy "2.39 / 2.38 / 2.24" string.
+function formatLoad(l) {
+  if (!l) return '';
+  if (typeof l === 'string') return l;
+  if (Array.isArray(l)) {
+    return l.map(function(x) { return (+x).toFixed(2); }).join(' / ');
+  }
+  return '' + l;
+}
+
+// Power — V1 dict {src: 0|1|2, pct: int?}; legacy "AC" / "Battery 75%".
+function formatPower(p) {
+  if (!p) return '';
+  if (typeof p === 'string') return p;
+  if (typeof p === 'object') {
+    var src = p.src;
+    if (src === 0) return p.pct != null ? 'AC (' + p.pct + '%)' : 'AC';
+    if (src === 1) return p.pct != null ? 'Battery ' + p.pct + '%' : 'Battery';
+    return 'Unknown';
+  }
+  return '';
+}
+
+// Disk I/O — V1 dict (varies by platform: {tps,kb_per_t,mb_per_s} or
+// {read_kbs,write_kbs} or {tps}); legacy single-line string.
+function formatDiskIO(d) {
+  if (!d) return '';
+  if (typeof d === 'string') return d;
+  if (typeof d === 'object') {
+    var parts = [];
+    if (typeof d.kb_per_t === 'number') parts.push(d.kb_per_t.toFixed(2) + ' KB/t');
+    if (typeof d.tps === 'number') parts.push(d.tps.toFixed(0) + ' tps');
+    if (typeof d.mb_per_s === 'number') parts.push(d.mb_per_s.toFixed(2) + ' MB/s');
+    if (typeof d.read_kbs === 'number') parts.push((d.read_kbs).toFixed(0) + ' KB/s read');
+    if (typeof d.write_kbs === 'number') parts.push((d.write_kbs).toFixed(0) + ' KB/s write');
+    return parts.join(', ');
+  }
+  return '';
+}
+
+// Page faults — V1 dict {soft, hard}; legacy "10303 soft / 196 hard".
+function formatPageFaults(pf) {
+  if (!pf) return '';
+  if (typeof pf === 'string') return pf;
+  if (typeof pf === 'object') {
+    return (pf.soft || 0) + ' soft / ' + (pf.hard || 0) + ' hard';
+  }
+  return '';
+}
+
+// Ctx switches — V1 dict {vol, invol}; legacy "39 voluntary / 2500 involuntary".
+function formatCtxSwitches(cs) {
+  if (!cs) return '';
+  if (typeof cs === 'string') return cs;
+  if (typeof cs === 'object') {
+    return (cs.vol || 0) + ' voluntary / ' + (cs.invol || 0) + ' involuntary';
+  }
+  return '';
+}
+
+// Uptime seconds → "5d 3h" display.
+function formatUptime(secs) {
+  if (typeof secs !== 'number' || secs < 0) return '';
+  var days = Math.floor(secs / 86400);
+  var hours = Math.floor((secs % 86400) / 3600);
+  return days + 'd ' + hours + 'h';
+}
+
+// Convenience: numeric byte value or 0 if missing/legacy unparseable.
+// Used by sky-band.js for animation magnitude scaling.
+function bytesValue(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    var m = v.match(/([\d.]+)\s*(TB|GB|MB|KB|B)/i);
+    if (m) {
+      var n = parseFloat(m[1]);
+      var u = m[2].toUpperCase();
+      if (u === 'TB') return n * 1024 * 1024 * 1024 * 1024;
+      if (u === 'GB') return n * 1024 * 1024 * 1024;
+      if (u === 'MB') return n * 1024 * 1024;
+      if (u === 'KB') return n * 1024;
+      return n;
+    }
+    return parseFloat(v) || 0;
+  }
+  return 0;
 }
 
 // =====================================================================
