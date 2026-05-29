@@ -5440,12 +5440,13 @@ setInterval(function() {
       '  <div class="config-field"><span class="config-field-label">Name</span>' +
       '    <input class="config-input" id="configChainNewName" type="text" placeholder="Display name"></div>' +
       '  <div class="config-field advanced-only"><span class="config-field-label">Prefix</span>' +
-      '    <input class="config-input" id="configChainNewPrefix" type="text" maxlength="16" placeholder="mememage (default)" pattern="^[a-z][a-z0-9_-]{1,14}[a-z0-9]$"></div>' +
+      '    <input class="config-input" id="configChainNewPrefix" type="text" maxlength="16" placeholder="mememage (default)" pattern="^[A-Za-z][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$"></div>' +
       '  <p class="config-note advanced-only" id="configChainNewPrefixHint" style="margin-top:0;">' +
       '    Optional. Sets the identifier shape for this chain: <code>&lt;prefix&gt;-&lt;16 hex&gt;</code>. ' +
       '    Leave blank to use the default <code>mememage</code>. ' +
-      '    Lowercase letters, digits, <code>-</code>, <code>_</code>; 3\u201316 chars; ' +
+      '    Letters (any case), digits, <code>-</code>, <code>_</code>; 3\u201316 chars; ' +
       '    must start with a letter and end with a letter or digit. ' +
+      '    Case is preserved \u2014 <code>MeMeMaGe</code> and <code>mememage</code> are distinct on IA. ' +
       '    <strong>Locked at creation.</strong>' +
       '  </p>' +
       '  <div class="config-field advanced-only"><span class="config-field-label">Visibility</span><span>' +
@@ -5737,9 +5738,10 @@ setInterval(function() {
       return;
     }
     // Front-load the prefix format check so the user sees the rule in
-    // the form (the server enforces it authoritatively too).
-    if (prefix && !/^[a-z][a-z0-9_-]{1,14}[a-z0-9]$/.test(prefix)) {
-      showError('Prefix must be 3\u201316 chars: lowercase letters/digits/-/_, start with a letter, end with letter or digit.');
+    // the form (the server enforces it authoritatively too). Case is
+    // preserved — IA treats different cases as different identifiers.
+    if (prefix && !/^[A-Za-z][A-Za-z0-9_-]{1,14}[A-Za-z0-9]$/.test(prefix)) {
+      showError('Prefix must be 3\u201316 chars: letters/digits/-/_, start with a letter, end with letter or digit.');
       return;
     }
     showError('');
