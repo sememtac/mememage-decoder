@@ -5950,16 +5950,35 @@ setInterval(function() {
       } else {
         _ccLog('Purge: ' + resp.files_deleted + ' files deleted, ' + resp.files_failed + ' failed.');
       }
+      // Track which identifiers came back clean so we can drop them
+      // from the local scan cache and re-render — otherwise the user
+      // sees stale rows pointing at items that no longer exist on the
+      // channel until they manually re-scan.
+      var clearedIds = {};
       (resp.results || []).forEach(function(r) {
         if (kind === 'hide') {
           _ccLog((r.ok ? '\u2713 ' : '\u2717 ') + r.identifier + (r.ok ? '' : ' \u2014 ' + (r.error || 'failed')), !r.ok);
+          if (r.ok) clearedIds[r.identifier] = true;
         } else {
           var bad = (r.errors || []).length > 0 || r.failed > 0;
           _ccLog((bad ? '\u26a0 ' : '\u2713 ') + r.identifier + ' \u2014 ' +
                  (r.deleted || 0) + '/' + (r.files || 0) + ' files deleted', bad);
           (r.errors || []).slice(0, 3).forEach(function(e) { _ccLog('    ' + e, true); });
+          if (!bad) clearedIds[r.identifier] = true;
         }
       });
+      if (Object.keys(clearedIds).length) {
+        _ccScanned = _ccScanned.filter(function(it) {
+          return !clearedIds[it.identifier];
+        });
+        var summary = _ccEl('configCcSummary');
+        if (summary) {
+          summary.textContent = _ccScanned.length
+            ? _ccScanned.length + ' item' + (_ccScanned.length === 1 ? '' : 's') + ' remaining on ' + ch.name + '.'
+            : 'No items remaining on ' + ch.name + '.';
+        }
+        _ccRenderResults();
+      }
     } catch (e) {
       _ccLog(verb + ' failed: ' + e.message, true);
     } finally {
