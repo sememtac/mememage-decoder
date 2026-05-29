@@ -1582,15 +1582,16 @@ function renderCert(meta, options) {
   // ===================================================================
   // SAVE CERTIFICATE — composite canvases + encode bar
   // ===================================================================
-  // Gate: don't render Save on a dark-matter cert that's still locked
-  // (badges + password prompt visible, every other section hidden).
-  // Saving a half-rendered plate would produce a confusing image —
-  // either the unlock prompt baked in or a near-empty cert. Once the
-  // viewer unlocks (meta._unlocked = true), Save reappears with the
-  // full plate to capture.
+  // Gate: only render Save on a full body view — image was dropped
+  // (window._lastDecodedCanvas set, so portrait + canvas bands +
+  // BIRTHPLACE + player all rendered) AND, on dark chains, the soul
+  // has been unlocked. Saving a partial cert (traversal stargazing
+  // shell, or locked dark prompt) would produce a confusing image —
+  // either mostly-empty plate or the unlock prompt baked in. Earned
+  // alongside the rest of the body view.
   var _stillLocked = (meta.chain_visibility === 1 || meta.chain_visibility === 'dark_matter')
                      && meta.encrypted_soul && !meta._unlocked;
-  if (barId && barHash && !isSample && !_stillLocked) {
+  if (barId && barHash && !isSample && _imageWasPresent && !_stillLocked) {
     var saveBtn = document.createElement('button');
     saveBtn.textContent = 'Save Certificate';
     saveBtn.className = 'save-cert-btn save-cert-rarity-' + rarityTier;
