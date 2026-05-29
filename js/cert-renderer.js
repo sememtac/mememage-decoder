@@ -1447,7 +1447,12 @@ function renderCert(meta, options) {
   // ===================================================================
   // 6. BIRTHPLACE — TIME-LOCKED
   // ===================================================================
-  if (GPS_CIPHER && !isSample) {
+  // Same body-vs-stargazing gate as the bands above. The encrypted
+  // GPS envelope + RSA modulus + password unlock UI is part of the
+  // body view — earned by dropping the image. Chain traversal shows
+  // navigation + soul fields without the birthplace block (matches
+  // the sample cert format the user pointed at).
+  if (GPS_CIPHER && !isSample && _imageWasPresent) {
     plate.appendChild(_sectionLabel('BIRTHPLACE \u2014 TIME-LOCKED *'));
 
     var gpsContainer = _div('gps-container');
@@ -1531,11 +1536,12 @@ function renderCert(meta, options) {
     }
 
     plate.appendChild(gpsContainer);
-  } else if (!isSample && birth && Object.keys(birth).length > 0) {
+  } else if (!isSample && _imageWasPresent && birth && Object.keys(birth).length > 0) {
     // Honest placeholder for records minted on chains with
     // ``gps_source: none`` (or any record lacking ``gps_time_locked``).
     // The cert acknowledges the absence rather than silently hiding
     // the section — like a camera that didn't write location to EXIF.
+    // Also gated on image-was-present so traversal stays clean.
     plate.appendChild(_sectionLabel('BIRTHPLACE \u2014 NOT RECORDED'));
     var noGps = _div('gps-container gps-container-empty');
     var gtc2 = _hexToRgb(tierColor || '#a0a0a0');
