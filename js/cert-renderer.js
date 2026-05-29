@@ -1134,37 +1134,39 @@ function renderCert(meta, options) {
   // wouldn't anchor to a real chain there.
   if (meta.constellation_name) {
     var conDiv = _div('lineage-text');
-    var conNameEl;
-    if (window._sampleMode) {
-      conNameEl = document.createElement('span');
-      conNameEl.textContent = meta.constellation_name;
-    } else {
-      conNameEl = document.createElement('a');
-      conNameEl.href = '#';
-      conNameEl.textContent = meta.constellation_name;
-      conNameEl.addEventListener('click', function(e) {
-        e.preventDefault();
-        if (typeof CosmicPlanetarium !== 'undefined') {
-          CosmicPlanetarium.open({
-            name: meta.constellation_name,
-            // Per-star Z depths derive from this seed. constellation_hash is
-            // identical across siblings, so the constellation looks the same
-            // from any star in it.
-            hash: meta.constellation_hash || meta._content_hash || meta.content_hash || '',
-            currentStarIndex: (typeof myChunkIdx === 'number' && myChunkIdx >= 0) ? myChunkIdx : -1,
-            // Heart's rarity drives the heart sprite's spectral class.
-            // Denormalize to meta.heart_rarity in production; until then
-            // default to 0 so the heart glows K-class orange.
-            heartRarity: meta.heart_rarity || 0,
-            currentRarity: rarityScore,
-            meta: meta
-          });
-        } else if (meta.heart_star_id && meta.heart_star_id !== meta._identifier) {
-          lookupById(meta.heart_star_id);
-          window.scrollTo({top: 0, behavior: 'smooth'});
-        }
-      });
-    }
+    // Constellation name is always a planetarium-opening link — the
+    // stargazing view is meaningful regardless of how the viewer
+    // arrived: drop-image, chain-traversal, or sample-cert preview.
+    // Earlier the sample branch rendered a plain span (defensive
+    // about wiring on the preview surface), but accidentally enabling
+    // it during traversal turned out to be a positive change. Made
+    // it permanent + extended to sample too: every cert with a
+    // constellation name opens the stellarium.
+    var conNameEl = document.createElement('a');
+    conNameEl.href = '#';
+    conNameEl.textContent = meta.constellation_name;
+    conNameEl.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof CosmicPlanetarium !== 'undefined') {
+        CosmicPlanetarium.open({
+          name: meta.constellation_name,
+          // Per-star Z depths derive from this seed. constellation_hash is
+          // identical across siblings, so the constellation looks the same
+          // from any star in it.
+          hash: meta.constellation_hash || meta._content_hash || meta.content_hash || '',
+          currentStarIndex: (typeof myChunkIdx === 'number' && myChunkIdx >= 0) ? myChunkIdx : -1,
+          // Heart's rarity drives the heart sprite's spectral class.
+          // Denormalize to meta.heart_rarity in production; until then
+          // default to 0 so the heart glows K-class orange.
+          heartRarity: meta.heart_rarity || 0,
+          currentRarity: rarityScore,
+          meta: meta
+        });
+      } else if (meta.heart_star_id && meta.heart_star_id !== meta._identifier) {
+        lookupById(meta.heart_star_id);
+        window.scrollTo({top: 0, behavior: 'smooth'});
+      }
+    });
     // Bayer designation — Greek letters by birth order.
     // Letter navigates to parent (one step back), name navigates to
     // heart star. Full 24-letter Greek alphabet covers K up to 24;
