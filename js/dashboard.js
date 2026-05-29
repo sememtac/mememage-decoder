@@ -5383,7 +5383,9 @@ setInterval(function() {
             pwLabel = pwSet ? '\u00b7 GPS password' : '\u00b7 public';
           }
           var gpsSource = c.gps_source || 'phone';
-          var meta = vis + ' ' + pwLabel + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
+          var prefix = c.identifier_prefix || 'mememage';
+          var prefixLabel = ' \u00b7 ' + prefix + '-XXXX';
+          var meta = vis + ' ' + pwLabel + prefixLabel + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
           var renameBtn = '<button class="config-btn" data-chain-action="rename" data-chain-id="' + escapeHtml(c.id) + '" data-chain-name="' + escapeHtml(c.name || c.id) + '" title="Change display name (visibility is locked at creation)">Rename</button>';
           // Password gating + Remove are advanced — most chains run public
           // (light) without a password, and removing a chain is rare.
@@ -5437,6 +5439,15 @@ setInterval(function() {
       '    <input class="config-input" id="configChainNewId" type="text" placeholder="aries / private_one / landscapes"></div>' +
       '  <div class="config-field"><span class="config-field-label">Name</span>' +
       '    <input class="config-input" id="configChainNewName" type="text" placeholder="Display name"></div>' +
+      '  <div class="config-field advanced-only"><span class="config-field-label">Prefix</span>' +
+      '    <input class="config-input" id="configChainNewPrefix" type="text" maxlength="16" placeholder="mememage (default)" pattern="^[a-z][a-z0-9_-]{1,14}[a-z0-9]$"></div>' +
+      '  <p class="config-note advanced-only" id="configChainNewPrefixHint" style="margin-top:0;">' +
+      '    Optional. Sets the identifier shape for this chain: <code>&lt;prefix&gt;-&lt;16 hex&gt;</code>. ' +
+      '    Leave blank to use the default <code>mememage</code>. ' +
+      '    Lowercase letters, digits, <code>-</code>, <code>_</code>; 3\u201316 chars; ' +
+      '    must start with a letter and end with a letter or digit. ' +
+      '    <strong>Locked at creation.</strong>' +
+      '  </p>' +
       '  <div class="config-field advanced-only"><span class="config-field-label">Visibility</span><span>' +
       '    <label style="margin-right:1rem"><input type="radio" name="newChainVis" value="light_energy" checked> light</label>' +
       '    <label><input type="radio" name="newChainVis" value="dark_matter"> dark</label></span></div>' +
@@ -5708,26 +5719,36 @@ setInterval(function() {
   }
 
   async function createChain() {
-    var idEl   = document.getElementById('configChainNewId');
-    var nameEl = document.getElementById('configChainNewName');
-    var visEl  = document.querySelector('input[name="newChainVis"]:checked');
-    var pwEl   = document.getElementById('configChainNewPw');
+    var idEl     = document.getElementById('configChainNewId');
+    var nameEl   = document.getElementById('configChainNewName');
+    var visEl    = document.querySelector('input[name="newChainVis"]:checked');
+    var pwEl     = document.getElementById('configChainNewPw');
+    var prefixEl = document.getElementById('configChainNewPrefix');
     var chainId = idEl ? idEl.value.trim() : '';
     if (!chainId) { showError('Chain ID required.'); return; }
     var visibility = visEl ? visEl.value : 'light_energy';
     var name = nameEl ? nameEl.value.trim() : '';
     var password = pwEl ? pwEl.value : '';
+    var prefix = prefixEl ? prefixEl.value.trim() : '';
     // Front-load the contract: Dark chains MUST have a password to
     // function. Catch this in the UI before the round-trip.
     if (visibility === 'dark_matter' && !password) {
       showError('Dark chains require a password. Set one now or pick Light visibility.');
       return;
     }
+    // Front-load the prefix format check so the user sees the rule in
+    // the form (the server enforces it authoritatively too).
+    if (prefix && !/^[a-z][a-z0-9_-]{1,14}[a-z0-9]$/.test(prefix)) {
+      showError('Prefix must be 3\u201316 chars: lowercase letters/digits/-/_, start with a letter, end with letter or digit.');
+      return;
+    }
     showError('');
     try {
+      var body = {chain_id: chainId, name: name || chainId, visibility: visibility};
+      if (prefix) body.identifier_prefix = prefix;
       await fetchJson('/api/chain/new', {
         method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({chain_id: chainId, name: name || chainId, visibility: visibility}),
+        body: JSON.stringify(body),
       });
       // Two-step: create the chain, then set its password if one was
       // provided. Keeps the new-chain endpoint focused and lets us
