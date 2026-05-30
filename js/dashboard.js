@@ -2437,8 +2437,9 @@ setInterval(function() {
     state.chainLockInfo = info.cycle_complete ? null : info;
     // Seal button: hard-disable while an Age is in progress so the user
     // doesn't get the impression they can re-seal at will. The next
-    // legitimate Seal only happens when the outer cycle completes (365
-    // mints later), at which point it advances Age N → Age N+1.
+    // legitimate Seal only happens when the outer cycle completes (cfg.M
+    // mints later — per-chain, not always 365), at which point it advances
+    // Age N → Age N+1.
     if (els.sealBtn) {
       if (info.cycle_complete) {
         els.sealBtn.textContent = 'Seal';
@@ -2626,7 +2627,12 @@ setInterval(function() {
       body = 'The current outer cycle is complete. Sealing begins the next Age — irreversible.';
     } else {
       head = 'Begin Age 1?';
-      body = 'This is irreversible. The chain becomes mintable once sealed; the next Seal won\u2019t unlock until this Age\u2019s outer cycle completes (365 conceptions).';
+      // Outer-cycle length is per-chain (cfg.M), not always the canonical
+      // 365. Read it from the loaded config so the count is honest; omit the
+      // parenthetical entirely if M is somehow unavailable rather than lie.
+      var m = (state.working && state.working.M) || (state.saved && state.saved.M);
+      var cycleLen = m ? ' (' + m + ' conception' + (m === 1 ? '' : 's') + ')' : '';
+      body = 'This is irreversible. The chain becomes mintable once sealed; the next Seal won\u2019t unlock until this Age\u2019s outer cycle completes' + cycleLen + '.';
     }
     var ok = window.prompt(head + '\n\n' + body + '\n\nType SEAL to confirm:');
     if (ok !== 'SEAL') return;
