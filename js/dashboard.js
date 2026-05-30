@@ -2368,12 +2368,8 @@ setInterval(function() {
       state.saved = deepClone(resp.config || state.working);
       state.working = deepClone(state.saved);
       state.touched = false;
-      // Apply succeeded → the in-progress draft now matches the
-      // chain. Clear the localStorage pointer so we read the
-      // chain's canonical preset_name on next visit.
-      if (state.working && state.working.id) {
-        _rememberChainPreset(state.working.id, '');
-      }
+      // Apply persisted preset_name into chain.json (via the body above),
+      // which is now the single source of the chain<->preset association.
       renderAll();
       showError('');
       // Apply changed which artifacts the chain expects — re-poll
@@ -2728,12 +2724,10 @@ setInterval(function() {
         method: 'POST', headers: authHeaders(),
         body: JSON.stringify({name: name, config: state.working}),
       });
+      // Saving names the in-memory draft so future Saves overwrite it.
+      // It does NOT associate the preset with the chain — that's Apply to
+      // Chain's job alone.
       state.lastPresetName = name;
-      // Pin this preset to the active chain so the next Payload tab
-      // open restores it as the draft baseline.
-      if (state.working && state.working.id) {
-        _rememberChainPreset(state.working.id, name);
-      }
       refreshPresetButtonLabel();
       // Brief inline confirmation via the dirty marker slot.
       flashSaved(name);
@@ -2802,10 +2796,11 @@ setInterval(function() {
         if ('type' in e) delete e.type;
       });
       // Remember which preset is loaded so Save overwrites it silently.
+      // In-memory only — a loaded preset is a TEMPORARY view. It does not
+      // associate with the chain; only Apply to Chain does that (writes
+      // chain.json preset_name). Reopening the tab reverts to the applied
+      // config.
       state.lastPresetName = name;
-      // Persist per-chain so the next Payload tab open restores this
-      // preset as the draft baseline.
-      _rememberChainPreset(state.working.id, name);
       refreshPresetButtonLabel();
       renderAll();
       // Loaded preset != saved state → dirty
@@ -2827,12 +2822,6 @@ setInterval(function() {
       if (state.lastPresetName === name) {
         state.lastPresetName = '';
         refreshPresetButtonLabel();
-      }
-      // Also clear any chain-association pointing at this preset.
-      if (state.working && state.working.id) {
-        if (_recallChainPreset(state.working.id) === name) {
-          _rememberChainPreset(state.working.id, '');
-        }
       }
       await loadPresetList();
     } catch (e) {
@@ -2875,28 +2864,10 @@ setInterval(function() {
   }
 
   // ===== Initial load + event wiring =====
-  // Default state for the Payload tab is EMPTY — the editor opens as
-  // a clean draft. If the user previously loaded a preset for this
-  // chain, we auto-restore it (per-chain memory in localStorage).
-  // Either way the editor is treated as a draft of a future Apply;
-  // the chain's currently-applied config is no longer the auto-loaded
-  // baseline. Click Refresh in the toolbar to fetch chain config
-  // explicitly.
-  function _chainPresetKey(chainId) {
-    return 'mememage-chain-preset-' + chainId;
-  }
-  function _rememberChainPreset(chainId, name) {
-    if (!chainId) return;
-    try {
-      if (name) localStorage.setItem(_chainPresetKey(chainId), name);
-      else localStorage.removeItem(_chainPresetKey(chainId));
-    } catch (e) { /* private mode etc. */ }
-  }
-  function _recallChainPreset(chainId) {
-    if (!chainId) return '';
-    try { return localStorage.getItem(_chainPresetKey(chainId)) || ''; }
-    catch (e) { return ''; }
-  }
+  // Default state for the Payload tab: restore the chain's APPLIED preset
+  // (chain.json preset_name) if it has one, else an empty draft. A merely
+  // loaded-not-applied preset is never restored — loading is temporary,
+  // and only Apply to Chain writes the chain<->preset association.
   function _emptyConfigFor(identity) {
     // Keep M from the active chain (orbital scaffolding) so a fresh
     // draft validates without prompting the user to set it; everything
@@ -2936,12 +2907,10 @@ setInterval(function() {
       var identity = {
         id: chainCfg.id, name: chainCfg.name, visibility: chainCfg.visibility,
       };
-      // Preset selection priority:
-      //   1. localStorage (user's in-progress draft for this chain)
-      //   2. chainCfg.preset_name (what the chain reports as applied)
-      //   3. empty default
-      var presetName = _recallChainPreset(identity.id)
-                    || chainCfg.preset_name || '';
+      // Only the APPLIED association (chain.json preset_name) restores a
+      // preset on tab open. A merely-loaded preset is temporary and never
+      // persisted, so reopening the tab shows the chain's applied config.
+      var presetName = chainCfg.preset_name || '';
       if (presetName) {
         try {
           var pd = await fetchJson('/api/payload/presets/' + encodeURIComponent(presetName));
@@ -2963,9 +2932,7 @@ setInterval(function() {
           });
           state.lastPresetName = presetName;
         } catch (e) {
-          // Preset gone (deleted on disk) — drop the stale pointer,
-          // fall back to empty.
-          _rememberChainPreset(identity.id, '');
+          // Preset gone (deleted on disk) — fall back to empty.
           state.working = _emptyConfigFor({id: identity.id, name: identity.name,
                                             visibility: identity.visibility, M: chainCfg.M});
           state.lastPresetName = '';
@@ -3104,12 +3071,7 @@ setInterval(function() {
   }
 
   els.refreshBtn.addEventListener('click', function() {
-    // Explicit Refresh = "show me the chain's actual applied config"
-    // which means dropping the chain-preset pointer (otherwise the
-    // next tab reopen would silently swap us back to the preset).
-    if (state.working && state.working.id) {
-      _rememberChainPreset(state.working.id, '');
-    }
+    // Explicit Refresh = "show me the chain's actual applied config".
     loadConfig();
   });
   els.buildBtn.addEventListener('click', rebuild);
