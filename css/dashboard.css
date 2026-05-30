@@ -1637,6 +1637,13 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-size: 0.7rem; color: #54545c;
   font-family: monospace;
 }
+.payload-preset-status {
+  font-size: 0.72rem; color: #54545c;
+  margin: 0.1rem 0 0.5rem;
+}
+.payload-preset-status strong {
+  font-weight: 700; color: #1a1a20;
+}
 .payload-dirty-marker {
   font-size: 0.66rem; font-weight: 700;
   letter-spacing: 0.06em;

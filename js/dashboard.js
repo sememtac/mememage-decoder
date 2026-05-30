@@ -1917,6 +1917,7 @@ setInterval(function() {
               'M=' + draftM + ' (draft, applied: ' + appliedM + ')';
     }
     els.chainMeta.textContent = meta;
+    renderPresetStatus();
     if (els.mInput) {
       els.mInput.value = (draftM != null) ? draftM : '';
       els.mInput.disabled = state.chainLocked === true;
@@ -1930,6 +1931,22 @@ setInterval(function() {
         r.disabled = state.chainLocked === true;
       });
     }
+  }
+
+  // Two independent facts (presets and chains don't depend on each other's
+  // creation order):
+  //   loaded  = the preset staged in the editor now (in-memory;
+  //             "Untitled" when the draft isn't from a named preset).
+  //   applied = the preset committed to this chain (chain.json preset_name,
+  //             held in state.saved); the segment hides when there's none.
+  function renderPresetStatus() {
+    var loadedEl = document.getElementById('payloadLoadedPreset');
+    if (loadedEl) loadedEl.textContent = state.lastPresetName || 'Untitled';
+    var appliedName = (state.saved && state.saved.preset_name) || '';
+    var wrap = document.getElementById('payloadAppliedPresetWrap');
+    var appliedEl = document.getElementById('payloadAppliedPreset');
+    if (appliedEl) appliedEl.textContent = appliedName;
+    if (wrap) wrap.hidden = !appliedName;
   }
 
   // ===== Rendering: entries =====
@@ -2823,6 +2840,7 @@ setInterval(function() {
       if (state.lastPresetName === name) {
         state.lastPresetName = '';
         refreshPresetButtonLabel();
+        renderPresetStatus();
       }
       await loadPresetList();
     } catch (e) {
