@@ -784,8 +784,23 @@ async function maybeUnlockRecord(record) {
     }
   }
   if (anyOk) unlocked._unlocked = true;
+  // Keep a reference to the as-stored sealed shell. The WITNESSED/verdict
+  // hash must run over the record AS STORED — on dark_matter chains the
+  // stored content_hash covers the sealed shell (encrypted blobs + public
+  // fields) because the hash is computed AFTER encryption strips plaintext.
+  // We merged plaintext above for DISPLAY only; hashing this merged record
+  // would include both plaintext AND leftover ciphertext → false mismatch.
+  // _sealedShellFor() routes every hash recompute back to this original.
+  unlocked._sealedOriginal = record;
   return unlocked;
 }
+
+// The original sealed record to hash for verification. Returns the pre-merge
+// shell stamped by maybeUnlockRecord when present, else the record itself
+// (non-dark records, sealed-but-not-unlocked records, and Audit-tab records
+// are already their own shell). Hashing the result reproduces the stored
+// content_hash exactly as the decoder's computeContentHash does.
+function _sealedShellFor(rec) { return (rec && rec._sealedOriginal) || rec; }
 
 async function analyzeMeta(files){
   // Render Observatory results in the sidebar, not inline
@@ -913,9 +928,9 @@ async function _renderObservatoryFromCache() {
 
   // Compute hashes for all valid records
   for(var vi=0;vi<valid.length;vi++){
-    var r=valid[vi];var stored=r.content_hash||null;
-    var _setA=_hashSetForRecord(r);
-    var hashable={};Object.keys(r).filter(function(k){return _setA.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
+    var r=valid[vi];var _shellA=_sealedShellFor(r);var stored=r.content_hash||null;
+    var _setA=_hashSetForRecord(_shellA);
+    var hashable={};Object.keys(_shellA).filter(function(k){return _setA.has(k);}).sort().forEach(function(k){hashable[k]=_shellA[k];});
     try {
       r._computed = await sha256_16(hashable);
     } catch (e) {
@@ -1107,9 +1122,10 @@ async function _renderObservatoryFromCache() {
     // Expandable detail (hidden by default)
     html+='<div class="meta-detail" style="display:none;padding:0.5rem 0.8rem;background:rgba(24,24,28,0.6);">';
 
+    var _shellB=_sealedShellFor(r);
     var stored=r.content_hash||null;
-    var _setB=_hashSetForRecord(r);
-    var hashable={};Object.keys(r).filter(function(k){return _setB.has(k);}).sort().forEach(function(k){hashable[k]=r[k];});
+    var _setB=_hashSetForRecord(_shellB);
+    var hashable={};Object.keys(_shellB).filter(function(k){return _setB.has(k);}).sort().forEach(function(k){hashable[k]=_shellB[k];});
     var computed=null;try{computed=await sha256_16(hashable);}catch(e){}
     var match=stored&&computed&&stored===computed;
     var sealed=r._sealed;
@@ -2897,8 +2913,9 @@ function renderAudit(rec, identifier, out) {
     // Compute hash client-side — uses the per-record inclusion set from
     // verify.js so historical records verify under their own hash_version.
     var hashable = {};
-    var _setC = _hashSetForRecord(rec);
-    _setC.forEach(function(k) { if (rec[k] !== undefined && rec[k] !== null) hashable[k] = rec[k]; });
+    var _shellC = _sealedShellFor(rec);
+    var _setC = _hashSetForRecord(_shellC);
+    _setC.forEach(function(k) { if (_shellC[k] !== undefined && _shellC[k] !== null) hashable[k] = _shellC[k]; });
     var sorted = JSON.stringify(sortKeysDeep(hashable)).replace(/[\u0080-\uffff]/g, function(c) { return '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'); });
     crypto.subtle.digest('SHA-256', new TextEncoder().encode(sorted)).then(function(buf) {
       var computed = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('').slice(0, 16);
