@@ -2382,15 +2382,27 @@ function buildOrbitInspector(records, collected) {
     var CC = {decoder:'#7bc4a0', truth:'#8898b8', proof:'#b898d8', epag:'#d4b87b', egg:'#c47bbb'};
 
     function resolveFilterCycle(filterKey) {
-      // Canonical offsets only apply when in range. For a non-canonical
-      // chain (M=20, M=15, etc.), CO.egg=364 / CO.epag=360 land off the
-      // grid and gEdge math wraps to nonsense. Fall through to data-
-      // derived offsets in those cases.
-      if (CL[filterKey] != null && (CO[filterKey] || 0) < chainM) {
-        return { len: CL[filterKey], off: CO[filterKey] || 0 };
+      var bucket = ageIndexed[filterKey];
+      var canonOff = CO[filterKey] || 0;
+      // Canonical cadence layers (decoder/truth/proof, offset 0): the cycle
+      // LENGTH is per-chain (decoder K, M, proof K), so prefer THIS Age's
+      // observed total over the canonical constant. On a canonical chain the
+      // observed total equals the CL value (12/365/7), so this is a visual
+      // no-op there; on a non-canonical chain (decoder K ≠ 12, proof K ≠ 7,
+      // M ≠ 365) it draws the cadence boundaries at the chain's real interval
+      // instead of the canon. Fall back to the CL constant only when no
+      // chunks of this layer were observed.
+      if (canonOff === 0 && CL[filterKey] != null) {
+        return { len: (bucket && bucket.total > 0) ? bucket.total : CL[filterKey], off: 0 };
+      }
+      // Canonical specials with a fixed offset (epag/egg) only apply when
+      // their position is in range for this chain's M. For a small chain
+      // (M=20, etc.) CO.egg=364 / CO.epag=360 land off the grid and gEdge
+      // math wraps to nonsense, so fall through to the data-derived path.
+      if (CL[filterKey] != null && canonOff < chainM) {
+        return { len: CL[filterKey], off: canonOff };
       }
       // Custom layer filter — read the total from observed chunks.
-      var bucket = ageIndexed[filterKey];
       if (bucket && bucket.total > 0) return { len: bucket.total, off: 0 };
       // Frozen-style filter (egg / epag / single-position custom role)
       // — find any record carrying a chunk under this filter's role
