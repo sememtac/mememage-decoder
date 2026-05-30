@@ -1168,6 +1168,24 @@ async function _renderObservatoryFromCache() {
     html+='<div class="ev-m w"><div class="ev-ml">Verdict</div><div class="ev-mv '+(sealed?'sealed':match?'pass':'fail')+'">'+_h(verdictText)+'</div></div>';
     html+='</div>';
 
+    // Dark Matter unlock — inline in the detail card, directly under the
+    // SEALED verdict so "unlock to verify" has somewhere to act. Reuses the
+    // generic .dm-unlock-btn handler (keyed by chainDiscriminator into
+    // _chainPasswords, then re-render from cache) — same mechanism as the
+    // chain-summary unlock; just surfaced where the user is actually looking.
+    if(sealed && !r._unlocked){
+      var dmKey=chainDiscriminator(r);
+      var dmIn='dm-pw-card-'+ri;
+      var dmErr=dmIn+'-err';
+      html+='<div class="ev-sec">Unlock</div>';
+      html+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">This record is sealed (Dark Matter). Enter the creator’s password to decrypt soul + chunks locally and verify the hash.</div>';
+      html+='<div style="display:flex;gap:0.3rem;align-items:center;">';
+      html+='<input id="'+dmIn+'" type="password" placeholder="Creator password" style="flex:1;background:#0a0a12;color:#c8c8d4;border:1px solid #2a2a40;border-radius:4px;padding:0.3rem 0.5rem;font-size:0.75rem;font-family:inherit;">';
+      html+='<button data-dm-chain="'+_h(dmKey)+'" data-dm-input="'+dmIn+'" data-dm-err="'+dmErr+'" class="dm-unlock-btn" style="padding:0.3rem 0.8rem;background:rgba(200,176,128,0.12);border:1px solid rgba(200,176,128,0.3);color:#c8b080;border-radius:4px;cursor:pointer;font-size:0.72rem;font-weight:600;letter-spacing:0.05em;">Unlock</button>';
+      html+='</div>';
+      html+='<div id="'+dmErr+'" style="font-size:0.6rem;color:#f87171;margin-top:0.25rem;min-height:0.7rem;"></div>';
+    }
+
     // Field audit
     html+='<div class="ev-sec">Field Audit</div>';
     html+='<div style="display:flex;flex-wrap:wrap;gap:3px;margin:0.3rem 0;">';
