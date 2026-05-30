@@ -108,11 +108,86 @@ function extractBitsAtScale(px,w,h,scale,ppb){
   return bits;
 }
 
-// Top-level scale-aware extractor. Tries 1:1 first, then sweeps
-// candidate scales derived from the measured band widths. Returns the
-// first {identifier, content_hash} that decodes cleanly, or null.
-// Mirrors the candidate-sweep logic in mememage/bar.py:extract_bar.
+// Band-edge finders for the high-res even-fill layout. Mirror
+// mememage/bar.py:_find_header_end / _find_footer_start. They return the
+// inner edges of the flush bilateral bands so the decoder can anchor to both
+// ends and even-divide the data region — no scale factor, so no drift.
+function findHeaderEnd(px,w,y){
+  function rgb(x){var i=(y*w+x)*4;return [px[i],px[i+1],px[i+2]];}
+  function isM(x){var c=rgb(x);return c[0]>130&&c[1]<120&&c[2]>130;}
+  function isY(x){var c=rgb(x);return c[0]>130&&c[1]>130&&c[2]<120;}
+  function isC(x){var c=rgb(x);return c[0]<120&&c[1]>130&&c[2]>130;}
+  var x=0,nm=0,ny=0,nc=0;
+  while(x<w&&x<40&&!isM(x))x++;
+  while(x<w&&isM(x)){x++;nm++;}
+  while(x<w&&x<60&&!isY(x))x++;
+  while(x<w&&isY(x)){x++;ny++;}
+  while(x<w&&x<80&&!isC(x))x++;
+  while(x<w&&isC(x)){x++;nc++;}
+  if(nm<2||ny<2||nc<2)return null;
+  return x;
+}
+function findFooterStart(px,w,y){
+  function rgb(x){var i=(y*w+x)*4;return [px[i],px[i+1],px[i+2]];}
+  function isM(x){var c=rgb(x);return c[0]>130&&c[1]<120&&c[2]>130;}
+  function isY(x){var c=rgb(x);return c[0]>130&&c[1]>130&&c[2]<120;}
+  function isC(x){var c=rgb(x);return c[0]<120&&c[1]>130&&c[2]>130;}
+  var x=w-1,nm=0,ny=0,nc=0;
+  while(x>=0&&x>w-40&&!isM(x))x--;
+  while(x>=0&&isM(x)){x--;nm++;}
+  while(x>=0&&x>w-60&&!isY(x))x--;
+  while(x>=0&&isY(x)){x--;ny++;}
+  while(x>=0&&x>w-80&&!isC(x))x--;
+  while(x>=0&&isC(x)){x--;nc++;}
+  if(nm<2||ny<2||nc<2)return null;
+  return x+1;
+}
+
+// High-res even-fill decode. Mirrors mememage/bar.py:_decode_even_fill.
+// Anchors to both band edges, evenly divides [a,b] by the frame bit count
+// (swept; CRC self-selects), and reads the two rows averaged (noise immunity)
+// then the bottom row alone (survives a 1px bottom crop).
+function decodeEvenFill(px,w,h){
+  if(h<1||w<3*HEADER_PIXELS)return null;
+  var y=h-1;
+  var a=findHeaderEnd(px,w,y);
+  var b=findFooterStart(px,w,y);
+  if(a===null||b===null||(b-a)<8)return null;
+  var span=b-a;
+  var readModes=(h>=2)?[[h-1,h-2],[h-1]]:[[h-1]];
+  for(var nBytes=EVENFILL_MIN_BYTES;nBytes<=EVENFILL_MAX_BYTES;nBytes++){
+    var n=nBytes*8;
+    for(var rm=0;rm<readModes.length;rm++){
+      var rows=readModes[rm],bits=[],ok=true;
+      for(var i=0;i<n;i++){
+        var cx=Math.round(a+(i+0.5)*span/n);
+        if(cx<0||cx>=w){ok=false;break;}
+        var acc=0;
+        for(var r=0;r<rows.length;r++){
+          var idx=(rows[r]*w+cx)*4;
+          acc+=(px[idx]+px[idx+1]+px[idx+2])/3;
+        }
+        bits.push((acc/rows.length)>=RGB_THRESHOLD?1:0);
+      }
+      if(!ok)continue;
+      var frame=decodeFrame(bits);
+      // Validate via payload (locks the right n_bytes) but return the FRAME so
+      // callers get rsErrors/rsCapacity for the forensic display.
+      if(frame){var p=decodePayload(frame.payload);if(p)return frame;}
+    }
+  }
+  return null;
+}
+
+// Top-level scale-aware extractor. Tries the high-res even-fill layout first
+// (both-ends-anchored, drift-free), then 1:1, then sweeps candidate scales
+// derived from the measured band widths. Returns the first
+// {identifier, content_hash} that decodes cleanly, or null.
+// Mirrors mememage/bar.py:extract_bar.
 function extractBarScaleAware(px,w,h){
+  // High-res even-fill layout — full-width, both-ends anchored.
+  var ef=decodeEvenFill(px,w,h);
+  if(ef){var efp=decodePayload(ef.payload);if(efp)return efp;}
   // Fast 1:1 path — by far the common case (no resize).
   if(detectBar(px,w,h)){
     for(var ppb0 of [PIXELS_PER_BIT,2]){

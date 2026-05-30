@@ -2,6 +2,8 @@
 // CODEC CONSTANTS
 // =====================================================================
 const SIG_ROWS=2,HEADER_BAND=8,HEADER_PIXELS=24,FOOTER_PIXELS=24,PIXELS_PER_BIT=3,RGB_THRESHOLD=128;
+// Even-fill frame byte-length sweep (8B header + 37..44B payload + 6B parity = 51..58B; margin both sides).
+const EVENFILL_MIN_BYTES=49,EVENFILL_MAX_BYTES=64;
 
 // Default source URL for record fetches. {id} expands to the
 // identifier; the decoder + validator both probe several filename

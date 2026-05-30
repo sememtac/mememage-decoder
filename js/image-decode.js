@@ -70,16 +70,24 @@ async function decodeImageBar(file) {
     height: img.height
   };
 
-  // Try the cheap 1:1 fast path first (no resize). Bands detected at
-  // the canonical pixel positions; extract at ppb=3 then ppb=2.
-  var detected = detectBar(px, img.width, img.height);
-  var frame = null, usedPpb = 3;
-  if (detected) {
-    var ppbCandidates = [3, 2];
-    for (var i = 0; i < ppbCandidates.length; i++) {
-      var ppb = ppbCandidates[i];
-      var f = decodeFrame(extractBits(px, img.width, img.height, ppb));
-      if (f) { frame = f; usedPpb = ppb; break; }
+  var frame = null, usedPpb = 3, detected = false;
+
+  // High-res even-fill layout first (full-width, both-ends anchored,
+  // drift-free). Mirrors Python's extract_bar order.
+  var efFrame = decodeEvenFill(px, img.width, img.height);
+  if (efFrame) { frame = efFrame; detected = true; }
+
+  // Cheap 1:1 fast path (no resize). Bands detected at the canonical
+  // pixel positions; extract at ppb=3 then ppb=2.
+  if (!frame) {
+    detected = detectBar(px, img.width, img.height);
+    if (detected) {
+      var ppbCandidates = [3, 2];
+      for (var i = 0; i < ppbCandidates.length; i++) {
+        var ppb = ppbCandidates[i];
+        var f = decodeFrame(extractBits(px, img.width, img.height, ppb));
+        if (f) { frame = f; usedPpb = ppb; break; }
+      }
     }
   }
   // If 1:1 didn't find bands OR couldn't decode, fall through to the
