@@ -2729,6 +2729,7 @@ setInterval(function() {
       // Chain's job alone.
       state.lastPresetName = name;
       refreshPresetButtonLabel();
+      renderPresetStatus();
       // Brief inline confirmation via the dirty marker slot.
       flashSaved(name);
       // Refresh the preset list if the panel happens to be open.
