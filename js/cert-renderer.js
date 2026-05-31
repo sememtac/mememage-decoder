@@ -804,18 +804,22 @@ function renderCert(meta, options) {
     plate.appendChild(conCanvas);
   }
 
-  // Portrait — gated on image-was-present (window._lastDecodedCanvas).
-  // Per CLAUDE.md's Constellations doctrine: "Chain traversal =
-  // stargazing — you see the fingerprint, not the face." Dropping an
-  // image is the gesture that earns the body view; By Word lookups
-  // and chain-link traversal show the soul (badges, identifier,
-  // public fields, decrypted dark data if unlocked) without the
-  // portrait. Three dimensions of mortal verification: body (the
-  // image), soul (the metadata), fingerprint (the hash). Traversal
-  // surfaces the latter two; the body stays in the user's hands.
+  // Portrait — the face is identity, shown on ANY entry path whenever a
+  // usable (plaintext) thumbnail exists: By Sight/Soul (image dropped),
+  // By Word lookup, or Greek-letter chain traversal. Official policy:
+  // looking a record up by identifier or walking to it by Bayer letter
+  // is enough to see whose star it is. Dark-matter records stay faceless
+  // until unlock — _safeThumbnail rejects the ciphertext envelope, so a
+  // locked dark record shows no portrait and the decrypted thumbnail
+  // surfaces only once the chain password is supplied (auto-applied to
+  // siblings during traversal). The heavier body view — gen/sky/machine
+  // canvas bands, vitals, BIRTHPLACE — stays gated on a dropped image
+  // (_imageWasPresent below); those are earned by holding the body, the
+  // portrait is not. (Supersedes the earlier "stargazing — fingerprint,
+  // not face" rule, which gated the portrait on image-present too.)
   var _imageWasPresent = !!window._lastDecodedCanvas;
   var safeThumb = _safeThumbnail(meta.thumbnail);
-  if (safeThumb && _imageWasPresent) {
+  if (safeThumb) {
     var portraitWrap = _div();
     portraitWrap.style.cssText = 'text-align:center;margin-bottom:12px;position:relative;z-index:3';
     var portraitRing = _div();
