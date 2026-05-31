@@ -950,8 +950,8 @@ setInterval(function() {
       var visText;
       if (vis === 'dark_matter') {
         if (!pwSet) visText = 'Dark \u00b7 NEEDS PASSWORD';
-        else if (info.password_needs_unlock) visText = 'Dark \u00b7 LOCKED';
-        else visText = 'Dark \u00b7 unlocked';
+        else if (info.password_needs_unlock) visText = 'Dark \u00b7 enter password';
+        else visText = 'Dark \u00b7 ready';
       } else {
         visText = pwSet ? 'Light \u00b7 GPS password' : 'Light \u00b7 public';
       }
