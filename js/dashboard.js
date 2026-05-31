@@ -600,7 +600,8 @@ setInterval(function() {
     // too so the user doesn't watch a file upload only to fail server
     // side. _refreshMintGuardrails has already shown the explainer.
     if (state.chainSealed === false ||
-        (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet)) {
+        (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet) ||
+        state.chainNeedsUnlock) {
       _refreshMintGuardrails();
       return;
     }
@@ -938,6 +939,8 @@ setInterval(function() {
       var pwSet = !!info.password_set;
       state.chainVisibility = vis;
       state.chainPasswordSet = pwSet;
+      state.chainUnlocked = !!info.password_unlocked;
+      state.chainNeedsUnlock = !!info.password_needs_unlock;
       els.chainId.textContent = id;
       els.chainName.textContent = name && name !== id ? ' \u00b7 ' + name : '';
       // Compose the visibility chip text. We avoid "sealed" here because
@@ -946,7 +949,9 @@ setInterval(function() {
       // the button labels say too — keep wording consistent.
       var visText;
       if (vis === 'dark_matter') {
-        visText = pwSet ? 'Dark \u00b7 password set' : 'Dark \u00b7 NEEDS PASSWORD';
+        if (!pwSet) visText = 'Dark \u00b7 NEEDS PASSWORD';
+        else if (info.password_needs_unlock) visText = 'Dark \u00b7 LOCKED';
+        else visText = 'Dark \u00b7 unlocked';
       } else {
         visText = pwSet ? 'Light \u00b7 GPS password' : 'Light \u00b7 public';
       }
@@ -988,6 +993,16 @@ setInterval(function() {
     } else if (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet) {
       blocked = true;
       msg = 'This chain is Dark but has no stored password — set it in <strong>Config \u2192 Chains</strong> before conceiving.';
+    } else if (state.chainNeedsUnlock) {
+      // Gated chain (verifier on disk) with no key held this session.
+      // Offer an in-memory unlock here; the password is never written
+      // to disk and is cleared on chain switch or server restart.
+      blocked = true;
+      msg = 'Chain is <strong>locked</strong>. Enter the chain password to conceive this session ' +
+            '(held in memory only):' +
+            '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;max-width:360px;">' +
+            '<input id="chainUnlockPw" type="password" autocomplete="off" placeholder="chain password" class="config-input" style="flex:1;min-width:0;">' +
+            '<button id="chainUnlockBtn" class="config-btn" type="button">Unlock</button></div>';
     }
     if (els.drop) {
       els.drop.classList.toggle('mint-blocked', blocked);
@@ -1002,8 +1017,38 @@ setInterval(function() {
     }
     if (blocked) {
       showError(msg, {html: true});
+      // If the message rendered the inline unlock form, wire it up.
+      var ubtn = document.getElementById('chainUnlockBtn');
+      if (ubtn) {
+        ubtn.addEventListener('click', unlockActiveChain);
+        var uinp = document.getElementById('chainUnlockPw');
+        if (uinp) uinp.addEventListener('keydown', function(e){
+          if (e.key === 'Enter') { e.preventDefault(); unlockActiveChain(); }
+        });
+      }
     } else {
       showError('');
+    }
+  }
+
+  // Hold the active chain's password in the server's memory for this session
+  // (rung-1 — never written to disk). Validated against the chain's verifier
+  // server-side; a wrong password is rejected.
+  async function unlockActiveChain() {
+    var inp = document.getElementById('chainUnlockPw');
+    var pw = inp ? inp.value : '';
+    if (!pw) return;
+    var btn = document.getElementById('chainUnlockBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Unlocking…'; }
+    try {
+      await fetchJson('/api/chain/unlock', {
+        method: 'POST',
+        body: JSON.stringify({password: pw}),
+      });
+      await loadActiveChain();
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Unlock'; }
+      showError('Unlock failed: ' + (e && e.message ? e.message : 'wrong password'));
     }
   }
   function humanSize(b) {
