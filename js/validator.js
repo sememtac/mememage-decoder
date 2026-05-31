@@ -400,20 +400,110 @@ function analyze(file){
         o+='</div>';
       }
 
-      // JPEG Survival — tests what the bar is actually designed to survive.
-      //
-      // The previous Scale Survival panel tested arbitrary downscaling,
-      // which Gen I bars genuinely don't survive (luminance bits are too
-      // narrow — adjacent bits' values blur into the threshold under any
-      // resampling kernel). Reporting LOST on every scale was honest but
-      // useless. JPEG Survival tests the real-world envelope: M/Y/C
-      // bands are DCT-block-aligned (8 px = exactly one JPEG block), and
-      // the 3-px luminance-modulated data bits survive q50+ because JPEG
-      // keeps the luminance channel at full resolution.
-      //
-      // For each quality level we re-encode the image as JPEG and try to
-      // extract the bar. Q95/q85/q70 should always pass; q50 typically
-      // passes; q30 is on the edge.
+      // Resilience panels — what the bar survives, three lenses:
+      //   1. Bar Architecture — which width-adaptive layout this image uses
+      //      (even-fill vs sequential) and the downscale floor that implies.
+      //   2. Scale Survival   — actually downscale the image and re-read the
+      //      bar to find the real floor. Meaningful now that even-fill makes
+      //      downscale survival real (it scales the bits with the image); the
+      //      old panel that reported LOST on every scale predated even-fill.
+      //   3. JPEG Survival     — re-encode at falling quality; M/Y/C bands are
+      //      DCT-block-aligned (8px = one JPEG block) and the luminance bits
+      //      survive q50+ because JPEG keeps luma at full resolution.
+
+      // === Bar Architecture + Scale Survival (derived instantly from width
+      // + identifier; gated on a readable bar). ===
+      if (decoded) {
+        // Two layouts share one frame format (mememage/bar.py): even-fill
+        // engages when the data region (width minus 48px of flush bands)
+        // holds the whole frame at >=3px/bit; below the crossover the bar
+        // falls back to the sequential split-row layout. We can name which
+        // one this image uses from width + identifier length alone
+        // (identifier = prefix + '-' + 16 hex => prefixLen = id.length - 17;
+        // frame = prefix + 48 bytes => frameBits = (prefixLen + 48) * 8).
+        var fid = decoded.identifier || '';
+        var prefixLen = Math.max(1, fid.length - 17);
+        var frameBits = (prefixLen + 48) * 8;
+        var crossoverW = frameBits * 3 + 48;
+        var isEven = (w - 48) >= frameBits * 3;
+        // Empirical downscale floor: a fat even-fill bit survives until it
+        // shrinks below ~3.3 destination px (calibrated to the ~0.37x floor
+        // documented at 4096px). Sequential bits already sit at the 3px
+        // floor, so they have no downscale headroom. The Scale Survival
+        // meter below measures the ACTUAL floor; this is the expected value.
+        var floorAt = function(width){ var f = 3.3 * frameBits / (width - 48); return f > 1 ? 1 : f; };
+        var fmtFloor = function(f){ return f >= 0.995 ? '≈1.0×' : ('~' + f.toFixed(2) + '×'); };
+
+        o+='<div class="ev-sec">Bar Architecture</div>';
+        var layoutCol = isEven ? '#4ade80' : '#facc15';
+        o+='<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">';
+        o+='<span style="font-size:0.7rem;padding:0.15rem 0.5rem;border-radius:3px;background:rgba(120,120,160,0.12);color:'+layoutCol+';font-weight:700;letter-spacing:0.04em;">'+(isEven?'EVEN-FILL':'SEQUENTIAL')+'</span>';
+        o+='<span style="font-size:0.65rem;color:#8a8a9a;">'+w+'×'+h+' · crossover '+crossoverW+'px</span>';
+        o+='</div>';
+        if (isEven) {
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Full-width fat bits painted into both rows. The bits scale with image width, so this layout survives downscaling — and the bigger the image, the lower it can go. Expected clean-downscale floor for this image: <span style="color:#c0c0d0;font-weight:600;">'+fmtFloor(floorAt(w))+'</span>.</div>';
+        } else {
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Frame split across the two rows at 3px/bit — the compact layout below the crossover. JPEG-resilient, but the bits are already at their minimum width, so it is <span style="color:#facc15;">not downscale-resilient</span>. Mint at ≥'+crossoverW+'px wide to unlock even-fill and its resize headroom.</div>';
+        }
+        // Resolution ladder — how the downscale floor improves with mint
+        // width for this image's prefix. Surfaces the resolution feature.
+        var rungs = [crossoverW, 2048, 3072, 4096].filter(function(x){ return x >= crossoverW; });
+        var rungSeen = {}; rungs = rungs.filter(function(x){ if(rungSeen[x])return false; rungSeen[x]=true; return true; });
+        o+='<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Downscale floor by mint width (this prefix)</div>';
+        o+='<div style="border:1px solid rgba(120,120,140,0.18);border-radius:4px;overflow:hidden;margin-bottom:0.5rem;">';
+        for (var ri = 0; ri < rungs.length; ri++) {
+          var rw = rungs[ri];
+          var here = Math.abs(rw - w) < 1;
+          o+='<div style="display:flex;justify-content:space-between;padding:0.22rem 0.5rem;font-size:0.66rem;'+(ri%2?'background:rgba(40,40,60,0.06);':'')+(here?'background:rgba(74,158,74,0.10);':'')+'">';
+          o+='<span style="color:'+(here?'#4ade80':'#a0a0b0')+';">'+rw+'px'+(here?' ← this image':'')+'</span>';
+          o+='<span style="color:#c0c0d0;font-weight:600;">'+fmtFloor(floorAt(rw))+'</span></div>';
+        }
+        o+='</div>';
+
+        // --- Scale Survival (revived, resolution-aware, synchronous) ---
+        o+='<div class="ev-sec">Scale Survival</div>';
+        if (isEven) {
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Downscales the image and re-reads the bar — the floor below which the fat bits blur past recovery. This is the actual measured floor for your image.</div>';
+          var scales = [0.9, 0.75, 0.6, 0.5, 0.4, 0.3];
+          var lowestOk = null;
+          for (var sIdx = 0; sIdx < scales.length; sIdx++) {
+            var s = scales[sIdx];
+            var sw = Math.max(1, Math.round(w * s)), sh = Math.max(1, Math.round(h * s));
+            var sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
+            var sx = sc.getContext('2d'); sx.imageSmoothingEnabled = true; sx.imageSmoothingQuality = 'high';
+            sx.drawImage(res.canvas, 0, 0, sw, sh);
+            var sok = false, sUri = null;
+            try {
+              var spx = sx.getImageData(0, 0, sw, sh).data;
+              sok = !!extractBarScaleAware(spx, sw, sh);
+              var sbH = Math.min(6, sh);
+              var sbc = document.createElement('canvas'); sbc.width = sw; sbc.height = sbH * 4;
+              var sbx = sbc.getContext('2d'); sbx.imageSmoothingEnabled = false;
+              sbx.drawImage(sc, 0, sh - sbH, sw, sbH, 0, 0, sw, sbH * 4);
+              sUri = sbc.toDataURL('image/png');
+            } catch (e) { sok = false; }
+            if (sok) lowestOk = s;
+            var sBg = sok ? 'rgba(74,158,74,0.08)' : 'rgba(180,60,60,0.06)';
+            var sBd = sok ? 'rgba(74,158,74,0.5)' : 'rgba(180,60,60,0.4)';
+            o+='<div style="padding:0.4rem 0.5rem;background:'+sBg+';border-left:3px solid '+sBd+';border-radius:4px;margin-bottom:0.3rem;">';
+            o+='<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">';
+            o+='<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">'+s.toFixed(2)+'×</span>';
+            o+='<span style="font-size:0.65rem;color:#8a8a9a;">'+sw+'×'+sh+'</span>';
+            o+='<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;background:'+(sok?'rgba(74,158,74,0.15)':'rgba(180,60,60,0.15)')+';color:'+(sok?'#4ade80':'#f87171')+';font-weight:600;">Bar '+(sok?'SURVIVED':'LOST')+'</span>';
+            o+='</div>';
+            if (sUri) {
+              o+='<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Bar region @ '+s.toFixed(2)+'×</div>';
+              o+='<img src="'+sUri+'" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
+            }
+            o+='</div>';
+          }
+          var floorTxt = lowestOk ? ('survives down to ~'+lowestOk.toFixed(2)+'×') : ('lost even at 0.90× — unusually fragile, check the source');
+          o+='<div style="font-size:0.62rem;color:#c0c0d0;margin-bottom:0.3rem;">Measured floor: <span style="font-weight:600;">'+floorTxt+'</span>.</div>';
+        } else {
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;line-height:1.5;">Skipped — this is a sequential-layout bar, which has no downscale headroom (the old “LOST on every scale” result). Resize resilience is a property of even-fill, which needs ≥'+crossoverW+'px width. JPEG Survival below still applies.</div>';
+        }
+      }
+
       o+='<div class="ev-sec">JPEG Survival</div>';
       o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Re-encodes the image as JPEG at each quality and tries to read the bar. Solid=survived, dashed=lost. Every social platform JPEG-encodes uploads \u2014 this is what the bar is built to survive.</div>';
       var jpegLevels = [95, 85, 70, 50, 30];
@@ -425,26 +515,38 @@ function analyze(file){
             if (!blob) { resolve({q:q, ok:false, dataUrl:null, dims:null}); return; }
             var url = URL.createObjectURL(blob);
             var im = new Image();
+            // De-hang: a missing onerror used to leave the row stuck on
+            // "analyzing" forever if the re-encoded blob failed to load
+            // (large WebP sources tripped this). onerror + a try/catch in
+            // onload guarantee every level resolves to a verdict.
+            im.onerror = function(){
+              try { URL.revokeObjectURL(url); } catch (e) {}
+              resolve({q:q, ok:false, dataUrl:null, dims:null, blobSize:blob.size});
+            };
             im.onload = function(){
-              var jc = document.createElement('canvas');
-              jc.width = im.width; jc.height = im.height;
-              jc.getContext('2d').drawImage(im, 0, 0);
-              var jpx = jc.getContext('2d').getImageData(0, 0, im.width, im.height).data;
-              var ok = detectBar(jpx, im.width, im.height);
-              if (ok) {
-                var f = decodeFrame(extractBits(jpx, im.width, im.height, 3))
-                     || decodeFrame(extractBits(jpx, im.width, im.height, 2));
-                ok = !!(f && decodePayload(f.payload));
+              try {
+                var jc = document.createElement('canvas');
+                jc.width = im.width; jc.height = im.height;
+                jc.getContext('2d').drawImage(im, 0, 0);
+                var jpx = jc.getContext('2d').getImageData(0, 0, im.width, im.height).data;
+                // Even-fill-aware decode — the same scale-aware extractor the
+                // By Sight path uses (codec.js). The old sequential-only
+                // extractBits(...,3/2) was blind to high-res even-fill bars
+                // and reported LOST even at q95.
+                var ok = !!extractBarScaleAware(jpx, im.width, im.height);
+                // Bar region preview (4x zoom on bottom 4 rows)
+                var bH = Math.min(4, im.height);
+                var bc = document.createElement('canvas');
+                bc.width = im.width; bc.height = bH * 4;
+                var bx = bc.getContext('2d');
+                bx.imageSmoothingEnabled = false;
+                bx.drawImage(jc, 0, im.height - bH, im.width, bH, 0, 0, im.width, bH * 4);
+                URL.revokeObjectURL(url);
+                resolve({q:q, ok:ok, dataUrl:bc.toDataURL('image/png'), dims:[im.width, im.height], blobSize:blob.size});
+              } catch (e) {
+                try { URL.revokeObjectURL(url); } catch (e2) {}
+                resolve({q:q, ok:false, dataUrl:null, dims:null, blobSize:blob.size});
               }
-              // Bar region preview (4x zoom on bottom 4 rows)
-              var bH = Math.min(4, im.height);
-              var bc = document.createElement('canvas');
-              bc.width = im.width; bc.height = bH * 4;
-              var bx = bc.getContext('2d');
-              bx.imageSmoothingEnabled = false;
-              bx.drawImage(jc, 0, im.height - bH, im.width, bH, 0, 0, im.width, bH * 4);
-              URL.revokeObjectURL(url);
-              resolve({q:q, ok:ok, dataUrl:bc.toDataURL('image/png'), dims:[im.width, im.height], blobSize:blob.size});
             };
             im.src = url;
           }, 'image/jpeg', q / 100);
