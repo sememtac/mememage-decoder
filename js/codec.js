@@ -3,6 +3,44 @@
 // =====================================================================
 function crc16(d){let c=0xFFFF;for(const b of d){c^=b<<8;for(let i=0;i<8;i++)c=(c&0x8000)?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF;}return c;}
 
+// =====================================================================
+// Identifier grammar — ONE source of truth for both pages (decoder By
+// Word + validator Audit both call these).
+//
+// Canonical identifier = <prefix>-<16 lowercase hex>. The prefix is
+// per-chain and case-PRESERVING (archive.org treats different cases as
+// different items), [A-Za-z][A-Za-z0-9_-]*[A-Za-z0-9] — it can itself
+// contain hyphens, so the trailing 16-hex suffix is what anchors the
+// parse. 'mememage' is only the DEFAULT prefix, never an assumption:
+// custom chains (dark-, phoenix-, …) must validate too.
+// =====================================================================
+var DEFAULT_PREFIX = 'mememage';
+// Embedded: pull an identifier out of a URL / path / filename.
+// Unanchored — the greedy prefix backtracks to the last hyphen before
+// the 16-hex suffix.
+var _ID_EMBED_RE = /[A-Za-z][A-Za-z0-9_-]*-[0-9a-f]{16}/;
+// Strict whole-string: a bare identifier with no surrounding junk, so a
+// trailing typo can't silently truncate to a valid record.
+var _ID_BARE_RE = /^[A-Za-z][A-Za-z0-9_-]*-[0-9a-f]{16}$/;
+var _ID_HEX16_RE = /^[0-9a-f]{16}$/i;
+
+// Extract an identifier embedded in a URL or path; null if none.
+function extractIdentifier(text){
+  if(!text) return null;
+  var m = String(text).match(_ID_EMBED_RE);
+  return m ? m[0] : null;
+}
+
+// Validate/normalize a BARE user-typed identifier (not a URL). Accepts
+// any <prefix>-<16hex>; a pure 16-hex string is sugar for the default
+// chain (mememage-<hex>). Returns the canonical identifier or null.
+function normalizeIdentifier(text){
+  if(!text) return null;
+  var s = String(text).trim();
+  if(_ID_HEX16_RE.test(s)) s = DEFAULT_PREFIX + '-' + s.toLowerCase();
+  return _ID_BARE_RE.test(s) ? s : null;
+}
+
 function detectBar(px,w,h){
   // Presence-only check — does the bottom row start with the M/Y/C
   // sequence at the original pixel scale? Cheap; used as a fast
@@ -387,8 +425,7 @@ function decodePayload(payload){
   // New format: bare identifier. Old format: URL (contains /).
   let identifier;
   if(first.includes('/')){
-    const m=first.match(/mememage-[a-f0-9]+/);
-    identifier=m?m[0]:first;
+    identifier=extractIdentifier(first)||first;
   }else{
     identifier=first;
   }

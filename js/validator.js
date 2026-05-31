@@ -2824,22 +2824,17 @@ function runAudit() {
   // manage here.
   function stopSpin() {}
 
-  // Parse identifier. URL inputs can have the id embedded anywhere —
-  // extract via unanchored regex. Bare inputs must match strictly
-  // end-to-end so junk like "mememage-<hex>ff99bad" can't sneak past
-  // by silently truncating to the valid hex prefix.
-  var identifier;
-  if (/^https?:\/\//.test(input)) {
-    var urlMatch = input.match(/mememage-[a-f0-9]+/);
-    identifier = urlMatch ? urlMatch[0] : null;
-  } else {
-    var bareMatch = input.match(/^mememage-[a-f0-9]+$/i);
-    identifier = bareMatch ? bareMatch[0] : null;
-  }
+  // Parse identifier through the shared codec grammar (any per-chain
+  // prefix, not just mememage). URL inputs can have the id embedded
+  // anywhere; bare inputs must match strictly end-to-end so junk like
+  // "<prefix>-<hex>ff99bad" can't sneak past by silent truncation.
+  var identifier = /^https?:\/\//.test(input)
+    ? extractIdentifier(input)
+    : normalizeIdentifier(input);
   if (!identifier) {
     setAuditError(
       'Invalid identifier.',
-      'Expected <strong>mememage-&lt;hex&gt;</strong>, or a URL containing one.'
+      'Expected <strong>&lt;prefix&gt;-&lt;hex&gt;</strong> (e.g. mememage-…), or a URL containing one.'
     );
     stopSpin();
     return;

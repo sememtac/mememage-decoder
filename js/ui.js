@@ -165,22 +165,22 @@ function soulFilename(identifier, contentHash) {
 function parseSoulInput(input) {
   input = input.trim();
 
-  // Direct URL to a .soul or .json file — fetch directly
+  // Direct URL to a .soul or .json file — fetch directly. Identifier
+  // extraction goes through the shared codec grammar so any per-chain
+  // prefix (dark-, phoenix-, …) is recognized, not just mememage.
   if (/^https?:\/\//.test(input) && /\.(soul|json)(\?.*)?$/.test(input)) {
-    var m = input.match(/mememage-[a-f0-9]+/);
-    return { identifier: m ? m[0] : null, contentHash: null, directUrl: input.split('?')[0] };
+    return { identifier: extractIdentifier(input), contentHash: null, directUrl: input.split('?')[0] };
   }
 
   // Base URL ending with / — treat as source base
   if (/^https?:\/\//.test(input) && input.endsWith('/')) {
-    var m2 = input.match(/mememage-[a-f0-9]+/);
-    return { identifier: m2 ? m2[0] : null, contentHash: null, sourceBase: input };
+    return { identifier: extractIdentifier(input), contentHash: null, sourceBase: input };
   }
 
   // URL with identifier (e.g., archive.org page)
   if (/^https?:\/\//.test(input)) {
-    var m3 = input.match(/mememage-[a-f0-9]+/);
-    if (m3) return { identifier: m3[0], contentHash: null };
+    var m3 = extractIdentifier(input);
+    if (m3) return { identifier: m3, contentHash: null };
     return { identifier: null, contentHash: null, directUrl: input };
   }
 
@@ -201,11 +201,12 @@ function parseSoulInput(input) {
 
   // Bare identifier or hex — must match strictly end-to-end. An
   // unanchored match would silently truncate trailing junk (e.g.
-  // "mememage-90dccd7b1233896ft4t4t" → "mememage-90dccd7b1233896f")
+  // "<prefix>-90dccd7b1233896ft4t4t" → "<prefix>-90dccd7b1233896f")
   // and validate a record the user didn't actually type.
-  var id2 = input;
-  if (!id2.startsWith('mememage-') && /^[a-f0-9]+$/i.test(id2)) id2 = 'mememage-' + id2;
-  if (!/^mememage-[a-f0-9]+$/i.test(id2)) return { identifier: null, contentHash: null };
+  // normalizeIdentifier accepts any <prefix>-<16hex> (a bare 16-hex
+  // string is sugar for the default mememage chain).
+  var id2 = normalizeIdentifier(input);
+  if (!id2) return { identifier: null, contentHash: null };
   return { identifier: id2, contentHash: null };
 }
 
@@ -844,7 +845,7 @@ function lookupById(input, pushHistory){
       setTabOwner('lookupPanel');
       showPanelError(
         'Invalid identifier.',
-        'Expected <strong>mememage-&lt;hex&gt;</strong>, or a URL containing one.'
+        'Expected <strong>&lt;prefix&gt;-&lt;hex&gt;</strong> (e.g. mememage-…), or a URL containing one.'
       );
       return;
     }
