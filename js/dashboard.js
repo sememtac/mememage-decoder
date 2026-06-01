@@ -949,7 +949,8 @@ setInterval(function() {
       state.chainUnlocked = !!info.password_unlocked;
       state.chainNeedsUnlock = !!info.password_needs_unlock;
       els.chainId.textContent = id;
-      els.chainName.textContent = name && name !== id ? ' \u00b7 ' + name : '';
+      // Display name lives on its own row now \u2014 no inline " \u00b7 " prefix.
+      els.chainName.textContent = name && name !== id ? name : '';
       // Compose the visibility chip text. We avoid "sealed" here because
       // "Seal Age" is the other primary use of that verb (site-pack) and
       // people mistake one state for the other. "password set" is what

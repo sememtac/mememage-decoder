@@ -603,14 +603,23 @@
    just reports it. */
 .mint-chain-banner {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.2rem;
   padding: 0.45rem 0.7rem;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: var(--radius-sm, 6px);
   font-size: 0.78rem;
   color: #1a1a20;
+}
+/* Row 1 holds the deterministic-width label + visibility chip. The chain
+   id and display name each get their own full-width row below so long
+   names never fight the chip for horizontal space. */
+.mint-chain-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 .mint-chain-label {
   font-size: 0.62rem;
@@ -623,16 +632,22 @@
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-weight: 700;
   color: #1a1a20;
+  word-break: break-word;
 }
-.mint-chain-name { color: #3a3a40; }
+.mint-chain-name {
+  color: #3a3a40;
+  word-break: break-word;
+}
+.mint-chain-name:empty { display: none; }
 .mint-chain-vis {
-  margin-left: auto;
+  flex: none;
   font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
+  white-space: nowrap;
 }
 .mint-chain-vis[data-vis="light_energy"] {
   background: rgba(212, 184, 123, 0.18);
