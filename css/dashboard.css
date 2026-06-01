@@ -834,11 +834,30 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   background: rgba(255, 255, 255, 0.5);
   border-radius: 6px;
 }
-/* Row 1: thumbnail + ticket id (left) + chain badge (pushed right). */
+/* Row 1: thumbnail + ticket id (left) + chain badge (pushed right). The badge
+   always stays on this row — it shrinks and the chain name clips with an
+   ellipsis (full id · name available via the badge's title tooltip on hover). */
 .mint-recent-head {
-  display: flex; align-items: center; gap: 0.5rem;
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: nowrap;
 }
-.mint-recent-head > .chain-badge.compact { margin-left: auto; }
+.mint-recent-head > .mint-recent-ticket { flex: none; }
+.mint-recent-head > .chain-badge.compact {
+  margin-left: auto;
+  min-width: 0;            /* allow the badge to shrink so its name can clip */
+  flex: 0 1 auto;          /* may shrink below content width */
+  max-width: 65%;          /* cap so a long name clips instead of pushing wide */
+  overflow: hidden;
+}
+.mint-recent-head > .chain-badge.compact .chain-badge-body {
+  min-width: 0; overflow: hidden; flex: 0 1 auto;
+}
+/* The chain name (rendered as .chain-badge-official outside Config) clips. */
+.mint-recent-head > .chain-badge.compact .chain-badge-official {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.mint-recent-head > .chain-badge.compact .chain-dot,
+.mint-recent-head > .chain-badge.compact .chain-vis,
+.mint-recent-head > .chain-badge.compact .chain-state-chip { flex: none; }
 /* Staged-image thumbnail — small square cue, first on row 1. */
 .mint-recent-thumb {
   flex: none;

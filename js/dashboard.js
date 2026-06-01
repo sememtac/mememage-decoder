@@ -39,39 +39,49 @@ window.ChainBadge = (function() {
   function word(st) { return WORD[st] || 'Unknown'; }
   function dot(st) { return '<span class="chain-dot" data-state="' + esc(st) + '"></span>'; }
   function chip(st) { return '<span class="chain-state-chip" data-state="' + esc(st) + '">' + word(st) + '</span>'; }
-  // Full stacked badge — Conceive + Payload banners. label is an optional
-  // tiny eyebrow above the id (e.g. "Target chain"). extra is optional HTML
-  // appended into the head row's right cluster (e.g. Payload's lock/build).
+  // The chain's display title. Default everywhere EXCEPT Config is the
+  // friendly name (falling back to the id when there's no separate name) —
+  // showing both id + name is confusing; the id lives in Config. Pass
+  // idAndName:true (Config only) to show the official id as the primary with
+  // the friendly name on a second line.
+  function primary(o) {
+    return esc((o.name && o.name !== o.id) ? o.name : (o.id || '?'));
+  }
+  // Full stacked badge — Conceive + Payload banners + Config rows. label is an
+  // optional eyebrow (e.g. "Target chain"); extra is HTML for the head row's
+  // right cluster (e.g. Payload's lock/build).
   function full(o) {
     o = o || {};
-    var official = esc(o.id || '?');
-    var friendly = (o.name && o.name !== o.id) ? esc(o.name) : '';
     var vis = (o.visibility === 'dark_matter') ? 'dark' : 'light';
     var label = o.label ? '<span class="chain-badge-label">' + esc(o.label) + '</span>' : '';
+    // Config: official id as primary + friendly name below. Elsewhere: friendly
+    // name (or id fallback) as primary, no second line.
+    var head = o.idAndName ? esc(o.id || '?') : primary(o);
+    var sub = (o.idAndName && o.name && o.name !== o.id)
+      ? '<span class="chain-badge-friendly">' + esc(o.name) + '</span>' : '';
     return '<div class="chain-badge">' + dot(o.readiness) +
       '<div class="chain-badge-body">' +
         '<div class="chain-badge-head">' +
-          '<span class="chain-badge-official">' + official + '</span>' +
+          '<span class="chain-badge-official">' + head + '</span>' +
           '<span class="chain-badge-right">' +
             (o.extra || '') +
             '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) +
           '</span>' +
         '</div>' +
         (label ? '<div class="chain-badge-sub">' + label + '</div>' : '') +
-        (friendly ? '<span class="chain-badge-friendly">' + friendly + '</span>' : '') +
+        sub +
         (o.below || '') +
       '</div></div>';
   }
-  // Compact one-line badge — Config picker rows + ticket rows.
+  // Compact one-line badge — ticket rows (name only). title tooltip carries
+  // the full id · name so a clipped long name is readable on hover.
   function compact(o) {
     o = o || {};
-    var official = esc(o.id || '?');
-    var friendly = (o.name && o.name !== o.id) ? esc(o.name) : '';
+    var tip = esc((o.id || '') + (o.name && o.name !== o.id ? ' · ' + o.name : ''));
     var vis = (o.visibility === 'dark_matter') ? 'dark' : 'light';
-    return '<span class="chain-badge compact">' + dot(o.readiness) +
+    return '<span class="chain-badge compact" title="' + tip + '">' + dot(o.readiness) +
       '<span class="chain-badge-body">' +
-        '<span class="chain-badge-official">' + official + '</span>' +
-        (friendly ? '<span class="chain-badge-sep">·</span><span class="chain-badge-friendly">' + friendly + '</span>' : '') +
+        '<span class="chain-badge-official">' + primary(o) + '</span>' +
       '</span>' +
       '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) + '</span>';
   }
@@ -5564,6 +5574,7 @@ setInterval(function() {
           var badge = ChainBadge.full({
             id: c.id, name: c.name, visibility: vis,
             readiness: c.readiness, below: detail,
+            idAndName: true,  // Config is where the id lives — show id + name
           });
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<div class="config-chain-badge-cell">' + badge + '</div>' +
