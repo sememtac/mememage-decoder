@@ -1052,7 +1052,8 @@ setInterval(function() {
         method: 'POST',
         body: JSON.stringify({password: pw}),
       });
-      await loadActiveChain();
+      // Keep the banner pinned to a loaded ticket's bound chain.
+      await loadActiveChain(state.token ? state.boundChain : undefined);
     } catch (e) {
       if (btn) { btn.disabled = false; btn.textContent = 'Unlock'; }
       showError('Unlock failed: ' + (e && e.message ? e.message : 'wrong password'));
@@ -1255,6 +1256,7 @@ setInterval(function() {
     state.gpsSource = null;
     state.qrDataUri = '';
     state.ticket = '';
+    state.boundChain = null;  // no ticket loaded → banner follows the active chain again
     els.fileInput.value = '';
     if (els.resumeInput) els.resumeInput.value = '';
     if (els.resumeBtn) els.resumeBtn.disabled = false;
@@ -1588,7 +1590,10 @@ setInterval(function() {
         // Re-check chain context — most importantly, the seal state can
         // have flipped (user just sealed in the Payload tab). Refreshes
         // the unsealed-chain guardrail without a full page reload.
-        loadActiveChain();
+        // When a ticket is loaded, keep the banner pinned to its BOUND
+        // chain — switching the active chain in Config must not change
+        // where this conception lands or the label it shows.
+        loadActiveChain(state.token ? state.boundChain : undefined);
       }
     });
   }
