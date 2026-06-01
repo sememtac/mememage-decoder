@@ -837,7 +837,8 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .mint-recent-head {
   display: flex; align-items: center; gap: 0.5rem;
 }
-/* Staged-image thumbnail — small square cue, left of the ticket id. */
+/* Staged-image thumbnail — small square cue, shares row 2 with the chain
+   badge (thumb left, badge right). */
 .mint-recent-thumb {
   flex: none;
   width: 34px; height: 34px;
@@ -850,7 +851,10 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .mint-recent-head > .mint-recent-age { margin-left: auto; }
 /* Chain badge sits on row 2, right-aligned and a touch smaller than the
    full-size compact pill so it reads as secondary to the ticket id. */
-.mint-recent-chainrow { display: flex; justify-content: flex-end; }
+/* Row 2: thumbnail pinned left, chain badge pinned right. */
+.mint-recent-chainrow { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.mint-recent-chainrow .mint-recent-thumb { order: -1; }
+.mint-recent-chainrow .chain-badge.compact { margin-left: auto; }
 .mint-recent-chainrow .chain-badge.compact {
   padding: 0.25rem 0.5rem; gap: 0.4rem;
 }
