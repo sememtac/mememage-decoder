@@ -73,19 +73,32 @@ window.ChainBadge = (function() {
         (o.below || '') +
       '</div></div>';
   }
-  // Compact one-line badge — ticket rows (name only). title tooltip carries
-  // the full id · name so a clipped long name is readable on hover.
+  // The pill — the ONE chain badge shape, used everywhere (Conceive, Payload,
+  // Config, tickets, conception page). Shows the friendly name only; pass
+  // idAndName:true (Config, where the id is looked up) to show "id · name".
+  // title tooltip always carries the full id · name for clipped long names.
   function compact(o) {
     o = o || {};
     var tip = esc((o.id || '') + (o.name && o.name !== o.id ? ' · ' + o.name : ''));
     var vis = (o.visibility === 'dark_matter') ? 'dark' : 'light';
+    var body = (o.idAndName && o.name && o.name !== o.id)
+      ? '<span class="chain-badge-official">' + esc(o.id) + '</span>' +
+        '<span class="chain-badge-sep">·</span>' +
+        '<span class="chain-badge-friendly">' + esc(o.name) + '</span>'
+      : '<span class="chain-badge-official">' + primary(o) + '</span>';
     return '<span class="chain-badge compact" title="' + tip + '">' + dot(o.readiness) +
-      '<span class="chain-badge-body">' +
-        '<span class="chain-badge-official">' + primary(o) + '</span>' +
-      '</span>' +
+      '<span class="chain-badge-body">' + body + '</span>' +
       '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) + '</span>';
   }
-  return { word: word, dot: dot, chip: chip, compact: compact, full: full };
+  // Pill with an optional eyebrow label above it (e.g. "Target chain"), for the
+  // banner surfaces. extra/below ride alongside the pill.
+  function labeled(o) {
+    o = o || {};
+    var label = o.label ? '<div class="chain-badge-label">' + esc(o.label) + '</div>' : '';
+    return '<div class="chain-badge-labeled">' + label + compact(o) +
+      (o.below || '') + '</div>';
+  }
+  return { word: word, dot: dot, chip: chip, compact: compact, full: full, labeled: labeled };
 })();
 
 window.FilePicker = {
@@ -1022,7 +1035,7 @@ setInterval(function() {
       // Render the chain badge — the at-a-glance "which chain + is it ok"
       // signal. "Target chain" eyebrow keeps the mint context obvious.
       if (els.chainBanner) {
-        els.chainBanner.innerHTML = ChainBadge.full({
+        els.chainBanner.innerHTML = ChainBadge.labeled({
           id: id, name: name, visibility: vis,
           readiness: info.readiness, label: 'Target chain',
         });
@@ -2066,7 +2079,7 @@ setInterval(function() {
       var data = await resp.json();
       readiness = (data.info && data.info.readiness) || '';
     } catch (e) { /* neutral dot on failure */ }
-    host.innerHTML = ChainBadge.full({
+    host.innerHTML = ChainBadge.labeled({
       id: w.id, name: w.name, visibility: w.visibility,
       readiness: readiness, below: below,
     });
@@ -5571,10 +5584,10 @@ setInterval(function() {
           // badge's .below slot.
           var detail = '<span class="config-chain-state" data-vis="' + escapeHtml(vis) +
             '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>';
-          var badge = ChainBadge.full({
+          var badge = ChainBadge.labeled({
             id: c.id, name: c.name, visibility: vis,
             readiness: c.readiness, below: detail,
-            idAndName: true,  // Config is where the id lives — show id + name
+            idAndName: true,  // Config is where the id lives — show id · name
           });
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<div class="config-chain-badge-cell">' + badge + '</div>' +

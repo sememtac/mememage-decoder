@@ -1692,7 +1692,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
    center from the base .payload-bar rule, which centered badge + buttons). */
 .payload-bar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 .payload-bar > * { max-width: 100%; }
-.payload-chain-banner .chain-badge { background: transparent; border: none; padding: 0; }
 .payload-chain-status {
   display: flex; flex-direction: column; gap: 0.3rem;
 }
@@ -3084,7 +3083,6 @@ label > input[type="checkbox"] {
 }
 .config-chain-row:last-child { border-bottom: none; }
 .config-chain-row[data-active="1"] { background: rgba(60, 200, 220, 0.08); border-radius: 6px; }
-.config-chain-badge-cell .chain-badge { background: transparent; border: none; padding: 0; }
 .config-chain-active-badge {
   font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   color: #1c6a8a; background: rgba(60, 200, 220, 0.18);
