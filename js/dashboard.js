@@ -73,10 +73,11 @@ window.ChainBadge = (function() {
         (o.below || '') +
       '</div></div>';
   }
-  // The pill — the ONE chain badge shape, used everywhere (Conceive, Payload,
-  // Config, tickets, conception page). Shows the friendly name only; pass
-  // idAndName:true (Config, where the id is looked up) to show "id · name".
-  // title tooltip always carries the full id · name for clipped long names.
+  // The chain badge. Bare = a stadium PILL (tickets, conception). When `below`
+  // extras are passed (Payload presets, Config status), the SAME badge grows
+  // into a rounded CARD that contains the header row + the extras within one
+  // background — so the info reads as part of the badge, not floating beneath.
+  // Shows the friendly name only; idAndName:true (Config) shows "id · name".
   function compact(o) {
     o = o || {};
     var tip = esc((o.id || '') + (o.name && o.name !== o.id ? ' · ' + o.name : ''));
@@ -86,17 +87,20 @@ window.ChainBadge = (function() {
         '<span class="chain-badge-sep">·</span>' +
         '<span class="chain-badge-friendly">' + esc(o.name) + '</span>'
       : '<span class="chain-badge-official">' + primary(o) + '</span>';
-    return '<span class="chain-badge compact" title="' + tip + '">' + dot(o.readiness) +
-      '<span class="chain-badge-body">' + body + '</span>' +
-      '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) + '</span>';
+    var head =
+      '<span class="chain-badge-head">' + dot(o.readiness) +
+        '<span class="chain-badge-body">' + body + '</span>' +
+        '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) +
+      '</span>';
+    var extra = o.below || '';
+    var cls = 'chain-badge compact' + (extra ? ' has-extra' : '');
+    return '<span class="' + cls + '" title="' + tip + '">' + head + extra + '</span>';
   }
-  // Pill with an optional eyebrow label above it (e.g. "Target chain"), for the
-  // banner surfaces. extra/below ride alongside the pill.
+  // Pill/card with an optional eyebrow label above it (e.g. "Target chain").
   function labeled(o) {
     o = o || {};
     var label = o.label ? '<div class="chain-badge-label">' + esc(o.label) + '</div>' : '';
-    return '<div class="chain-badge-labeled">' + label + compact(o) +
-      (o.below || '') + '</div>';
+    return '<div class="chain-badge-labeled">' + label + compact(o) + '</div>';
   }
   return { word: word, dot: dot, chip: chip, compact: compact, full: full, labeled: labeled };
 })();

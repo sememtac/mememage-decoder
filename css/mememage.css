@@ -2690,10 +2690,22 @@
 .chain-state-chip[data-state="pending"]   { background: rgba(243, 156, 18, 0.18); color: #9a5410; border: 1px solid rgba(243, 156, 18, 0.55); }
 .chain-state-chip[data-state="notready"]  { background: rgba(231, 76, 60, 0.16); color: #a02a20; border: 1px solid rgba(231, 76, 60, 0.5); }
 
-/* Compact variant — Config picker rows + ticket rows (single line). */
-.chain-badge.compact { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.65rem; border-radius: 999px; }
-.chain-badge.compact .chain-dot { margin-top: 0; }
-.chain-badge.compact .chain-badge-body { flex-direction: row; align-items: center; gap: 0.4rem; }
+/* Compact badge. Bare = a stadium pill (single line). With extras, it grows
+   into a rounded card containing the header row + the extras in one bg. */
+.chain-badge.compact {
+  display: inline-flex; flex-direction: column; align-items: stretch;
+  gap: 0.3rem; padding: 0.4rem 0.65rem; border-radius: 999px;
+}
+.chain-badge.compact.has-extra { border-radius: 12px; align-items: flex-start; }
+/* Header row — dot + name + vis + chip on one line. */
+.chain-badge.compact .chain-badge-head {
+  display: flex; align-items: center; gap: 0.5rem;
+  justify-content: flex-start; min-width: 0; width: 100%;
+}
+.chain-badge.compact .chain-dot { margin-top: 0; flex: none; }
+.chain-badge.compact .chain-badge-body { flex-direction: row; align-items: center; gap: 0.4rem; min-width: 0; }
+.chain-badge.compact .chain-vis { flex: none; }
+.chain-badge.compact .chain-state-chip { flex: none; }
 .chain-badge.compact .chain-badge-official { font-size: 0.78rem; }
 .chain-badge.compact .chain-badge-friendly { font-size: 0.68rem; }
 .chain-badge.compact .chain-badge-sep { color: #8a8a92; }
