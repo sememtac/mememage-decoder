@@ -1640,20 +1640,39 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 
 /* Action bar: chain id + dirty marker on the left, buttons on the right */
 .payload-bar { flex-wrap: wrap; row-gap: 0.4rem; }
+/* Stacked to avoid text squish: row 1 is the chain id + the fixed-shape
+   lock/build/dirty badges (pinned right); the display name + visibility get
+   their own full-width row below so a long name never crowds the badges.
+   Design rule: never let variable-length text share a row with other
+   variable-length text or fixed chips — give each its own row. */
 .payload-chain-line {
-  display: flex; align-items: baseline; gap: 0.5rem;
+  display: flex; flex-direction: column; gap: 0.2rem;
   flex: 1; min-width: 200px;
   color: #1a1a20;
+}
+.payload-chain-head {
+  display: flex; align-items: center; gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.payload-chain-badges {
+  display: flex; align-items: center; gap: 0.4rem;
+  margin-left: auto;
 }
 .payload-chain-id {
   font-family: monospace; font-weight: 700;
   font-size: 0.85rem;
+  word-break: break-word;
 }
 .payload-chain-meta {
   font-size: 0.7rem; color: #54545c;
   font-family: monospace;
+  word-break: break-word;
 }
+.payload-chain-meta:empty { display: none; }
+/* Each preset name on its own row — "Loaded preset: X" and
+   "applied to chain: Y" can both be long. */
 .payload-preset-status {
+  display: flex; flex-direction: column; gap: 0.1rem;
   font-size: 0.72rem; color: #54545c;
   margin: 0.1rem 0 0.5rem;
 }
