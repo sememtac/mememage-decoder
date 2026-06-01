@@ -2063,32 +2063,50 @@ setInterval(function() {
   // between header / status line.
   // Render the Payload chain banner as the shared chain badge. Readiness is
   // a server signal, fetched cheaply; M-drift annotation rides in .below.
-  async function _renderPayloadBadge() {
+  // Build the payload-specific extras that ride under the chain pill: the
+  // loaded + applied preset names, and an M-drift note. Pure function of state.
+  function _payloadBadgeBelow() {
+    var rows = '';
+    var loaded = state.lastPresetName || 'Untitled';
+    rows += '<span class="chain-badge-info">Loaded preset: <strong>' +
+            escapeHtml(loaded) + '</strong></span>';
+    var applied = (state.saved && state.saved.preset_name) || '';
+    if (applied) {
+      rows += '<span class="chain-badge-info">Applied preset: <strong>' +
+              escapeHtml(applied) + '</strong></span>';
+    }
+    var draftM = state.working && state.working.M;
+    var appliedM = state.saved && state.saved.M;
+    if (draftM != null && appliedM != null && appliedM !== draftM) {
+      rows += '<span class="chain-badge-note">M=' + escapeHtml(String(draftM)) +
+              ' (draft, applied: ' + escapeHtml(String(appliedM)) + ')</span>';
+    }
+    return rows ? '<div class="chain-badge-extra">' + rows + '</div>' : '';
+  }
+
+  // Cache the last fetched readiness so re-renders triggered by preset changes
+  // don't each fire a network round-trip.
+  var _payloadReadiness = '';
+  async function _renderPayloadBadge(refetch) {
     var host = els.chainBanner;
     if (!host || !state.working) return;
     var w = state.working;
-    var below = '';
-    var draftM = w.M, appliedM = state.saved && state.saved.M;
-    if (draftM != null && appliedM != null && appliedM !== draftM) {
-      below = '<span class="chain-badge-note">M=' + draftM +
-              ' (draft, applied: ' + appliedM + ')</span>';
+    if (refetch !== false) {
+      try {
+        var resp = await fetch('/api/chain/current', { headers: authHeaders() });
+        var data = await resp.json();
+        _payloadReadiness = (data.info && data.info.readiness) || '';
+      } catch (e) { /* keep prior readiness on failure */ }
     }
-    var readiness = '';
-    try {
-      var resp = await fetch('/api/chain/current', { headers: authHeaders() });
-      var data = await resp.json();
-      readiness = (data.info && data.info.readiness) || '';
-    } catch (e) { /* neutral dot on failure */ }
     host.innerHTML = ChainBadge.labeled({
       id: w.id, name: w.name, visibility: w.visibility,
-      readiness: readiness, below: below,
+      readiness: _payloadReadiness, below: _payloadBadgeBelow(),
     });
   }
 
   function renderChainBar() {
     if (!state.working) return;
-    _renderPayloadBadge();
-    renderPresetStatus();
+    _renderPayloadBadge();  // refetches readiness; badge includes preset info
     var draftM = state.working.M;
     if (els.mInput) {
       els.mInput.value = (draftM != null) ? draftM : '';
@@ -2112,13 +2130,10 @@ setInterval(function() {
   //   applied = the preset committed to this chain (chain.json preset_name,
   //             held in state.saved); the segment hides when there's none.
   function renderPresetStatus() {
-    var loadedEl = document.getElementById('payloadLoadedPreset');
-    if (loadedEl) loadedEl.textContent = state.lastPresetName || 'Untitled';
-    var appliedName = (state.saved && state.saved.preset_name) || '';
-    var wrap = document.getElementById('payloadAppliedPresetWrap');
-    var appliedEl = document.getElementById('payloadAppliedPreset');
-    if (appliedEl) appliedEl.textContent = appliedName;
-    if (wrap) wrap.hidden = !appliedName;
+    // Preset info lives inside the chain badge now (below the pill). Re-render
+    // the badge from cached readiness — no network round-trip for a preset
+    // change.
+    _renderPayloadBadge(false);
   }
 
   // ===== Rendering: entries =====

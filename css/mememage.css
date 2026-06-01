@@ -2719,6 +2719,16 @@
   color: #6a6a74; font-weight: 700;
 }
 .chain-badge-sub { margin: -0.05rem 0 0.05rem; }
+/* Extra info under the pill (preset names, identifier sample, chain status) —
+   one item per row so long values don't squish. */
+.chain-badge-extra {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  margin-top: 0.05rem;
+}
+.chain-badge-info { font-size: 0.7rem; color: #54545c; }
+.chain-badge-info strong { color: #1a1a20; font-weight: 700; }
+.conception-section .chain-badge-info { color: #b8b8c2; }
+.conception-section .chain-badge-info strong { color: #f0f0f4; }
 /* Neutral dot (no readiness known — e.g. ticket rows). */
 .chain-dot[data-state=""] { background: #b8b8c0; }
 .conception-section .chain-badge-label { color: #9a9aa6; }
