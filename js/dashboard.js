@@ -1596,10 +1596,10 @@ setInterval(function() {
         // between the ticket and the buttons. Row 1: ticket + age + Resume + \u00d7
         // (all deterministic width). Row 2: the chain badge \u2014 the chain it
         // conceives into (bound at creation, immune to later switches).
-        // Row 2 shares the staged-image thumbnail (left) with the chain badge
-        // (right). Thumb is served from the existing token-based image endpoint
-        // (/api/mint/<token>/image, which serves pending sessions); hides via
-        // onerror if it can't load. Gives a visual cue beyond the opaque id.
+        // Row 1: thumbnail + ticket id + chain badge (identity). Row 2: age +
+        // Resume + delete (actions). Thumb is served from the token-based image
+        // endpoint (/api/mint/<token>/image, which serves pending sessions);
+        // hides via onerror if it can't load.
         var tThumb = r.token
           ? '<img class="mint-recent-thumb" src="/api/mint/' + encodeURIComponent(r.token) +
               '/image" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
@@ -1610,18 +1610,18 @@ setInterval(function() {
               visibility: r.chain_visibility, readiness: r.chain_readiness,
             })
           : '';
-        var tRow2 = (tThumb || tBadge)
-          ? '<div class="mint-recent-chainrow">' + tThumb + tBadge + '</div>'
-          : '';
         return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '" title="' + escapeHtml(r.image) + '">' +
           '<div class="mint-recent-head">' +
+            tThumb +
             '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
+            tBadge +
+          '</div>' +
+          '<div class="mint-recent-actions">' +
             '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
               (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
             '<button type="button" class="mint-recent-btn" data-recent-action="resume">Resume</button>' +
             '<button type="button" class="mint-recent-btn mint-recent-btn-danger" data-recent-action="delete">\u00d7</button>' +
           '</div>' +
-          tRow2 +
           '</div>';
       }).join('');
     } catch (e) {

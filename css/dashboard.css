@@ -834,11 +834,12 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   background: rgba(255, 255, 255, 0.5);
   border-radius: 6px;
 }
+/* Row 1: thumbnail + ticket id (left) + chain badge (pushed right). */
 .mint-recent-head {
   display: flex; align-items: center; gap: 0.5rem;
 }
-/* Staged-image thumbnail — small square cue, shares row 2 with the chain
-   badge (thumb left, badge right). */
+.mint-recent-head > .chain-badge.compact { margin-left: auto; }
+/* Staged-image thumbnail — small square cue, first on row 1. */
 .mint-recent-thumb {
   flex: none;
   width: 34px; height: 34px;
@@ -847,22 +848,18 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: rgba(0, 0, 0, 0.05);
 }
-/* Ticket stays left; age + Resume + × cluster on the right. */
-.mint-recent-head > .mint-recent-age { margin-left: auto; }
-/* Chain badge sits on row 2, right-aligned and a touch smaller than the
-   full-size compact pill so it reads as secondary to the ticket id. */
-/* Row 2: thumbnail pinned left, chain badge pinned right. */
-.mint-recent-chainrow { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.mint-recent-chainrow .mint-recent-thumb { order: -1; }
-.mint-recent-chainrow .chain-badge.compact { margin-left: auto; }
-.mint-recent-chainrow .chain-badge.compact {
-  padding: 0.25rem 0.5rem; gap: 0.4rem;
+/* The chain badge is a touch smaller than the full compact pill so it reads
+   as secondary to the ticket id. */
+.mint-recent-head > .chain-badge.compact { padding: 0.25rem 0.5rem; gap: 0.4rem; }
+.mint-recent-head > .chain-badge.compact .chain-dot { width: 8px; height: 8px; }
+.mint-recent-head > .chain-badge.compact .chain-badge-official { font-size: 0.7rem; }
+.mint-recent-head > .chain-badge.compact .chain-badge-friendly { font-size: 0.62rem; }
+.mint-recent-head > .chain-badge.compact .chain-vis { font-size: 0.52rem; }
+.mint-recent-head > .chain-badge.compact .chain-state-chip { font-size: 0.54rem; padding: 0.1rem 0.4rem; }
+/* Row 2: age + Resume + delete, right-aligned. */
+.mint-recent-actions {
+  display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end;
 }
-.mint-recent-chainrow .chain-badge.compact .chain-dot { width: 8px; height: 8px; }
-.mint-recent-chainrow .chain-badge.compact .chain-badge-official { font-size: 0.7rem; }
-.mint-recent-chainrow .chain-badge.compact .chain-badge-friendly { font-size: 0.62rem; }
-.mint-recent-chainrow .chain-badge.compact .chain-vis { font-size: 0.52rem; }
-.mint-recent-chainrow .chain-badge.compact .chain-state-chip { font-size: 0.54rem; padding: 0.1rem 0.4rem; }
 .mint-recent-ticket {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-weight: 700;
