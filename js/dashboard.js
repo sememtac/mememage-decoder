@@ -739,7 +739,11 @@ setInterval(function() {
       }
       renderMetaEditor();
     }
-    loadActiveChain();   // refresh chain banner (may have changed since)
+    // Pin the banner to the ticket's BOUND chain (server-stamped at
+    // creation). Switching the active chain in Config must not change
+    // where this conception lands, and the banner must reflect that.
+    state.boundChain = data.chain || null;
+    loadActiveChain(state.boundChain);
     applyHandoffUi();    // QR, URL, copy/open, ticket — same for every mode
     setState('reviewing');
     // New session just landed server-side (upload) or we just resumed
@@ -927,9 +931,12 @@ setInterval(function() {
   state.chainVisibility = null;
   state.chainPasswordSet = false;
   state.chainSealed = null;  // tri-state: null = unknown, true/false once loaded
-  async function loadActiveChain() {
+  async function loadActiveChain(overrideId) {
     try {
-      var resp = await fetch('/api/chain/current', {headers: authHeaders()});
+      // overrideId pins the banner to a ticket's BOUND chain so it stays
+      // correct even if the user switches the active chain in Config.
+      var _url = '/api/chain/current' + (overrideId ? ('?chain=' + encodeURIComponent(overrideId)) : '');
+      var resp = await fetch(_url, {headers: authHeaders()});
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       var data = await resp.json();
       var id = data.id || '';
