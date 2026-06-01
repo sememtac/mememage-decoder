@@ -39,6 +39,29 @@ window.ChainBadge = (function() {
   function word(st) { return WORD[st] || 'Unknown'; }
   function dot(st) { return '<span class="chain-dot" data-state="' + esc(st) + '"></span>'; }
   function chip(st) { return '<span class="chain-state-chip" data-state="' + esc(st) + '">' + word(st) + '</span>'; }
+  // Full stacked badge — Conceive + Payload banners. label is an optional
+  // tiny eyebrow above the id (e.g. "Target chain"). extra is optional HTML
+  // appended into the head row's right cluster (e.g. Payload's lock/build).
+  function full(o) {
+    o = o || {};
+    var official = esc(o.id || '?');
+    var friendly = (o.name && o.name !== o.id) ? esc(o.name) : '';
+    var vis = (o.visibility === 'dark_matter') ? 'dark' : 'light';
+    var label = o.label ? '<span class="chain-badge-label">' + esc(o.label) + '</span>' : '';
+    return '<div class="chain-badge">' + dot(o.readiness) +
+      '<div class="chain-badge-body">' +
+        '<div class="chain-badge-head">' +
+          '<span class="chain-badge-official">' + official + '</span>' +
+          '<span class="chain-badge-right">' +
+            (o.extra || '') +
+            '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) +
+          '</span>' +
+        '</div>' +
+        (label ? '<div class="chain-badge-sub">' + label + '</div>' : '') +
+        (friendly ? '<span class="chain-badge-friendly">' + friendly + '</span>' : '') +
+        (o.below || '') +
+      '</div></div>';
+  }
   // Compact one-line badge — Config picker rows + ticket rows.
   function compact(o) {
     o = o || {};
@@ -52,7 +75,7 @@ window.ChainBadge = (function() {
       '</span>' +
       '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) + '</span>';
   }
-  return { word: word, dot: dot, chip: chip, compact: compact };
+  return { word: word, dot: dot, chip: chip, compact: compact, full: full };
 })();
 
 window.FilePicker = {
@@ -423,9 +446,6 @@ setInterval(function() {
     metaEditor:  document.getElementById('mintMetaEditor'),
     metaAdd:     document.getElementById('mintMetaAdd'),
     chainBanner: document.getElementById('mintChainBanner'),
-    chainId:     document.getElementById('mintChainId'),
-    chainName:   document.getElementById('mintChainName'),
-    chainVis:    document.getElementById('mintChainVis'),
     awaitUrl:    document.getElementById('mintAwaitUrl'),
     awaitCopy:   document.getElementById('mintAwaitCopy'),
     handoffHead: document.getElementById('mintHandoffHead'),
@@ -972,30 +992,6 @@ setInterval(function() {
   var chainStateChipHtml = ChainBadge.chip;
   var chainBadgeCompact = ChainBadge.compact;
 
-  // Inject/refresh the readiness dot + chip in the mint banner's head row.
-  // The banner markup predates the badge, so we patch it in by id once.
-  function _stampMintReadiness(state) {
-    var head = document.querySelector('#mintChainBanner .mint-chain-row-head');
-    if (!head) return;
-    var dot = document.getElementById('mintReadyDot');
-    if (!dot) {
-      dot = document.createElement('span');
-      dot.id = 'mintReadyDot';
-      dot.className = 'chain-dot';
-      head.insertBefore(dot, head.firstChild);
-    }
-    dot.setAttribute('data-state', state || '');
-    var chip = document.getElementById('mintReadyChip');
-    if (!chip) {
-      chip = document.createElement('span');
-      chip.id = 'mintReadyChip';
-      chip.className = 'chain-state-chip';
-      head.appendChild(chip);
-    }
-    chip.setAttribute('data-state', state || '');
-    chip.textContent = chainStateWord(state);
-  }
-
   async function loadActiveChain(overrideId) {
     try {
       // overrideId pins the banner to a ticket's BOUND chain so it stays
@@ -1013,30 +1009,19 @@ setInterval(function() {
       state.chainPasswordSet = pwSet;
       state.chainUnlocked = !!info.password_unlocked;
       state.chainNeedsUnlock = !!info.password_needs_unlock;
-      els.chainId.textContent = id;
-      // Display name lives on its own row now \u2014 no inline " \u00b7 " prefix.
-      els.chainName.textContent = name && name !== id ? name : '';
-      // Compose the visibility chip text. We avoid "sealed" here because
-      // "Seal Age" is the other primary use of that verb (site-pack) and
-      // people mistake one state for the other. "password set" is what
-      // the button labels say too — keep wording consistent.
-      var visText;
-      if (vis === 'dark_matter') {
-        if (!pwSet) visText = 'Dark \u00b7 NEEDS PASSWORD';
-        else if (info.password_needs_unlock) visText = 'Dark \u00b7 enter password';
-        else visText = 'Dark \u00b7 ready';
-      } else {
-        visText = pwSet ? 'Light \u00b7 GPS password' : 'Light \u00b7 public';
+      // Render the chain badge — the at-a-glance "which chain + is it ok"
+      // signal. "Target chain" eyebrow keeps the mint context obvious.
+      if (els.chainBanner) {
+        els.chainBanner.innerHTML = ChainBadge.full({
+          id: id, name: name, visibility: vis,
+          readiness: info.readiness, label: 'Target chain',
+        });
       }
-      els.chainVis.textContent = visText;
-      els.chainVis.dataset.vis = vis;
-      els.chainVis.dataset.pwSet = pwSet ? '1' : '0';
-      // Readiness dot + chip — the at-a-glance "is this chain ok" signal.
-      _stampMintReadiness(info.readiness);
     } catch (e) {
-      els.chainId.textContent = '(could not load active chain)';
-      els.chainName.textContent = '';
-      els.chainVis.textContent = '';
+      if (els.chainBanner) {
+        els.chainBanner.innerHTML = '<div class="chain-badge"><div class="chain-badge-body">' +
+          '<span class="chain-badge-official">(could not load active chain)</span></div></div>';
+      }
       state.chainVisibility = null;
       state.chainPasswordSet = false;
     }
@@ -1607,10 +1592,13 @@ setInterval(function() {
         // and the ticket alone is enough to identify the session.
         // Filename is kept as a title attribute on the row for desktop
         // hover.
-        // Chain on each pending ticket so the creator sees which chain it
-        // conceives into (bound at creation, immune to later chain switches).
+        // Chain pill on each pending ticket so the creator sees which chain
+        // it conceives into (bound at creation, immune to later switches).
+        // Per-ticket live readiness isn't fetched (would be N lookups); the
+        // chain identity is the point here, so the dot stays neutral.
         var tChain = r.chain
-          ? '<span class="mint-recent-chain" title="Target chain">' + escapeHtml(r.chain) + '</span>'
+          ? '<span class="mint-recent-chain" title="Target chain">' +
+              '<span class="chain-dot" data-state=""></span>' + escapeHtml(r.chain) + '</span>'
           : '';
         return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '" title="' + escapeHtml(r.image) + '">' +
           '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
@@ -2036,19 +2024,26 @@ setInterval(function() {
   // M differs from the chain's applied M (e.g. user loaded a preset
   // with a different M) so the user understands the discrepancy
   // between header / status line.
-  // Inject/refresh the readiness dot in the Payload chain banner. Readiness
-  // is a server-derived signal, so we fetch it (cheap, cached by the browser
-  // between renders) and stamp the dot into the existing badges span.
+  // Stamp the readiness dot (before the chain id) + a state chip (in the
+  // badge cluster, alongside LOCKED/build) so the Payload banner reads like
+  // the shared chain badge. Readiness is a server signal — fetch it cheaply.
   async function _stampPayloadReadiness() {
-    var host = document.querySelector('#payloadChainBanner .payload-chain-badges')
-            || document.querySelector('.payload-chain-badges');
-    if (!host) return;
+    var idEl = els.chainId;        // .payload-chain-id span
+    var cluster = document.querySelector('.payload-chain-badges');
+    if (!idEl) return;
     var dot = document.getElementById('payloadReadyDot');
     if (!dot) {
       dot = document.createElement('span');
       dot.id = 'payloadReadyDot';
       dot.className = 'chain-dot';
-      host.insertBefore(dot, host.firstChild);
+      idEl.parentNode.insertBefore(dot, idEl);  // dot sits before the id
+    }
+    var chip = document.getElementById('payloadReadyChip');
+    if (!chip && cluster) {
+      chip = document.createElement('span');
+      chip.id = 'payloadReadyChip';
+      chip.className = 'chain-state-chip';
+      cluster.insertBefore(chip, cluster.firstChild);  // first in the cluster
     }
     try {
       var resp = await fetch('/api/chain/current', { headers: authHeaders() });
@@ -2056,7 +2051,11 @@ setInterval(function() {
       var st = (data.info && data.info.readiness) || '';
       dot.setAttribute('data-state', st);
       dot.title = 'Chain ' + (ChainBadge.word(st) || '').toLowerCase();
-    } catch (e) { /* leave the dot neutral on failure */ }
+      if (chip) {
+        chip.setAttribute('data-state', st);
+        chip.textContent = ChainBadge.word(st);
+      }
+    } catch (e) { /* leave neutral on failure */ }
   }
 
   function renderChainBar() {
