@@ -687,3 +687,7 @@ body {
   border-color: rgba(220, 80, 220, 0.4);
   color: #f0d0f0;
 }
+
+/* Chain badge wrapper — server-injected ({{CHAIN_BADGE}}). The .chain-*
+   styles live in mememage.css; this just spaces it under the head. */
+.conception-chain { margin: 0.2rem 0 0.9rem; }

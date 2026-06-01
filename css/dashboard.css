@@ -3799,3 +3799,9 @@ label > input[type="checkbox"] {
 }
 .config-cc-log-line { line-height: 1.4; }
 .config-cc-log-err { color: #8a3030; }
+
+/* Chain-badge legend inside the glossary entry — one line per status with
+   its dot. The .chain-dot styles come from mememage.css. */
+.glossary-badge-legend { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.6rem 0; }
+.glossary-badge-legend > div { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.78rem; line-height: 1.4; }
+.glossary-badge-legend .chain-dot { flex: none; margin-top: 0.15rem; }

@@ -22,6 +22,39 @@
 // Resolves to a path string when the user picks, or to null when they
 // cancel. Rejects on errors.
 // =====================================================================
+// =====================================================================
+// CHAIN BADGE — global so all three tab IIFEs (Conceive / Payload /
+// Config) render the identical badge. The dot color is the chain's
+// readiness (ready/nopayload/pending/notready, from the server's
+// _chain_readiness), shown with a word so it's never color-only.
+// Mirrors server.py:_chain_badge_html. CSS: .chain-* in mememage.css.
+// =====================================================================
+window.ChainBadge = (function() {
+  var WORD = { ready: 'Ready', nopayload: 'No payload', pending: 'Update pending', notready: 'Not ready' };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function word(st) { return WORD[st] || 'Unknown'; }
+  function dot(st) { return '<span class="chain-dot" data-state="' + esc(st) + '"></span>'; }
+  function chip(st) { return '<span class="chain-state-chip" data-state="' + esc(st) + '">' + word(st) + '</span>'; }
+  // Compact one-line badge — Config picker rows + ticket rows.
+  function compact(o) {
+    o = o || {};
+    var official = esc(o.id || '?');
+    var friendly = (o.name && o.name !== o.id) ? esc(o.name) : '';
+    var vis = (o.visibility === 'dark_matter') ? 'dark' : 'light';
+    return '<span class="chain-badge compact">' + dot(o.readiness) +
+      '<span class="chain-badge-body">' +
+        '<span class="chain-badge-official">' + official + '</span>' +
+        (friendly ? '<span class="chain-badge-sep">·</span><span class="chain-badge-friendly">' + friendly + '</span>' : '') +
+      '</span>' +
+      '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) + '</span>';
+  }
+  return { word: word, dot: dot, chip: chip, compact: compact };
+})();
+
 window.FilePicker = {
   // Cached probe of the server's picker capability. The dashboard
   // can read .available synchronously after FilePicker.checkAvailable()
@@ -931,6 +964,38 @@ setInterval(function() {
   state.chainVisibility = null;
   state.chainPasswordSet = false;
   state.chainSealed = null;  // tri-state: null = unknown, true/false once loaded
+
+  // Chain badge helpers are global (window.ChainBadge) \u2014 see top of file \u2014
+  // because they're called from three separate tab IIFEs.
+  var chainStateWord = ChainBadge.word;
+  var chainDotHtml = ChainBadge.dot;
+  var chainStateChipHtml = ChainBadge.chip;
+  var chainBadgeCompact = ChainBadge.compact;
+
+  // Inject/refresh the readiness dot + chip in the mint banner's head row.
+  // The banner markup predates the badge, so we patch it in by id once.
+  function _stampMintReadiness(state) {
+    var head = document.querySelector('#mintChainBanner .mint-chain-row-head');
+    if (!head) return;
+    var dot = document.getElementById('mintReadyDot');
+    if (!dot) {
+      dot = document.createElement('span');
+      dot.id = 'mintReadyDot';
+      dot.className = 'chain-dot';
+      head.insertBefore(dot, head.firstChild);
+    }
+    dot.setAttribute('data-state', state || '');
+    var chip = document.getElementById('mintReadyChip');
+    if (!chip) {
+      chip = document.createElement('span');
+      chip.id = 'mintReadyChip';
+      chip.className = 'chain-state-chip';
+      head.appendChild(chip);
+    }
+    chip.setAttribute('data-state', state || '');
+    chip.textContent = chainStateWord(state);
+  }
+
   async function loadActiveChain(overrideId) {
     try {
       // overrideId pins the banner to a ticket's BOUND chain so it stays
@@ -966,6 +1031,8 @@ setInterval(function() {
       els.chainVis.textContent = visText;
       els.chainVis.dataset.vis = vis;
       els.chainVis.dataset.pwSet = pwSet ? '1' : '0';
+      // Readiness dot + chip — the at-a-glance "is this chain ok" signal.
+      _stampMintReadiness(info.readiness);
     } catch (e) {
       els.chainId.textContent = '(could not load active chain)';
       els.chainName.textContent = '';
@@ -1540,8 +1607,14 @@ setInterval(function() {
         // and the ticket alone is enough to identify the session.
         // Filename is kept as a title attribute on the row for desktop
         // hover.
+        // Chain on each pending ticket so the creator sees which chain it
+        // conceives into (bound at creation, immune to later chain switches).
+        var tChain = r.chain
+          ? '<span class="mint-recent-chain" title="Target chain">' + escapeHtml(r.chain) + '</span>'
+          : '';
         return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '" title="' + escapeHtml(r.image) + '">' +
           '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
+          tChain +
           '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
             (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
           '<button type="button" class="mint-recent-btn" data-recent-action="resume">Resume</button>' +
@@ -1963,6 +2036,29 @@ setInterval(function() {
   // M differs from the chain's applied M (e.g. user loaded a preset
   // with a different M) so the user understands the discrepancy
   // between header / status line.
+  // Inject/refresh the readiness dot in the Payload chain banner. Readiness
+  // is a server-derived signal, so we fetch it (cheap, cached by the browser
+  // between renders) and stamp the dot into the existing badges span.
+  async function _stampPayloadReadiness() {
+    var host = document.querySelector('#payloadChainBanner .payload-chain-badges')
+            || document.querySelector('.payload-chain-badges');
+    if (!host) return;
+    var dot = document.getElementById('payloadReadyDot');
+    if (!dot) {
+      dot = document.createElement('span');
+      dot.id = 'payloadReadyDot';
+      dot.className = 'chain-dot';
+      host.insertBefore(dot, host.firstChild);
+    }
+    try {
+      var resp = await fetch('/api/chain/current', { headers: authHeaders() });
+      var data = await resp.json();
+      var st = (data.info && data.info.readiness) || '';
+      dot.setAttribute('data-state', st);
+      dot.title = 'Chain ' + (ChainBadge.word(st) || '').toLowerCase();
+    } catch (e) { /* leave the dot neutral on failure */ }
+  }
+
   function renderChainBar() {
     if (!state.working) return;
     els.chainId.textContent = state.working.id || '?';
@@ -1976,6 +2072,7 @@ setInterval(function() {
     }
     els.chainMeta.textContent = meta;
     renderPresetStatus();
+    _stampPayloadReadiness();
     if (els.mInput) {
       els.mInput.value = (draftM != null) ? draftM : '';
       els.mInput.disabled = state.chainLocked === true;
@@ -5466,9 +5563,11 @@ setInterval(function() {
             '</div>';
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<span class="config-chain-active-mark">' + markCell + '</span>' +
-            '<span class="config-chain-id" title="' + escapeHtml(c.id) + '">' + escapeHtml(c.id) + '</span>' +
+            '<span class="config-chain-id" title="' + escapeHtml(c.id) + '">' +
+              ChainBadge.dot(c.readiness) + escapeHtml(c.id) + '</span>' +
             '<span class="config-chain-meta" title="' + escapeHtml(c.name || '') + '">' +
-              escapeHtml(c.name || '') + '<br><span class="config-chain-state" data-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>' +
+              escapeHtml(c.name || '') + ' ' + ChainBadge.chip(c.readiness) +
+              '<br><span class="config-chain-state" data-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>' +
             '</span>' +
             '<span class="config-chain-actions">' + actions + '</span>' +
             '<span class="config-chain-gps-cell advanced-only">' + gpsRadio + '</span>' +
@@ -6179,6 +6278,15 @@ setInterval(function() {
     // --- Chains + Profiles ---
     { id: 'chain', label: 'Chain',
       body: 'A universe of conceptions. Multiple chains let one host run separate provenance streams (a public art chain, a password-gated private chain, a test chain). Each chain has its own Age cycle, records, visibility setting, and (optionally) password. Chain shape — cycle length, payload layout, GPS contract — is per-chain configuration.' },
+    { id: 'chain_badge', label: 'Chain badge',
+      body: 'The little badge shown on every chain — in Conceive, Payload, Config, on tickets, and on the conception page — so you always know which chain you’re on. It carries the <strong>official id</strong> (the slug, e.g. <code>watermark</code>) and the <strong>friendly name</strong> you can rename, plus a colored <strong>status dot</strong> that tells you the chain’s readiness at a glance:' +
+        '<div class="glossary-badge-legend">' +
+          '<div><span class="chain-dot" data-state="ready"></span> <strong>Green — Ready.</strong> Sealed and good to conceive. (Most chains, most of the time.)</div>' +
+          '<div><span class="chain-dot" data-state="nopayload"></span> <strong>Yellow — No payload.</strong> Provenance still works; no payload distribution configured. Perfectly fine, just flagged.</div>' +
+          '<div><span class="chain-dot" data-state="pending"></span> <strong>Orange (pulsing) — Update pending.</strong> A payload change is staged for the next Age but not yet applied.</div>' +
+          '<div><span class="chain-dot" data-state="notready"></span> <strong>Red — Not ready.</strong> Can’t conceive yet: a dark chain needs its password, or the chain has no sealed Age.</div>' +
+        '</div>' +
+        'The dot always shows the most important state (red beats orange beats yellow beats green), and a matching word sits beside it so it reads without relying on color.' },
     { id: 'age', label: 'Age',
       body: 'A version epoch of a chain. Records minted during an Age share the same decoder, ruleset, and cycle-position counter. Sealing locks the Age in place; the next Age begins fresh. Cycle length is per-chain configuration — the demo chain runs a 365-position year, but any chain can define its own cadence.' },
     { id: 'constellation', label: 'Constellation',

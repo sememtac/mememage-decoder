@@ -2640,3 +2640,70 @@
   .cosmic-player[data-rarity="veryrare"]  { --rarity-color: #5a2a8a; --rarity-glow: rgba(90,42,138,0.2); }
   .cosmic-player[data-rarity="epic"]      { --rarity-color: #8a6210; --rarity-glow: rgba(138,98,16,0.2); }
   .cosmic-player[data-rarity="legendary"] { --rarity-color: #d44040; --rarity-glow: rgba(212,64,64,0.2); }
+
+/* =====================================================================
+   CHAIN BADGE — shared component (dashboard + conception page). One
+   look everywhere so the creator always knows which chain they're on.
+   The DOT COLOR is the chain's readiness (semantic, not decorative):
+     green  = ready        yellow = no payload configured (fine, flagged)
+     orange = update pending (pulses)   red = not ready to conceive
+   Every badge also carries the state WORD so it's never color-only.
+   ===================================================================== */
+.chain-badge {
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 7px;
+  padding: 0.55rem 0.7rem;
+}
+.chain-badge-body { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0; }
+.chain-badge-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.chain-badge-official { font-weight: 700; font-size: 0.85rem; color: #1a1a20; word-break: break-word; }
+.chain-badge-right { display: flex; align-items: center; gap: 0.4rem; flex: none; }
+.chain-vis { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: #5a5a64; font-weight: 700; }
+.chain-badge-friendly { font-size: 0.72rem; color: #45454e; word-break: break-word; }
+.chain-badge-friendly:empty { display: none; }
+
+/* The readiness dot. */
+.chain-dot {
+  flex: none; width: 11px; height: 11px; border-radius: 50%;
+  margin-top: 0.18rem;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.12) inset;
+}
+.chain-dot[data-state="ready"]     { background: #2ecc71; }
+.chain-dot[data-state="nopayload"] { background: #f1c40f; }
+.chain-dot[data-state="pending"]   { background: #f39c12; animation: chain-pulse 1.8s ease-in-out infinite; }
+.chain-dot[data-state="notready"]  { background: #e74c3c; }
+@keyframes chain-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.55), 0 0 0 2px rgba(0, 0, 0, 0.12) inset; }
+  55%      { box-shadow: 0 0 0 5px rgba(243, 156, 18, 0),  0 0 0 2px rgba(0, 0, 0, 0.12) inset; }
+}
+
+/* The readiness chip — same palette as the dot, with a word. */
+.chain-state-chip {
+  white-space: nowrap; flex: none;
+  font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase;
+  font-weight: 700; padding: 0.13rem 0.5rem; border-radius: 999px;
+}
+.chain-state-chip[data-state="ready"]     { background: rgba(46, 204, 113, 0.16); color: #1c7a44; border: 1px solid rgba(46, 204, 113, 0.5); }
+.chain-state-chip[data-state="nopayload"] { background: rgba(241, 196, 15, 0.18); color: #8a6510; border: 1px solid rgba(241, 196, 15, 0.55); }
+.chain-state-chip[data-state="pending"]   { background: rgba(243, 156, 18, 0.18); color: #9a5410; border: 1px solid rgba(243, 156, 18, 0.55); }
+.chain-state-chip[data-state="notready"]  { background: rgba(231, 76, 60, 0.16); color: #a02a20; border: 1px solid rgba(231, 76, 60, 0.5); }
+
+/* Compact variant — Config picker rows + ticket rows (single line). */
+.chain-badge.compact { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.65rem; border-radius: 999px; }
+.chain-badge.compact .chain-dot { margin-top: 0; }
+.chain-badge.compact .chain-badge-body { flex-direction: row; align-items: center; gap: 0.4rem; }
+.chain-badge.compact .chain-badge-official { font-size: 0.78rem; }
+.chain-badge.compact .chain-badge-friendly { font-size: 0.68rem; }
+.chain-badge.compact .chain-badge-sep { color: #8a8a92; }
+
+/* Dark surfaces (conception page yin theme) — lift text/bg for contrast. */
+[data-theme="yin"] ~ .panel-layout .chain-badge,
+.conception-section .chain-badge {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.conception-section .chain-badge-official { color: #f0f0f4; }
+.conception-section .chain-badge-friendly { color: #b8b8c2; }
+.conception-section .chain-vis { color: #9a9aa6; }
