@@ -837,6 +837,15 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .mint-recent-head {
   display: flex; align-items: center; gap: 0.5rem;
 }
+/* Staged-image thumbnail — small square cue, left of the ticket id. */
+.mint-recent-thumb {
+  flex: none;
+  width: 34px; height: 34px;
+  object-fit: cover;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.05);
+}
 /* Ticket stays left; age + Resume + × cluster on the right. */
 .mint-recent-head > .mint-recent-age { margin-left: auto; }
 /* Chain badge sits on row 2, right-aligned and a touch smaller than the

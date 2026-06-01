@@ -1602,8 +1602,16 @@ setInterval(function() {
               visibility: r.chain_visibility, readiness: r.chain_readiness,
             }) + '</div>'
           : '';
+        // Staged-image thumbnail \u2014 the server serves pending-session images
+        // at /api/mint/<token>/image. Gives the creator a visual cue for which
+        // conception this ticket is, beyond the opaque id.
+        var tThumb = r.token
+          ? '<img class="mint-recent-thumb" src="/api/mint/' + encodeURIComponent(r.token) +
+              '/image" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+          : '';
         return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '" title="' + escapeHtml(r.image) + '">' +
           '<div class="mint-recent-head">' +
+            tThumb +
             '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
             '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
               (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
