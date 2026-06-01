@@ -1669,12 +1669,13 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   word-break: break-word;
 }
 .payload-chain-meta:empty { display: none; }
-/* Each preset name on its own row — "Loaded preset: X" and
-   "applied to chain: Y" can both be long. */
+/* Stacked under the chain name (lives inside .payload-chain-line). Each
+   preset name on its own row — "Loaded preset: X" and "applied preset: Y"
+   can both be long. */
 .payload-preset-status {
   display: flex; flex-direction: column; gap: 0.1rem;
   font-size: 0.72rem; color: #54545c;
-  margin: 0.1rem 0 0.5rem;
+  margin: 0.25rem 0 0;
 }
 .payload-preset-status strong {
   font-weight: 700; color: #1a1a20;
