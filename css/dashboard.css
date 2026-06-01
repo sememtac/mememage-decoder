@@ -468,6 +468,7 @@
 .mint-thumb-meta { flex: 1; min-width: 0; }
 .mint-filename {
   font-size: 0.78rem; font-weight: 600; margin: 0;
+  color: #1a1a20;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .mint-size { font-size: 0.7rem; opacity: 0.6; margin: 0.1rem 0 0; }
