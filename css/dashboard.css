@@ -3806,14 +3806,9 @@ label > input[type="checkbox"] {
 .glossary-badge-legend > div { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.78rem; line-height: 1.4; }
 .glossary-badge-legend .chain-dot { flex: none; margin-top: 0.15rem; }
 
-/* Pending-ticket chain pill — dot + chain id, right-aligned before the age. */
-.mint-recent-chain {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  margin-left: auto;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.72rem; color: #45454e;
-}
-.mint-recent-chain .chain-dot { width: 8px; height: 8px; }
+/* Pending-ticket chain badge — right-aligned before the age. Wraps the real
+   .chain-badge.compact, so it just handles placement. */
+.mint-recent-chain { margin-left: auto; display: inline-flex; }
 /* Payload banner: the readiness dot sits inline before the chain id. */
 .payload-chain-head { align-items: center; }
 .payload-chain-head > .chain-dot { margin-top: 0; }

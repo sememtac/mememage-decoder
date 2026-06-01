@@ -1592,13 +1592,15 @@ setInterval(function() {
         // and the ticket alone is enough to identify the session.
         // Filename is kept as a title attribute on the row for desktop
         // hover.
-        // Chain pill on each pending ticket so the creator sees which chain
-        // it conceives into (bound at creation, immune to later switches).
-        // Per-ticket live readiness isn't fetched (would be N lookups); the
-        // chain identity is the point here, so the dot stays neutral.
+        // The real compact chain badge on each pending ticket, so the creator
+        // sees which chain it conceives into (bound at creation, immune to
+        // later switches). The sessions API ships the chain's name + vis +
+        // readiness so this matches the badge everywhere else.
         var tChain = r.chain
-          ? '<span class="mint-recent-chain" title="Target chain">' +
-              '<span class="chain-dot" data-state=""></span>' + escapeHtml(r.chain) + '</span>'
+          ? '<span class="mint-recent-chain">' + ChainBadge.compact({
+              id: r.chain, name: r.chain_name,
+              visibility: r.chain_visibility, readiness: r.chain_readiness,
+            }) + '</span>'
           : '';
         return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '" title="' + escapeHtml(r.image) + '">' +
           '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
