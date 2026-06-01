@@ -1648,7 +1648,10 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 /* Payload bar — vertical stack: chain badge, then payload-specific status
    (lock / build / dirty + preset), then the action rows. The badge owns the
    chain identity; the status block carries everything payload-specific. */
-.payload-bar { display: flex; flex-direction: column; gap: 0.5rem; }
+/* Left-align everything in the column (overrides the inherited align-items:
+   center from the base .payload-bar rule, which centered badge + buttons). */
+.payload-bar { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+.payload-bar > * { max-width: 100%; }
 .payload-chain-banner .chain-badge { background: transparent; border: none; padding: 0; }
 .payload-chain-status {
   display: flex; flex-direction: column; gap: 0.3rem;
