@@ -823,16 +823,23 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   margin: 0 0 0.4rem;
 }
 .mint-recent-list { display: flex; flex-direction: column; gap: 0.3rem; }
+/* Two-row ticket: head (ticket + age + Resume + ×) on row 1, chain badge on
+   row 2 — so a long chain name never squeezes the controls. */
 .mint-recent-row {
-  display: grid;
-  grid-template-columns: 1fr max-content max-content max-content;
-  align-items: center;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   font-size: 0.7rem;
-  padding: 0.3rem 0.4rem;
+  padding: 0.45rem 0.5rem;
   background: rgba(255, 255, 255, 0.5);
-  border-radius: 4px;
+  border-radius: 6px;
 }
+.mint-recent-head {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+/* Ticket stays left; age + Resume + × cluster on the right. */
+.mint-recent-head > .mint-recent-age { margin-left: auto; }
+.mint-recent-chainrow { display: flex; }
 .mint-recent-ticket {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-weight: 600;
@@ -3438,25 +3445,12 @@ label > input[type="checkbox"] {
   .welcome-step-label { grid-area: label; }
   .welcome-step-detail { grid-area: detail; }
 
-  /* --- Pending sessions list --- */
-  .mint-recent-row {
-    grid-template-columns: 1fr max-content;
-    grid-template-areas:
-      "ticket meta"
-      "actions actions";
-    gap: 0.25rem 0.6rem;
-    padding: 0.5rem 0.6rem;
-  }
-  .mint-recent-row > .mint-recent-ticket { grid-area: ticket; align-self: center; font-size: 0.78rem; }
-  .mint-recent-row > .mint-recent-age    { grid-area: meta; align-self: center; }
-  .mint-recent-row > .mint-recent-btn:not(.mint-recent-btn-danger) {
-    grid-area: actions; justify-self: stretch; padding: 0.45rem 0.6rem; font-size: 0.7rem;
-  }
-  .mint-recent-row > .mint-recent-btn-danger {
-    /* Stack the × under the Resume button on its own line */
-    position: absolute; top: 0.4rem; right: 0.5rem; padding: 0.15rem 0.45rem;
-  }
-  .mint-recent-row { position: relative; }
+  /* --- Pending sessions list --- (flex-column on every width; the head
+     row's controls wrap if the ticket id + buttons get tight) */
+  .mint-recent-row { padding: 0.5rem 0.6rem; }
+  .mint-recent-head { flex-wrap: wrap; }
+  .mint-recent-head > .mint-recent-ticket { font-size: 0.78rem; }
+  .mint-recent-head > .mint-recent-btn { padding: 0.35rem 0.6rem; font-size: 0.7rem; }
 
   /* --- Resume input row (empty state) --- */
   .mint-resume {

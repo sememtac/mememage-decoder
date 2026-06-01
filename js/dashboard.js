@@ -1592,23 +1592,25 @@ setInterval(function() {
         // and the ticket alone is enough to identify the session.
         // Filename is kept as a title attribute on the row for desktop
         // hover.
-        // The real compact chain badge on each pending ticket, so the creator
-        // sees which chain it conceives into (bound at creation, immune to
-        // later switches). The sessions API ships the chain's name + vis +
-        // readiness so this matches the badge everywhere else.
+        // Two-row layout so the chain badge (variable width) doesn't squeeze
+        // between the ticket and the buttons. Row 1: ticket + age + Resume + \u00d7
+        // (all deterministic width). Row 2: the chain badge \u2014 the chain it
+        // conceives into (bound at creation, immune to later switches).
         var tChain = r.chain
-          ? '<span class="mint-recent-chain">' + ChainBadge.compact({
+          ? '<div class="mint-recent-chainrow">' + ChainBadge.compact({
               id: r.chain, name: r.chain_name,
               visibility: r.chain_visibility, readiness: r.chain_readiness,
-            }) + '</span>'
+            }) + '</div>'
           : '';
         return '<div class="mint-recent-row" data-ticket="' + escapeHtml(r.ticket) + '" title="' + escapeHtml(r.image) + '">' +
-          '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
+          '<div class="mint-recent-head">' +
+            '<span class="mint-recent-ticket">' + escapeHtml(r.ticket) + '</span>' +
+            '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
+              (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
+            '<button type="button" class="mint-recent-btn" data-recent-action="resume">Resume</button>' +
+            '<button type="button" class="mint-recent-btn mint-recent-btn-danger" data-recent-action="delete">\u00d7</button>' +
+          '</div>' +
           tChain +
-          '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
-            (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
-          '<button type="button" class="mint-recent-btn" data-recent-action="resume">Resume</button>' +
-          '<button type="button" class="mint-recent-btn mint-recent-btn-danger" data-recent-action="delete">\u00d7</button>' +
           '</div>';
       }).join('');
     } catch (e) {
@@ -2053,6 +2055,7 @@ setInterval(function() {
     if (!state.working) return;
     _renderPayloadBadge();
     renderPresetStatus();
+    var draftM = state.working.M;
     if (els.mInput) {
       els.mInput.value = (draftM != null) ? draftM : '';
       els.mInput.disabled = state.chainLocked === true;
