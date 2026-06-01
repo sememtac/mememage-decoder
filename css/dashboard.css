@@ -839,11 +839,22 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 /* Ticket stays left; age + Resume + × cluster on the right. */
 .mint-recent-head > .mint-recent-age { margin-left: auto; }
-.mint-recent-chainrow { display: flex; }
+/* Chain badge sits on row 2, right-aligned and a touch smaller than the
+   full-size compact pill so it reads as secondary to the ticket id. */
+.mint-recent-chainrow { display: flex; justify-content: flex-end; }
+.mint-recent-chainrow .chain-badge.compact {
+  padding: 0.25rem 0.5rem; gap: 0.4rem;
+}
+.mint-recent-chainrow .chain-badge.compact .chain-dot { width: 8px; height: 8px; }
+.mint-recent-chainrow .chain-badge.compact .chain-badge-official { font-size: 0.7rem; }
+.mint-recent-chainrow .chain-badge.compact .chain-badge-friendly { font-size: 0.62rem; }
+.mint-recent-chainrow .chain-badge.compact .chain-vis { font-size: 0.52rem; }
+.mint-recent-chainrow .chain-badge.compact .chain-state-chip { font-size: 0.54rem; padding: 0.1rem 0.4rem; }
 .mint-recent-ticket {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
   color: #1a1a20;
   overflow: hidden;
   text-overflow: ellipsis;
