@@ -1687,8 +1687,7 @@ setInterval(function() {
 (function _payloadTab() {
   var els = {
     error:        document.getElementById('payloadError'),
-    chainId:      document.getElementById('payloadChainId'),
-    chainMeta:    document.getElementById('payloadChainMeta'),
+    chainBanner:  document.getElementById('payloadChainBanner'),
     dirty:        document.getElementById('payloadDirty'),
     validation:   document.getElementById('payloadValidation'),
     entries:      document.getElementById('payloadEntries'),
@@ -2026,54 +2025,34 @@ setInterval(function() {
   // M differs from the chain's applied M (e.g. user loaded a preset
   // with a different M) so the user understands the discrepancy
   // between header / status line.
-  // Stamp the readiness dot (before the chain id) + a state chip (in the
-  // badge cluster, alongside LOCKED/build) so the Payload banner reads like
-  // the shared chain badge. Readiness is a server signal — fetch it cheaply.
-  async function _stampPayloadReadiness() {
-    var idEl = els.chainId;        // .payload-chain-id span
-    var cluster = document.querySelector('.payload-chain-badges');
-    if (!idEl) return;
-    var dot = document.getElementById('payloadReadyDot');
-    if (!dot) {
-      dot = document.createElement('span');
-      dot.id = 'payloadReadyDot';
-      dot.className = 'chain-dot';
-      idEl.parentNode.insertBefore(dot, idEl);  // dot sits before the id
+  // Render the Payload chain banner as the shared chain badge. Readiness is
+  // a server signal, fetched cheaply; M-drift annotation rides in .below.
+  async function _renderPayloadBadge() {
+    var host = els.chainBanner;
+    if (!host || !state.working) return;
+    var w = state.working;
+    var below = '';
+    var draftM = w.M, appliedM = state.saved && state.saved.M;
+    if (draftM != null && appliedM != null && appliedM !== draftM) {
+      below = '<span class="chain-badge-note">M=' + draftM +
+              ' (draft, applied: ' + appliedM + ')</span>';
     }
-    var chip = document.getElementById('payloadReadyChip');
-    if (!chip && cluster) {
-      chip = document.createElement('span');
-      chip.id = 'payloadReadyChip';
-      chip.className = 'chain-state-chip';
-      cluster.insertBefore(chip, cluster.firstChild);  // first in the cluster
-    }
+    var readiness = '';
     try {
       var resp = await fetch('/api/chain/current', { headers: authHeaders() });
       var data = await resp.json();
-      var st = (data.info && data.info.readiness) || '';
-      dot.setAttribute('data-state', st);
-      dot.title = 'Chain ' + (ChainBadge.word(st) || '').toLowerCase();
-      if (chip) {
-        chip.setAttribute('data-state', st);
-        chip.textContent = ChainBadge.word(st);
-      }
-    } catch (e) { /* leave neutral on failure */ }
+      readiness = (data.info && data.info.readiness) || '';
+    } catch (e) { /* neutral dot on failure */ }
+    host.innerHTML = ChainBadge.full({
+      id: w.id, name: w.name, visibility: w.visibility,
+      readiness: readiness, below: below,
+    });
   }
 
   function renderChainBar() {
     if (!state.working) return;
-    els.chainId.textContent = state.working.id || '?';
-    var meta = state.working.name || '';
-    if (state.working.visibility) meta += (meta ? ' \u00b7 ' : '') + state.working.visibility;
-    var draftM = state.working.M;
-    var appliedM = state.saved && state.saved.M;
-    if (draftM != null && appliedM != null && appliedM !== draftM) {
-      meta += (meta ? ' \u00b7 ' : '') +
-              'M=' + draftM + ' (draft, applied: ' + appliedM + ')';
-    }
-    els.chainMeta.textContent = meta;
+    _renderPayloadBadge();
     renderPresetStatus();
-    _stampPayloadReadiness();
     if (els.mInput) {
       els.mInput.value = (draftM != null) ? draftM : '';
       els.mInput.disabled = state.chainLocked === true;
@@ -5541,10 +5520,10 @@ setInterval(function() {
           // get the Switch button there instead. Pushes Rename / Set
           // password / Remove into a single tight actions row no
           // matter the chain's state.
-          var markCell = isActive
+          var switchBtn = isActive
             ? '<span class="config-chain-active-badge">active</span>'
             : '<button class="config-btn" data-chain-action="switch" data-chain-id="' + escapeHtml(c.id) + '">Switch</button>';
-          var actions = renameBtn + pwBtn + removeBtn;
+          var actions = switchBtn + renameBtn + pwBtn + removeBtn;
           // GPS source radio: three modes, persisted to chain.json on
           // change. Kept inline with the chain row so the Mint tab can
           // stay "drop image here" — the source decision lives here,
@@ -5562,16 +5541,20 @@ setInterval(function() {
               '<label><input type="radio" name="gps-' + escapeHtml(c.id) + '" value="none" ' +
                 (gpsSource === 'none' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> none</label>' +
             '</div>';
+          // The row LEADS with the shared chain badge (identity +
+          // readiness), then the action buttons, then the GPS radios.
+          // Chain detail (prefix / created / pw contract) rides in the
+          // badge's .below slot.
+          var detail = '<span class="config-chain-state" data-vis="' + escapeHtml(vis) +
+            '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>';
+          var badge = ChainBadge.full({
+            id: c.id, name: c.name, visibility: vis,
+            readiness: c.readiness, below: detail,
+          });
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
-            '<span class="config-chain-active-mark">' + markCell + '</span>' +
-            '<span class="config-chain-id" title="' + escapeHtml(c.id) + '">' +
-              ChainBadge.dot(c.readiness) + escapeHtml(c.id) + '</span>' +
-            '<span class="config-chain-meta" title="' + escapeHtml(c.name || '') + '">' +
-              escapeHtml(c.name || '') + ' ' + ChainBadge.chip(c.readiness) +
-              '<br><span class="config-chain-state" data-vis="' + escapeHtml(vis) + '" data-pw-set="' + (pwSet ? '1' : '0') + '">' + escapeHtml(meta) + '</span>' +
-            '</span>' +
-            '<span class="config-chain-actions">' + actions + '</span>' +
-            '<span class="config-chain-gps-cell advanced-only">' + gpsRadio + '</span>' +
+            '<div class="config-chain-badge-cell">' + badge + '</div>' +
+            '<div class="config-chain-actions">' + actions + '</div>' +
+            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + '</div>' +
           '</div>';
         }).join('') + '</div>';
 

@@ -1638,44 +1638,26 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .input-panel#tab-payload { height: auto; min-height: 365px; overflow: visible; }
 .payload-panel { display: flex; flex-direction: column; gap: 0.5rem; height: auto; }
 
-/* Action bar: chain id + dirty marker on the left, buttons on the right */
-.payload-bar { flex-wrap: wrap; row-gap: 0.4rem; }
-/* Stacked to avoid text squish: row 1 is the chain id + the fixed-shape
-   lock/build/dirty badges (pinned right); the display name + visibility get
-   their own full-width row below so a long name never crowds the badges.
-   Design rule: never let variable-length text share a row with other
-   variable-length text or fixed chips — give each its own row. */
-.payload-chain-line {
-  display: flex; flex-direction: column; gap: 0.2rem;
-  flex: 1; min-width: 200px;
-  color: #1a1a20;
-}
-.payload-chain-head {
-  display: flex; align-items: center; gap: 0.5rem;
-  flex-wrap: wrap;
+/* Payload bar — vertical stack: chain badge, then payload-specific status
+   (lock / build / dirty + preset), then the action rows. The badge owns the
+   chain identity; the status block carries everything payload-specific. */
+.payload-bar { display: flex; flex-direction: column; gap: 0.5rem; }
+.payload-chain-banner .chain-badge { background: transparent; border: none; padding: 0; }
+.payload-chain-status {
+  display: flex; flex-direction: column; gap: 0.3rem;
 }
 .payload-chain-badges {
-  display: flex; align-items: center; gap: 0.4rem;
-  margin-left: auto;
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
 }
-.payload-chain-id {
-  font-family: monospace; font-weight: 700;
-  font-size: 0.85rem;
-  word-break: break-word;
+/* "M=… (draft, applied: …)" annotation in the badge's .below slot. */
+.chain-badge-note {
+  font-size: 0.66rem; color: #8a5a1a; font-family: monospace;
 }
-.payload-chain-meta {
-  font-size: 0.7rem; color: #54545c;
-  font-family: monospace;
-  word-break: break-word;
-}
-.payload-chain-meta:empty { display: none; }
-/* Stacked under the chain name (lives inside .payload-chain-line). Each
-   preset name on its own row — "Loaded preset: X" and "applied preset: Y"
-   can both be long. */
+/* Each preset name on its own row — both can be long. */
 .payload-preset-status {
   display: flex; flex-direction: column; gap: 0.1rem;
   font-size: 0.72rem; color: #54545c;
-  margin: 0.25rem 0 0;
+  margin: 0;
 }
 .payload-preset-status strong {
   font-weight: 700; color: #1a1a20;
@@ -3038,58 +3020,29 @@ label > input[type="checkbox"] {
   gap: 0;
   margin: 0.4rem 0 0.6rem;
 }
+/* Config chain row — LEADS with the shared chain badge, then the action
+   buttons, then the GPS radios, stacked vertically. The badge owns identity
+   + readiness; the prefix/created/pw-contract detail rides in its .below. */
 .config-chain-row {
-  display: grid;
-  /* Four stacked rows, all content aligned past the leading mark
-     column so id / meta / actions / gps share the same left edge.
-     Mark (active badge or Switch button) anchors the row at the top. */
-  grid-template-columns: max-content 1fr;
-  grid-template-areas:
-    "mark    id"
-    ".       meta"
-    ".       actions"
-    ".       gps";
-  align-items: center;
-  gap: 0.25rem 0.5rem;
-  padding: 0.5rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.4rem;
   font-size: 0.78rem;
   color: #1a1a20;
   border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
 }
-.config-chain-row > .config-chain-active-mark { grid-area: mark; }
-.config-chain-row > .config-chain-id          { grid-area: id; }
-.config-chain-row > .config-chain-meta        { grid-area: meta; }
-.config-chain-row > .config-chain-actions     {
-  grid-area: actions;
-  justify-self: start;
-}
-.config-chain-row > .config-chain-gps-cell    { grid-area: gps; }
 .config-chain-row:last-child { border-bottom: none; }
-.config-chain-row[data-active="1"] { background: rgba(60, 200, 220, 0.08); }
-.config-chain-active-mark {
-  font-size: 0.66rem; font-weight: 700;
-  color: #2050a0;
-  text-align: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.config-chain-row[data-active="1"] { background: rgba(60, 200, 220, 0.08); border-radius: 6px; }
+.config-chain-badge-cell .chain-badge { background: transparent; border: none; padding: 0; }
+.config-chain-active-badge {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #1c6a8a; background: rgba(60, 200, 220, 0.18);
+  border: 1px solid rgba(60, 200, 220, 0.5); border-radius: 999px;
+  padding: 0.2rem 0.55rem; display: inline-flex; align-items: center;
 }
-.config-chain-active-mark .config-btn {
-  padding: 0.25rem 0.6rem;
-  font-size: 0.66rem;
-}
-.config-chain-id {
-  font-family: monospace; font-weight: 700;
-  color: #1a1a20;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.config-chain-meta {
-  font-size: 0.7rem; color: #54545c;
-  font-family: monospace;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* Chain state line — encodes (visibility, password-set) as a single
-   text + color: green = sealed correctly, gold = light+public,
+/* Chain detail line in the badge's .below — (visibility, password-set) as a
+   single colored string: green = sealed correctly, gold = light+public,
    red = dark+no-password (broken). */
 .config-chain-state[data-vis="dark_matter"][data-pw-set="1"] { color: #155030; }
 .config-chain-state[data-vis="dark_matter"][data-pw-set="0"] { color: #8c2424; font-weight: 700; }
@@ -3585,34 +3538,10 @@ label > input[type="checkbox"] {
     font-size: 0.72rem;
   }
 
-  /* --- Chain rows --- */
-  .config-chain-row {
-    grid-template-columns: 1fr max-content;
-    grid-template-areas:
-      "id   mark"
-      "meta meta"
-      "actions actions"
-      "gps gps";
-    gap: 0.2rem 0.5rem;
-    padding: 0.55rem 0.6rem;
-  }
-  .config-chain-row > .config-chain-active-mark {
-    grid-area: mark;
-    justify-self: end;
-  }
-  .config-chain-row > .config-chain-id          { grid-area: id; }
-  .config-chain-row > .config-chain-meta        { grid-area: meta; }
-  .config-chain-row > .config-chain-actions     {
-    grid-area: actions;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.3rem;
-  }
-  .config-chain-row > .config-chain-gps-cell    {
-    grid-area: gps;
-    padding-left: 0;
-  }
+  /* --- Chain rows --- (flex-column on every width; actions wrap on mobile) */
+  .config-chain-row { padding: 0.55rem 0.6rem; }
+  .config-chain-row > .config-chain-actions { flex-wrap: wrap; }
+  .config-chain-row > .config-chain-gps-cell { padding-left: 0; }
   .config-chain-actions .config-btn {
     padding: 0.4rem 0.7rem; font-size: 0.72rem;
   }
@@ -3809,6 +3738,3 @@ label > input[type="checkbox"] {
 /* Pending-ticket chain badge — right-aligned before the age. Wraps the real
    .chain-badge.compact, so it just handles placement. */
 .mint-recent-chain { margin-left: auto; display: inline-flex; }
-/* Payload banner: the readiness dot sits inline before the chain id. */
-.payload-chain-head { align-items: center; }
-.payload-chain-head > .chain-dot { margin-top: 0; }
