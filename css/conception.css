@@ -72,6 +72,61 @@ body {
   padding: 0.85rem 1.1rem 0;
 }
 
+/* --- Channels strip ---
+ * The surfaces this conception will blast to (server-rendered). Each chip
+ * leads with the channel id (the stable slug that appears on viewer
+ * certificates) and trails the local friendly name. The primary surface
+ * carries a small flag. Sits between the chain badge and the staged image. */
+.conception-channels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.6rem;
+  padding: 0.7rem 1.1rem 0;
+}
+.conception-channels-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.conception-channels-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.conception-channel {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.conception-channel-id {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.conception-channel-name {
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+}
+.conception-channel-primary {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6fd08c;
+}
+.conception-channels-none {
+  font-size: 0.66rem;
+  color: #e0907a;
+}
+
 /* --- State container --- */
 .conception-state {
   padding: 1.1rem 1.1rem 1.2rem;
