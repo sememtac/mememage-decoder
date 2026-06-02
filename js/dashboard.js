@@ -3615,6 +3615,9 @@ setInterval(function() {
           headers: w.headers || {},
           template: w.template || '',
           attach_files: !!w.attach_files,
+          kind: w.kind || '',
+          slack_bot_token: w.slack_bot_token || '',
+          slack_channel: w.slack_channel || '',
         };
       });
     }
@@ -3862,6 +3865,24 @@ setInterval(function() {
             '</div>';
           }).join('');
           var attachFiles = !!w.attach_files;
+          // Slack file attachments use a different mechanism (files.uploadV2)
+          // than the incoming-webhook text post, so they need a bot token +
+          // channel. Surface those fields when the destination is Slack.
+          var isSlack = (w.kind === 'slack') || /hooks\.slack\.com/.test(w.url || '');
+          var slackBlock = isSlack
+            ? '<div class="config-webhook-slack">' +
+                '<p class="config-webhook-slack-note">Slack file attachments need a bot token (<code>xoxb-…</code>, <code>files:write</code> scope) + a channel ID. Without them, the attachment toggle posts text only.</p>' +
+                '<label class="config-webhook-slack-field"><span>Bot token</span>' +
+                  '<span class="config-password-wrap">' +
+                    '<input class="config-input" data-webhook-slack-token="' + i + '" type="password" autocomplete="off" value="' + escapeHtml(w.slack_bot_token || '') + '" placeholder="xoxb-…">' +
+                    '<button type="button" class="config-password-toggle" data-pw-toggle aria-label="Show value" title="Show value">👁</button>' +
+                  '</span>' +
+                '</label>' +
+                '<label class="config-webhook-slack-field"><span>Channel ID</span>' +
+                  '<input class="config-input" data-webhook-slack-channel="' + i + '" type="text" autocomplete="off" value="' + escapeHtml(w.slack_channel || '') + '" placeholder="C0XXXXXXX">' +
+                '</label>' +
+              '</div>'
+            : '';
           return '' +
             '<div class="config-webhook-row" data-i="' + i + '">' +
               // URL on its own row — long Discord/Slack URLs need
@@ -3874,7 +3895,7 @@ setInterval(function() {
               '<div class="config-webhook-main">' +
                 '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="conceived" ' + (allEv || hasC ? 'checked' : '') + '> conceived</label>' +
                 '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="ready"     ' + (allEv || hasR ? 'checked' : '') + '> ready</label>' +
-                '<label class="config-webhook-ev" title="Send minted image + .soul as Discord-style multipart attachments on conceived events"><input type="checkbox" data-webhook-attach="' + i + '" ' + (attachFiles ? 'checked' : '') + '> attachment</label>' +
+                '<label class="config-webhook-ev" title="Send the minted image + .soul to the recipient on conceived events. Each platform attaches its own way — Discord: multipart; Slack: files.uploadV2 (needs the bot token + channel below); generic: links in the body."><input type="checkbox" data-webhook-attach="' + i + '" ' + (attachFiles ? 'checked' : '') + '> attachment</label>' +
               '</div>' +
               '<details class="config-webhook-hdrs-section" ' + (hCount > 0 ? 'open' : '') + '>' +
                 '<summary>Headers (' + hCount + ')</summary>' +
@@ -3892,6 +3913,7 @@ setInterval(function() {
                 '</label>' +
                 '<textarea class="config-input config-webhook-tmpl-input" data-webhook-tmpl="' + i + '" rows="3" placeholder="Empty = raw POST. JSON template with {{event}}, {{identifier}}, {{content_hash}}, {{url}} (primary surface), {{distribution}} (all surfaces, multiline), {{constellation}}, {{constellation_star}}, {{rarity_tier}}, {{rarity_score}}, {{creator_name}}, {{key_fingerprint}}, {{chain_id}}, {{chain_visibility}}, {{gps_source}}, {{mint_url}}, {{image_name}}.">' + escapeHtml(tmpl) + '</textarea>' +
               '</div>' +
+              slackBlock +
             '</div>';
         }).join('');
 
@@ -3913,6 +3935,26 @@ setInterval(function() {
         _webhooksDirty = true;
         // Don't re-render — that would steal focus mid-typing. Just
         // mark dirty and update the Save/Cancel button state.
+        markWebhooksDirty();
+      });
+      // On commit (blur/Enter), re-render so the Slack attachment fields
+      // appear/disappear if the destination's slack-ness just changed. Safe
+      // here — focus has already left the input.
+      inp.addEventListener('change', function() { renderWebhooks(); });
+    });
+    host.querySelectorAll('[data-webhook-slack-token]').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var i = parseInt(inp.getAttribute('data-webhook-slack-token'), 10);
+        _webhooksDraft[i].slack_bot_token = inp.value;
+        _webhooksDirty = true;
+        markWebhooksDirty();
+      });
+    });
+    host.querySelectorAll('[data-webhook-slack-channel]').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var i = parseInt(inp.getAttribute('data-webhook-slack-channel'), 10);
+        _webhooksDraft[i].slack_channel = inp.value;
+        _webhooksDirty = true;
         markWebhooksDirty();
       });
     });
@@ -4110,6 +4152,9 @@ setInterval(function() {
           }
           if (w.template && w.template.trim()) out.template = w.template.trim();
           if (w.attach_files) out.attach_files = true;
+          if (w.kind && w.kind.trim()) out.kind = w.kind.trim();
+          if (w.slack_bot_token && w.slack_bot_token.trim()) out.slack_bot_token = w.slack_bot_token.trim();
+          if (w.slack_channel && w.slack_channel.trim()) out.slack_channel = w.slack_channel.trim();
           return out;
         })}),
       });

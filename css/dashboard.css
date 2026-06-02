@@ -2966,6 +2966,41 @@ label > input[type="checkbox"] {
   width: 100%;
   margin-top: 0;
 }
+/* Slack file-upload config — bot token + channel, shown for Slack hooks.
+   files.uploadV2 needs these; the incoming-webhook URL alone can't carry
+   files. */
+.config-webhook-slack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px dashed rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+}
+.config-webhook-slack-note {
+  margin: 0;
+  font-size: 0.66rem;
+  color: #5a5a62;
+  line-height: 1.4;
+}
+.config-webhook-slack-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.config-webhook-slack-field > span {
+  flex: none;
+  width: 5.5rem;
+  font-size: 0.7rem;
+  color: #3a3a40;
+}
+.config-webhook-slack-field .config-password-wrap,
+.config-webhook-slack-field > input {
+  flex: 1;
+  min-width: 0;
+}
 .config-webhook-ev {
   display: flex;
   align-items: center;
