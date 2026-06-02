@@ -3633,6 +3633,7 @@ setInterval(function() {
     var resolved = server.domain_resolved || '';
     var cert   = server.cert   || '';
     var keyP   = server.key    || '';
+    var port   = server.port   || 8443;
     var tokenSet = !!env.MINT_API_TOKEN;
     // Show what the server is actually using right now. If the user
     // explicitly set a domain, that's the value; otherwise the
@@ -3649,6 +3650,11 @@ setInterval(function() {
       '  <span class="config-field-label">Domain</span>' +
       '  <input class="config-input" id="configServerDomain" type="text" value="' + escapeHtml(domainShown) + '" placeholder="(auto-detect at startup)">' +
       '  <span class="config-channel-field-hint">' + escapeHtml(domainHint) + '</span>' +
+      '</div>' +
+      '<div class="config-field">' +
+      '  <span class="config-field-label">Port</span>' +
+      '  <input class="config-input" id="configServerPort" type="number" min="1" max="65535" value="' + escapeHtml(String(port)) + '" placeholder="8443">' +
+      '  <span class="config-channel-field-hint">listen port (1–65535). Changing it needs a restart.</span>' +
       '</div>' +
       '<div class="config-field config-field-with-browse advanced-only">' +
       '  <span class="config-field-label">TLS cert</span>' +
@@ -3786,18 +3792,28 @@ setInterval(function() {
     var domain = (document.getElementById('configServerDomain').value || '').trim();
     var cert = (document.getElementById('configServerCert').value || '').trim();
     var key = (document.getElementById('configServerKey').value || '').trim();
+    var portStr = (document.getElementById('configServerPort').value || '').trim();
     var statusEl = document.getElementById('configServerStatus');
     var btn = document.getElementById('configServerSave');
     showError('');
     statusEl.textContent = '';
+    var body = {domain: domain, cert: cert, key: key};
+    if (portStr) {
+      var port = parseInt(portStr, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        showError('Port must be a number between 1 and 65535.');
+        return;
+      }
+      body.port = port;
+    }
     btn.disabled = true; btn.textContent = 'Saving\u2026';
     try {
       var res = await fetchJson('/api/config/server', {
         method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({domain: domain, cert: cert, key: key}),
+        body: JSON.stringify(body),
       });
       statusEl.textContent = res.restart_needed
-        ? 'Saved. Restart server to apply cert/key.'
+        ? 'Saved. Restart server to apply cert/key/port.'
         : 'Saved.';
       statusEl.style.color = res.restart_needed ? '#a06010' : '#1a7a1a';
       setTimeout(function() { statusEl.textContent = ''; }, 4000);
