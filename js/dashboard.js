@@ -3895,7 +3895,7 @@ setInterval(function() {
           var isTelegram = (w.kind === 'telegram') || /api\.telegram\.org/.test(w.url || '');
           var telegramBlock = isTelegram
             ? '<div class="config-webhook-slack">' +
-                '<p class="config-webhook-slack-note">Telegram needs a bot token (from <code>@BotFather</code>) + a chat ID (a numeric id, or <code>@channelusername</code>). The bot must be a member/admin of the target chat. Attachment sends the image + .soul as photo + document.</p>' +
+                '<p class="config-webhook-slack-note">Telegram needs a bot token (from <code>@BotFather</code>) + a chat ID. <strong>To DM yourself:</strong> message the bot first (it can’t initiate), then use your <em>numeric</em> user ID (from <code>@userinfobot</code>) — not the bot’s <code>@name</code>. <strong>Channel/group:</strong> <code>@channelname</code> or the numeric id, with the bot added as member/admin. Attachment sends the image + .soul as photo + document.</p>' +
                 '<label class="config-webhook-slack-field"><span>Bot token</span>' +
                   '<span class="config-password-wrap">' +
                     '<input class="config-input" data-webhook-tg-token="' + i + '" type="password" autocomplete="off" value="' + escapeHtml(w.telegram_bot_token || '') + '" placeholder="123456:ABC-DEF…">' +
