@@ -68,6 +68,7 @@ body {
  * of flush against its edge. The badge is an inline-flex pill; the wrapper
  * just provides the gutter. */
 .conception-chain {
+  display: flex;
   padding: 0.85rem 1.1rem 0;
 }
 
