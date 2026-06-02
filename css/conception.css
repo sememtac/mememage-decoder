@@ -79,10 +79,9 @@ body {
  * carries a small flag. Sits between the chain badge and the staged image. */
 .conception-channels {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.45rem 0.6rem;
-  padding: 0.7rem 1.1rem 0;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.8rem 1.1rem 0;
 }
 .conception-channels-label {
   font-size: 0.58rem;
@@ -91,18 +90,20 @@ body {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+/* One channel per row — they stack, so multiple surfaces read cleanly
+   instead of wrapping into a chip soup. */
 .conception-channels-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 .conception-channel {
-  display: inline-flex;
+  display: flex;
   align-items: baseline;
-  gap: 0.35rem;
-  padding: 0.2rem 0.55rem;
+  gap: 0.4rem;
+  padding: 0.32rem 0.6rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
 }
 .conception-channel-id {
@@ -116,6 +117,7 @@ body {
   color: var(--text-secondary);
 }
 .conception-channel-primary {
+  margin-left: auto;
   font-size: 0.52rem;
   font-weight: 700;
   letter-spacing: 0.08em;

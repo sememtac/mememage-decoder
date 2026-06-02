@@ -2706,6 +2706,10 @@
 .chain-badge.compact .chain-badge-body { flex-direction: row; align-items: center; gap: 0.4rem; min-width: 0; }
 .chain-badge.compact .chain-vis { flex: none; }
 .chain-badge.compact .chain-state-chip { flex: none; }
+/* Tail — extra head-row markers placed right of the readiness chip (e.g. the
+   Payload tab's LOCKED + BUILD state). Stays on the head line; flex:none so it
+   isn't squeezed. */
+.chain-badge-tail { display: inline-flex; align-items: center; gap: 0.3rem; flex: none; }
 .chain-badge.compact .chain-badge-official { font-size: 0.78rem; }
 .chain-badge.compact .chain-badge-friendly { font-size: 0.68rem; }
 .chain-badge.compact .chain-badge-sep { color: #8a8a92; }

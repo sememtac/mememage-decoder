@@ -602,17 +602,14 @@
    is. The visibility chip is the key signal: chain visibility was
    locked at chain creation in the Config tab, so the mint surface
    just reports it. */
+/* Plain layout wrapper — the chain badge it holds (ChainBadge.labeled) is
+   self-contained (eyebrow + its own pill background), so the banner adds no
+   box of its own; a second border/bg here would nest a box inside the pill. */
 .mint-chain-banner {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.45rem 0.7rem;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: var(--radius-sm, 6px);
-  font-size: 0.78rem;
-  color: #1a1a20;
 }
+.mint-chain-banner:empty { display: none; }
 /* Row 1 holds the deterministic-width label + visibility chip. The chain
    id and display name each get their own full-width row below so long
    names never fight the chip for horizontal space. */

@@ -66,6 +66,7 @@ window.ChainBadge = (function() {
           '<span class="chain-badge-right">' +
             (o.extra || '') +
             '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) +
+            (o.tail ? '<span class="chain-badge-tail">' + o.tail + '</span>' : '') +
           '</span>' +
         '</div>' +
         (label ? '<div class="chain-badge-sub">' + label + '</div>' : '') +
@@ -91,6 +92,7 @@ window.ChainBadge = (function() {
       '<span class="chain-badge-head">' + dot(o.readiness) +
         '<span class="chain-badge-body">' + body + '</span>' +
         '<span class="chain-vis">' + vis + '</span>' + chip(o.readiness) +
+        (o.tail ? '<span class="chain-badge-tail">' + o.tail + '</span>' : '') +
       '</span>';
     var extra = o.below || '';
     var cls = 'chain-badge compact' + (extra ? ' has-extra' : '');
@@ -1742,8 +1744,6 @@ setInterval(function() {
     applyBtn:     document.getElementById('payloadApplyBtn'),
     discardBtn:   document.getElementById('payloadDiscardBtn'),
     sealBtn:      document.getElementById('payloadSealBtn'),
-    lockBadge:    document.getElementById('payloadLockBadge'),
-    buildBadge:   document.getElementById('payloadBuildBadge'),
     applyLockBanner: document.getElementById('payloadApplyLockBanner'),
     nux:          document.getElementById('payloadNux'),
     nuxDismiss:   document.getElementById('payloadNuxDismiss'),
@@ -2088,6 +2088,32 @@ setInterval(function() {
     return rows ? '<div class="chain-badge-extra">' + rows + '</div>' : '';
   }
 
+  // The lock + build markers — payload-specific chain state. They ride in the
+  // chain badge's head row (the `tail`, right of the READY chip) so the chain
+  // identity and its editability/build state read as one unit. Reuses the
+  // existing .payload-lock-badge / .payload-build-badge styling. Both helpers
+  // (_aggregateBuildState etc.) are function declarations hoisted in this IIFE.
+  function _payloadMarkersTail() {
+    var out = '';
+    if (state.chainLocked === undefined) {
+      out += '<span class="payload-lock-badge" data-state="unknown">checking…</span>';
+    } else if (state.chainLocked) {
+      out += '<span class="payload-lock-badge" data-state="locked" title="' +
+        escapeHtml(state.chainLockedReason ||
+          'The chain is mid-Age — template changes are blocked until the outer cycle completes.') +
+        '">LOCKED</span>';
+    } else {
+      out += '<span class="payload-lock-badge" data-state="editable" title="' +
+        escapeHtml('No Age in progress on this chain. Applying a new template will commit it ' +
+          'as the chain’s next Age starts.') + '">EDITABLE</span>';
+    }
+    var key = _aggregateBuildState(state.buildStatus);
+    out += '<span class="payload-build-badge" data-state="' + key + '" title="' +
+      escapeHtml(_buildBadgeTooltip(key, state.buildStatus)) + '">' +
+      escapeHtml(_buildBadgeText(key)) + '</span>';
+    return out;
+  }
+
   // Cache the last fetched readiness so re-renders triggered by preset changes
   // don't each fire a network round-trip.
   var _payloadReadiness = '';
@@ -2104,7 +2130,8 @@ setInterval(function() {
     }
     host.innerHTML = ChainBadge.labeled({
       id: w.id, name: w.name, visibility: w.visibility,
-      readiness: _payloadReadiness, below: _payloadBadgeBelow(),
+      readiness: _payloadReadiness, tail: _payloadMarkersTail(),
+      below: _payloadBadgeBelow(),
     });
   }
 
@@ -2664,23 +2691,10 @@ setInterval(function() {
   }
 
   function renderLockBadge() {
-    if (!els.lockBadge) return;
-    if (state.chainLocked === undefined) {
-      els.lockBadge.textContent = 'checking\u2026';
-      els.lockBadge.setAttribute('data-state', 'unknown');
-      els.lockBadge.title = '';
-    } else if (state.chainLocked) {
-      els.lockBadge.textContent = 'LOCKED';
-      els.lockBadge.setAttribute('data-state', 'locked');
-      els.lockBadge.title = state.chainLockedReason ||
-        'The chain is mid-Age — template changes are blocked until the outer cycle completes.';
-    } else {
-      els.lockBadge.textContent = 'EDITABLE';
-      els.lockBadge.setAttribute('data-state', 'editable');
-      els.lockBadge.title =
-        'No Age in progress on this chain. Applying a new template will commit it ' +
-        'as the chain\u2019s next Age starts.';
-    }
+    // The lock marker now rides inside the chain badge's tail (right of the
+    // READY chip). Re-render the badge from current state — no network, the
+    // readiness is cached. _payloadMarkersTail() reads state.chainLocked.
+    _renderPayloadBadge(false);
   }
 
   // ===== Build state =====
@@ -2747,11 +2761,10 @@ setInterval(function() {
   }
 
   function renderBuildBadge() {
-    if (!els.buildBadge) return;
     var key = _aggregateBuildState(state.buildStatus);
-    els.buildBadge.textContent = _buildBadgeText(key);
-    els.buildBadge.setAttribute('data-state', key);
-    els.buildBadge.title = _buildBadgeTooltip(key, state.buildStatus);
+    // The build marker now rides in the chain badge tail — re-render it from
+    // current state (no network). Button + Seal gating below is unchanged.
+    _renderPayloadBadge(false);
     // Build button: reflects current state in its label.
     if (els.buildBtn && !els.buildBtn.disabled) {
       if (key === 'built')       els.buildBtn.textContent = 'Rebuild \u2713';
@@ -2779,7 +2792,6 @@ setInterval(function() {
   }
 
   async function fetchBuildStatus() {
-    if (!els.buildBadge) return;
     try {
       state.buildStatus = await fetchJson('/api/payload/status');
     } catch (e) {
@@ -5566,7 +5578,6 @@ setInterval(function() {
           var metaParts = [];
           if (pwSet) metaParts.push('\ud83d\udd12');  // \ud83d\udd12 password present
           metaParts.push(prefix + '-XXXX');            // namespace shape
-          if (c.created_at) metaParts.push(c.created_at.slice(0, 10));
           var meta = metaParts.join(' \u00b7 ');
           var renameBtn = '<button class="config-btn" data-chain-action="rename" data-chain-id="' + escapeHtml(c.id) + '" data-chain-name="' + escapeHtml(c.name || c.id) + '" title="Change display name (visibility is locked at creation)">Rename</button>';
           // Password gating + Remove are advanced — most chains run public
