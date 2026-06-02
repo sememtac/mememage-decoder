@@ -5554,16 +5554,20 @@ setInterval(function() {
           // We say "password set" / "GPS password" rather than "sealed" —
           // "Seal Age" is the other primary use of that verb (site-pack
           // sealing) and people mistake one for the other.
-          var pwLabel;
-          if (vis === 'dark_matter') {
-            pwLabel = pwSet ? '\u00b7 password set' : '\u00b7 NEEDS PASSWORD';
-          } else {
-            pwLabel = pwSet ? '\u00b7 GPS password' : '\u00b7 public';
-          }
+          // The DARK/LIGHT chip in the badge head already carries
+          // visibility, so the detail row drops the vis word. Password
+          // presence collapses to a lock glyph: lock = password set,
+          // no lock = public (instantly recognizable, no prose). The
+          // notready dot already flags a dark chain that still NEEDS a
+          // password, so absence of a lock there isn't mistaken for
+          // "public" \u2014 the red state speaks first.
           var gpsSource = c.gps_source || 'phone';
           var prefix = c.identifier_prefix || 'mememage';
-          var prefixLabel = ' \u00b7 ' + prefix + '-XXXX';
-          var meta = vis + ' ' + pwLabel + prefixLabel + (c.created_at ? ' \u00b7 ' + c.created_at.slice(0, 10) : '');
+          var metaParts = [];
+          if (pwSet) metaParts.push('\ud83d\udd12');  // \ud83d\udd12 password present
+          metaParts.push(prefix + '-XXXX');            // namespace shape
+          if (c.created_at) metaParts.push(c.created_at.slice(0, 10));
+          var meta = metaParts.join(' \u00b7 ');
           var renameBtn = '<button class="config-btn" data-chain-action="rename" data-chain-id="' + escapeHtml(c.id) + '" data-chain-name="' + escapeHtml(c.name || c.id) + '" title="Change display name (visibility is locked at creation)">Rename</button>';
           // Password gating + Remove are advanced — most chains run public
           // (light) without a password, and removing a chain is rare.
