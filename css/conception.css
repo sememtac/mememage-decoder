@@ -83,6 +83,9 @@ body {
   gap: 0.45rem;
   padding: 0.8rem 1.1rem 0;
 }
+/* display:flex above beats the UA [hidden] rule, so be explicit — the strip
+   is hidden post-conception (the Surfaces list is the truth then). */
+.conception-channels[hidden] { display: none; }
 .conception-channels-label {
   font-size: 0.58rem;
   font-weight: 700;

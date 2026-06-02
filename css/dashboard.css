@@ -2721,7 +2721,6 @@ label > input[type="checkbox"] {
    render with inline-flex so input + text share the same baseline
    regardless of font metrics. */
 .config-sync-categories label,
-.config-profile-scope-row,
 .config-chain-gps label,
 .config-webhook-ev,
 .config-webhook-tmpl-label {
@@ -3278,12 +3277,6 @@ label > input[type="checkbox"] {
   border-top: 1px dashed rgba(0, 0, 0, 0.06);
   font-size: 0.66rem;
 }
-.config-profile-scope-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  margin: 0.45rem 0 0.6rem;
-}
 .config-sync-categories {
   display: flex;
   flex-direction: column;
@@ -3296,22 +3289,6 @@ label > input[type="checkbox"] {
   font-size: 0.75rem;
 }
 .config-sync-categories label > input { margin: 0; }
-.config-profile-scope-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0;
-  font-size: 0.75rem;
-}
-.config-profile-scope-id {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-weight: 600;
-}
-.config-profile-scope-meta {
-  font-size: 0.65rem;
-  color: rgba(0, 0, 0, 0.5);
-  font-style: italic;
-}
 .config-profile-alias-label {
   color: #6a6a72;
   font-size: 0.6rem;
@@ -3663,7 +3640,6 @@ label > input[type="checkbox"] {
 
   /* Sync / Push categories — wider labels wrap on phones */
   .config-sync-categories label { flex-wrap: wrap; }
-  .config-profile-scope-row label { padding: 0.4rem 0; }
 
   /* --- Mint result + Mint review --- */
   .mint-thumb-row { flex-wrap: wrap; }

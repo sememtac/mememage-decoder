@@ -99,11 +99,28 @@
   });
 
   // ===== State transitions =====
+  // The sticky head label is borrowed from the "confirm" step; retitle it per
+  // state so the conceived/failed result doesn't still read "Confirm conception".
+  var HEAD_LABEL = {
+    pre: 'Confirm conception',
+    minting: 'Conceiving…',
+    conceived: 'Conceived',
+    failed: 'Conception failed',
+  };
   function showState(name) {
     var states = document.querySelectorAll('.conception-state');
     states.forEach(function(s) {
       s.hidden = (s.getAttribute('data-state') !== name);
     });
+    var headLabel = document.querySelector('.conception-head-label');
+    if (headLabel && HEAD_LABEL[name]) headLabel.textContent = HEAD_LABEL[name];
+    // The top "Target channels" strip is a PLAN — where the soul will go,
+    // read from current config. That's honest before the point of no return
+    // (pre / in-flight), but once conceived the truth is what was actually
+    // captured, shown in the result's Surfaces list. Hide the plan post-
+    // conception (and on failure) so it can't contradict the record.
+    var planStrip = document.querySelector('.conception-channels');
+    if (planStrip) planStrip.hidden = (name === 'conceived' || name === 'failed');
   }
 
   // ===== GPS branches =====

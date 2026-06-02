@@ -230,7 +230,7 @@ window.FilePicker = {
 
 // =====================================================================
 // Per-section "Advanced" toggles. The dashboard hides power-user
-// controls (Scope, Pair, Push, Rotate, TLS paths, raw JSON, etc.)
+// controls (Pair, Push, Rotate, TLS paths, raw JSON, etc.)
 // behind a per-section checkbox. State persists in localStorage so
 // returning users keep their preference. Sections inherit
 // data-show-advanced="true" on the parent <details> element, and
@@ -4237,33 +4237,20 @@ setInterval(function() {
           var btns = '';
           if (!active) {
             // Use is common — needed any time you have >1 profile.
-            // Alias / Remove / Scope are advanced (multi-host / privacy
-            // concepts most single-machine users won't touch).
+            // Alias / Remove are advanced (multi-host concepts most
+            // single-machine users won't touch). Channel scoping is no
+            // longer a per-profile knob — each profile owns its own
+            // channels.json (set in Config -> Channels while that profile
+            // is active), so there's nothing to "scope" here.
             btns += '<button class="config-btn config-profile-use" data-profile-use="' + escapeHtml(p.id) + '">Use</button>';
             btns += '<button class="config-btn config-profile-alias advanced-only" data-profile-alias="' + escapeHtml(p.id) + '">Alias\u2026</button>';
             btns += '<button class="config-btn config-btn-danger config-profile-remove advanced-only" data-profile-remove="' + escapeHtml(p.id) + '">Remove\u2026</button>';
           }
-          btns += '<button class="config-btn config-profile-scope advanced-only" data-profile-scope="' + escapeHtml(p.id) + '" title="Restrict which channels this profile publishes to (privacy boundary)">Scope\u2026</button>';
           // Alias chips — one per linked profile. Bidirectional uses
           // ↔ glyph + green tint; one-way uses → + muted tint.
           // Unknown-locally siblings (alias points at a fingerprint
           // not in our local profile list) render with the truncated
           // fingerprint instead of an id.
-          // Channel scope chip — only rendered when this profile has
-          // narrowed itself to a subset of channels (privacy boundary).
-          // Default "all enabled" stays invisible to keep the row tidy.
-          var scopeChip = '';
-          if (p.channels && p.channels.length) {
-            scopeChip = '<div class="config-profile-alias-row">' +
-              '<span class="config-profile-alias-label">channels:</span>' +
-              p.channels.map(function(c) {
-                return '<span class="config-alias-chip config-alias-bi" title="Souls + keychain records from this profile only go to: ' +
-                  escapeHtml(p.channels.join(', ')) + '">' +
-                  escapeHtml(c) +
-                  '</span>';
-              }).join('') +
-            '</div>';
-          }
           var aliasChips = '';
           if (p.aliases && p.aliases.length) {
             aliasChips = '<div class="config-profile-alias-row">' +
@@ -4291,7 +4278,6 @@ setInterval(function() {
               '<span class="config-profile-name">' + escapeHtml(name) + '</span>' +
               '<span class="config-profile-state">' + (active ? 'active' : '') + '</span>' +
               '<span class="config-profile-actions">' + btns + '</span>' +
-              scopeChip +
               aliasChips +
             '</div>';
         }).join('');
@@ -4318,11 +4304,6 @@ setInterval(function() {
     });
     els.profiles.querySelectorAll('[data-profile-remove]').forEach(function(b) {
       b.addEventListener('click', function() { openRemoveConfirm(b.getAttribute('data-profile-remove')); });
-    });
-    els.profiles.querySelectorAll('[data-profile-scope]').forEach(function(b) {
-      b.addEventListener('click', function() {
-        openScopeChannels(b.getAttribute('data-profile-scope'), rows);
-      });
     });
     document.getElementById('configProfileNewBtn').addEventListener('click', openNewProfile);
     document.getElementById('configProfileImportBtn').addEventListener('click', openImportProfile);
@@ -4905,82 +4886,6 @@ setInterval(function() {
     }
   }
 
-  async function openScopeChannels(pid, allProfiles) {
-    // Editor for the profile's channel allow-list. Fetches the live
-    // channel list so users can check boxes against whatever's
-    // currently configured (including ones added after this profile).
-    var zone = document.getElementById('configProfileDanger');
-    zone.style.display = '';
-    zone.innerHTML =
-      '<h4>Channel scope: ' + escapeHtml(pid) + '</h4>' +
-      '<p>Restrict which channels this profile publishes to. Affects souls AND keychain records (succession, revocation, alias) signed by this profile. Leave <em>all unchecked</em> to use every enabled channel (default).</p>' +
-      '<p class="config-note">Use case: a VPS-only profile that shouldn\u2019t leak its key rotations / aliases to the public Internet Archive index. Keep the IA box unchecked here and the keychain records will only land on your peer surfaces.</p>' +
-      '<div id="configProfileScopeBoxes" class="config-profile-scope-list"><em>Loading channels\u2026</em></div>' +
-      '<div class="config-row">' +
-      '  <button class="config-btn" id="configProfileScopeGo">Save</button>' +
-      '  <button class="config-btn" id="configProfileScopeCancel">Cancel</button>' +
-      '</div>' +
-      '<div id="configProfileScopeStatus" class="config-note"></div>';
-    document.getElementById('configProfileScopeCancel').addEventListener('click', closeProfileDanger);
-
-    var boxesEl = document.getElementById('configProfileScopeBoxes');
-    var current = [];
-    (allProfiles || []).forEach(function(pp) {
-      if (pp.id === pid && Array.isArray(pp.channels)) current = pp.channels;
-    });
-    try {
-      var data = await fetchJson('/api/channels');
-      var channels = data.channels || [];
-      if (!channels.length) {
-        boxesEl.innerHTML = '<em>No channels configured. Add some in the Channels section first.</em>';
-        return;
-      }
-      var rowsHtml = channels.map(function(c) {
-        var checked = current.indexOf(c.id) >= 0;
-        return '<label class="config-profile-scope-row">' +
-          '<input type="checkbox" data-channel-id="' + escapeHtml(c.id) + '"' +
-          (checked ? ' checked' : '') + '> ' +
-          '<span class="config-profile-scope-id">' + escapeHtml(c.id) + '</span>' +
-          '<span class="config-profile-scope-meta">' + escapeHtml(c.type || '') +
-            (c.primary ? ' \u00b7 primary' : '') + '</span>' +
-          '</label>';
-      }).join('');
-      boxesEl.innerHTML = rowsHtml;
-    } catch (e) {
-      boxesEl.innerHTML = 'Failed to load channels: ' + escapeHtml(e.message);
-    }
-
-    document.getElementById('configProfileScopeGo').addEventListener('click', async function() {
-      var picked = [];
-      boxesEl.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
-        if (cb.checked) picked.push(cb.getAttribute('data-channel-id'));
-      });
-      var statusEl = document.getElementById('configProfileScopeStatus');
-      var btn = document.getElementById('configProfileScopeGo');
-      btn.disabled = true;
-      statusEl.textContent = 'Saving\u2026';
-      statusEl.style.color = '';
-      try {
-        await fetchJson('/api/profiles/channels', {
-          method: 'POST', headers: authHeaders(),
-          body: JSON.stringify({
-            profile_id: pid,
-            // Empty array clears the override server-side (= "all
-            // enabled channels"). User-friendly: unchecking everything
-            // means "no restriction" rather than "publish to nothing".
-            channels: picked.length ? picked : null,
-          }),
-        });
-        closeProfileDanger();
-        await loadProfiles();
-      } catch (e) {
-        statusEl.textContent = 'Failed: ' + e.message;
-        statusEl.style.color = '#b04040';
-        btn.disabled = false;
-      }
-    });
-  }
-
   function openRemoveConfirm(pid) {
     var zone = document.getElementById('configProfileDanger');
     zone.style.display = '';
@@ -5031,7 +4936,7 @@ setInterval(function() {
   }
 
   // Keyboard polish: Esc closes whichever inline drawer is open inside
-  // configProfileDanger (Pair / Push / Export / Import / Scope / Alias
+  // configProfileDanger (Pair / Push / Export / Import / Alias
   // / Remove / New profile / Import key / Rotate / Revoke / Keygen).
   // Cancel buttons stay — Esc is just the extra path.
   document.addEventListener('keydown', function(e) {
@@ -6364,9 +6269,9 @@ setInterval(function() {
     { id: 'channel', label: 'Channel',
       body: 'A pluggable destination for souls. Each enabled+configured channel receives a copy on every conception; at least one must succeed. The framework is type-agnostic — built-in types include <code>internet_archive</code>, <code>http_push</code> (peer host), and <code>zenodo</code>, and authors can register more (S3, IPFS, etc.).' },
     { id: 'primary', label: 'Primary channel',
-      body: 'The one channel whose URL becomes <code>record.url</code> — the bar reference and the notification link. Exactly one channel can be primary at a time; promote / demote via the radio button or the Scope flow.' },
-    { id: 'channel_scope', label: 'Channel scope (per-profile)',
-      body: 'A profile can restrict which channels it publishes to. Privacy boundary: a VPS-only profile that shouldn\u2019t leak its rotations to a public archive marks itself scope=[peer-only]. Affects souls AND keychain records signed by that profile. None / empty = use every enabled channel (default).' },
+      body: 'The one channel whose URL becomes <code>record.url</code> — the bar reference and the notification link. Exactly one channel can be primary at a time; promote / demote via the radio button.' },
+    { id: 'per_profile_channels', label: 'Per-profile channels',
+      body: 'Each profile owns its own set of channels (its channels.json). Switching the active profile switches the whole blast setup \u2014 surfaces and their credentials \u2014 with no reconfiguring. A conception publishes to every enabled + configured channel in the active profile\u2019s set. To keep a profile (e.g. a VPS key) off a public archive, just don\u2019t add that channel to it.' },
     { id: 'distribution', label: 'Distribution',
       body: 'The server-side publish-results map (<code>{channel_id \u2192 url}</code>) returned by <code>channels.blast()</code>. Surfaced in webhook templates as <code>{{distribution}}</code> and in the dashboard handoff card after a mint completes. Not written into the soul itself \u2014 the artifact is surface-agnostic; mirror discovery is an operational concern handled by whoever serves the soul. Sovereignty signal lives in the system\u2019s design (any number of mirrors can serve any soul), not in a list baked into every record.' },
 
