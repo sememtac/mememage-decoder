@@ -5087,13 +5087,13 @@ setInterval(function() {
     }).join('');
 
     host.innerHTML =
-      (rows || '<p class="config-field-empty">No channels configured.</p>') +
+      (rows || '<p class="config-field-empty">No surfaces configured.</p>') +
       '<div class="config-channel-add">' +
       '  <select class="config-input config-channel-add-type" id="configChannelNewType">' +
       addOptions +
       '  </select>' +
-      '  <input class="config-input config-channel-add-id" id="configChannelNewId" type="text" placeholder="channel id (e.g. ia-backup)">' +
-      '  <button class="config-btn" id="configChannelAddBtn">+ Add channel</button>' +
+      '  <input class="config-input config-channel-add-id" id="configChannelNewId" type="text" placeholder="surface id (e.g. ia-backup)">' +
+      '  <button class="config-btn" id="configChannelAddBtn">+ Add surface</button>' +
       '  <button type="button" class="config-btn config-btn-subtle advanced-only" id="configChannelViewRaw">View raw JSON\u2026</button>' +
       '</div>' +
       '<p class="config-note">The <strong>primary</strong> channel\u2019s URL becomes the bar\u2019s record link and the Discord notification target. Every enabled+configured channel receives a copy of the soul on every mint; at least one must succeed. Credentials always live in <code>.env</code> — fields below name the env var to read.</p>';
@@ -5272,7 +5272,7 @@ setInterval(function() {
     var removeBtn = row.querySelector('[data-channel-remove]');
     if (removeBtn) {
       removeBtn.addEventListener('click', function() {
-        if (!confirm('Remove channel "' + (channel.name || channel.id) + '"? Existing records that already shipped to it are unaffected; future mints will skip it.')) return;
+        if (!confirm('Remove surface "' + (channel.name || channel.id) + '"? Existing records that already shipped to it are unaffected; future mints will skip it.')) return;
         row.remove();
         saveChannelsFromDom(host);
       });
@@ -5391,7 +5391,7 @@ setInterval(function() {
       var text = await resp.text();
       var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
       if (!resp.ok) {
-        showError(data.error || ('Channels save failed (HTTP ' + resp.status + ').'));
+        showError(data.error || ('Surfaces save failed (HTTP ' + resp.status + ').'));
         loadChannels();  // revert UI to server truth
         return;
       }
@@ -5399,7 +5399,7 @@ setInterval(function() {
       // Refresh so the configured/primary chips reflect the saved state.
       loadChannels();
     } catch (e) {
-      showError('Channels save failed: ' + e.message);
+      showError('Surfaces save failed: ' + e.message);
     }
   }
 
@@ -5410,7 +5410,7 @@ setInterval(function() {
     var type = typeSel.value;
     var id = (idInp.value || '').trim();
     if (!id) {
-      showError('Channel id required (e.g. "ia-backup", "my-server").');
+      showError('Surface id required (e.g. "ia-backup", "my-server").');
       return;
     }
     // Build a fresh channel with schema defaults filled in.
@@ -6001,7 +6001,7 @@ setInterval(function() {
     var sel = _ccEl('configCcChannel');
     if (sel) {
       if (!_ccChannels.length) {
-        sel.innerHTML = '<option value="">(no channels configured)</option>';
+        sel.innerHTML = '<option value="">(no surfaces configured)</option>';
       } else {
         sel.innerHTML = _ccChannels.map(function(c) {
           return '<option value="' + escapeHtml(c.id) + '">' +
@@ -6058,7 +6058,7 @@ setInterval(function() {
       : 'PURGE ' + ids.length + ' item(s) on ' + ch.name + ' — irreversible content removal';
     var typed = window.prompt(
       'About to ' + human + '.\n\n' +
-      'The identifier may remain reserved on the channel (e.g. IA never releases a namespace).\n\n' +
+      'The identifier may remain reserved on the surface (e.g. IA never releases a namespace).\n\n' +
       'Type ' + verb + ' to confirm:'
     );
     if (typed !== verb) return;
@@ -6225,12 +6225,12 @@ setInterval(function() {
   var ENTRIES = [
     // --- The model ---
     { id: 'soul', label: 'Soul',
-      body: 'The metadata record — a structured JSON document carrying every fact about a conception. Stored as <code>.soul</code> files; lives wherever your channels carry it (peer mirror, archive, content-addressed network) plus your local disk. The soul is the meaning; the image is the body.' +
+      body: 'The metadata record — a structured JSON document carrying every fact about a conception. Stored as <code>.soul</code> files; lives wherever your surfaces carry it (peer mirror, archive, content-addressed network) plus your local disk. The soul is the meaning; the image is the body.' +
         '<pre class="glossary-snippet">{\n  "identifier":   "mememage-\u2026",\n  "content_hash": "\u2026",\n  "prompt":       "\u2026",\n  "birth":        { /* sky + machine + GPS */ },\n  "signature":    "\u2026",\n  /* \u2026more fields\u2026 */\n}</pre>' },
     { id: 'bar', label: 'Bar',
       body: 'The 2-pixel-tall steganographic strip at the bottom of every conceived image. Carries the identifier (so any decoder can look up the soul) and the content hash (so tampering is detectable). Reed-Solomon FEC + color delimiter bands make it survive JPEG re-encoding and crops down to common social-media sizes.' },
     { id: 'conception', label: 'Conception',
-      body: 'The conscious act of binding a body (image) to a soul (metadata): the server hashes the record, signs it with your active key, writes the bar into the image, blasts the soul to your channels. GPS is mandatory by default; chains can opt out via <code>gps_source: none</code>.' },
+      body: 'The conscious act of binding a body (image) to a soul (metadata): the server hashes the record, signs it with your active key, writes the bar into the image, blasts the soul to your surfaces. GPS is mandatory by default; chains can opt out via <code>gps_source: none</code>.' },
     { id: 'identifier', label: 'Identifier',
       body: 'The key for finding a soul. Derived from the conception\u2019s essentials (prompt + seed + dimensions + timestamp on AI-gen chains; other inputs on other chain shapes). Lives in the bar; readers use it to fetch the soul from any source. Source-agnostic — no URL in the pixels themselves.' },
     { id: 'content_hash', label: 'Content hash',
@@ -6266,12 +6266,12 @@ setInterval(function() {
       body: 'One-shot push of your chains + channels (+ optionally webhooks) to a peer host. Peer applies additively — existing entries are kept untouched. No private keys, no API tokens, no channel credentials cross the wire (webhooks excepted, with explicit opt-in).' },
 
     // --- Channels ---
-    { id: 'channel', label: 'Channel',
-      body: 'A pluggable destination for souls. Each enabled+configured channel receives a copy on every conception; at least one must succeed. The framework is type-agnostic — built-in types include <code>internet_archive</code>, <code>http_push</code> (peer host), and <code>zenodo</code>, and authors can register more (S3, IPFS, etc.).' },
-    { id: 'primary', label: 'Primary channel',
-      body: 'The one channel whose URL becomes <code>record.url</code> — the bar reference and the notification link. Exactly one channel can be primary at a time; promote / demote via the radio button.' },
-    { id: 'per_profile_channels', label: 'Per-profile channels',
-      body: 'Each profile owns its own set of channels (its channels.json). Switching the active profile switches the whole blast setup \u2014 surfaces and their credentials \u2014 with no reconfiguring. A conception publishes to every enabled + configured channel in the active profile\u2019s set. To keep a profile (e.g. a VPS key) off a public archive, just don\u2019t add that channel to it.' },
+    { id: 'channel', label: 'Surface',
+      body: 'A pluggable destination for souls — a surface the soul lands on. Each enabled+configured surface receives a copy on every conception; at least one must succeed. The framework is type-agnostic — built-in types include <code>internet_archive</code>, <code>http_push</code> (peer host), and <code>zenodo</code>, and authors can register more (S3, IPFS, etc.).' },
+    { id: 'primary', label: 'Primary surface',
+      body: 'The one surface whose URL becomes <code>record.url</code> — the bar reference and the notification link. Exactly one surface can be primary at a time; promote / demote via the radio button.' },
+    { id: 'per_profile_channels', label: 'Per-profile surfaces',
+      body: 'Each profile owns its own set of surfaces (its <code>channels.json</code>). Switching the active profile switches the whole blast setup \u2014 surfaces and their credentials \u2014 with no reconfiguring. A conception publishes to every enabled + configured surface in the active profile\u2019s set. To keep a profile (e.g. a VPS key) off a public archive, just don\u2019t add that surface to it.' },
     { id: 'distribution', label: 'Distribution',
       body: 'The server-side publish-results map (<code>{channel_id \u2192 url}</code>) returned by <code>channels.blast()</code>. Surfaced in webhook templates as <code>{{distribution}}</code> and in the dashboard handoff card after a mint completes. Not written into the soul itself \u2014 the artifact is surface-agnostic; mirror discovery is an operational concern handled by whoever serves the soul. Sovereignty signal lives in the system\u2019s design (any number of mirrors can serve any soul), not in a list baked into every record.' },
 

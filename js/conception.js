@@ -114,7 +114,7 @@
     });
     var headLabel = document.querySelector('.conception-head-label');
     if (headLabel && HEAD_LABEL[name]) headLabel.textContent = HEAD_LABEL[name];
-    // The top "Target channels" strip is a PLAN — where the soul will go,
+    // The top "Target surfaces" strip is a PLAN — where the soul will go,
     // read from current config. That's honest before the point of no return
     // (pre / in-flight), but once conceived the truth is what was actually
     // captured, shown in the result's Surfaces list. Hide the plan post-
