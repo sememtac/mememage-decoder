@@ -62,6 +62,15 @@ body {
   max-width: 60%;
 }
 
+/* --- Chain badge strip ---
+ * The server-substituted chain badge. Pad it to the same 1.1rem gutter
+ * as the head + state blocks so the pill sits inside the section instead
+ * of flush against its edge. The badge is an inline-flex pill; the wrapper
+ * just provides the gutter. */
+.conception-chain {
+  padding: 0.85rem 1.1rem 0;
+}
+
 /* --- State container --- */
 .conception-state {
   padding: 1.1rem 1.1rem 1.2rem;
