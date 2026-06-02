@@ -3393,6 +3393,11 @@ setInterval(function() {
     slack: JSON.stringify({
       text: ':art: *{{summary}}*\n{{action_url}}'
     }, null, 2),
+    // Telegram sendMessage shape — this adapter pulls "text" out and injects
+    // chat_id. (Telegram renders real emoji, not :shortcodes:.)
+    telegram: JSON.stringify({
+      text: '🎨 {{summary}}\n{{action_url}}'
+    }, null, 2),
     raw: '',
   };
 
@@ -3618,6 +3623,8 @@ setInterval(function() {
           kind: w.kind || '',
           slack_bot_token: w.slack_bot_token || '',
           slack_channel: w.slack_channel || '',
+          telegram_bot_token: w.telegram_bot_token || '',
+          telegram_chat_id: w.telegram_chat_id || '',
         };
       });
     }
@@ -3883,6 +3890,23 @@ setInterval(function() {
                 '</label>' +
               '</div>'
             : '';
+          // Telegram has no per-target webhook URL — the bot token authenticates
+          // and a chat id names the destination. Reuse the slack-block styling.
+          var isTelegram = (w.kind === 'telegram') || /api\.telegram\.org/.test(w.url || '');
+          var telegramBlock = isTelegram
+            ? '<div class="config-webhook-slack">' +
+                '<p class="config-webhook-slack-note">Telegram needs a bot token (from <code>@BotFather</code>) + a chat ID (a numeric id, or <code>@channelusername</code>). The bot must be a member/admin of the target chat. Attachment sends the image + .soul as photo + document.</p>' +
+                '<label class="config-webhook-slack-field"><span>Bot token</span>' +
+                  '<span class="config-password-wrap">' +
+                    '<input class="config-input" data-webhook-tg-token="' + i + '" type="password" autocomplete="off" value="' + escapeHtml(w.telegram_bot_token || '') + '" placeholder="123456:ABC-DEF…">' +
+                    '<button type="button" class="config-password-toggle" data-pw-toggle aria-label="Show value" title="Show value">👁</button>' +
+                  '</span>' +
+                '</label>' +
+                '<label class="config-webhook-slack-field"><span>Chat ID</span>' +
+                  '<input class="config-input" data-webhook-tg-chat="' + i + '" type="text" autocomplete="off" value="' + escapeHtml(w.telegram_chat_id || '') + '" placeholder="@mychannel or -1001234567890">' +
+                '</label>' +
+              '</div>'
+            : '';
           return '' +
             '<div class="config-webhook-row" data-i="' + i + '">' +
               // URL on its own row — long Discord/Slack URLs need
@@ -3908,12 +3932,14 @@ setInterval(function() {
                     '<option value="raw"' + (presetKey === 'raw' ? ' selected' : '') + '>Raw (generic JSON)</option>' +
                     '<option value="discord"' + (presetKey === 'discord' ? ' selected' : '') + '>Discord</option>' +
                     '<option value="slack"' + (presetKey === 'slack' ? ' selected' : '') + '>Slack</option>' +
+                    '<option value="telegram"' + (presetKey === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
                     '<option value="custom"' + (presetKey === 'custom' ? ' selected' : '') + ' disabled>Custom (edited)</option>' +
                   '</select>' +
                 '</label>' +
                 '<textarea class="config-input config-webhook-tmpl-input" data-webhook-tmpl="' + i + '" rows="3" placeholder="Empty = raw POST. JSON template with {{event}}, {{identifier}}, {{content_hash}}, {{url}} (primary surface), {{distribution}} (all surfaces, multiline), {{constellation}}, {{constellation_star}}, {{rarity_tier}}, {{rarity_score}}, {{creator_name}}, {{key_fingerprint}}, {{chain_id}}, {{chain_visibility}}, {{gps_source}}, {{mint_url}}, {{image_name}}.">' + escapeHtml(tmpl) + '</textarea>' +
               '</div>' +
               slackBlock +
+              telegramBlock +
             '</div>';
         }).join('');
 
@@ -3954,6 +3980,22 @@ setInterval(function() {
       inp.addEventListener('input', function() {
         var i = parseInt(inp.getAttribute('data-webhook-slack-channel'), 10);
         _webhooksDraft[i].slack_channel = inp.value;
+        _webhooksDirty = true;
+        markWebhooksDirty();
+      });
+    });
+    host.querySelectorAll('[data-webhook-tg-token]').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var i = parseInt(inp.getAttribute('data-webhook-tg-token'), 10);
+        _webhooksDraft[i].telegram_bot_token = inp.value;
+        _webhooksDirty = true;
+        markWebhooksDirty();
+      });
+    });
+    host.querySelectorAll('[data-webhook-tg-chat]').forEach(function(inp) {
+      inp.addEventListener('input', function() {
+        var i = parseInt(inp.getAttribute('data-webhook-tg-chat'), 10);
+        _webhooksDraft[i].telegram_chat_id = inp.value;
         _webhooksDirty = true;
         markWebhooksDirty();
       });
@@ -4026,6 +4068,16 @@ setInterval(function() {
         if (key === 'custom') return; // disabled, but defensive
         var tmpl = WEBHOOK_PRESETS[key] || '';
         _webhooksDraft[i].template = tmpl;
+        // Telegram has no per-target webhook URL to paste — picking the
+        // Telegram preset pins kind=telegram and fills the constant API URL
+        // (the routing identity; the real secret is the bot token field that
+        // now appears). Other presets stay auto-detected by URL.
+        if (key === 'telegram') {
+          _webhooksDraft[i].kind = 'telegram';
+          if (!(_webhooksDraft[i].url || '').trim()) {
+            _webhooksDraft[i].url = 'https://api.telegram.org';
+          }
+        }
         _webhooksDirty = true;
         // Re-render this row's textarea content. Full re-render is
         // overkill but cheap, and the preset is a deliberate one-shot
@@ -4155,6 +4207,8 @@ setInterval(function() {
           if (w.kind && w.kind.trim()) out.kind = w.kind.trim();
           if (w.slack_bot_token && w.slack_bot_token.trim()) out.slack_bot_token = w.slack_bot_token.trim();
           if (w.slack_channel && w.slack_channel.trim()) out.slack_channel = w.slack_channel.trim();
+          if (w.telegram_bot_token && w.telegram_bot_token.trim()) out.telegram_bot_token = w.telegram_bot_token.trim();
+          if (w.telegram_chat_id && w.telegram_chat_id.trim()) out.telegram_chat_id = w.telegram_chat_id.trim();
           return out;
         })}),
       });
