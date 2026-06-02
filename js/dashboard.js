@@ -3370,7 +3370,7 @@ setInterval(function() {
   //                       conceived → IA record URL
   //
   // Event-specific keys (only on the matching event):
-  //   ready:     mint_url, image_name
+  //   ready:     mint_url, image_name, gps_source
   //   conceived: identifier, content_hash, url (primary surface),
   //              distribution (multiline "label: url" for every
   //              surface the soul landed on), image_path, soul_path,
