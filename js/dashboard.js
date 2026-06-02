@@ -6273,6 +6273,40 @@ setInterval(function() {
     if (p) p.addEventListener('click', function() { _ccAction('purge'); });
   })();
 
+  // ----- Diagnostics (deployment preflight) -----------------------------
+  function _renderDoctor(data) {
+    var host = document.getElementById('configDoctorResults');
+    if (!host) return;
+    var checks = (data && data.checks) || [];
+    if (!checks.length) { host.innerHTML = '<p class="config-note">No checks returned.</p>'; return; }
+    var GLYPH = { ok: '✓', warn: '⚠', fail: '✗' };
+    var rows = checks.map(function(c) {
+      return '<div class="config-doctor-row" data-status="' + escapeHtml(c.status) + '">' +
+        '<span class="config-doctor-mark">' + (GLYPH[c.status] || '?') + '</span>' +
+        '<span class="config-doctor-label">' + escapeHtml(c.label) + '</span>' +
+        '<span class="config-doctor-detail">' + escapeHtml(c.detail || '') + '</span>' +
+      '</div>';
+    }).join('');
+    host.innerHTML = '<div class="config-doctor" data-summary="' + escapeHtml(data.summary || '') + '">' + rows + '</div>';
+  }
+  async function runDoctor() {
+    var btn = document.getElementById('configDoctorRun');
+    var host = document.getElementById('configDoctorResults');
+    if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+    if (host) host.innerHTML = '';
+    try {
+      _renderDoctor(await fetchJson('/api/doctor'));
+    } catch (e) {
+      if (host) host.innerHTML = '<p class="config-doctor-err">Diagnostics failed: ' + escapeHtml(e.message) + '</p>';
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Run diagnostics'; }
+    }
+  }
+  (function _wireDoctor() {
+    var btn = document.getElementById('configDoctorRun');
+    if (btn) btn.addEventListener('click', runDoctor);
+  })();
+
   window.__loadConfigTab = function() {
     if (loaded) return;
     loaded = true;

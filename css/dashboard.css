@@ -3086,6 +3086,34 @@ label > input[type="checkbox"] {
   margin: 0.6rem 0 0;
   font-style: italic;
 }
+
+/* Diagnostics checklist (the Doctor) */
+.config-doctor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.7rem;
+}
+.config-doctor-row {
+  display: grid;
+  grid-template-columns: 1.2rem auto 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 0.74rem;
+}
+.config-doctor-row[data-status="ok"]   { background: rgba(46,204,113,0.10); border-color: rgba(46,204,113,0.4); }
+.config-doctor-row[data-status="warn"] { background: rgba(243,156,18,0.10); border-color: rgba(243,156,18,0.45); }
+.config-doctor-row[data-status="fail"] { background: rgba(231,76,60,0.10);  border-color: rgba(231,76,60,0.45); }
+.config-doctor-mark { font-weight: 700; }
+.config-doctor-row[data-status="ok"]   .config-doctor-mark { color: #1c7a44; }
+.config-doctor-row[data-status="warn"] .config-doctor-mark { color: #9a5410; }
+.config-doctor-row[data-status="fail"] .config-doctor-mark { color: #a02a20; }
+.config-doctor-label { font-weight: 700; color: #1a1a20; white-space: nowrap; }
+.config-doctor-detail { color: #45454e; }
+.config-doctor-err { color: #a02a20; font-size: 0.74rem; margin-top: 0.6rem; }
 .config-note code {
   background: rgba(0, 0, 0, 0.06);
   padding: 0.05rem 0.3rem;
