@@ -677,11 +677,14 @@ setInterval(function() {
       // attempting the doomed fetch.
       return;
     }
-    // Pre-flight: the server refuses /api/mint/upload with 412 on an
-    // unsealed chain (and 4xx on a Dark-no-password chain). Refuse here
-    // too so the user doesn't watch a file upload only to fail server
-    // side. _refreshMintGuardrails has already shown the explainer.
-    if (state.chainSealed === false ||
+    // Pre-flight: the server refuses /api/mint/upload with 412 only when a
+    // payload-CARRYING chain is unsealed (and 4xx on a Dark-no-password
+    // chain). Refuse here too so the user doesn't watch a file upload only
+    // to fail server side. A provenance-only chain (no payload) conceives
+    // freely while unsealed, so it must NOT bail here — that was the bug
+    // where a fresh chain's drop silently did nothing. Mirror the exact
+    // condition in _refreshMintGuardrails so the two never disagree.
+    if ((state.chainSealed === false && state.chainHasPayload) ||
         (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet) ||
         state.chainNeedsUnlock) {
       _refreshMintGuardrails();
@@ -1063,6 +1066,9 @@ setInterval(function() {
       if (sealResp.ok) {
         var sealInfo = await sealResp.json();
         state.chainSealed = !!(sealInfo && sealInfo.sealed);
+        // Provenance-only chains (no payload) conceive freely while unsealed —
+        // the server gate allows it, so the local guardrail must too.
+        state.chainHasPayload = !!(sealInfo && sealInfo.has_payload);
       }
     } catch (e) { /* keep prior state; refresh will retry */ }
     _refreshMintGuardrails();
@@ -1076,9 +1082,9 @@ setInterval(function() {
   function _refreshMintGuardrails() {
     var blocked = false;
     var msg = '';
-    if (state.chainSealed === false) {
+    if (state.chainSealed === false && state.chainHasPayload) {
       blocked = true;
-      msg = 'This chain has no sealed Age yet. Open the <strong>Payload</strong> tab and click <strong>Seal Age</strong> before conceiving — minting against an unsealed chain would produce a record with no Age number, no decoder_hash, and no chunks.';
+      msg = 'This chain carries a payload but has no sealed Age yet. Open the <strong>Payload</strong> tab and click <strong>Seal Age</strong> before conceiving — otherwise each record would lose the Age number, decoder_hash, and chunks it is meant to carry. (Provenance-only chains don’t need this.)';
     } else if (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet) {
       blocked = true;
       msg = 'This chain is Dark but has no stored password — set it in <strong>Config \u2192 Chains</strong> before conceiving.';
@@ -5638,6 +5644,7 @@ setInterval(function() {
           // password, so absence of a lock there isn't mistaken for
           // "public" \u2014 the red state speaks first.
           var gpsSource = c.gps_source || 'phone';
+          var gpsVisibility = c.gps_visibility || 'time_locked';
           var prefix = c.identifier_prefix || 'mememage';
           var metaParts = [];
           if (pwSet) metaParts.push('\ud83d\udd12');  // \ud83d\udd12 password present
@@ -5676,6 +5683,17 @@ setInterval(function() {
               '<label><input type="radio" name="gps-' + escapeHtml(c.id) + '" value="none" ' +
                 (gpsSource === 'none' ? 'checked' : '') + ' data-chain-gps-set="' + escapeHtml(c.id) + '"> none</label>' +
             '</div>';
+          // GPS visibility — only meaningful when GPS is captured. Two modes:
+          // time-locked (default, private now / provable in ~10 years) vs
+          // public (plaintext on the cert; deliberate, irreversible per record).
+          var visRadio = gpsSource === 'none' ? '' :
+            '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
+              '<span class="config-chain-gps-label">GPS visibility</span>' +
+              '<label title="Coordinates sealed in a ~10-year time-lock — private now, provable later"><input type="radio" name="gpsvis-' + escapeHtml(c.id) + '" value="time_locked" ' +
+                (gpsVisibility === 'time_locked' ? 'checked' : '') + ' data-chain-gpsvis-set="' + escapeHtml(c.id) + '"> time-locked</label>' +
+              '<label title="Coordinates ALSO stored in plaintext — the certificate shows the location immediately. Irreversible per record."><input type="radio" name="gpsvis-' + escapeHtml(c.id) + '" value="public" ' +
+                (gpsVisibility === 'public' ? 'checked' : '') + ' data-chain-gpsvis-set="' + escapeHtml(c.id) + '"> public</label>' +
+            '</div>';
           // The row LEADS with the shared chain badge (identity +
           // readiness), then the action buttons, then the GPS radios.
           // Chain detail (prefix / created / pw contract) rides in the
@@ -5690,7 +5708,7 @@ setInterval(function() {
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<div class="config-chain-badge-cell">' + badge + '</div>' +
             '<div class="config-chain-actions">' + actions + '</div>' +
-            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + '</div>' +
+            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + visRadio + '</div>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -5782,6 +5800,22 @@ setInterval(function() {
         setChainGpsSource(cid, input.value);
       });
     });
+    els.chains.querySelectorAll('input[data-chain-gpsvis-set]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        if (!input.checked) return;
+        var cid = input.getAttribute('data-chain-gpsvis-set');
+        // Public GPS is an irreversible per-record exposure — confirm once.
+        if (input.value === 'public' && !window.confirm(
+          'Make GPS PUBLIC for this chain?\n\n' +
+          'Future conceptions will store the exact coordinates in plaintext — ' +
+          'the certificate shows where each image was made, to anyone who has ' +
+          'it. This is baked into each record and can’t be undone.\n\n' +
+          '(Already-minted records are unaffected. The ~10-year time-lock is ' +
+          'kept either way.)'
+        )) { loadChains(); return; }  // revert the radio
+        setChainGpsVisibility(cid, input.value);
+      });
+    });
   }
 
   async function setChainGpsSource(chainId, gpsSource) {
@@ -5799,6 +5833,25 @@ setInterval(function() {
       }
     } catch (e) {
       alert('Failed to set GPS source: ' + e.message);
+      loadChains();
+    }
+  }
+
+  async function setChainGpsVisibility(chainId, gpsVisibility) {
+    try {
+      var resp = await fetch('/api/chain/gps-visibility', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({chain_id: chainId, gps_visibility: gpsVisibility}),
+      });
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        alert(data.error || ('Failed to set GPS visibility (HTTP ' + resp.status + ')'));
+        loadChains();  // revert UI to server truth
+      }
+    } catch (e) {
+      alert('Failed to set GPS visibility: ' + e.message);
       loadChains();
     }
   }

@@ -50,8 +50,10 @@ const HASH_INCLUDED_V1 = new Set([
   'conceived', 'rendered',
   // birth contains celestial + machine (no GPS). GPS lives at
   // top-level: gps_time_locked is hashed; gps_password_locked is
-  // added post-hash by access.py and stays out of the set.
-  'birth', 'gps_time_locked',
+  // added post-hash by access.py and stays out of the set. 'gps'
+  // (plaintext [lat,lon]) is hashed too — present only on
+  // gps_visibility: "public" chains, absent otherwise (intersection-safe).
+  'birth', 'gps_time_locked', 'gps',
   'constellation_hash', 'machine_fingerprint',
   // rarity dict is hashed; rarity_score is the derived sum — readers
   // reconstruct via rarity-helpers.js / RarityScore.fromRecord().

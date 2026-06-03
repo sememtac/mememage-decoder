@@ -761,3 +761,13 @@ body {
 /* Chain badge wrapper — server-injected ({{CHAIN_BADGE}}). The .chain-*
    styles live in mememage.css; this just spaces it under the head. */
 .conception-chain { margin: 0.2rem 0 0.9rem; }
+
+/* State chip on the DARK conception card. mememage.css tunes the chip text
+   for a light dashboard (dark amber / green / red), which is near-invisible
+   against this yin plate — restore contrast with bright semantic text and a
+   touch more fill. Scoped to .conception-chain so the light dashboard chip
+   is untouched. */
+.conception-chain .chain-state-chip[data-state="ready"]     { background: rgba(46, 204, 113, 0.20); color: #5fe39a; border-color: rgba(46, 204, 113, 0.6); }
+.conception-chain .chain-state-chip[data-state="nopayload"] { background: rgba(241, 196, 15, 0.22); color: #f4d24f; border-color: rgba(241, 196, 15, 0.65); }
+.conception-chain .chain-state-chip[data-state="pending"]   { background: rgba(243, 156, 18, 0.22); color: #f6ad48; border-color: rgba(243, 156, 18, 0.65); }
+.conception-chain .chain-state-chip[data-state="notready"]  { background: rgba(231, 76, 60, 0.20); color: #f2877a; border-color: rgba(231, 76, 60, 0.6); }

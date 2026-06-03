@@ -1909,6 +1909,18 @@
     line-height: 1.6;
   }
 
+  /* Public-GPS "View on map" link (gps_visibility: public). */
+  .gps-map-link {
+    display: block;
+    text-align: center;
+    margin-top: 8px;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    color: color-mix(in srgb, var(--rarity-color, #a0a0a0) 70%, #cccccc);
+  }
+  .gps-map-link:hover { text-decoration: underline; }
+
   /* --- GPS Password Unlock --- */
   .gps-unlock {
     margin-top: 14px;

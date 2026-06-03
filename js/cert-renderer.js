@@ -1470,7 +1470,31 @@ function renderCert(meta, options) {
   // body view — earned by dropping the image. Chain traversal shows
   // navigation + soul fields without the birthplace block (matches
   // the sample cert format the user pointed at).
-  if (GPS_CIPHER && !isSample && _imageWasPresent) {
+  if (meta.gps && Array.isArray(meta.gps) && meta.gps.length === 2 && !isSample && _imageWasPresent) {
+    // Public-GPS chain (gps_visibility: "public") \u2014 coordinates shown in
+    // the clear by the creator's deliberate choice. The time-lock is still
+    // present in the record for independent proof later.
+    plate.appendChild(_sectionLabel('BIRTHPLACE'));
+    var pgLat = '' + meta.gps[0], pgLon = '' + meta.gps[1];
+    var pgC = _div('gps-container');
+    var pgRgb = _hexToRgb(tierColor || '#a0a0a0');
+    pgC.style.background = 'linear-gradient(180deg, rgb(' + Math.floor(pgRgb[0]*0.08) + ',' + Math.floor(pgRgb[1]*0.08) + ',' + Math.floor(pgRgb[2]*0.08) + ') 0%, rgb(' + Math.floor(pgRgb[0]*0.12) + ',' + Math.floor(pgRgb[1]*0.12) + ',' + Math.floor(pgRgb[2]*0.12) + ') 50%, rgb(' + Math.floor(pgRgb[0]*0.08) + ',' + Math.floor(pgRgb[1]*0.08) + ',' + Math.floor(pgRgb[2]*0.08) + ') 100%)';
+    var pgCoords = _div('gps-unlock-coords');
+    pgCoords.innerHTML =
+      '<div><span class="gps-unlock-k">LAT</span> <span class="gps-unlock-v">' + escapeHtml(pgLat) + '</span></div>' +
+      '<div><span class="gps-unlock-k">LON</span> <span class="gps-unlock-v">' + escapeHtml(pgLon) + '</span></div>';
+    pgC.appendChild(pgCoords);
+    var pgMap = document.createElement('a');
+    pgMap.className = 'gps-map-link';
+    pgMap.href = 'https://www.openstreetmap.org/?mlat=' + encodeURIComponent(pgLat) + '&mlon=' + encodeURIComponent(pgLon) + '#map=12/' + encodeURIComponent(pgLat) + '/' + encodeURIComponent(pgLon);
+    pgMap.target = '_blank'; pgMap.rel = 'noopener';
+    pgMap.textContent = 'View on map \u2197';
+    pgC.appendChild(pgMap);
+    var pgNote = _div('gps-footnote');
+    pgNote.textContent = 'Shown by the creator\u2019s choice. The coordinates are also sealed in a ~10-year time-lock for independent proof.';
+    pgC.appendChild(pgNote);
+    plate.appendChild(pgC);
+  } else if (GPS_CIPHER && !isSample && _imageWasPresent) {
     plate.appendChild(_sectionLabel('BIRTHPLACE \u2014 TIME-LOCKED *'));
 
     var gpsContainer = _div('gps-container');
