@@ -3439,8 +3439,14 @@ setInterval(function() {
   function renderIdentity(identity) {
     if (!identity.signing_available) {
       els.identity.innerHTML =
-        '<p class="config-note">Signing requires the <code>cryptography</code> ' +
-        'library. Install with <code>pip install mememage[sign]</code> and refresh.</p>';
+        '<p>Signing is <strong>optional</strong> — your conceptions are already verifiable by their content hash. ' +
+        'Add it to also prove they’re <em>yours</em> (the AUTHENTICATED badge). It needs the ' +
+        '<code>cryptography</code> library, which you can install right here — no terminal:</p>' +
+        '<div class="config-row">' +
+        '  <button class="config-btn config-btn-primary" id="configInstallSigning">Install signing support</button>' +
+        '</div>' +
+        '<div id="configInstallSigningStatus" class="config-note"></div>';
+      document.getElementById('configInstallSigning').addEventListener('click', installSigning);
       return;
     }
     if (!identity.has_private_key) {
@@ -4265,6 +4271,34 @@ setInterval(function() {
       setTimeout(function() { btn.textContent = prev; btn.disabled = false; }, 1500);
     } catch (e) {
       showError('Save failed: ' + e.message);
+    }
+  }
+
+  // Install the optional `cryptography` lib server-side so signing works —
+  // no terminal. The server lazy-imports it, so it's usable without a restart;
+  // we just re-render the Identity section (now showing the keygen form).
+  async function installSigning() {
+    var btn = document.getElementById('configInstallSigning');
+    var status = document.getElementById('configInstallSigningStatus');
+    if (btn) { btn.disabled = true; btn.textContent = 'Installing… (up to a minute)'; }
+    if (status) { status.textContent = 'Downloading cryptography…'; status.style.color = ''; }
+    try {
+      var res = await fetchJson('/api/identity/install-signing', {
+        method: 'POST', headers: authHeaders(),
+      });
+      if (res.available) {
+        if (status) {
+          status.textContent = '✓ ' + (res.message || 'Installed.') + ' Opening key setup…';
+          status.style.color = '#1a7a1a';
+        }
+        await refresh();   // re-render Identity — the keygen form replaces this
+      } else {
+        if (status) { status.textContent = res.error || 'Install failed.'; status.style.color = '#b04040'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Install signing support'; }
+      }
+    } catch (e) {
+      if (status) { status.textContent = 'Install failed: ' + e.message; status.style.color = '#b04040'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Install signing support'; }
     }
   }
 
