@@ -3450,15 +3450,20 @@ setInterval(function() {
       return;
     }
     if (!identity.has_private_key) {
-      // No key yet — show the keygen form.
+      // No key yet — show the keygen form, framed as the optional-but-valuable
+      // step it is (you already get WITNESSED; a key adds AUTHENTICATED).
       els.identity.innerHTML =
-        '<p>No identity key found. Generate one to sign your records.</p>' +
+        '<p>A signing key proves your conceptions are <em>yours</em> — the ' +
+        '<strong>AUTHENTICATED</strong> badge. Optional (your work is already ' +
+        'verifiable by content hash without it), but it’s the heart of the idea: ' +
+        '<em>the artist is the authority</em>. The key lives only on this machine; ' +
+        'no account, no platform.</p>' +
         '<div class="config-field">' +
-        '  <label class="config-field-label" for="configKeygenName">Creator name</label>' +
-        '  <input class="config-input" id="configKeygenName" type="text" placeholder="your name or handle">' +
+        '  <label class="config-field-label" for="configKeygenName">Your name or handle</label>' +
+        '  <input class="config-input" id="configKeygenName" type="text" placeholder="how you want to be credited">' +
         '</div>' +
         '<div class="config-row">' +
-        '  <button class="config-btn config-btn-primary" id="configKeygenBtn">Generate key</button>' +
+        '  <button class="config-btn config-btn-primary" id="configKeygenBtn">Create my signing key</button>' +
         '</div>';
       document.getElementById('configKeygenBtn').addEventListener('click', generateKey);
       return;
@@ -4377,6 +4382,11 @@ setInterval(function() {
 
   function renderProfiles(activeId, rows) {
     if (!els.profiles) return;
+    // Profiles is the advanced multi-machine surface — collapsed by default
+    // for the common single-key case, auto-expanded once you actually have
+    // more than one (so power users aren't hiding their own keys).
+    var section = document.querySelector('[data-section="profiles"]');
+    if (section && rows.length > 1) section.open = true;
     var listHtml = rows.length === 0
       ? '<p class="config-field-empty">No profiles found.</p>'
       : rows.map(function(p) {
