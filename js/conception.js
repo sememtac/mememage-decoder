@@ -41,7 +41,6 @@
   var pulseDotsEl = document.getElementById('conceptionPulseDots');
   var imageEl = document.getElementById('conceptionImage');
   var downloadImageBtn = document.getElementById('conceptionDownloadImage');
-  var downloadImageMetaEl = document.getElementById('conceptionDownloadImageMeta');
   var factsEl = document.getElementById('conceptionFacts');
   var surfacesEl = document.getElementById('conceptionSurfaces');
   var failBodyEl = document.getElementById('conceptionFailBody');
@@ -264,7 +263,6 @@
     var imgUrl = '/api/mint/' + token + '/image';
 
     imageEl.src = imgUrl;
-    if (downloadImageMetaEl) downloadImageMetaEl.textContent = ident + '.png';
 
     // Facts list — identifier, hash, GPS, constellation if surfaced.
     factsEl.innerHTML = '';
@@ -312,6 +310,22 @@
       ? distKeys.map(function(k) { return [k, dist[k]]; })
       : [['local', '/api/mint/' + token + '/soul']];
 
+    // Label a captured surface by WHERE the soul landed (the URL's host),
+    // not the internal channel slug — matches the plan strip's
+    // display_surface(): localhost stays "localhost", a bare IP falls back
+    // to the slug (we don't surface raw IPs), a relative/local URL keeps the
+    // slug, and a real domain shows verbatim (e.g. soul-test.mememage.art).
+    function _surfaceLabel(channelId, url) {
+      if (!/^https?:\/\//i.test(url || '')) return channelId;
+      try {
+        var host = (new URL(url).hostname || '').toLowerCase();
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return 'localhost';
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return channelId;
+        if (host) return host;
+      } catch (e) { /* unparseable URL */ }
+      return channelId;
+    }
+
     entries.forEach(function(e) {
       var label = e[0];
       var url = e[1];
@@ -319,7 +333,8 @@
       row.className = 'conception-surface';
       var lab = document.createElement('span');
       lab.className = 'conception-surface-label';
-      lab.textContent = label;
+      lab.textContent = _surfaceLabel(label, url);
+      lab.title = label;  // the channel slug, for reference
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'conception-surface-dl';

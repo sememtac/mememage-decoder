@@ -501,6 +501,7 @@ setInterval(function() {
     resultUrlOpen: document.getElementById('mintResultUrlOpen'),
     resultChannels:     document.getElementById('mintResultChannels'),
     resultChannelsList: document.getElementById('mintResultChannelsList'),
+    resultImage:    document.getElementById('mintResultImage'),
     download:      document.getElementById('mintDownload'),
     downloadSoul:  document.getElementById('mintDownloadSoul'),
     again:         document.getElementById('mintAgain'),
@@ -764,22 +765,25 @@ setInterval(function() {
   // Click thumbnail → full-size lightbox overlay. Matches the
   // conception page + decoder ui.js:870 pattern so the creator can
   // verify image details before committing.
+  // Full-size lightbox overlay (click anywhere or Esc to close). Shared by
+  // the staged thumbnail and the conceived-result image.
+  function _openLightbox(src) {
+    if (!src) return;
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:1.5rem;';
+    var fullImg = document.createElement('img');
+    fullImg.src = src;
+    fullImg.style.cssText = 'max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 40px rgba(0,0,0,0.6);';
+    overlay.appendChild(fullImg);
+    overlay.addEventListener('click', function() { overlay.remove(); });
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+    });
+    document.body.appendChild(overlay);
+  }
   if (els.thumb) {
     els.thumb.style.cursor = 'zoom-in';
-    els.thumb.addEventListener('click', function() {
-      if (!els.thumb.src) return;
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:1.5rem;';
-      var fullImg = document.createElement('img');
-      fullImg.src = els.thumb.src;
-      fullImg.style.cssText = 'max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 40px rgba(0,0,0,0.6);';
-      overlay.appendChild(fullImg);
-      overlay.addEventListener('click', function() { overlay.remove(); });
-      document.addEventListener('keydown', function esc(e) {
-        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
-      });
-      document.body.appendChild(overlay);
-    });
+    els.thumb.addEventListener('click', function() { _openLightbox(els.thumb.src); });
   }
 
   // Shared rehydration path — used by both the fresh-upload flow and
@@ -1258,6 +1262,13 @@ setInterval(function() {
     // click with explicit download attribute saves with the right
     // name. Same fix the conception page uses.
     var imgUrl = s.download_url || ('/api/mint/' + state.token + '/image');
+    // Show the conceived image (matches the conception page's result).
+    // Click → full-size lightbox.
+    if (els.resultImage) {
+      els.resultImage.src = imgUrl;
+      els.resultImage.alt = (s.identifier || 'conceived') + ' image';
+      els.resultImage.onclick = function() { _openLightbox(imgUrl); };
+    }
     _wireBlobDownload(els.download, imgUrl, (s.identifier || 'image') + '.png');
     // Soul download — points at our /api/mint/<token>/soul endpoint
     // which streams the local .soul file regardless of whether IA
@@ -5645,6 +5656,7 @@ setInterval(function() {
           // "public" \u2014 the red state speaks first.
           var gpsSource = c.gps_source || 'phone';
           var gpsVisibility = c.gps_visibility || 'time_locked';
+          var constellationSize = c.constellation_size || 12;
           var prefix = c.identifier_prefix || 'mememage';
           var metaParts = [];
           if (pwSet) metaParts.push('\ud83d\udd12');  // \ud83d\udd12 password present
@@ -5694,6 +5706,22 @@ setInterval(function() {
               '<label title="Coordinates ALSO stored in plaintext — the certificate shows the location immediately. Irreversible per record."><input type="radio" name="gpsvis-' + escapeHtml(c.id) + '" value="public" ' +
                 (gpsVisibility === 'public' ? 'checked' : '') + ' data-chain-gpsvis-set="' + escapeHtml(c.id) + '"> public</label>' +
             '</div>';
+          // Constellation size — one knob (1..12) deriving the decoder cycle
+          // K, the heart-reset cadence (new heart star every N records), and
+          // the Bayer-letter span. Snapshotted at seal, so a change takes
+          // effect on the NEXT Age.
+          var sizeOptions = '';
+          for (var n = 1; n <= 12; n++) {
+            sizeOptions += '<option value="' + n + '"' +
+              (constellationSize === n ? ' selected' : '') + '>' + n + '</option>';
+          }
+          var constellationSel =
+            '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
+              '<span class="config-chain-gps-label" title="Stars per constellation: the decoder cycle K, the heart-reset cadence, and the Bayer span (α..). Applies on the next Age.">Constellation size</span>' +
+              '<select class="config-input config-chain-size-select" data-chain-size-set="' + escapeHtml(c.id) + '" style="width:auto;">' +
+                sizeOptions +
+              '</select>' +
+            '</div>';
           // The row LEADS with the shared chain badge (identity +
           // readiness), then the action buttons, then the GPS radios.
           // Chain detail (prefix / created / pw contract) rides in the
@@ -5708,7 +5736,7 @@ setInterval(function() {
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<div class="config-chain-badge-cell">' + badge + '</div>' +
             '<div class="config-chain-actions">' + actions + '</div>' +
-            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + visRadio + '</div>' +
+            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + visRadio + constellationSel + '</div>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -5816,6 +5844,32 @@ setInterval(function() {
         setChainGpsVisibility(cid, input.value);
       });
     });
+    // Constellation-size selector — persist on change, optimistic UI.
+    els.chains.querySelectorAll('select[data-chain-size-set]').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        var cid = sel.getAttribute('data-chain-size-set');
+        setChainConstellationSize(cid, parseInt(sel.value, 10));
+      });
+    });
+  }
+
+  async function setChainConstellationSize(chainId, size) {
+    try {
+      var resp = await fetch('/api/chain/constellation-size', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({chain_id: chainId, constellation_size: size}),
+      });
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        alert(data.error || ('Failed to set constellation size (HTTP ' + resp.status + ')'));
+        loadChains();  // revert UI to server truth
+      }
+    } catch (e) {
+      alert('Failed to set constellation size: ' + e.message);
+      loadChains();
+    }
   }
 
   async function setChainGpsSource(chainId, gpsSource) {

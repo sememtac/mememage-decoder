@@ -1245,12 +1245,29 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
    URL is a readonly text input + copy/open buttons instead of a
    truncated anchor — pasting the URL is the common action, and a
    line that ends in "…" is useless for that. */
+/* Matches the conception page's "● CONCEIVED" head: green dot + uppercase,
+   letter-spaced label. Green darkened from --accent-green (#7bc4a0) so it
+   reads on the lighter dashboard panel. */
 .mint-result-head {
-  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #1a1a20;
-  margin: 0 0 0.2rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #1f8f57;
+  margin: 0 0 0.3rem;
+}
+.mint-result-glyph {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  /* Exact --accent-green sage to match the conception page's dot; the label
+     stays the deeper green above for contrast on the light panel. */
+  background: #7bc4a0;
+  box-shadow: 0 0 9px rgba(123, 196, 160, 0.5);
+  flex: none;
+  margin-right: 0.5rem;
 }
 .mint-result-head[data-dry-run="1"]::after {
   content: "DRY RUN";
@@ -1388,6 +1405,23 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   cursor: help;
 }
 
+/* Conceived image in the result view (mirrors the conception page). */
+.mint-result-image-wrap {
+  margin: 0.2rem 0 0.7rem;
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+.mint-result-image {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
 .mint-result-actions {
   display: flex;
   gap: 0.5rem;
@@ -1409,10 +1443,48 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+/* Metallic download pair — same brushed-metal family as the cert's Save
+   button + the conception Conceive button. Silver = the body (image),
+   gold = the soul. Dark body, metal border + text, inset highlight. */
+.mint-action.mint-action-silver,
+.mint-action.mint-action-gold {
+  border: 1px solid;
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.12), 0 1px 1px rgba(0,0,0,0.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 1px 2px rgba(0,0,0,0.3);
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+.mint-action.mint-action-silver {
+  background: linear-gradient(180deg, rgba(48,52,60,0.94) 0%, rgba(16,18,22,0.9) 50%, rgba(12,14,18,0.94) 100%);
+  color: #c2cad6;
+  border-color: rgba(176,188,204,0.45);
+}
+.mint-action.mint-action-silver:hover {
+  color: #e6ecf4;
+  border-color: rgba(208,218,232,0.75);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 6px rgba(0,0,0,0.35), 0 0 12px rgba(190,205,225,0.2);
+  filter: none;
+}
+.mint-action.mint-action-gold {
+  background: linear-gradient(180deg, rgba(60,50,20,0.94) 0%, rgba(18,14,8,0.9) 50%, rgba(14,10,6,0.94) 100%);
+  color: #c8a850;
+  border-color: rgba(200,170,80,0.5);
+}
+.mint-action.mint-action-gold:hover {
+  color: #e0c070;
+  border-color: rgba(224,192,112,0.75);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 6px rgba(0,0,0,0.35), 0 0 12px rgba(220,190,80,0.18);
+  filter: none;
+}
 .mint-action-secondary {
   background: rgba(255, 255, 255, 0.7);
   color: #1a1a20;
   border: 1px solid rgba(0, 0, 0, 0.25);
+}
+/* Mobile: stack the actions full-width, cap the image height. */
+@media (max-width: 600px) {
+  .mint-result-actions { flex-direction: column; }
+  .mint-result-actions .mint-action { flex: 1 1 auto; width: 100%; }
+  .mint-result-image { max-height: 52vh; }
 }
 .mint-action:hover { filter: brightness(1.05); }
 .mint-action-secondary:hover {
