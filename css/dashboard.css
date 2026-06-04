@@ -3043,12 +3043,6 @@ label > input[type="checkbox"] {
   font-size: 0.78rem;
   color: #555;
 }
-.config-webhook-sum-ev {
-  flex: 0 0 auto;
-  font-size: 0.7rem;
-  color: #8a8a90;
-  white-space: nowrap;
-}
 .config-webhook-summary .config-webhook-del { flex: 0 0 auto; margin-left: 0.15rem; }
 .config-webhook-body {
   display: flex;

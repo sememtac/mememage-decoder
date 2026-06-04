@@ -3692,7 +3692,13 @@ setInterval(function() {
     // UNLESS the user has unsaved local edits — those win until they
     // click Save (which flushes) or Cancel (which discards).
     if (!_webhooksDirty) {
-      _webhooksDraft = (server.webhooks || []).map(function(w) {
+      // Preserve each row's expand/collapse state across this rebuild. Without
+      // this, any config re-render (even just viewing, not editing) re-adopts
+      // the server list as fresh objects with no _open, silently collapsing
+      // rows the user had expanded. Order matches the server list when not
+      // dirty, so map by index (missing -> collapsed).
+      var prevOpen = (_webhooksDraft || []).map(function(w) { return !!w._open; });
+      _webhooksDraft = (server.webhooks || []).map(function(w, idx) {
         return {
           url: w.url || '',
           events: (w.events || []).slice(),
@@ -3704,6 +3710,7 @@ setInterval(function() {
           slack_channel: w.slack_channel || '',
           telegram_bot_token: w.telegram_bot_token || '',
           telegram_chat_id: w.telegram_chat_id || '',
+          _open: !!prevOpen[idx],
         };
       });
     }
@@ -4013,13 +4020,14 @@ setInterval(function() {
           if (w.url) { try { sumDesc = new URL(w.url).host; } catch (e) { sumDesc = w.url; } }
           else if (isTelegram && w.telegram_chat_id) { sumDesc = w.telegram_chat_id; }
           else { sumDesc = '(no URL yet)'; }
-          var sumEv = allEv ? 'all events' : ((w.events || []).join(' + ') || 'no events');
+          // Summary stays minimal \u2014 platform + destination only. Events /
+          // attachment / template are one expand-click away; no need to
+          // restate them on the collapsed header.
           var summaryHtml =
             '<summary class="config-webhook-summary">' +
               '<span class="config-webhook-sum-chevron" aria-hidden="true">\u25b8</span>' +
               '<span class="config-webhook-sum-platform">' + escapeHtml(sumPlatform) + '</span>' +
               '<span class="config-webhook-sum-desc" title="' + escapeHtml(w.url || sumDesc) + '">' + escapeHtml(sumDesc) + '</span>' +
-              '<span class="config-webhook-sum-ev">' + escapeHtml(sumEv) + (attachFiles ? ' \u00b7 \ud83d\udcce' : '') + '</span>' +
               '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
             '</summary>';
           return '' +
