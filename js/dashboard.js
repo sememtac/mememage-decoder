@@ -2255,9 +2255,17 @@ setInterval(function() {
       if (ly.entry && allEntries.indexOf(ly.entry) < 0) {
         entryOpts = '<option value="' + escapeHtml(ly.entry) + '" selected>' + escapeHtml(ly.entry) + ' (missing)</option>' + entryOpts;
       }
+      // The decoder layer's K is NOT independently editable \u2014 it's owned by
+      // the chain's constellation_size (one full decoder per constellation).
+      // Render it read-only with a pointer to where it's set, so the two
+      // inputs can never disagree (no "K=13 but size=12" conflict).
+      var isDecoder = (ly.name === 'decoder');
+      var kInput = isDecoder
+        ? '<input class="payload-edit-input numeric" data-field="K" type="number" value="' + (ly.K || 1) + '" readonly disabled title="Set by Chains \u2192 Constellation size (one decoder per constellation)." style="opacity:0.6;cursor:not-allowed;">'
+        : '<input class="payload-edit-input numeric" data-field="K" type="number" min="1" value="' + (ly.K || 1) + '">';
       return '<div class="payload-edit-row layer-row" data-layer="' + i + '">' +
         '<input class="payload-edit-input" data-field="name" type="text" value="' + escapeHtml(ly.name || '') + '">' +
-        '<input class="payload-edit-input numeric" data-field="K" type="number" min="1" value="' + (ly.K || 1) + '">' +
+        kInput +
         '<input class="payload-edit-input numeric" data-field="reserved" type="number" min="0" value="' + (ly.reserved || 0) + '">' +
         '<select class="payload-edit-select" data-field="entry">' + entryOpts + '</select>' +
         '<button class="payload-edit-delete" data-action="delete-layer" title="Delete layer">\u00d7</button>' +
@@ -5711,7 +5719,7 @@ setInterval(function() {
           // the Bayer-letter span. Snapshotted at seal, so a change takes
           // effect on the NEXT Age.
           var sizeOptions = '';
-          for (var n = 1; n <= 12; n++) {
+          for (var n = 1; n <= 24; n++) {
             sizeOptions += '<option value="' + n + '"' +
               (constellationSize === n ? ' selected' : '') + '>' + n + '</option>';
           }

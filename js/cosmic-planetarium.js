@@ -27,7 +27,10 @@ var CosmicPlanetarium = (function() {
   'use strict';
 
   // ─── Constants ───
-  var GREEK = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc'];
+  // Full 24-letter Greek alphabet (\u03b1..\u03c9, no final sigma) \u2014 the Bayer
+  // designation space. Caps constellation_size at 24. Keep in sync with
+  // the tables in core.py / server.py / cert-renderer.js / cosmic-player.js.
+  var GREEK = ['\u03b1','\u03b2','\u03b3','\u03b4','\u03b5','\u03b6','\u03b7','\u03b8','\u03b9','\u03ba','\u03bb','\u03bc','\u03bd','\u03be','\u03bf','\u03c0','\u03c1','\u03c3','\u03c4','\u03c5','\u03c6','\u03c7','\u03c8','\u03c9'];
   var SPECTRAL = [
     { color: [255, 180, 100], min: 0  }, // K
     { color: [255, 240, 180], min: 20 }, // G
@@ -112,11 +115,17 @@ var CosmicPlanetarium = (function() {
   // SAME string (constellation_hash) so the backdrop the user sees
   // on the cert matches the constellation they navigate inside the
   // planetarium.
-  function generateLayout(seed) {
+  function generateLayout(seed, count) {
+    // count = constellation_size (stars in this constellation). Clamped to
+    // [1, 24] (the Bayer cap); defaults to 12 for records minted before
+    // constellation_size was stamped. The shape grows with count — the cert
+    // backdrop and the planetarium pass the record's constellation_size so
+    // the drawn shape matches the constellation's actual member count.
+    count = Math.max(1, Math.min(24, (count | 0) || 12));
     var rng = makeRng(strSeed(seed));
     var st = [];
     st.push({ x: (0.3 + rng() * 0.4) - 0.5, y: (0.2 + rng() * 0.6) - 0.5, isHeart: true });
-    for (var i = 1; i < 12; i++) {
+    for (var i = 1; i < count; i++) {
       var placed = false, x = 0, y = 0;
       for (var attempt = 0; attempt < 50 && !placed; attempt++) {
         var anchor = st[Math.floor(rng() * st.length)];
@@ -211,27 +220,16 @@ var CosmicPlanetarium = (function() {
     var cAdj = [];
     for (var ai = 0; ai < n; ai++) cAdj.push([]);
     for (var ei2 = 0; ei2 < cEdges.length; ei2++) { cAdj[cEdges[ei2][0]].push(cEdges[ei2][1]); cAdj[cEdges[ei2][1]].push(cEdges[ei2][0]); }
-    var rngE = [];
-    for (var ri = 0; ri < n; ri++) {
-      for (var rj = ri + 1; rj < n; rj++) {
-        var dij = cDst(cStars[ri], cStars[rj]);
-        var blocked = false;
-        for (var rk = 0; rk < n; rk++) {
-          if (rk === ri || rk === rj) continue;
-          if (cDst(cStars[ri], cStars[rk]) < dij && cDst(cStars[rj], cStars[rk]) < dij) { blocked = true; break; }
-        }
-        if (!blocked) rngE.push([ri, rj]);
-      }
-    }
-    var extras = [];
-    for (var xi = 0; xi < rngE.length; xi++) {
-      var a = rngE[xi][0], b = rngE[xi][1];
-      var inM = false;
-      for (var mi = 0; mi < cEdges.length; mi++) {
-        if ((cEdges[mi][0] === a && cEdges[mi][1] === b) || (cEdges[mi][0] === b && cEdges[mi][1] === a)) { inM = true; break; }
-      }
-      if (!inM) extras.push([a, b]);
-    }
+    // ── Closed shapes ────────────────────────────────────────────────
+    // The MST above is a tree — no loops. A bare spine reads as a
+    // squiggle, not a constellation. To give constellations closed cells,
+    // close the SHORTEST geometric gaps that form a small cycle
+    // (triangle..pentagon). Sourcing closures from the shortest
+    // non-adjacent pairs — not the near-empty relative-neighbourhood graph
+    // the old code mined — reliably yields ~1-2 loops per constellation.
+    // The distance gate keeps every closure tight (no strut spanning the
+    // whole shape); the no-enclosed-star test keeps each cell clean.
+    function deg(idx) { return cAdj[idx].length; }
     function findPath(f, t, mx) {
       var q = [[f, [f]]]; var v = {}; v[f] = true;
       while (q.length > 0) {
@@ -256,23 +254,56 @@ var CosmicPlanetarium = (function() {
       }
       return true;
     }
-    var addedExtras = 0;
-    for (var ek = 0; ek < extras.length && addedExtras < 2; ek++) {
-      var ea = extras[ek][0], eb = extras[ek][1];
-      var path2 = findPath(ea, eb, 3);
-      if (!path2 || path2.length < 3 || path2.length > 4) continue;
-      var poly = path2.map(function(idx) { return cStars[idx]; });
+    // Proper segment intersection (CCW test). The MST is already planar, so
+    // crossings only ever come from closure edges cutting across existing
+    // ones — reject those so the constellation stays planar (no crossings),
+    // the way a real star chart reads.
+    function ccw(a, b, c) { return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x); }
+    function segCross(p1, p2, p3, p4) {
+      return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+    }
+    function crossesAny(a, b) {
+      for (var ce = 0; ce < cEdges.length; ce++) {
+        var u = cEdges[ce][0], w = cEdges[ce][1];
+        if (u === a || u === b || w === a || w === b) continue;  // shares an endpoint — not a crossing
+        if (segCross(cStars[a], cStars[b], cStars[u], cStars[w])) return true;
+      }
+      return false;
+    }
+    // Average spine edge length — gates how long a closure may be.
+    var avgLen = 0;
+    if (cELens.length) { for (var al = 0; al < cELens.length; al++) avgLen += cELens[al]; avgLen /= cELens.length; }
+    // Every non-adjacent star pair, shortest first.
+    var gaps = [];
+    for (var gi = 0; gi < n; gi++) {
+      for (var gj = gi + 1; gj < n; gj++) {
+        if (cAdj[gi].indexOf(gj) >= 0) continue;
+        gaps.push({ i: gi, j: gj, d: cDst(cStars[gi], cStars[gj]) });
+      }
+    }
+    gaps.sort(function(a, b) { return a.d - b.d; });
+    var MAX_CLOSURES = Math.max(1, Math.round(n / 6));  // ~1 for small, up to 4 at n=24
+    var DIST_FACTOR = 1.7;   // only close gaps <= 1.7x the average spine edge
+    var MAX_DEG = 4;         // a loop may push a node to degree 4 (spine cap is 3)
+    var MAX_CYCLE = 5;       // triangle .. pentagon
+    var closed = 0;
+    for (var gk = 0; gk < gaps.length && closed < MAX_CLOSURES; gk++) {
+      var g = gaps[gk];
+      if (avgLen > 0 && g.d > avgLen * DIST_FACTOR) break;  // sorted asc → rest are longer
+      if (deg(g.i) >= MAX_DEG || deg(g.j) >= MAX_DEG) continue;
+      if (crossesAny(g.i, g.j)) continue;  // keep the graph planar — no crossing lines
+      var cyc = findPath(g.i, g.j, MAX_CYCLE - 1);
+      if (!cyc || cyc.length < 3 || cyc.length > MAX_CYCLE) continue;  // tri..pentagon only
+      var poly = cyc.map(function(idx) { return cStars[idx]; });
       var enclosed = false;
-      for (var csi = 0; csi < n; csi++) {
-        var inP = false;
-        for (var pi = 0; pi < path2.length; pi++) if (path2[pi] === csi) { inP = true; break; }
-        if (inP) continue;
-        if (ptInPoly(cStars[csi].x, cStars[csi].y, poly)) { enclosed = true; break; }
+      for (var ci2 = 0; ci2 < n; ci2++) {
+        if (cyc.indexOf(ci2) >= 0) continue;
+        if (ptInPoly(cStars[ci2].x, cStars[ci2].y, poly)) { enclosed = true; break; }
       }
       if (enclosed) continue;
-      cEdges.push([ea, eb]);
-      cAdj[ea].push(eb); cAdj[eb].push(ea);
-      addedExtras++;
+      cEdges.push([g.i, g.j]);
+      cAdj[g.i].push(g.j); cAdj[g.j].push(g.i);
+      closed++;
     }
     return cEdges;
   }
@@ -742,7 +773,7 @@ var CosmicPlanetarium = (function() {
     // Single source of truth: generateLayout drives both 2D positions
     // and edges (cert backdrop also calls this with the same seed,
     // so the patterns match). Z is added per-star from the same hash.
-    var layout = generateLayout(hash);
+    var layout = generateLayout(hash, opts.size);
     stars = layout.stars;
     edges = layout.edges;
     for (var zk = 0; zk < stars.length; zk++) {

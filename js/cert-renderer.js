@@ -640,7 +640,7 @@ function renderCert(meta, options) {
     // so the cert backdrop pattern and the planetarium overlay
     // produce the IDENTICAL constellation shape. Layout returns
     // stars in [-0.5, 0.5]² centered space + edge list.
-    var conLayout = CosmicPlanetarium.generateLayout(conSeed);
+    var conLayout = CosmicPlanetarium.generateLayout(conSeed, meta.constellation_size);
     var cStars = conLayout.stars.map(function(s) {
       return { x: (s.x + 0.5) * CON_W, y: (s.y + 0.5) * CON_H };
     });
@@ -1162,6 +1162,9 @@ function renderCert(meta, options) {
           // identical across siblings, so the constellation looks the same
           // from any star in it.
           hash: meta.constellation_hash || meta._content_hash || meta.content_hash || '',
+          // constellation_size drives how many stars the layout draws so the
+          // planetarium shape matches the constellation's member count.
+          size: meta.constellation_size,
           currentStarIndex: (typeof myChunkIdx === 'number' && myChunkIdx >= 0) ? myChunkIdx : -1,
           // Heart's rarity drives the heart sprite's spectral class.
           // Denormalize to meta.heart_rarity in production; until then

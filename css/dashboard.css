@@ -3236,6 +3236,13 @@ label > input[type="checkbox"] {
    (placed via grid-area: gps in .config-chain-row). */
 .config-chain-gps-cell {
   padding: 0.2rem 0 0.1rem 0;
+  /* Each control group (GPS source, GPS visibility, constellation size) gets
+     its own row. Without this the inline-flex groups flow inline and wrap by
+     width, so the constellation-size select tucked onto the GPS-source line. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
 }
 .config-chain-gps {
   display: inline-flex;
