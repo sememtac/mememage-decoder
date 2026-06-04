@@ -1893,8 +1893,8 @@ setInterval(function() {
     els.dirty.hidden = !(dirty && state.touched);
     els.discardBtn.disabled = !dirty;
     // Inline lock banner — visible message when the chain is mid-Age
-    // and Apply is therefore disabled. Repaints whenever lock state or
-    // cycle progress changes.
+    // (Apply stays enabled mid-Age; this banner is informational only.)
+    // Repaints whenever lock state or cycle progress changes.
     if (els.applyLockBanner) {
       if (state.chainLocked === true) {
         var info = state.chainLockInfo || {};
@@ -1910,8 +1910,8 @@ setInterval(function() {
         var progress = (typeof pos === 'number' && typeof total === 'number')
           ? ' \u00b7 conception ' + pos + '/' + total : '';
         els.applyLockBanner.textContent =
-          'Apply is locked: ' + ageLabel + ' in progress' + progress +
-          '. Changes commit when this Age completes.';
+          ageLabel + ' in progress' + progress +
+          '. Applied changes take effect on the next Age (the current Age keeps its sealed payload).';
         els.applyLockBanner.hidden = false;
       } else {
         els.applyLockBanner.hidden = true;
@@ -1920,21 +1920,15 @@ setInterval(function() {
     // Apply to chain: needs unsaved edits, no validation errors, the
     // chain to be in EDITABLE state, AND a non-empty template (at least
     // one layer or frozen entry — the server's chain_config.validate()
-    // refuses a fully empty one). While the lock state is still loading
-    // (undefined), keep the button off so we never invite a click
-    // that 409s.
+    // refuses a fully empty one). Allowed mid-Age — the apply stages the
+    // config for the next seal and cannot disturb the running Age, so there
+    // is no lock to wait on.
     var w = state.working || {};
     var isIncomplete = (w.layers || []).length === 0 && (w.frozen || []).length === 0;
     if (els.applyBtn) {
-      var lockKnown = state.chainLocked !== undefined;
-      els.applyBtn.disabled = !dirty || hasErrors || isIncomplete || !lockKnown || state.chainLocked === true;
-      if (!lockKnown) {
-        els.applyBtn.title = 'Checking chain lock state\u2026';
-      } else if (state.chainLocked) {
-        els.applyBtn.title =
-          'Locked: an Age is in progress on this chain. Applying a new template ' +
-          'would invalidate the chunks already distributed. Wait until the cycle ' +
-          'completes (or seal the next Age) before applying.';
+      els.applyBtn.disabled = !dirty || hasErrors || isIncomplete;
+      if (state.chainLocked === true && dirty && !hasErrors && !isIncomplete) {
+        els.applyBtn.title = 'Apply to the active chain. An Age is in progress, so this takes effect on the next Age.';
       } else if (hasErrors) {
         els.applyBtn.title = 'Fix the validation errors below before applying.';
       } else if (isIncomplete) {
@@ -2115,10 +2109,10 @@ setInterval(function() {
     if (state.chainLocked === undefined) {
       out += '<span class="payload-lock-badge" data-state="unknown">checking…</span>';
     } else if (state.chainLocked) {
-      out += '<span class="payload-lock-badge" data-state="locked" title="' +
-        escapeHtml(state.chainLockedReason ||
-          'The chain is mid-Age — template changes are blocked until the outer cycle completes.') +
-        '">LOCKED</span>';
+      out += '<span class="payload-lock-badge" data-state="in-age" title="' +
+        escapeHtml('An Age is in progress. Edits are allowed — they take effect on the next Age ' +
+          '(the current Age keeps its sealed payload).') +
+        '">MID-AGE</span>';
     } else {
       out += '<span class="payload-lock-badge" data-state="editable" title="' +
         escapeHtml('No Age in progress on this chain. Applying a new template will commit it ' +
@@ -2155,10 +2149,13 @@ setInterval(function() {
   function renderChainBar() {
     if (!state.working) return;
     _renderPayloadBadge();  // refetches readiness; badge includes preset info
+    // M (Age length) and watermark are part of the staged config like
+    // layers/entries — editable mid-Age; the change rides along on the next
+    // Apply and takes effect at the next seal. No lock-based disabling.
     var draftM = state.working.M;
     if (els.mInput) {
       els.mInput.value = (draftM != null) ? draftM : '';
-      els.mInput.disabled = state.chainLocked === true;
+      els.mInput.disabled = false;
     }
     if (els.watermarkPresets) {
       // Server normalizes "off" → omitted, so absence means off.
@@ -2166,7 +2163,7 @@ setInterval(function() {
       var radios = els.watermarkPresets.querySelectorAll('input[type="radio"]');
       radios.forEach(function(r) {
         r.checked = (r.value === wmPreset);
-        r.disabled = state.chainLocked === true;
+        r.disabled = false;
       });
     }
   }
@@ -2919,28 +2916,17 @@ setInterval(function() {
       }
       els.presetList.innerHTML = items.map(function(p) {
         var when = p.modified ? p.modified.replace('T', ' ') : '';
-        var isLinked = ((state.saved && state.saved.preset_name) || '') === p.name;
         return '<div class="payload-preset-row">' +
           '<span class="payload-preset-name" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</span>' +
           '<span class="payload-preset-mtime">' + escapeHtml(when) + '</span>' +
           '<span class="payload-preset-actions">' +
             '<button class="payload-btn payload-preset-load" data-name="' + escapeHtml(p.name) + '">Load</button>' +
-            // Tag the active chain with this preset's name — a metadata-only
-            // label write, allowed even while an Age is in progress (unlike
-            // the full payload Apply). Lets a sealed chain be named after the
-            // preset it was built from.
-            '<button class="payload-btn payload-preset-use" data-name="' + escapeHtml(p.name) + '"' +
-              (isLinked ? ' disabled title="Already this chain’s preset"' : ' title="Use this preset name for the active chain"') +
-              '>' + (isLinked ? 'In use' : 'Use for chain') + '</button>' +
             '<button class="payload-btn payload-preset-delete" data-name="' + escapeHtml(p.name) + '">Delete</button>' +
           '</span>' +
         '</div>';
       }).join('');
       els.presetList.querySelectorAll('.payload-preset-load').forEach(function(b) {
         b.addEventListener('click', function() { loadPreset(b.getAttribute('data-name')); });
-      });
-      els.presetList.querySelectorAll('.payload-preset-use').forEach(function(b) {
-        b.addEventListener('click', function() { usePresetForChain(b.getAttribute('data-name')); });
       });
       els.presetList.querySelectorAll('.payload-preset-delete').forEach(function(b) {
         b.addEventListener('click', function() { deletePreset(b.getAttribute('data-name')); });
@@ -3021,33 +3007,6 @@ setInterval(function() {
       els.dirty.hidden = prevHidden && !isDirty();
       refreshDirtyUI();
     }, 1400);
-  }
-
-  // Tag the active chain with a preset name — metadata only (not the
-  // payload). Works even when Apply is locked mid-Age, so a sealed chain
-  // can finally be labelled with the preset it was built from.
-  async function usePresetForChain(name) {
-    if (!name) return;
-    var cid = (state.saved && state.saved.id) || (state.working && state.working.id) || '';
-    if (!cid) { showError('No active chain to tag.'); return; }
-    showError('');
-    try {
-      var resp = await fetchJson('/api/chain/preset-name', {
-        method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({chain_id: cid, preset_name: name}),
-      });
-      var applied = (resp && resp.preset_name) || name;
-      // Reflect the new association in the saved baseline + editor label.
-      if (state.saved) state.saved.preset_name = applied;
-      state.lastPresetName = applied;
-      refreshPresetButtonLabel();
-      renderChainBar();
-      renderPresetStatus();
-      flashSaved(applied);
-      await loadPresetList();  // re-render so the "In use" marker updates
-    } catch (e) {
-      showError('Failed to set chain preset: ' + e.message);
-    }
   }
 
   async function loadPreset(name) {

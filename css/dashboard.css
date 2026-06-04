@@ -1812,6 +1812,13 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   background: rgba(200, 80, 80, 0.14);
   border-color: rgba(200, 80, 80, 0.4);
 }
+/* Mid-Age: editing is allowed (stages for the next Age) — an amber notice,
+   not the alarming red of a hard lock. */
+.payload-lock-badge[data-state="in-age"] {
+  color: #8a6210;
+  background: rgba(200, 150, 40, 0.14);
+  border-color: rgba(200, 150, 40, 0.4);
+}
 .payload-lock-badge[data-state="unknown"] {
   color: #54545c;
   background: rgba(0, 0, 0, 0.06);
