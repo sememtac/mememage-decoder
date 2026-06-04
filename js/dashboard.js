@@ -1766,6 +1766,8 @@ setInterval(function() {
     nuxDismiss:   document.getElementById('payloadNuxDismiss'),
     nuxReopen:    document.getElementById('payloadNuxReopen'),
     mInput:       document.getElementById('payloadM'),
+    constellationInput: document.getElementById('payloadConstellationSize'),
+    constellationHint:  document.getElementById('payloadConstellationHint'),
     watermarkPresets: document.getElementById('payloadWatermarkPresets'),
     addEntryBtn:  document.getElementById('addEntryBtn'),
     addLayerBtn:  document.getElementById('addLayerBtn'),
@@ -1965,6 +1967,12 @@ setInterval(function() {
       msgs.push({severity: 'error',
                  text: 'Age length (' + cfg.M + ') is smaller than the largest layer’s chunk count (' + maxK + '). That layer can never finish a full copy within an Age — raise the Age length or lower the chunk count.'});
     }
+    // Constellation size range (mirrors chain_config.validate).
+    if (cfg.constellation_size != null &&
+        (cfg.constellation_size < 1 || cfg.constellation_size > 24)) {
+      msgs.push({severity: 'error',
+                 text: 'Constellation size must be between 1 and 24.'});
+    }
     // Uneven tiling — M is not a whole multiple of a layer's K. The
     // chain still works, but the layer's last cycle is partial: its
     // chunks 0..K-1 don't all get the same number of turns across
@@ -2149,6 +2157,23 @@ setInterval(function() {
     if (els.mInput) {
       els.mInput.value = (draftM != null) ? draftM : '';
       els.mInput.disabled = false;
+    }
+    if (els.constellationInput) {
+      var cs = state.working.constellation_size;
+      els.constellationInput.value = (cs != null) ? cs : 12;
+      // Locked only for a provenance-only chain that has already minted —
+      // its rhythm is fixed (no Age boundary to re-stage at). Sealed chains
+      // stage it per Age, so they stay editable.
+      var locked = !!state.constellationLocked;
+      els.constellationInput.disabled = locked;
+      els.constellationInput.title = locked
+        ? 'Locked: this chain has started minting and never seals, so its constellation rhythm is fixed.'
+        : 'Stars per constellation. Drives the decoder chunk count; takes effect on the next Age for sealed chains.';
+      if (els.constellationHint) {
+        els.constellationHint.textContent = locked
+          ? 'locked — chain has started minting (rhythm is fixed)'
+          : 'stars per constellation · = decoder chunk count (one per star)';
+      }
     }
     if (els.watermarkPresets) {
       // Server normalizes "off" → omitted, so absence means off.
@@ -2559,6 +2584,11 @@ setInterval(function() {
     showError('');
     try {
       var cfg = await fetchJson('/api/chain/config');
+      // constellation_size_locked is a server-computed flag, NOT config —
+      // capture it, then strip so it never round-trips into chain.json or
+      // skews the working-vs-saved dirty comparison.
+      state.constellationLocked = !!cfg.constellation_size_locked;
+      delete cfg.constellation_size_locked;
       // Strip any legacy chunk_type/type fields the server might still emit.
       (cfg.layers || []).forEach(function(ly) {
         if ('chunk_type' in ly) delete ly.chunk_type;
@@ -3114,6 +3144,7 @@ setInterval(function() {
       name: identity.name,
       visibility: identity.visibility,
       M: identity.M,
+      constellation_size: (typeof identity.constellation_size === 'number') ? identity.constellation_size : 12,
       layers: [],
       frozen: [],
       entries: {},
@@ -3126,6 +3157,8 @@ setInterval(function() {
     showError('');
     try {
       var chainCfg = await fetchJson('/api/chain/config');
+      state.constellationLocked = !!chainCfg.constellation_size_locked;
+      delete chainCfg.constellation_size_locked;
       // Normalize legacy fields the same way loadConfig does so the
       // saved baseline is comparable to the working draft.
       (chainCfg.layers || []).forEach(function(ly) {
@@ -3171,12 +3204,14 @@ setInterval(function() {
         } catch (e) {
           // Preset gone (deleted on disk) — fall back to empty.
           state.working = _emptyConfigFor({id: identity.id, name: identity.name,
-                                            visibility: identity.visibility, M: chainCfg.M});
+                                            visibility: identity.visibility, M: chainCfg.M,
+                                            constellation_size: chainCfg.constellation_size});
           state.lastPresetName = '';
         }
       } else {
         state.working = _emptyConfigFor({id: identity.id, name: identity.name,
-                                          visibility: identity.visibility, M: chainCfg.M});
+                                          visibility: identity.visibility, M: chainCfg.M,
+                                          constellation_size: chainCfg.constellation_size});
         state.lastPresetName = '';
       }
       refreshPresetButtonLabel();
@@ -3287,6 +3322,24 @@ setInterval(function() {
       if (isNaN(v) || v < 1) return;  // invalid keystroke — refreshDirtyUI revalidates
       state.working.M = v;
       markTouched();
+      refreshDirtyUI();
+    });
+  }
+
+  // Constellation size — stars per constellation. Drives the decoder layer's
+  // chunk count (one per star), so changing it also rewrites that layer's K
+  // in the draft to keep them aligned. Staged through Apply like M.
+  if (els.constellationInput) {
+    els.constellationInput.addEventListener('input', function() {
+      if (!state.working) return;
+      var v = parseInt(els.constellationInput.value, 10);
+      if (isNaN(v) || v < 1 || v > 24) return;  // refreshDirtyUI revalidates the range
+      state.working.constellation_size = v;
+      (state.working.layers || []).forEach(function(ly) {
+        if (ly.name === 'decoder') ly.K = v;  // keep decoder chunk count = size
+      });
+      markTouched();
+      renderLayers();      // reflect the new decoder chunk count in the table
       refreshDirtyUI();
     });
   }
@@ -5654,7 +5707,6 @@ setInterval(function() {
           // "public" \u2014 the red state speaks first.
           var gpsSource = c.gps_source || 'phone';
           var gpsVisibility = c.gps_visibility || 'time_locked';
-          var constellationSize = c.constellation_size || 12;
           var prefix = c.identifier_prefix || 'mememage';
           var metaParts = [];
           if (pwSet) metaParts.push('\ud83d\udd12');  // \ud83d\udd12 password present
@@ -5704,22 +5756,9 @@ setInterval(function() {
               '<label title="Coordinates ALSO stored in plaintext — the certificate shows the location immediately. Irreversible per record."><input type="radio" name="gpsvis-' + escapeHtml(c.id) + '" value="public" ' +
                 (gpsVisibility === 'public' ? 'checked' : '') + ' data-chain-gpsvis-set="' + escapeHtml(c.id) + '"> public</label>' +
             '</div>';
-          // Constellation size — one knob (1..12) deriving the decoder cycle
-          // K, the heart-reset cadence (new heart star every N records), and
-          // the Bayer-letter span. Snapshotted at seal, so a change takes
-          // effect on the NEXT Age.
-          var sizeOptions = '';
-          for (var n = 1; n <= 24; n++) {
-            sizeOptions += '<option value="' + n + '"' +
-              (constellationSize === n ? ' selected' : '') + '>' + n + '</option>';
-          }
-          var constellationSel =
-            '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
-              '<span class="config-chain-gps-label" title="Stars per constellation: the decoder chunk count, the heart-reset cadence, and the Bayer span (α..). Applies on the next Age.">Constellation size</span>' +
-              '<select class="config-input config-chain-size-select" data-chain-size-set="' + escapeHtml(c.id) + '" style="width:auto;">' +
-                sizeOptions +
-              '</select>' +
-            '</div>';
+          // Constellation size lives in the Payload tab now (it's payload
+          // cadence — it drives the decoder chunk count and stages through
+          // Apply -> next seal like M). Not edited here.
           // The row LEADS with the shared chain badge (identity +
           // readiness), then the action buttons, then the GPS radios.
           // Chain detail (prefix / created / pw contract) rides in the
@@ -5734,7 +5773,7 @@ setInterval(function() {
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<div class="config-chain-badge-cell">' + badge + '</div>' +
             '<div class="config-chain-actions">' + actions + '</div>' +
-            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + visRadio + constellationSel + '</div>' +
+            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + visRadio + '</div>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -5842,32 +5881,6 @@ setInterval(function() {
         setChainGpsVisibility(cid, input.value);
       });
     });
-    // Constellation-size selector — persist on change, optimistic UI.
-    els.chains.querySelectorAll('select[data-chain-size-set]').forEach(function(sel) {
-      sel.addEventListener('change', function() {
-        var cid = sel.getAttribute('data-chain-size-set');
-        setChainConstellationSize(cid, parseInt(sel.value, 10));
-      });
-    });
-  }
-
-  async function setChainConstellationSize(chainId, size) {
-    try {
-      var resp = await fetch('/api/chain/constellation-size', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({chain_id: chainId, constellation_size: size}),
-      });
-      var text = await resp.text();
-      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
-      if (!resp.ok) {
-        alert(data.error || ('Failed to set constellation size (HTTP ' + resp.status + ')'));
-        loadChains();  // revert UI to server truth
-      }
-    } catch (e) {
-      alert('Failed to set constellation size: ' + e.message);
-      loadChains();
-    }
   }
 
   async function setChainGpsSource(chainId, gpsSource) {
