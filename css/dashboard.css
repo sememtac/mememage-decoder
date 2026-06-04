@@ -3034,16 +3034,7 @@ label > input[type="checkbox"] {
   background: rgba(0, 0, 0, 0.06);
   color: #333;
 }
-.config-webhook-sum-desc {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.78rem;
-  color: #555;
-}
-.config-webhook-summary .config-webhook-del { flex: 0 0 auto; margin-left: 0.15rem; }
+.config-webhook-summary .config-webhook-del { flex: 0 0 auto; margin-left: auto; }
 .config-webhook-body {
   display: flex;
   flex-direction: column;

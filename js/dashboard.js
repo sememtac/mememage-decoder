@@ -4020,14 +4020,14 @@ setInterval(function() {
           if (w.url) { try { sumDesc = new URL(w.url).host; } catch (e) { sumDesc = w.url; } }
           else if (isTelegram && w.telegram_chat_id) { sumDesc = w.telegram_chat_id; }
           else { sumDesc = '(no URL yet)'; }
-          // Summary stays minimal \u2014 platform + destination only. Events /
-          // attachment / template are one expand-click away; no need to
-          // restate them on the collapsed header.
+          // Summary stays minimal \u2014 just the platform badge. The address
+          // isn't displayed (the badge says the type; expand to see details)
+          // but rides along as a hover title so same-platform rows are still
+          // distinguishable without expanding.
           var summaryHtml =
             '<summary class="config-webhook-summary">' +
               '<span class="config-webhook-sum-chevron" aria-hidden="true">\u25b8</span>' +
-              '<span class="config-webhook-sum-platform">' + escapeHtml(sumPlatform) + '</span>' +
-              '<span class="config-webhook-sum-desc" title="' + escapeHtml(w.url || sumDesc) + '">' + escapeHtml(sumDesc) + '</span>' +
+              '<span class="config-webhook-sum-platform" title="' + escapeHtml(w.url || sumDesc) + '">' + escapeHtml(sumPlatform) + '</span>' +
               '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
             '</summary>';
           return '' +
@@ -4057,7 +4057,10 @@ setInterval(function() {
                     '<option value="discord"' + (presetKey === 'discord' ? ' selected' : '') + '>Discord</option>' +
                     '<option value="slack"' + (presetKey === 'slack' ? ' selected' : '') + '>Slack</option>' +
                     '<option value="telegram"' + (presetKey === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
-                    '<option value="custom"' + (presetKey === 'custom' ? ' selected' : '') + ' disabled>Custom (edited)</option>' +
+                    // "Custom (edited)" is a STATUS, not a choice — shown only
+                    // when the template doesn't match a preset (you become
+                    // custom by editing the textarea, you can't pick it).
+                    (presetKey === 'custom' ? '<option value="custom" selected disabled>Custom (edited)</option>' : '') +
                   '</select>' +
                 '</label>' +
                 '<textarea class="config-input config-webhook-tmpl-input" data-webhook-tmpl="' + i + '" rows="3" placeholder="Empty = raw POST. JSON template with {{event}}, {{identifier}}, {{content_hash}}, {{url}} (primary surface), {{distribution}} (all surfaces, multiline), {{constellation}}, {{constellation_star}}, {{rarity_tier}}, {{rarity_score}}, {{creator_name}}, {{key_fingerprint}}, {{chain_id}}, {{chain_visibility}}, {{gps_source}}, {{mint_url}}, {{image_name}}.">' + escapeHtml(tmpl) + '</textarea>' +
@@ -4186,14 +4189,26 @@ setInterval(function() {
           else for (var pk in WEBHOOK_PRESETS) {
             if (WEBHOOK_PRESETS[pk] === ta.value) { match = pk; break; }
           }
-          // The "Custom (edited)" option is disabled in markup so the
-          // user can't pick it directly; enable it just-in-time when
-          // we need to select it programmatically.
+          // "Custom (edited)" is a transient status option: add it (disabled
+          // — it's a status, not a pickable choice) the moment the template
+          // stops matching a preset, and drop it again when it matches one,
+          // so the dropdown never carries a dead greyed entry in the normal
+          // case. .selected works even on a disabled option.
           if (match === 'custom') {
             var customOpt = sel.querySelector('option[value="custom"]');
-            if (customOpt) customOpt.disabled = false;
+            if (!customOpt) {
+              customOpt = document.createElement('option');
+              customOpt.value = 'custom';
+              customOpt.textContent = 'Custom (edited)';
+              customOpt.disabled = true;
+              sel.appendChild(customOpt);
+            }
+            customOpt.selected = true;
+          } else {
+            var staleCustom = sel.querySelector('option[value="custom"]');
+            if (staleCustom) staleCustom.remove();
+            sel.value = match;
           }
-          sel.value = match;
         }
         markWebhooksDirty();
       });
