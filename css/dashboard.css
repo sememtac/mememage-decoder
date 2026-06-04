@@ -1226,7 +1226,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .mint-error-global:not(:empty) { display: block; }
 
-
 /* Minting (in progress) */
 .mint-progress { align-items: center; justify-content: center; text-align: center; }
 .mint-progress-head { font-size: 1rem; font-weight: 600; margin: 0; }
@@ -1611,7 +1610,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   font-size: 0.7rem; color: #404048; margin: 0.2rem 0 0; line-height: 1.4;
 }
 
-
 /* Inspect modal — file metadata only.
  *
  * --bg-card is tuned for dark backgrounds (8% opacity); use an opaque
@@ -1943,46 +1941,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 /* Watermark preset row — matches the M editor's visual register, but the
    options live on their own line because three radios + the explainer
    wouldn't fit alongside other fields. */
-.payload-watermark-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin: 0.4rem 0 0;
-  flex-basis: 100%;
-  font-size: 0.78rem;
-}
-.payload-watermark-label {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #1a1a20;
-  white-space: nowrap;
-}
-.payload-watermark-presets {
-  display: inline-flex;
-  gap: 0.85rem;
-  align-items: center;
-}
-.payload-watermark-presets label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: #1a1a20;
-  cursor: pointer;
-}
-.payload-watermark-presets input[type="radio"]:disabled + *,
-.payload-watermark-presets label:has(input:disabled) {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.payload-watermark-hint {
-  flex-basis: 100%;
-  margin: 0;
-  font-size: 0.7rem;
-  color: rgba(0, 0, 0, 0.55);
-  font-style: italic;
-  line-height: 1.4;
-}
 
 /* Payload tab NUX — collapsible workflow guide. Auto-shows for fresh
    chains (no preset + empty layers/frozen); dismissible via the ×
@@ -3595,7 +3553,6 @@ label > input[type="checkbox"] {
 }
 .config-copy-btn:hover { color: #103060; }
 .config-copy-btn[data-copied="1"] { color: #2a8050; }
-
 
 /* =====================================================================
  * MOBILE / NARROW VIEWPORT PASS

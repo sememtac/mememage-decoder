@@ -1768,7 +1768,6 @@ setInterval(function() {
     mInput:       document.getElementById('payloadM'),
     constellationInput: document.getElementById('payloadConstellationSize'),
     constellationHint:  document.getElementById('payloadConstellationHint'),
-    watermarkPresets: document.getElementById('payloadWatermarkPresets'),
     addEntryBtn:  document.getElementById('addEntryBtn'),
     addLayerBtn:  document.getElementById('addLayerBtn'),
     addFrozenBtn: document.getElementById('addFrozenBtn'),
@@ -2174,15 +2173,6 @@ setInterval(function() {
           ? 'locked — chain has started minting (rhythm is fixed)'
           : 'stars per constellation · = decoder chunk count (one per star)';
       }
-    }
-    if (els.watermarkPresets) {
-      // Server normalizes "off" → omitted, so absence means off.
-      var wmPreset = (state.working.watermark && state.working.watermark.preset) || 'off';
-      var radios = els.watermarkPresets.querySelectorAll('input[type="radio"]');
-      radios.forEach(function(r) {
-        r.checked = (r.value === wmPreset);
-        r.disabled = false;
-      });
     }
   }
 
@@ -3344,21 +3334,8 @@ setInterval(function() {
     });
   }
 
-  // Watermark preset — writes state.working.watermark. Omit the key
-  // entirely when off so chain.json stays clean. Server validates.
-  if (els.watermarkPresets) {
-    els.watermarkPresets.addEventListener('change', function(ev) {
-      if (!state.working || !ev.target || ev.target.name !== 'payload-watermark') return;
-      var preset = ev.target.value;
-      if (preset === 'off') {
-        delete state.working.watermark;
-      } else {
-        state.working.watermark = { preset: preset };
-      }
-      markTouched();
-      refreshDirtyUI();
-    });
-  }
+  // Watermark moved to Config -> per-chain settings (live toggle via
+  // /api/chain/watermark), so there's no Payload-tab handler anymore.
 
   els.refreshBtn.addEventListener('click', function() {
     // Explicit Refresh = "show me the chain's actual applied config".
@@ -5765,6 +5742,7 @@ setInterval(function() {
           // "public" \u2014 the red state speaks first.
           var gpsSource = c.gps_source || 'phone';
           var gpsVisibility = c.gps_visibility || 'time_locked';
+          var watermark = c.watermark || 'off';
           var prefix = c.identifier_prefix || 'mememage';
           var metaParts = [];
           if (pwSet) metaParts.push('\ud83d\udd12');  // \ud83d\udd12 password present
@@ -5814,6 +5792,20 @@ setInterval(function() {
               '<label title="Coordinates ALSO stored in plaintext — the certificate shows the location immediately. Irreversible per record."><input type="radio" name="gpsvis-' + escapeHtml(c.id) + '" value="public" ' +
                 (gpsVisibility === 'public' ? 'checked' : '') + ' data-chain-gpsvis-set="' + escapeHtml(c.id) + '"> public</label>' +
             '</div>';
+          // Watermark — a live per-chain image toggle (read at mint time),
+          // so it lives here with the other chain settings, not in Payload.
+          // off = pristine pixels; subtle/standard embed a content-hash
+          // watermark as crop-resilient backup for the bar.
+          var watermarkRadio =
+            '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
+              '<span class="config-chain-gps-label" title="Embeds a content-hash watermark across the whole image as deeper backup for the bar. Subtle: low strength, skips flat regions (survives Discord/Twitter recompression). Standard: full strength, survives heavy cropping. Read live at mint time — toggle anytime.">Watermark</span>' +
+              '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="off" ' +
+                (watermark === 'off' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> off</label>' +
+              '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="subtle" ' +
+                (watermark === 'subtle' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> subtle</label>' +
+              '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="standard" ' +
+                (watermark === 'standard' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> standard</label>' +
+            '</div>';
           // Constellation size lives in the Payload tab now (it's payload
           // cadence — it drives the decoder chunk count and stages through
           // Apply -> next seal like M). Not edited here.
@@ -5831,7 +5823,7 @@ setInterval(function() {
           return '<div class="config-chain-row" data-active="' + (isActive ? '1' : '0') + '">' +
             '<div class="config-chain-badge-cell">' + badge + '</div>' +
             '<div class="config-chain-actions">' + actions + '</div>' +
-            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + visRadio + '</div>' +
+            '<div class="config-chain-gps-cell advanced-only">' + gpsRadio + visRadio + watermarkRadio + '</div>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -5939,6 +5931,31 @@ setInterval(function() {
         setChainGpsVisibility(cid, input.value);
       });
     });
+    els.chains.querySelectorAll('input[data-chain-wm-set]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        if (!input.checked) return;
+        setChainWatermark(input.getAttribute('data-chain-wm-set'), input.value);
+      });
+    });
+  }
+
+  async function setChainWatermark(chainId, preset) {
+    try {
+      var resp = await fetch('/api/chain/watermark', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({chain_id: chainId, watermark: preset}),
+      });
+      var text = await resp.text();
+      var data; try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+      if (!resp.ok) {
+        alert(data.error || ('Failed to set watermark (HTTP ' + resp.status + ')'));
+        loadChains();  // revert UI to server truth
+      }
+    } catch (e) {
+      alert('Failed to set watermark: ' + e.message);
+      loadChains();
+    }
   }
 
   async function setChainGpsSource(chainId, gpsSource) {
