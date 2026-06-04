@@ -1905,12 +1905,12 @@ setInterval(function() {
         var ageLabel = info.age_name
           ? info.age_name + (info.age ? ' (Age ' + info.age + ')' : '')
           : 'an Age';
-        // Use "conception" — each mint advances the outer position by
-        // 1, regardless of the chain's layer K values. "chunk" was
-        // misleading on chains whose layers have small K (suggested
-        // the count should be 0/K, not 0/M).
+        // "star" = the counted unit: each mint places one star, advancing
+        // the outer position by 1 regardless of layer chunk counts.
+        // "conception" stays the name of the ACT; "star" is the unit, to
+        // parallel "stars per Age" / "stars per constellation".
         var progress = (typeof pos === 'number' && typeof total === 'number')
-          ? ' \u00b7 conception ' + pos + '/' + total : '';
+          ? ' \u00b7 star ' + pos + '/' + total : '';
         els.applyLockBanner.textContent =
           ageLabel + ' in progress' + progress +
           '. Applied changes take effect on the next Age (the current Age keeps its sealed payload).';
@@ -2892,7 +2892,7 @@ setInterval(function() {
       // 365. Read it from the loaded config so the count is honest; omit the
       // parenthetical entirely if M is somehow unavailable rather than lie.
       var m = (state.working && state.working.M) || (state.saved && state.saved.M);
-      var cycleLen = m ? ' (' + m + ' conception' + (m === 1 ? '' : 's') + ')' : '';
+      var cycleLen = m ? ' (' + m + ' star' + (m === 1 ? '' : 's') + ')' : '';
       body = 'This is irreversible. The chain becomes mintable once sealed; the next Seal won\u2019t unlock until this Age\u2019s outer cycle completes' + cycleLen + '.';
     }
     var ok = window.prompt(head + '\n\n' + body + '\n\nType SEAL to confirm:');
