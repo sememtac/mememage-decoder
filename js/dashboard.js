@@ -1088,7 +1088,7 @@ setInterval(function() {
     var msg = '';
     if (state.chainSealed === false && state.chainHasPayload) {
       blocked = true;
-      msg = 'This chain carries a payload but has no sealed Age yet. Open the <strong>Payload</strong> tab and click <strong>Seal Age</strong> before conceiving — otherwise each record would lose the Age number, decoder_hash, and chunks it is meant to carry. (Provenance-only chains don’t need this.)';
+      msg = 'This chain carries a payload but has no sealed Age yet. Open the <strong>Payload</strong> tab and click <strong>Seal Age</strong> before conceiving — otherwise each record would lose the Age number and the chunks it is meant to carry. (Provenance-only chains don’t need this.)';
     } else if (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet) {
       blocked = true;
       msg = 'This chain is Dark but has no stored password — set it in <strong>Config \u2192 Chains</strong> before conceiving.';
@@ -2167,11 +2167,11 @@ setInterval(function() {
       els.constellationInput.disabled = locked;
       els.constellationInput.title = locked
         ? 'Locked: this chain has started minting and never seals, so its constellation rhythm is fixed.'
-        : 'Stars per constellation. Drives the decoder chunk count; takes effect on the next Age for sealed chains.';
+        : 'Stars per constellation. Also the data chunk count (one per star); takes effect on the next Age for sealed chains.';
       if (els.constellationHint) {
         els.constellationHint.textContent = locked
           ? 'locked — chain has started minting (rhythm is fixed)'
-          : 'stars per constellation · = decoder chunk count (one per star)';
+          : 'stars per constellation · one data chunk per star';
       }
     }
   }
@@ -2266,7 +2266,7 @@ setInterval(function() {
       // inputs can never disagree (no "K=13 but size=12" conflict).
       var isDecoder = (ly.name === 'decoder');
       var kInput = isDecoder
-        ? '<input class="payload-edit-input numeric" data-field="K" type="number" value="' + (ly.K || 1) + '" readonly disabled title="Chunk count = constellation size (one decoder chunk per star). Set in Chains \u2192 Constellation size." style="opacity:0.6;cursor:not-allowed;">'
+        ? '<input class="payload-edit-input numeric" data-field="K" type="number" value="' + (ly.K || 1) + '" readonly disabled title="Chunk count = constellation size (one chunk per star). Set by Constellation size above." style="opacity:0.6;cursor:not-allowed;">'
         : '<input class="payload-edit-input numeric" data-field="K" type="number" min="1" value="' + (ly.K || 1) + '">';
       return '<div class="payload-edit-row layer-row" data-layer="' + i + '">' +
         '<input class="payload-edit-input" data-field="name" type="text" value="' + escapeHtml(ly.name || '') + '">' +
@@ -6657,7 +6657,7 @@ setInterval(function() {
     { id: 'age', label: 'Age',
       body: 'A version epoch of a chain. Records minted during an Age share the same decoder, ruleset, and cycle-position counter. Sealing locks the Age in place; the next Age begins fresh. Cycle length is per-chain configuration — the demo chain runs a 365-position year, but any chain can define its own cadence.' },
     { id: 'constellation', label: 'Constellation',
-      body: 'A group of conceptions sharing one decoder cycle within an Age. The first conception (the <em>heart star</em>) names the family from its sky and conditions; subsequent stars are lettered in conception order. Family claims (constellation name + heart star id + position) are tamper-evident in the content hash.' },
+      body: 'A group of conceptions forming one constellation within an Age. The first conception (the <em>heart star</em>) names the family from its sky and conditions; subsequent stars are lettered in conception order. Family claims (constellation name + heart star id + position) are tamper-evident in the content hash.' },
     { id: 'heart_star', label: 'Heart star',
       body: 'The first conception in a constellation — α. Its identifier names the family; the conditions at its conception (sky, vitals) seed the constellation\u2019s identity. Every subsequent star in the same constellation references back to this anchor.' },
     { id: 'profile', label: 'Profile',
