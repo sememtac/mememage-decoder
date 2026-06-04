@@ -2088,7 +2088,7 @@ setInterval(function() {
   // loaded + applied preset names, and an M-drift note. Pure function of state.
   function _payloadBadgeBelow() {
     var rows = '';
-    var loaded = state.lastPresetName || 'Untitled';
+    var loaded = state.lastPresetName || 'Custom (no preset)';
     rows += '<span class="chain-badge-info">Loaded preset: <strong>' +
             escapeHtml(loaded) + '</strong></span>';
     var applied = (state.saved && state.saved.preset_name) || '';
@@ -2919,17 +2919,28 @@ setInterval(function() {
       }
       els.presetList.innerHTML = items.map(function(p) {
         var when = p.modified ? p.modified.replace('T', ' ') : '';
+        var isLinked = ((state.saved && state.saved.preset_name) || '') === p.name;
         return '<div class="payload-preset-row">' +
           '<span class="payload-preset-name" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</span>' +
           '<span class="payload-preset-mtime">' + escapeHtml(when) + '</span>' +
           '<span class="payload-preset-actions">' +
             '<button class="payload-btn payload-preset-load" data-name="' + escapeHtml(p.name) + '">Load</button>' +
+            // Tag the active chain with this preset's name — a metadata-only
+            // label write, allowed even while an Age is in progress (unlike
+            // the full payload Apply). Lets a sealed chain be named after the
+            // preset it was built from.
+            '<button class="payload-btn payload-preset-use" data-name="' + escapeHtml(p.name) + '"' +
+              (isLinked ? ' disabled title="Already this chain’s preset"' : ' title="Use this preset name for the active chain"') +
+              '>' + (isLinked ? 'In use' : 'Use for chain') + '</button>' +
             '<button class="payload-btn payload-preset-delete" data-name="' + escapeHtml(p.name) + '">Delete</button>' +
           '</span>' +
         '</div>';
       }).join('');
       els.presetList.querySelectorAll('.payload-preset-load').forEach(function(b) {
         b.addEventListener('click', function() { loadPreset(b.getAttribute('data-name')); });
+      });
+      els.presetList.querySelectorAll('.payload-preset-use').forEach(function(b) {
+        b.addEventListener('click', function() { usePresetForChain(b.getAttribute('data-name')); });
       });
       els.presetList.querySelectorAll('.payload-preset-delete').forEach(function(b) {
         b.addEventListener('click', function() { deletePreset(b.getAttribute('data-name')); });
@@ -3010,6 +3021,33 @@ setInterval(function() {
       els.dirty.hidden = prevHidden && !isDirty();
       refreshDirtyUI();
     }, 1400);
+  }
+
+  // Tag the active chain with a preset name — metadata only (not the
+  // payload). Works even when Apply is locked mid-Age, so a sealed chain
+  // can finally be labelled with the preset it was built from.
+  async function usePresetForChain(name) {
+    if (!name) return;
+    var cid = (state.saved && state.saved.id) || (state.working && state.working.id) || '';
+    if (!cid) { showError('No active chain to tag.'); return; }
+    showError('');
+    try {
+      var resp = await fetchJson('/api/chain/preset-name', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({chain_id: cid, preset_name: name}),
+      });
+      var applied = (resp && resp.preset_name) || name;
+      // Reflect the new association in the saved baseline + editor label.
+      if (state.saved) state.saved.preset_name = applied;
+      state.lastPresetName = applied;
+      refreshPresetButtonLabel();
+      renderChainBar();
+      renderPresetStatus();
+      flashSaved(applied);
+      await loadPresetList();  // re-render so the "In use" marker updates
+    } catch (e) {
+      showError('Failed to set chain preset: ' + e.message);
+    }
   }
 
   async function loadPreset(name) {
