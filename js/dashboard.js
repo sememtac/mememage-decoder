@@ -1963,7 +1963,7 @@ setInterval(function() {
     (cfg.layers || []).forEach(function(ly) { if (ly.K > maxK) maxK = ly.K; });
     if (maxK > (cfg.M || 0)) {
       msgs.push({severity: 'error',
-                 text: 'M=' + cfg.M + ' is smaller than the longest layer cycle K=' + maxK + '.'});
+                 text: 'Age length (' + cfg.M + ') is smaller than the largest layer’s chunk count (' + maxK + '). That layer can never finish a full copy within an Age — raise the Age length or lower the chunk count.'});
     }
     // Uneven tiling — M is not a whole multiple of a layer's K. The
     // chain still works, but the layer's last cycle is partial: its
@@ -1974,16 +1974,9 @@ setInterval(function() {
       (cfg.layers || []).forEach(function(ly, i) {
         if (!ly.K || ly.K < 1) return;
         if (cfg.M % ly.K !== 0) {
-          var fullCycles = Math.floor(cfg.M / ly.K);
-          var leftover = cfg.M - fullCycles * ly.K;
           var name = ly.name || ('#' + (i + 1));
-          msgs.push({severity: 'warning',
-                     text: 'Layer "' + name + '" doesn\u2019t fit evenly into the Age. ' +
-                           'With M=' + cfg.M + ' and K=' + ly.K + ', its chunks cycle ' +
-                           fullCycles + ' full time(s) and then ' + leftover + ' more position(s) ' +
-                           'use chunks 0..' + (leftover - 1) + ' again. Some chunks get one extra turn ' +
-                           'than the rest. Pick an M that\u2019s a whole multiple of ' + ly.K +
-                           ' for even tiling (e.g. ' + (fullCycles * ly.K) + ' or ' + ((fullCycles + 1) * ly.K) + ').'});
+          msgs.push({severity: 'info',
+                     text: 'Layer "' + name + '" (' + ly.K + ' chunks) doesn\u2019t divide evenly into the Age (' + cfg.M + '), so its last cycle each Age is partial. Fine if that\u2019s intended \u2014 tiling is aesthetic, not required.'});
         }
       });
     }
@@ -2006,7 +1999,7 @@ setInterval(function() {
       }
       if (ly.reserved != null && (ly.reserved < 0 || ly.reserved >= ly.K)) {
         msgs.push({severity:'error',
-                   text: 'Layer ' + ly.name + ': reserved=' + ly.reserved + ' must satisfy 0 <= reserved < K=' + ly.K + '.'});
+                   text: 'Layer ' + ly.name + ': reserved=' + ly.reserved + ' must satisfy 0 <= reserved < chunk count (' + ly.K + ').'});
       }
     });
     var seen = {};
@@ -2239,7 +2232,7 @@ setInterval(function() {
     els.layersCount.textContent = '(' + layers.length + ')';
     var allEntries = entryNames();
     var header = '<div class="payload-edit-header layer-header">' +
-      '<span>Name</span><span>K</span><span>Reserved</span><span>Entry</span><span></span></div>';
+      '<span>Name</span><span title="How many chunks this layer’s payload is split across. One chunk rides each record, so it also = how many records it takes to collect one full copy of the layer.">Chunks</span><span>Reserved</span><span>Entry</span><span></span></div>';
     if (layers.length === 0) {
       els.layers.innerHTML = header + '<div class="payload-edit-row layer-row">' +
         '<span style="grid-column:1/-1; opacity:0.5; font-style:italic;">No layers defined.</span></div>';
@@ -2258,7 +2251,7 @@ setInterval(function() {
       // inputs can never disagree (no "K=13 but size=12" conflict).
       var isDecoder = (ly.name === 'decoder');
       var kInput = isDecoder
-        ? '<input class="payload-edit-input numeric" data-field="K" type="number" value="' + (ly.K || 1) + '" readonly disabled title="Set by Chains \u2192 Constellation size (one decoder per constellation)." style="opacity:0.6;cursor:not-allowed;">'
+        ? '<input class="payload-edit-input numeric" data-field="K" type="number" value="' + (ly.K || 1) + '" readonly disabled title="Chunk count = constellation size (one decoder chunk per star). Set in Chains \u2192 Constellation size." style="opacity:0.6;cursor:not-allowed;">'
         : '<input class="payload-edit-input numeric" data-field="K" type="number" min="1" value="' + (ly.K || 1) + '">';
       return '<div class="payload-edit-row layer-row" data-layer="' + i + '">' +
         '<input class="payload-edit-input" data-field="name" type="text" value="' + escapeHtml(ly.name || '') + '">' +
@@ -5722,7 +5715,7 @@ setInterval(function() {
           }
           var constellationSel =
             '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
-              '<span class="config-chain-gps-label" title="Stars per constellation: the decoder cycle K, the heart-reset cadence, and the Bayer span (α..). Applies on the next Age.">Constellation size</span>' +
+              '<span class="config-chain-gps-label" title="Stars per constellation: the decoder chunk count, the heart-reset cadence, and the Bayer span (α..). Applies on the next Age.">Constellation size</span>' +
               '<select class="config-input config-chain-size-select" data-chain-size-set="' + escapeHtml(c.id) + '" style="width:auto;">' +
                 sizeOptions +
               '</select>' +
