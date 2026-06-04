@@ -2617,6 +2617,27 @@ setInterval(function() {
     fetchBuildStatus();
   }
 
+  // Commit the working draft to the chain (POST /api/chain/config), stamping
+  // the active preset name. Shared by Apply-to-chain and the auto-associate
+  // path in savePreset. Updates the saved baseline + re-renders.
+  async function _commitConfigToChain() {
+    var body = Object.assign({}, state.working, {
+      preset_name: state.lastPresetName || '',
+    });
+    var resp = await fetchJson('/api/chain/config', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
+    state.saved = deepClone(resp.config || state.working);
+    state.working = deepClone(state.saved);
+    state.touched = false;
+    renderAll();
+    // Apply changed which artifacts the chain expects — re-poll build status
+    // so the badge correctly shows NOT BUILT for newly-added entries.
+    fetchBuildStatus();
+  }
+
   async function onApplyToChain() {
     if (!els.applyBtn || els.applyBtn.disabled) return;
     showError('');
@@ -2624,28 +2645,8 @@ setInterval(function() {
     var prev = els.applyBtn.textContent;
     els.applyBtn.textContent = 'Applying\u2026';
     try {
-      // Stamp the active preset name (or empty string to clear) onto
-      // the chain so future sessions / other devices know which
-      // preset this chain is using. ChainConfig.extras round-trips it.
-      var body = Object.assign({}, state.working, {
-        preset_name: state.lastPresetName || '',
-      });
-      var resp = await fetchJson('/api/chain/config', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify(body),
-      });
-      state.saved = deepClone(resp.config || state.working);
-      state.working = deepClone(state.saved);
-      state.touched = false;
-      // Apply persisted preset_name into chain.json (via the body above),
-      // which is now the single source of the chain<->preset association.
-      renderAll();
+      await _commitConfigToChain();
       showError('');
-      // Apply changed which artifacts the chain expects — re-poll
-      // build status so the badge correctly shows NOT BUILT for any
-      // newly-added entries until the user clicks Build.
-      fetchBuildStatus();
     } catch (e) {
       showError('Apply to chain failed: ' + e.message);
     } finally {
@@ -2980,13 +2981,27 @@ setInterval(function() {
         body: JSON.stringify({name: name, config: state.working}),
       });
       // Saving names the in-memory draft so future Saves overwrite it.
-      // It does NOT associate the preset with the chain — that's Apply to
-      // Chain's job alone.
       state.lastPresetName = name;
       refreshPresetButtonLabel();
       renderPresetStatus();
+      // Auto-associate when the draft IS the chain's applied config (not
+      // dirty): the user just saved the exact config they already applied
+      // as a preset, so the chain should now show that preset — without
+      // forcing the reload → load → re-apply dance. When dirty, we don't
+      // touch the chain (the draft isn't what's applied yet); the upcoming
+      // Apply will carry this preset name.
+      var associated = false;
+      if (!isDirty()) {
+        try {
+          await _commitConfigToChain();  // re-applies same config, now with preset_name
+          associated = true;
+        } catch (e) {
+          // Non-fatal: the preset is saved; the chain just isn't tagged.
+          showError('Preset saved, but tagging the chain failed: ' + e.message);
+        }
+      }
       // Brief inline confirmation via the dirty marker slot.
-      flashSaved(name);
+      flashSaved(associated ? name + ' ✓ applied to chain' : name);
       // Refresh the preset list if the panel happens to be open.
       if (els.presetPanel && !els.presetPanel.hidden) await loadPresetList();
     } catch (e) {
