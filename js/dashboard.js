@@ -1984,7 +1984,7 @@ setInterval(function() {
         if (cfg.M % ly.K !== 0) {
           var name = ly.name || ('#' + (i + 1));
           msgs.push({severity: 'info',
-                     text: 'Layer "' + name + '" (' + ly.K + ' chunks) doesn\u2019t divide evenly into the Age (' + cfg.M + '), so its last cycle each Age is partial. Fine if that\u2019s intended \u2014 tiling is aesthetic, not required.'});
+                     text: 'Layer "' + name + '" (' + ly.K + ' chunks) doesn\u2019t divide evenly into the Age (' + cfg.M + '), so its last cycle each Age is partial.'});
         }
       });
     }
