@@ -4002,14 +4002,35 @@ setInterval(function() {
                 '</label>' +
               '</div>'
             : '';
+          // Compact one-line summary so a long webhook list collapses to
+          // scannable headers (platform / destination / events) instead of a
+          // wall of expanded editors. Open state is persisted on the draft
+          // (_open, stripped before save) so it survives the re-renders that
+          // fire on url-blur / preset / add / delete.
+          var sumPlatform = isSlack ? 'Slack' : isTelegram ? 'Telegram'
+            : (/discord(app)?\.com/.test(w.url || '') ? 'Discord' : 'Webhook');
+          var sumDesc;
+          if (w.url) { try { sumDesc = new URL(w.url).host; } catch (e) { sumDesc = w.url; } }
+          else if (isTelegram && w.telegram_chat_id) { sumDesc = w.telegram_chat_id; }
+          else { sumDesc = '(no URL yet)'; }
+          var sumEv = allEv ? 'all events' : ((w.events || []).join(' + ') || 'no events');
+          var summaryHtml =
+            '<summary class="config-webhook-summary">' +
+              '<span class="config-webhook-sum-chevron" aria-hidden="true">\u25b8</span>' +
+              '<span class="config-webhook-sum-platform">' + escapeHtml(sumPlatform) + '</span>' +
+              '<span class="config-webhook-sum-desc" title="' + escapeHtml(w.url || sumDesc) + '">' + escapeHtml(sumDesc) + '</span>' +
+              '<span class="config-webhook-sum-ev">' + escapeHtml(sumEv) + (attachFiles ? ' \u00b7 \ud83d\udcce' : '') + '</span>' +
+              '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
+            '</summary>';
           return '' +
-            '<div class="config-webhook-row" data-i="' + i + '">' +
+            '<details class="config-webhook-row" data-i="' + i + '"' + (w._open ? ' open' : '') + '>' +
+              summaryHtml +
+              '<div class="config-webhook-body">' +
               // URL on its own row — long Discord/Slack URLs need
               // the full width to read; sharing the row with checkboxes
               // crammed everything on narrow widths.
               '<div class="config-webhook-urlrow">' +
                 '<input class="config-input config-webhook-url" data-webhook-url="' + i + '" type="url" value="' + escapeHtml(w.url) + '" placeholder="https://…">' +
-                '<button class="config-btn config-webhook-del" data-webhook-del="' + i + '" title="Remove webhook">\u00d7</button>' +
               '</div>' +
               '<div class="config-webhook-main">' +
                 '<label class="config-webhook-ev"><input type="checkbox" data-webhook-ev="' + i + '" value="conceived" ' + (allEv || hasC ? 'checked' : '') + '> conceived</label>' +
@@ -4035,7 +4056,8 @@ setInterval(function() {
               '</div>' +
               slackBlock +
               telegramBlock +
-            '</div>';
+              '</div>' +
+            '</details>';
         }).join('');
 
     host.innerHTML =
@@ -4120,11 +4142,23 @@ setInterval(function() {
       });
     });
     host.querySelectorAll('[data-webhook-del]').forEach(function(b) {
-      b.addEventListener('click', function() {
+      b.addEventListener('click', function(e) {
+        // The delete button lives inside <summary>; a plain click would
+        // toggle the <details>. Suppress that — we're removing the row.
+        e.preventDefault();
+        e.stopPropagation();
         var i = parseInt(b.getAttribute('data-webhook-del'), 10);
         _webhooksDraft.splice(i, 1);
         _webhooksDirty = true;
         renderWebhooks();
+      });
+    });
+    // Persist expand/collapse on the draft so it survives re-renders
+    // (url-blur / preset / add / delete all rebuild the list).
+    host.querySelectorAll('details.config-webhook-row').forEach(function(d) {
+      d.addEventListener('toggle', function() {
+        var i = parseInt(d.getAttribute('data-i'), 10);
+        if (_webhooksDraft[i]) _webhooksDraft[i]._open = d.open;
       });
     });
     host.querySelectorAll('[data-webhook-tmpl]').forEach(function(ta) {
@@ -4239,7 +4273,8 @@ setInterval(function() {
     });
     var addBtn = document.getElementById('configWebhookAdd');
     if (addBtn) addBtn.addEventListener('click', function() {
-      _webhooksDraft.push({url: '', events: [], headers: {}});
+      // _open: true so a new row renders expanded, ready to fill in.
+      _webhooksDraft.push({url: '', events: [], headers: {}, _open: true});
       _webhooksDirty = true;
       renderWebhooks();
       // Focus the newly-added URL input so the user can start typing.

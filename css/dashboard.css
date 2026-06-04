@@ -2995,14 +2995,66 @@ label > input[type="checkbox"] {
   flex-direction: column;
   gap: 0.4rem;
 }
+/* Each webhook is a collapsible <details> so a long list reads as scannable
+   one-line headers instead of a stack of full editors. */
 .config-webhook-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.4rem 0.5rem;
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+.config-webhook-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;            /* hide the default disclosure marker (Firefox) */
+}
+.config-webhook-summary::-webkit-details-marker { display: none; }  /* Chrome/Safari */
+.config-webhook-row[open] > .config-webhook-summary {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.config-webhook-sum-chevron {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: #999;
+  transition: transform 0.15s ease;
+}
+.config-webhook-row[open] > .config-webhook-summary .config-webhook-sum-chevron {
+  transform: rotate(90deg);
+}
+.config-webhook-sum-platform {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #333;
+}
+.config-webhook-sum-desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: #555;
+}
+.config-webhook-sum-ev {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: #8a8a90;
+  white-space: nowrap;
+}
+.config-webhook-summary .config-webhook-del { flex: 0 0 auto; margin-left: 0.15rem; }
+.config-webhook-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.55rem;
 }
 .config-webhook-urlrow {
   display: flex;
