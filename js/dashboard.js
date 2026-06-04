@@ -3233,6 +3233,11 @@ setInterval(function() {
     } catch (e) {
       els.ageStatus.textContent = '(site-pack status unavailable: ' + e.message + ')';
     }
+    // Build status — without this the badge renders from a null buildStatus
+    // ("build…/unknown") on first open and after a page reload, even when the
+    // chain is fully built. loadConfig()/Apply/Build all fetch it; the tab
+    // initializer must too.
+    fetchBuildStatus();
   };
   // Called by the Config tab after a chain switch so the next visit to
   // the Payload tab re-initializes against the new chain (and its own
