@@ -2688,7 +2688,7 @@ setInterval(function() {
     // Build status line, omitting decoder fields for chains that have
     // no decoder layer (inner_total=0 / decoder_hash=null).
     var statusParts = [info.age_name + ' (Age ' + info.age + ')'];
-    statusParts.push('outer ' + info.outer_position + '/' + info.outer_total);
+    statusParts.push('star ' + info.outer_position + '/' + info.outer_total);
     if (info.inner_total) {
       statusParts.push('inner ' + info.inner_position + '/' + info.inner_total);
     }
@@ -2700,7 +2700,7 @@ setInterval(function() {
     // again. Mid-cycle = locked.
     state.chainLocked = !info.cycle_complete;
     state.chainLockedReason = info.cycle_complete
-      ? '' : ('Age in progress: outer ' + info.outer_position + '/' + info.outer_total);
+      ? '' : ('Age in progress: star ' + info.outer_position + '/' + info.outer_total);
     state.chainLockInfo = info.cycle_complete ? null : info;
     // Seal button: hard-disable while an Age is in progress so the user
     // doesn't get the impression they can re-seal at will. The next
@@ -2717,7 +2717,7 @@ setInterval(function() {
         els.sealBtn.textContent = 'Sealed';
         els.sealBtn.disabled = true;
         els.sealBtn.title =
-          'Already sealed: Age ' + info.age + ' in progress (outer ' +
+          'Already sealed: Age ' + info.age + ' in progress (star ' +
           info.outer_position + '/' + info.outer_total + '). The next Seal ' +
           'unlocks when this Age\u2019s cycle completes.';
       }
