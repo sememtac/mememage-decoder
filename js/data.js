@@ -9,7 +9,14 @@ const EVENFILL_MIN_BYTES=49,EVENFILL_MAX_BYTES=64;
 // identifier; the decoder + validator both probe several filename
 // variants under this base. Self-hosters override via the Source URL
 // input (one per page; persisted in localStorage by SourceConfig).
-const SOURCE_DEFAULT = 'https://archive.org/download/{id}/';
+// A self-hosted mint server injects window.MEMEMAGE_SOULS_BASE (an
+// absolute souls read base ending in /) before this script loads, so a
+// self-served decoder/validator defaults to the local souls face. On
+// GitHub Pages nothing is injected and the IA default applies. Either
+// way the Source field stays user-overridable — source-agnostic by design.
+const SOURCE_DEFAULT = (typeof window !== 'undefined' && window.MEMEMAGE_SOULS_BASE)
+  ? window.MEMEMAGE_SOULS_BASE
+  : 'https://archive.org/download/{id}/';
 
 // =====================================================================
 // ASSET RESOLUTION — packer injects INLINE_ASSETS before this script
