@@ -1262,8 +1262,17 @@ if (tryLink) {
   });
 }
 
-// Handoff from validator.html Audit tab — auto-lookup on page load
+// Auto-lookup handoffs on page load.
+//  - URL ?id= works CROSS-ORIGIN — the dashboard's mint-result "View
+//    certificate" link, where the decoder is on a different host
+//    (souls.<domain>) than the dashboard (mint.<domain>). The value may
+//    be a bare identifier or a full .soul URL; lookupById handles both.
+//  - localStorage works same-origin — the validator.html Audit tab.
 (function() {
+  try {
+    var qid = new URLSearchParams(location.search).get('id');
+    if (qid) { lookupById(qid); return; }
+  } catch (e) { /* no URLSearchParams — fall through to localStorage */ }
   var handoff = localStorage.getItem('mememage-lookup');
   if (handoff) {
     localStorage.removeItem('mememage-lookup');
