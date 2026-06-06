@@ -743,14 +743,24 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
    pending mint. Compact row so it doesn't compete with the drop
    zone above. */
 .mint-resume {
+  /* Label on its own row, controls (input | Resume | Delete) beneath it.
+     The label spans full width so it never crowds the input, and the
+     row-gap + label margin give it breathing room from the controls. */
   display: grid;
-  grid-template-columns: max-content 9rem max-content max-content;
+  grid-template-columns: 1fr max-content max-content;
   align-items: center;
   gap: 0.4rem 0.5rem;
   padding: 0.3rem 0.1rem 0;
   font-size: 0.72rem;
 }
-.mint-resume-labelwrap { display: flex; align-items: center; gap: 0.3rem; }
+.mint-resume-labelwrap {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.3rem;
+}
+.mint-resume-input { grid-column: 1; }
 .mint-resume-btn-danger {
   border-color: rgba(180, 60, 40, 0.4);
   color: rgba(140, 40, 30, 0.85);
