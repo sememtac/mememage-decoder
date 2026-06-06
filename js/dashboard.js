@@ -1095,7 +1095,12 @@ setInterval(function() {
     var msg = '';
     if (state.chainSealed === false && state.chainHasPayload) {
       blocked = true;
-      msg = 'This chain carries a payload but has no sealed Age yet. Open the <strong>Payload</strong> tab and click <strong>Seal Age</strong> before conceiving — otherwise each record would lose the Age number and the chunks it is meant to carry. (Provenance-only chains don’t need this.)';
+      msg = '<strong>This chain carries a payload but has no sealed Age yet.</strong>' +
+            '<ul style="margin:0.3rem 0 0;padding-left:1.15rem;">' +
+              '<li>Open the <strong>Payload</strong> tab and click <strong>Seal Age</strong> before conceiving.</li>' +
+              '<li>Otherwise each record loses its Age number and the chunks it should carry.</li>' +
+            '</ul>' +
+            '<div style="margin-top:0.3rem;opacity:0.75;">Provenance-only chains don’t need this.</div>';
     } else if (state.chainVisibility === 'dark_matter' && !state.chainPasswordSet) {
       blocked = true;
       msg = 'This chain is Dark but has no stored password — set it in <strong>Config \u2192 Chains</strong> before conceiving.';
