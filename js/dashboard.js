@@ -6714,6 +6714,8 @@ setInterval(function() {
       body: 'A pending conception not yet confirmed. Created when an image is staged on the dashboard, completes when the conception page POSTs back (with GPS if the chain requires it). Lives 7 days unless explicitly deleted.' },
     { id: 'ticket', label: 'Ticket',
       body: 'Short 8-char prefix of a session token (e.g. <code>E33C9891</code>). Pasteable handle for resuming or deleting a pending session without dealing with the full token.' },
+    { id: 'resume', label: 'Resume / Delete',
+      body: 'Bring a pending conception back up — to keep editing its fields or copy its handoff URL again. <strong>Delete</strong> throws a pending conception away for good, instead of waiting out its 7-day expiry. Both act on a pending session by its ticket (the short code).' },
     { id: 'dry_run', label: 'Dry run',
       body: 'A full local rehearsal of a conception. Runs the entire pipeline — content hash, signature, bar embed, thumbnail, birth certificate — and writes the soul to a <code>dryrun/</code> folder so you can inspect the exact result and verify it By Soul. But it publishes to <strong>no surfaces</strong> and does <strong>not advance the chain</strong>: nothing leaves the machine, and the chain’s Age and position are untouched. Use it to preview a conception before committing one for real.' },
 

@@ -744,12 +744,13 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
    zone above. */
 .mint-resume {
   display: grid;
-  grid-template-columns: max-content 9rem max-content max-content 1fr;
+  grid-template-columns: max-content 9rem max-content max-content;
   align-items: center;
   gap: 0.4rem 0.5rem;
   padding: 0.3rem 0.1rem 0;
   font-size: 0.72rem;
 }
+.mint-resume-labelwrap { display: flex; align-items: center; gap: 0.3rem; }
 .mint-resume-btn-danger {
   border-color: rgba(180, 60, 40, 0.4);
   color: rgba(140, 40, 30, 0.85);
@@ -793,11 +794,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .mint-resume-btn:hover { background: white; border-color: rgba(0, 0, 0, 0.5); }
 .mint-resume-btn:disabled { opacity: 0.5; cursor: wait; }
-.mint-resume-hint {
-  font-size: 0.66rem;
-  color: rgba(0, 0, 0, 0.5);
-  font-style: italic;
-}
 
 /* --- Mint-tab recent pending sessions --- */
 .mint-recent {
@@ -3620,10 +3616,9 @@ label > input[type="checkbox"] {
     grid-template-columns: 1fr;
     gap: 0.35rem;
   }
-  .mint-resume-label { grid-column: 1; }
+  .mint-resume-labelwrap { grid-column: 1; }
   .mint-resume-input { grid-column: 1; width: 100%; }
   .mint-resume-btn   { grid-column: 1; padding: 0.5rem 0.7rem; font-size: 0.75rem; }
-  .mint-resume-hint  { grid-column: 1; }
 
   /* --- Forecast widget --- */
   .mint-forecast-summary { flex-wrap: wrap; }
