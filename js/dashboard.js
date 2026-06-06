@@ -6778,10 +6778,10 @@ setInterval(function() {
       body: 'Portrait match via dHash: the image you have IS the original body (not a re-encode that happens to share the bar). Post-conception thumbnail comparison — protected by signature, not by the content hash.' },
 
     // --- Chain visibility + GPS ---
-    { id: 'light_energy', label: 'Light energy (visibility)',
-      body: 'Public chain. Records are unencrypted; anyone with the identifier can fetch and verify the soul fully.' },
-    { id: 'dark_matter', label: 'Dark matter (visibility)',
-      body: 'Password-gated chain. Protected fields (prompt, GPS, designated soul fields) live encrypted; readers need the chain password to unlock. Public fields (identifier, content_hash) stay visible so the bar still verifies.' },
+    { id: 'light_energy', label: 'Light chain',
+      body: 'Public chain. The soul is unencrypted — anyone with the identifier fetches and verifies it fully. GPS is the exception: coordinates are always sealed in a time-lock puzzle (recoverable by anyone in ~10 years), and a chain password, if set, lets the creator unlock them instantly.' },
+    { id: 'dark_matter', label: 'Dark chain',
+      body: 'Password-gated chain. The whole soul is encrypted — your origin fields, dimensions, birth certificate, GPS, traits, rarity, thumbnail, and the content chunks. Readers need the chain password to unlock any of it. Only the public anchors (identifier, content_hash, hash_version) and the record\u2019s grid position stay visible — so the bar still verifies and the record still places in the Observatory.' },
     { id: 'gps_source', label: 'GPS source',
       body: 'Chain-level setting for how location is captured at conception: <code>phone</code> (browser <code>watchPosition</code>, precise), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded — no time-lock puzzle). A <code>phone</code> chain automatically falls back to <code>machine</code> when no phone can reach this server (a loopback-only desktop with no Tailscale) — the conception handoff shows which source will actually be used, so the swap is never silent.' },
 
