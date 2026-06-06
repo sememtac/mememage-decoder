@@ -6714,7 +6714,7 @@ setInterval(function() {
     { id: 'conception', label: 'Conception',
       body: 'The conscious act of binding a body (image) to a soul (metadata): the server hashes the record, signs it with your active key, writes the bar into the image, blasts the soul to your surfaces. GPS is mandatory by default; chains can opt out via <code>gps_source: none</code>.' },
     { id: 'identifier', label: 'Identifier',
-      body: 'The key for finding a soul. Derived from the conception\u2019s essentials (prompt + seed + dimensions + timestamp on AI-gen chains; other inputs on other chain shapes). Lives in the bar; readers use it to fetch the soul from any source. Source-agnostic — no URL in the pixels themselves.' },
+      body: 'The key for finding a soul. Format: <code>&lt;prefix&gt;-&lt;16 hex&gt;</code>. The prefix is set once per chain (default <code>mememage</code>, then locked), so each chain owns its namespace — you see <code>mememage-XXXX</code> on the chain cards. The 16 hex are a fingerprint of the conception: its details plus the moment it happened, so every conception is unique — even two mints of the same image. Lives in the bar; readers fetch the soul with it from any source — no URL in the pixels.' },
     { id: 'content_hash', label: 'Content hash',
       body: 'SHA-256 of the soul\u2019s canonical JSON, first 16 hex chars. Baked into the bar so anyone can verify a soul matches the image even when the file came from a stranger. The integrity authority — independent of where the soul was retrieved from.' },
 
