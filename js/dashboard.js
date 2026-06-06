@@ -6742,12 +6742,11 @@ setInterval(function() {
     { id: 'chain_badge', label: 'Chain badge',
       body: 'The little badge shown on every chain — in Conceive, Payload, Config, on tickets, and on the conception page — so you always know which chain you’re on. It carries the <strong>official id</strong> (the slug, e.g. <code>watermark</code>) and the <strong>friendly name</strong> you can rename, plus a colored <strong>status dot</strong> that tells you the chain’s readiness at a glance:' +
         '<div class="glossary-badge-legend">' +
-          '<div><span class="chain-dot" data-state="ready"></span> <strong>Green — Ready.</strong> Sealed and good to conceive. (Most chains, most of the time.)</div>' +
-          '<div><span class="chain-dot" data-state="nopayload"></span> <strong>Yellow — No payload.</strong> Provenance still works; no payload distribution configured. Perfectly fine, just flagged.</div>' +
-          '<div><span class="chain-dot" data-state="pending"></span> <strong>Orange (pulsing) — Update pending.</strong> A payload change is staged for the next Age but not yet applied.</div>' +
-          '<div><span class="chain-dot" data-state="notready"></span> <strong>Red — Not ready.</strong> Can’t conceive yet: a dark chain needs its password, or the chain has no sealed Age.</div>' +
-        '</div>' +
-        'The dot always shows the most important state (red beats orange beats yellow beats green), and a matching word sits beside it so it reads without relying on color.' },
+          '<div><span class="chain-dot" data-state="ready"></span> <strong>Green — Ready.</strong> Sealed and good to conceive.</div>' +
+          '<div><span class="chain-dot" data-state="nopayload"></span> <strong>Yellow — No payload.</strong> Provenance works; no distribution set up.</div>' +
+          '<div><span class="chain-dot" data-state="pending"></span> <strong>Orange — Update pending.</strong> A payload change is staged for the next Age.</div>' +
+          '<div><span class="chain-dot" data-state="notready"></span> <strong>Red — Not ready.</strong> Needs a password, or no sealed Age yet.</div>' +
+        '</div>' },
     { id: 'age', label: 'Age',
       body: 'A version epoch of a chain. Records minted during an Age share the same decoder, ruleset, and cycle-position counter. Sealing locks the Age in place; the next Age begins fresh. Cycle length is per-chain configuration — the demo chain runs a 365-position year, but any chain can define its own cadence.' },
     { id: 'constellation', label: 'Constellation',
