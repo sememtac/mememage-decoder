@@ -724,7 +724,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-sm, 6px);
   font-size: 0.76rem;
-  cursor: pointer;
   user-select: none;
 }
 /* Override the state-machine's generic `display: block` for our
@@ -732,13 +731,13 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .mint-panel[data-mint-state="empty"] > .mint-dryrun-row[data-mint-only="empty"] {
   display: flex;
 }
+/* Only the checkbox + label toggle the option; the trailing ? opens the
+   glossary (it sits outside this label so a click doesn't flip dry run). */
+.mint-dryrun-toggle {
+  display: flex; align-items: center; gap: 0.4rem; cursor: pointer;
+}
 .mint-dryrun-row input { cursor: pointer; margin: 0; }
 .mint-dryrun-label { color: #1a1a20; font-weight: 600; }
-.mint-dryrun-hint { color: #5a5a62; font-size: 0.7rem; font-style: italic; }
-/* Hint gets ellipsized if the row narrows so it never wraps awkwardly. */
-.mint-dryrun-row .mint-dryrun-hint {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto;
-}
 
 /* Resume-by-ticket — empty-state convenience for pulling back a
    pending mint. Compact row so it doesn't compete with the drop
