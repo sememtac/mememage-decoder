@@ -6751,7 +6751,7 @@ setInterval(function() {
 
     // --- Channels ---
     { id: 'channel', label: 'Surface',
-      body: 'A pluggable destination for souls — a surface the soul lands on. Each enabled+configured surface receives a copy on every conception; at least one must succeed. The framework is type-agnostic — built-in types include <code>internet_archive</code>, <code>http_push</code> (peer host), and <code>zenodo</code>, and authors can register more (S3, IPFS, etc.).' },
+      body: 'A pluggable destination for souls — a place the soul lands. Every enabled + configured surface gets a copy on each conception; at least one must succeed. Built-in types: <code>http_push</code> (a mememage host — your own server is seeded enabled as the default primary surface), <code>internet_archive</code> and <code>zenodo</code> (both <strong>opt-in</strong> — off until you add their credentials). Authors can register more (S3, IPFS, etc.).' },
     { id: 'primary', label: 'Primary surface',
       body: 'The one surface whose URL becomes <code>record.url</code> — the bar reference and the notification link. Exactly one surface can be primary at a time; promote / demote via the radio button.' },
     { id: 'per_profile_channels', label: 'Per-profile surfaces',
