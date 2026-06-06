@@ -6108,10 +6108,10 @@ setInterval(function() {
     host.style.borderLeftColor = 'rgba(0,0,0,0.2)';
     host.style.color = '#1a1a20';
     var nature = visibility === 'dark_matter'
-      ? '<strong>Dark chain</strong>: password seals the soul fields (prompt, born, rarity, …) AND the chunks. <strong>Required</strong> — mints fail without it. Viewers need this exact password to decrypt records.'
+      ? '<strong>Dark chain</strong>: password seals the soul fields (your origin fields, birth, rarity, …) AND the chunks. <strong>Required</strong> — mints fail without it. Viewers need this exact password to decrypt records.'
       : '<strong>Light chain</strong>: password is optional. Without it, every field (including GPS) is public. With it, GPS is sealed for your own time-lock unlock; the rest stays public.';
     host.innerHTML =
-      '<h4 style="margin:0 0 0.3rem;font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;">' + (currentlySet ? 'Change' : 'Set') + ' password \u2014 ' + escapeHtml(chainId) + '</h4>' +
+      '<h4 style="margin:0 0 0.3rem;font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;">' + (currentlySet ? 'Change' : 'Set') + ' password \u2014 ' + escapeHtml(chainId) + ' <button type=\"button\" class=\"glossary-link\" data-glossary=\"access_layer\" title=\"What is the chain password?\">?</button></h4>' +
       '<p style="font-size:0.72rem;margin:0 0 0.5rem;line-height:1.5;">' + nature + '</p>' +
       '<div class="config-field">' +
       '  <span class="config-field-label">New password</span>' +
@@ -6738,6 +6738,8 @@ setInterval(function() {
       body: 'A group of conceptions forming one constellation within an Age. The first conception (the <em>heart star</em>) names the family from its sky and conditions; subsequent stars are lettered in conception order. Family claims (constellation name + heart star id + position) are tamper-evident in the content hash.' },
     { id: 'heart_star', label: 'Heart star',
       body: 'The first conception in a constellation — α. Its identifier names the family; the conditions at its conception (sky, vitals) seed the constellation\u2019s identity. Every subsequent star in the same constellation references back to this anchor.' },
+    { id: 'constellation_size', label: 'Constellation size',
+      body: 'How many stars make one constellation (heart star + siblings) — a per-chain knob, 1\u201324, default 12. The same number is the data-chunk count (one chunk per star) and the span of Bayer letters that name the stars: <strong>\u03b1</strong> for the heart star, then \u03b2, \u03b3, \u03b4 \u2026 in birth order. Staged like Age length — it takes effect on the next Age for sealed chains.' },
     { id: 'profile', label: 'Profile',
       body: 'One Ed25519 signing identity. A human can carry many — typically one per machine — so a compromised VPS doesn\u2019t expose the laptop\u2019s primary key. Profiles link into one human identity via signed alias records, never via shared key bytes.' },
     { id: 'active_profile', label: 'Active profile',
@@ -6782,6 +6784,8 @@ setInterval(function() {
       body: 'Public chain. The soul is unencrypted — anyone with the identifier fetches and verifies it fully. GPS is the exception: coordinates are always sealed in a time-lock puzzle (recoverable by anyone in ~10 years), and a chain password, if set, lets the creator unlock them instantly.' },
     { id: 'dark_matter', label: 'Dark chain',
       body: 'Password-gated chain. The whole soul is encrypted — your origin fields, dimensions, birth certificate, GPS, traits, rarity, thumbnail, and the content chunks. Readers need the chain password to unlock any of it. Only the public anchors (identifier, content_hash, hash_version) and the record\u2019s grid position stay visible — so the bar still verifies and the record still places in the Observatory.' },
+    { id: 'access_layer', label: 'Access layer (chain password)',
+      body: 'The third pillar of creator control, beside your signing key (identity) and the content hash (integrity): an optional password that encrypts what the world sees. On a <strong>Light chain</strong> it seals only the GPS (your private time capsule); on a <strong>Dark chain</strong> it seals the whole soul. Mememage never stores or learns it — you bring the key, we hold the lock: we encrypt, keep the ciphertext, and forget. Lose it and the sealed fields are unrecoverable.' },
     { id: 'gps_source', label: 'GPS source',
       body: 'Chain-level setting for how location is captured at conception: <code>phone</code> (browser <code>watchPosition</code>, precise), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded — no time-lock puzzle). A <code>phone</code> chain automatically falls back to <code>machine</code> when no phone can reach this server (a loopback-only desktop with no Tailscale) — the conception handoff shows which source will actually be used, so the swap is never silent.' },
 
