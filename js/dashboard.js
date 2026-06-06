@@ -6708,7 +6708,7 @@ setInterval(function() {
     // --- The model ---
     { id: 'soul', label: 'Soul',
       body: 'The metadata record — a structured JSON document carrying every fact about a conception. Stored as <code>.soul</code> files; lives wherever your surfaces carry it (peer mirror, archive, content-addressed network) plus your local disk. The soul is the meaning; the image is the body.' +
-        '<pre class="glossary-snippet">{\n  "identifier":   "mememage-\u2026",\n  "content_hash": "\u2026",\n  "prompt":       "\u2026",\n  "birth":        { /* sky + machine + GPS */ },\n  "signature":    "\u2026",\n  /* \u2026more fields\u2026 */\n}</pre>' },
+        '<pre class="glossary-snippet">{\n  "identifier":   "mememage-\u2026",\n  "content_hash": "\u2026",\n  "origin":       { /* your fields */ },\n  "birth":        { /* sky + machine + GPS */ },\n  "signature":    "\u2026",\n  /* \u2026more fields\u2026 */\n}</pre>' },
     { id: 'bar', label: 'Bar',
       body: 'The 2-pixel-tall steganographic strip at the bottom of every conceived image. Carries the identifier (so any decoder can look up the soul) and the content hash (so tampering is detectable). Reed-Solomon FEC + color delimiter bands make it survive JPEG re-encoding and crops down to common social-media sizes.' },
     { id: 'conception', label: 'Conception',
@@ -6718,6 +6718,8 @@ setInterval(function() {
     { id: 'content_hash', label: 'Content hash',
       body: 'SHA-256 of the soul\u2019s canonical JSON, first 16 hex chars. Baked into the bar so anyone can verify a soul matches the image even when the file came from a stranger. The integrity authority — independent of where the soul was retrieved from.' },
 
+    { id: 'origin', label: 'Origin fields',
+      body: 'The soul\u2019s open section: fields you declare about your image \u2014 title, creator, camera, a story, anything you want to attest to. Add, edit, or remove freely; the certificate\u2019s Origin panel shows whatever you put here. If the dropped image already carries embedded metadata (e.g. PNG text fields), it prefills these to save you typing.' },
     // --- Chains + Profiles ---
     { id: 'chain', label: 'Chain',
       body: 'A universe of conceptions. Multiple chains let one host run separate provenance streams (a public art chain, a password-gated private chain, a test chain). Each chain has its own Age cycle, records, visibility setting, and (optionally) password. Chain shape — cycle length, payload layout, GPS contract — is per-chain configuration.' },
