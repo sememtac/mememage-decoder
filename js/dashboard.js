@@ -6781,7 +6781,7 @@ setInterval(function() {
     { id: 'dark_matter', label: 'Dark matter (visibility)',
       body: 'Password-gated chain. Protected fields (prompt, GPS, designated soul fields) live encrypted; readers need the chain password to unlock. Public fields (identifier, content_hash) stay visible so the bar still verifies.' },
     { id: 'gps_source', label: 'GPS source',
-      body: 'Chain-level setting controlling how location gets captured at conception: <code>phone</code> (browser <code>watchPosition</code>), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded; record carries no time-lock puzzle).' },
+      body: 'Chain-level setting for how location is captured at conception: <code>phone</code> (browser <code>watchPosition</code>, precise), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded — no time-lock puzzle). A <code>phone</code> chain automatically falls back to <code>machine</code> when no phone can reach this server (a loopback-only desktop with no Tailscale) — the conception handoff shows which source will actually be used, so the swap is never silent.' },
 
     // --- Misc tech ---
     { id: 'halo', label: 'Halo',
