@@ -6773,7 +6773,7 @@ setInterval(function() {
     { id: 'witnessed', label: 'WITNESSED',
       body: 'Hash match: the image\u2019s bar carries the same content_hash the soul claims. Body and soul are joined. Verifiable from any source — the hash is the authority.' },
     { id: 'authenticated', label: 'AUTHENTICATED',
-      body: 'Ed25519 signature verifies: only the holder of the signing key could have produced this record. Browser-side TOFU (Trust On First Use) stores the creator name in localStorage; later records under the same fingerprint inherit it.' },
+      body: 'Ed25519 signature verifies: only the holder of the signing key could have produced this record. The signature also binds the image\u2019s thumbnail (its hash is part of what is signed), so swapping the portrait breaks authorship — not just the visual EMBODIED check. Trust is silent (TOFU — Trust On First Use): the creator\u2019s name auto-appears on first encounter with no prompt, and later records under the same key inherit it.' },
     { id: 'embodied', label: 'EMBODIED',
       body: 'Portrait match via dHash: the image you have IS the original body (not a re-encode that happens to share the bar). Post-conception thumbnail comparison — protected by signature, not by the content hash.' },
 
