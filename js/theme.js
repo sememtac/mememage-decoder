@@ -30,7 +30,7 @@ var Theme = {
   // Validator voice tilts forensic / judicial.
   taglines: {
     decoder: [
-      'decode the origin story of an AI-generated image',
+      'decode the origin story of an image',
       'every image is a star with a birth certificate',
       'the sky at the moment of conception, in two pixels',
       'every image was conceived; few were witnessed',
