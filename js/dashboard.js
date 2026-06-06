@@ -803,6 +803,12 @@ setInterval(function() {
     state.metadata = data.metadata || {};
     state.mintUrl = data.mint_url_full || data.mint_url || '';
     state.gpsSource = data.gps_source || 'phone';
+    // gps_source is the EFFECTIVE source. When the chain is configured for
+    // phone but no phone can reach this host (loopback-only desktop, no
+    // Tailscale), the server falls back to machine and reports both so the
+    // handoff UI can explain the swap instead of silently changing.
+    state.gpsSourceConfigured = data.gps_source_configured || state.gpsSource;
+    state.phoneReachable = data.phone_reachable !== false;
     state.qrDataUri = data.qr_data_uri || '';
     if (file) {
       renderReview(file);
@@ -1173,6 +1179,12 @@ setInterval(function() {
     } else if (src === 'machine') {
       head = 'Conception link ready (machine GPS)';
       body = 'Open the conception page on any device — the server will fetch its own approximate GPS (city-level) when you press Conceive. Scan the QR, tap Discord, or click Open below.';
+      // Explain the fallback when the chain WANTED phone but no phone can
+      // reach this host — otherwise "machine GPS" looks like a silent change.
+      if (state.gpsSourceConfigured === 'phone' && state.phoneReachable === false) {
+        head = 'Conception link ready (machine GPS — phone unreachable)';
+        body = 'This chain is set to phone GPS, but no phone can reach this server, so it fell back to approximate machine GPS. To capture precise phone GPS from a desktop install, join this machine and your phone to the same Tailscale tailnet (with HTTPS enabled) — the capture link then becomes a trusted https://…ts.net URL your phone can open. ' + body;
+      }
     } else {
       head = 'Conception link ready (no GPS)';
       body = 'Open the conception page on any device and press Conceive — this chain records no GPS, and the cert will show "BIRTHPLACE — NOT RECORDED".';
