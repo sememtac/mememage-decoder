@@ -1910,6 +1910,8 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   flex-basis: 100%;
 }
 .payload-apply-lock-banner[hidden] { display: none; }
+.payload-apply-lock-status { display: block; font-weight: 600; }
+.payload-apply-lock-note { display: block; margin-top: 0.2rem; opacity: 0.82; }
 
 /* Age-length (M) editor — surfaced as a first-class field so users
    don't have to crack open a preset JSON. Disabled while the chain

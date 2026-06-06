@@ -1938,9 +1938,14 @@ setInterval(function() {
         // parallel "stars per Age" / "stars per constellation".
         var progress = (typeof pos === 'number' && typeof total === 'number')
           ? ' \u00b7 star ' + pos + '/' + total : '';
-        els.applyLockBanner.textContent =
-          ageLabel + ' in progress' + progress +
-          '. Applied changes take effect on the next Age (the current Age keeps its sealed payload).';
+        // Two stacked lines, not one run-on sentence: the status (what
+        // Age / how far) reads at a glance, the consequence (when edits
+        // land) sits beneath it, muted. Easier to scan than a paragraph.
+        els.applyLockBanner.innerHTML =
+          '<span class="payload-apply-lock-status">' +
+            escapeHtml(ageLabel) + ' in progress' + progress + '</span>' +
+          '<span class="payload-apply-lock-note">Applied changes take effect on the ' +
+            'next Age — the current Age keeps its sealed payload.</span>';
         els.applyLockBanner.hidden = false;
       } else {
         els.applyLockBanner.hidden = true;
