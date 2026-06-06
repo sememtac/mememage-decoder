@@ -3595,7 +3595,11 @@ setInterval(function() {
       '  <button class="config-btn config-btn-danger advanced-only" id="configRevokeBtn"' + (hasRevCert ? '' : ' disabled title="No revocation cert on disk"') + '>Revoke key\u2026</button>' +
       '</div>' +
       '<div id="configIdentityDanger" class="config-danger-zone" style="display:none;"></div>' +
-      '<p class="config-note">Rotation signs a succession record with the OLD key + uploads it to IA so verifiers can follow the keychain. Revocation publishes the pre-signed revocation cert; every record signed by this key will then show a revocation warning. Both are irreversible.</p>';
+      '<p class="config-note">Two irreversible key operations:</p>' +
+      '<ul class="config-note-list">' +
+        '<li><strong>Rotate</strong> — signs a succession record with the OLD key and uploads it to IA, so verifiers can follow the keychain to your new key.</li>' +
+        '<li><strong>Revoke</strong> — publishes the pre-signed revocation cert; every record signed by this key then shows a revocation warning.</li>' +
+      '</ul>';
 
     document.getElementById('configSaveCreator').addEventListener('click', saveCreatorName);
     document.getElementById('configRotateBtn').addEventListener('click', openRotateConfirm);
@@ -3808,7 +3812,11 @@ setInterval(function() {
       '  <button class="config-btn" id="configServerSave" title="Write changes to ~/.mememage/server.json on this host">Save server settings</button>' +
       '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
       '</div>' +
-      '<p class="config-note">Cert/key paths use the native file picker — OS-agnostic, no copy-paste of long paths. Empty = auto-detect from <code>~/.mememage/certs/</code> at startup. Cert/key + API token changes require a server restart to take effect for new sessions.</p>' +
+      '<p class="config-note">TLS cert/key paths use the native file picker — no copy-pasting long paths:</p>' +
+      '<ul class="config-note-list">' +
+        '<li>Empty = auto-detect from <code>~/.mememage/certs/</code> at startup.</li>' +
+        '<li>Cert / key / API-token changes need a server restart to take effect for new sessions.</li>' +
+      '</ul>' +
       '<div id="configWebhooks" class="config-webhooks"></div>';
 
     document.getElementById('configServerSave').addEventListener('click', saveServerConfig);
@@ -4109,7 +4117,12 @@ setInterval(function() {
         '<button class="config-btn config-btn-primary" id="configWebhookSave" ' + (_webhooksDirty ? '' : 'disabled') + '>Save</button>' +
         '<button class="config-btn" id="configWebhookCancel" ' + (_webhooksDirty ? '' : 'disabled') + '>Cancel</button>' +
       '</div>' +
-      '<p class="config-note">Webhooks fire on <code>conceived</code> (image minted) and <code>ready</code> (GPS capture link generated). Custom auth headers (Discord bot token, etc.) require editing <code>~/.mememage/server.json</code> directly — they\u2019re preserved here across saves but not editable from the dashboard.</p>';
+      '<p class="config-note">Webhooks fire on two events:</p>' +
+      '<ul class="config-note-list">' +
+        '<li><code>conceived</code> — image minted.</li>' +
+        '<li><code>ready</code> — GPS capture link generated.</li>' +
+      '</ul>' +
+      '<p class="config-note">Custom auth headers (Discord bot token, etc.) aren\u2019t editable here — set them in <code>~/.mememage/server.json</code> directly; they\u2019re preserved across saves.</p>';
 
     // Wire row controls
     host.querySelectorAll('[data-webhook-url]').forEach(function(inp) {
@@ -4608,7 +4621,12 @@ setInterval(function() {
       '  <button class="config-btn advanced-only" id="configProfileImportFileBtn" title="Import a previously-exported config file. Additive — existing entries on this host are kept untouched.">Import config\u2026</button>' +
       '</div>' +
       '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
-      '<p class="config-note">One profile is active at a time \u2014 that\u2019s the key signing the next conception. Different machines can carry their own profile so a remote host never sees your primary identity. To link two profiles into one human identity, use <strong>Alias</strong> from each side, or <strong>Pair</strong> for a one-click cross-host handshake (each side keeps its private key, only public keys move).</p>';
+      '<p class="config-note">One profile is active at a time \u2014 it\u2019s the key that signs your next conception.</p>' +
+      '<ul class="config-note-list">' +
+        '<li>Different machines can carry their own profile, so a remote host never sees your primary identity.</li>' +
+        '<li>Link two profiles into one identity with <strong>Alias</strong> (run from each side), or <strong>Pair</strong> for a one-click cross-host handshake.</li>' +
+        '<li>Either way each side keeps its private key \u2014 only public keys move.</li>' +
+      '</ul>';
 
     // Wire row actions
     els.profiles.querySelectorAll('[data-profile-use]').forEach(function(b) {
@@ -4643,7 +4661,11 @@ setInterval(function() {
     host.innerHTML =
       '<div class="config-pair-form">' +
       '  <p class="config-pair-head">Push config to peer</p>' +
-      '  <p class="config-note">Sends your chains + channels (no credentials) to another mememage host. Peer applies additively \u2014 anything it already has is kept untouched, new entries are appended. Private keys, API tokens, and channel credentials NEVER cross the wire.</p>' +
+      '  <p class="config-note">Sends your chains + channels (no credentials) to another mememage host.</p>' +
+      '  <ul class="config-note-list">' +
+        '<li>The peer applies additively \u2014 anything it already has is kept; new entries are appended.</li>' +
+        '<li>Private keys, API tokens, and channel credentials NEVER cross the wire.</li>' +
+      '  </ul>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">Peer URL</span>' +
       '    <input class="config-input" id="configSyncUrl" type="text" placeholder="https://160.153.182.117:8444">' +
@@ -4948,7 +4970,11 @@ setInterval(function() {
     host.innerHTML =
       '<div class="config-pair-form">' +
       '  <p class="config-pair-head">Pair with another mememage server</p>' +
-      '  <p class="config-note">Enter the peer\u2019s dashboard URL and its API token. Both sides will sign aliases naming each other; the link becomes bidirectional in one round-trip. Neither side\u2019s private key leaves its host.</p>' +
+      '  <p class="config-note">Enter the peer\u2019s dashboard URL and its API token.</p>' +
+      '  <ul class="config-note-list">' +
+        '<li>Both sides sign aliases naming each other \u2014 the link becomes bidirectional in one round-trip.</li>' +
+        '<li>Neither side\u2019s private key leaves its host.</li>' +
+      '  </ul>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">Peer URL</span>' +
       '    <input class="config-input" id="configPairUrl" type="text" placeholder="https://160.153.182.117:8444">' +
@@ -5411,7 +5437,12 @@ setInterval(function() {
       '  <button class="config-btn" id="configChannelAddBtn">+ Add surface</button>' +
       '  <button type="button" class="config-btn config-btn-subtle advanced-only" id="configChannelViewRaw">View raw JSON\u2026</button>' +
       '</div>' +
-      '<p class="config-note">The <strong>primary</strong> channel\u2019s URL becomes the bar\u2019s record link and the Discord notification target. Every enabled+configured channel receives a copy of the soul on every mint; at least one must succeed. Credentials always live in <code>.env</code> — fields below name the env var to read.</p>';
+      '<p class="config-note">How surfaces distribute a soul:</p>' +
+      '<ul class="config-note-list">' +
+        '<li>The <strong>primary</strong> surface\u2019s URL becomes the bar\u2019s record link and the notification target.</li>' +
+        '<li>Every enabled + configured surface gets a copy of the soul on every mint; at least one must succeed.</li>' +
+        '<li>Credentials always live in <code>.env</code> \u2014 the fields below name the env var to read.</li>' +
+      '</ul>';
 
     // Wire row controls
     channels.forEach(function(c, i) {
@@ -5772,7 +5803,11 @@ setInterval(function() {
         '  <div class="config-row">' +
         '    <button class="config-btn config-btn-primary" id="configChainMigrateBtn">Migrate</button>' +
         '  </div>' +
-        '  <p class="config-note">Moves <code>sealed_chunks.json</code>, <code>chunk_state.json</code>, <code>records/</code>, <code>mememage.db</code> and <code>last_id.json</code> into <code>~/.mememage/chains/&lt;id&gt;/</code> and writes <code>chain.json</code> metadata. Original location logged to <code>migration.log</code>.</p>' +
+        '  <p class="config-note">Moves this chain\u2019s data into <code>~/.mememage/chains/&lt;id&gt;/</code> and writes <code>chain.json</code> metadata:</p>' +
+        '  <ul class="config-note-list">' +
+          '<li><code>sealed_chunks.json</code>, <code>chunk_state.json</code>, <code>records/</code>, <code>mememage.db</code>, <code>last_id.json</code></li>' +
+          '<li>Original location logged to <code>migration.log</code>.</li>' +
+        '  </ul>' +
         '</div>'
       : '';
 
@@ -5912,7 +5947,11 @@ setInterval(function() {
       '    Light + password: GPS sealed for personal time-lock; soul fields stay public. ' +
       '    Dark + password: soul + chunks sealed (viewers need this exact password to decrypt).' +
       '  </p>' +
-      '  <p class="config-note config-chain-visibility-warning">\u26a0\ufe0f Visibility is permanent. Once you create the chain, you cannot switch between light and dark \u2014 visibility is baked into every record minted in it. The display name and password can be changed later; the ID and visibility cannot.</p>' +
+      '  <p class="config-note config-chain-visibility-warning">\u26a0\ufe0f Visibility is permanent \u2014 you cannot switch a chain between light and dark after creating it.</p>' +
+      '  <ul class="config-note-list">' +
+        '<li>Visibility is baked into every record minted in the chain.</li>' +
+        '<li>The display name and password can be changed later; the ID and visibility cannot.</li>' +
+      '  </ul>' +
       '  <div class="config-row">' +
       '    <button class="config-btn config-btn-primary" id="configChainNewCreate">Create</button>' +
       '    <button class="config-btn" id="configChainNewCancel">Cancel</button>' +
@@ -6086,7 +6125,11 @@ setInterval(function() {
       (currentlySet ? '<button class="config-btn config-btn-danger" id="configChainPwClear">Clear stored password</button>' : '') +
       '  <button class="config-btn" id="configChainPwCancel">Cancel</button>' +
       '</div>' +
-      '<p class="config-note" style="margin-top:0.4rem;">Stored locally in <code>~/.mememage/chains/' + escapeHtml(chainId) + '/chain.json</code> at 0600 perms (owner-only). Same threat model as your Ed25519 private key. To keep the password out of files entirely, leave this blank and set <code>MEMEMAGE_PASSWORD</code> in <code>.env</code> instead.</p>';
+      '<p class="config-note" style="margin-top:0.4rem;">Stored locally in <code>~/.mememage/chains/' + escapeHtml(chainId) + '/chain.json</code> at 0600 perms (owner-only).</p>' +
+      '<ul class="config-note-list">' +
+        '<li>Same threat model as your Ed25519 private key.</li>' +
+        '<li>To keep the password out of files entirely, leave this blank and set <code>MEMEMAGE_PASSWORD</code> in <code>.env</code> instead.</li>' +
+      '</ul>';
     var save = document.getElementById('configChainPwSave');
     var clear = document.getElementById('configChainPwClear');
     var cancel = document.getElementById('configChainPwCancel');

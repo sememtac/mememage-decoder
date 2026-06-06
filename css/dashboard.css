@@ -3176,6 +3176,18 @@ label > input[type="checkbox"] {
   margin: 0.6rem 0 0;
   font-style: italic;
 }
+/* Scannable companion to .config-note: a lead note followed by one idea
+   per bulleted line instead of a run-on paragraph. Same muted tone, upright
+   (lists read better non-italic), tight spacing. */
+.config-note-list {
+  font-size: 0.7rem;
+  color: #54545c;
+  margin: 0.3rem 0 0;
+  padding-left: 1.05rem;
+  list-style: disc;
+}
+.config-note-list li { margin: 0.14rem 0; }
+.config-note + .config-note-list { margin-top: 0.25rem; }
 
 /* Diagnostics checklist (the Doctor) */
 .config-doctor {
