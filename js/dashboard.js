@@ -5467,8 +5467,19 @@ setInterval(function() {
     var statusBits = [];
     if (!c.type_known) statusBits.push('<span class="config-channel-status-warn">unknown type</span>');
     else if (!c.configured) statusBits.push('<span class="config-channel-status-warn">needs creds</span>');
-    else statusBits.push('<span class="config-channel-status-ok">configured</span>');
-    if (c.primary) statusBits.push('<span class="config-channel-status-primary">primary</span>');
+    // 'set up' = required fields present, NOT verified-working (credentials
+    // could be wrong/expired). A real probe comes from the Test button (#21).
+    else statusBits.push('<span class="config-channel-status-ok">set up</span>');
+    if (c.primary) {
+      statusBits.push('<span class="config-channel-status-primary">primary</span>');
+      // Honest about the silent fallback: a primary surface that can't
+      // actually blast (disabled, or required fields missing) won't supply
+      // record.url — pick_primary_url quietly falls back to another surface.
+      if (!c.enabled || !c.configured) {
+        statusBits.push('<span class="config-channel-status-warn">primary, but ' +
+          (!c.enabled ? 'disabled' : 'not set up') + ' \u2014 record URL will fall back</span>');
+      }
+    }
 
     // Credential field rows — read-only env var name + override input
     var credFields = '';
