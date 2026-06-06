@@ -148,6 +148,10 @@ function _isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent || '') && !window.MSStream;
 }
 
+function _isAndroid() {
+  return /Android/i.test(navigator.userAgent || '');
+}
+
 function _saveLivePlate(plate, barId, barHash) {
   var SCALE = 2; // 2x for retina output
 
@@ -272,23 +276,28 @@ function _saveLivePlate(plate, barId, barHash) {
             return;
           }
 
-          // Non-iOS mobile (Android Chrome) — Web Share API works and
-          // gives users a proper "save image" / "share" option.
-          var canShareFile = false;
-          try {
-            var probe = new File([blob], filename, { type: 'image/png' });
-            canShareFile = !!(navigator.canShare && navigator.canShare({ files: [probe] }));
-            if (canShareFile) {
-              navigator.share({ files: [probe], title: 'Mememage Certificate' })
-                .then(resolve)
-                .catch(function(err) {
-                  if (err && err.name === 'AbortError') { resolve(); return; }
-                  _saveViaAnchor(blob, filename);
-                  resolve();
-                });
-              return;
-            }
-          } catch (e) { /* File ctor or canShare unsupported — fall through */ }
+          // Non-iOS MOBILE (Android Chrome) — Web Share API gives a proper
+          // "save image" / "share" sheet. Gate on the mobile UA, NOT on
+          // navigator.canShare alone: Windows Chrome/Edge ALSO report
+          // canShare({files})===true, so an unguarded check hijacked the
+          // desktop "Save Certificate" download with the OS share sheet.
+          // Desktop (Windows/macOS/Linux) must always take the anchor
+          // download path — it's deterministic and never re-encodes.
+          if (_isAndroid()) {
+            try {
+              var probe = new File([blob], filename, { type: 'image/png' });
+              if (navigator.canShare && navigator.canShare({ files: [probe] })) {
+                navigator.share({ files: [probe], title: 'Mememage Certificate' })
+                  .then(resolve)
+                  .catch(function(err) {
+                    if (err && err.name === 'AbortError') { resolve(); return; }
+                    _saveViaAnchor(blob, filename);
+                    resolve();
+                  });
+                return;
+              }
+            } catch (e) { /* File ctor or canShare unsupported — fall through */ }
+          }
 
           // Desktop fallback — synthetic anchor click.
           _saveViaAnchor(blob, filename);
