@@ -2071,6 +2071,9 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   margin: 0.4rem 0 0.2rem;
 }
 .payload-template-banner p { margin: 0; }
+.payload-template-lead { margin: 0 0 0.35rem; }
+.payload-template-actions { margin: 0; padding-left: 1.1rem; list-style: disc; }
+.payload-template-actions li { margin: 0.15rem 0; }
 /* Payload primary (Save / Build) — brushed gold to match the rest
    of the dashboard's confirmation buttons. */
 .payload-btn-primary {
