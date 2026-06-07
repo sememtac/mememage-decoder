@@ -3,10 +3,10 @@
 //
 // Background: circuit traces (thin lines forming a PCB-like grid —
 // the silicon pathways the machine thinks through).
-// Includes kernel entropy cell, machine/entropy traits, and halo.
+// Includes kernel entropy cell, machine/entropy traits, and sigil.
 // =====================================================================
 
-function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, haloData, tierColor, aboutText, rarityScore, parentId, parentHash) {
+function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, barSpec, barFragment, machineTraits, entropyTraits, sigilData, tierColor, aboutText, rarityScore, parentId, parentHash) {
   var ctx = canvas.getContext('2d');
 
   // Cell colors — shared rarity tint (variant C) from cert-renderer.
@@ -78,18 +78,18 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
   }
   // Identity + traits cell (below entropy)
   var allTraitsList = (machineTraits || []).concat(entropyTraits || []);
-  var hasBottomCell = fingerprint || allTraitsList.length || haloData;
+  var hasBottomCell = fingerprint || allTraitsList.length || sigilData;
   var bottomCell = null;
   if (hasBottomCell) {
     var bcY = (entropyCell ? entropyCell.y + entropyCell.h : gridBottom) + GAP;
     var bcH = 14;
     if (fingerprint) bcH += 12;
     if (allTraitsList.length) bcH += 12;
-    if (haloData) bcH += 12;
+    if (sigilData) bcH += 12;
     bottomCell = { x: PAD, y: bcY, w: W - PAD * 2, h: bcH, hover: 0 };
   }
 
-  // Precompute font fits for static text (FP, traits, halo, entropy hex).
+  // Precompute font fits for static text (FP, traits, sigil, entropy hex).
   // These strings are fixed at init, so the shrink-to-fit measureText
   // loops don't need to run every frame. Cached font strings are looked
   // up in the tick instead.
@@ -104,13 +104,13 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
   }
   var _fpText = fingerprint ? 'FP: ' + fingerprint : '';
   var _traitText = allTraitsList.length ? allTraitsList.join(' \u00b7 ') : '';
-  var _haloText = haloData ? '\u2728 Halo \u2014 0xAD4E found in entropy' : '';
-  var _fpFont = '', _traitFont = '', _haloFont = '';
+  var _sigilText = sigilData ? '\u2728 Sigil \u2014 0xAD4E found in entropy' : '';
+  var _fpFont = '', _traitFont = '', _sigilFont = '';
   if (bottomCell) {
     var _bottomMaxW = bottomCell.w - 16;
     if (fingerprint) _fpFont = _fitFont(_fpText, '300', _bottomMaxW, 7, 5);
     if (allTraitsList.length) _traitFont = _fitFont(_traitText, '400', _bottomMaxW, 8, 5);
-    if (haloData) _haloFont = _fitFont(_haloText, 'italic 400', _bottomMaxW, 8, 5);
+    if (sigilData) _sigilFont = _fitFont(_sigilText, 'italic 400', _bottomMaxW, 8, 5);
   }
   var _entropyLine1 = '', _entropyLine2 = '', _entropyFont = '';
   if (entropyCell && entropyHex) {
@@ -431,12 +431,12 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
       var lineCount = 0;
       if (fingerprint) lineCount++;
       if (allTraitsList.length) lineCount++;
-      if (haloData) lineCount++;
+      if (sigilData) lineCount++;
       var lineH = 13;
       var totalTextH = lineCount * lineH;
       var btY = bottomCell.y + (bottomCell.h - totalTextH) / 2 + lineH - 2;
 
-      // FP, trait list, halo caption — fonts precomputed at init.
+      // FP, trait list, sigil caption — fonts precomputed at init.
       if (fingerprint) {
         ctx.font = _fpFont;
         ctx.fillStyle = 'rgba(255,255,255,' + (0.25 + bh * 0.3) + ')';
@@ -449,10 +449,10 @@ function initMachineBand(canvas, W, H, machineData, entropyHex, fingerprint, bar
         ctx.fillText(_traitText, W / 2, btY);
         btY += lineH;
       }
-      if (haloData) {
-        ctx.font = _haloFont;
+      if (sigilData) {
+        ctx.font = _sigilFont;
         ctx.fillStyle = 'rgba(160, 140, 240,' + (0.6 + bh * 0.15) + ')';
-        ctx.fillText(_haloText, W / 2, btY);
+        ctx.fillText(_sigilText, W / 2, btY);
       }
     }
 

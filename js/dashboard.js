@@ -1560,7 +1560,7 @@ setInterval(function() {
       'Common':    '#606060',
     };
 
-    // Full breakdown — tier bars + score range + halo + traits.
+    // Full breakdown — tier bars + score range + sigil + traits.
     var html = '';
     html += '<div class="mint-forecast-bars">';
     ordered.forEach(function(e) {
@@ -1584,7 +1584,7 @@ setInterval(function() {
       '<span>score range <strong>' + report.min + '\u2013' + report.max + '</strong></span>' +
       '<span>median <strong>' + report.median + '</strong></span>' +
       '<span>p99 <strong>' + report.p99 + '</strong></span>' +
-      '<span>halo <strong>' + (report.halo_pct || 0).toFixed(3) + '%</strong></span>' +
+      '<span>sigil <strong>' + (report.sigil_pct || 0).toFixed(3) + '%</strong></span>' +
       '</div>';
 
     function _renderTraits(label, items, fireRates) {
@@ -6805,7 +6805,7 @@ setInterval(function() {
       body: 'Chain-level setting for how location is captured at conception: <code>phone</code> (browser <code>watchPosition</code>, precise), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded — no time-lock puzzle). A <code>phone</code> chain automatically falls back to <code>machine</code> when no phone can reach this server (a loopback-only desktop with no Tailscale) — the conception handoff shows which source will actually be used, so the swap is never silent.' },
 
     // --- Misc tech ---
-    { id: 'halo', label: 'Halo',
+    { id: 'sigil', label: 'Sigil',
       body: 'The name for a rare event: when the kernel\u2019s entropy at conception happens to contain the bar\u2019s magic bytes (<code>AD4E</code>) somewhere in the random hex. The image\u2019s identity radiating unbidden in pure noise. ~0.09% per conception; +10 rarity score when it lands.' },
     { id: 'hash_version', label: 'Hash version',
       body: 'Which inclusion set was used to compute this record\u2019s content_hash. Lets the system evolve which fields are tamper-evident without invalidating older records — verifiers dispatch on the field at hash time.' },

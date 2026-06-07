@@ -1380,7 +1380,7 @@ async function _renderObservatoryFromCache() {
         var mF=[
           ['cpu','CPU',null],
           ['cores','Cores',formatCores],
-          ['gpu_cores','GPU',null],
+          ['gpu','GPU',null],
           ['ram','RAM',formatRam],
           ['mem_active','Active',formatBytes],
           ['mem_compressed','Compressed',formatBytes],

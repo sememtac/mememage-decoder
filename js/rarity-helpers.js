@@ -2,7 +2,7 @@
 // RARITY HELPERS — reconstruct derived rarity fields from the dice dict.
 // =====================================================================
 // Records store the rarity dice rolls themselves (rarity.celestial,
-// .machine, .entropy, .machine_signature, .halo). The aggregate
+// .machine, .entropy, .machine_signature, .sigil). The aggregate
 // rarity_score used to be persisted alongside, but it's a pure sum
 // of those components — readers reconstruct it via RarityScore.compute.
 //
@@ -23,7 +23,7 @@
       }
     });
     if (typeof rarity.machine_signature === 'number') sum += rarity.machine_signature;
-    if (rarity.halo && typeof rarity.halo.points === 'number') sum += rarity.halo.points;
+    if (rarity.sigil && typeof rarity.sigil.points === 'number') sum += rarity.sigil.points;
     if (sum < 0) sum = 0;
     if (sum > 255) sum = 255;
     return sum;

@@ -363,12 +363,12 @@ function _renderDieTraits(plate, dieData, tierColor) {
   plate.appendChild(traits);
 }
 
-function _renderHalo(plate, halo, tierColor) {
-  if (!halo) return;
-  var haloDiv = _div('rarity-traits');
-  haloDiv.style.cssText = 'margin-top:6px;color:' + tierColor + ';font-style:italic;';
-  haloDiv.textContent = '\u2728 Halo \u2014 0xAD4E found in entropy';
-  plate.appendChild(haloDiv);
+function _renderSigil(plate, sigil, tierColor) {
+  if (!sigil) return;
+  var sigilDiv = _div('rarity-traits');
+  sigilDiv.style.cssText = 'margin-top:6px;color:' + tierColor + ';font-style:italic;';
+  sigilDiv.textContent = '\u2728 Sigil \u2014 0xAD4E found in entropy';
+  plate.appendChild(sigilDiv);
 }
 
 function renderCert(meta, options) {
@@ -518,7 +518,7 @@ function renderCert(meta, options) {
     {k:'cpu', l:'CPU', span: 3},
     {k:'cores', l:'Cores', fmt: formatCores},
     {k:'mem_active', l:'Active', fmt: formatBytes},
-    {k:'gpu_cores', l:'GPU', fmt: function(v){return v + ' cores';}},
+    {k:'gpu', l:'GPU', fmt: function(v){return (typeof v === 'number') ? v + ' cores' : String(v);}},
     {k:'ram', l:'RAM', fmt: formatRam},
     {k:'mem_compressed', l:'Compressed', fmt: formatBytes},
     {k:'mem_free', l:'Free', fmt: formatBytes},
@@ -1402,7 +1402,7 @@ function renderCert(meta, options) {
     if (meta.machine_fingerprint) bottomCellH += 12;
     var machTraitCount = (rarity.machine || []).length + (rarity.entropy || []).length;
     if (machTraitCount > 0) bottomCellH += 12;
-    if (rarity.halo || rarity.echo) bottomCellH += 12;
+    if (rarity.sigil || rarity.echo) bottomCellH += 12;
     extraH += bottomCellH + 6; // cell + gap
     var MACH_H = Math.max(80, machRows * 44 + 30 + extraH);
     var machCanvas = document.createElement('canvas');
@@ -1413,12 +1413,12 @@ function renderCert(meta, options) {
 
     var machineTraits = (rarity.machine || []).map(function(t) { return t.trait; });
     var entropyTraits = (rarity.entropy || []).map(function(t) { return t.trait; });
-    var haloData = rarity.halo || rarity.echo || null;
+    var sigilData = rarity.sigil || rarity.echo || null;
 
     setTimeout(function() {
       if (typeof initMachineBand !== 'function') return;
       var dims = _setupHiDpi(machCanvas, MACH_W, MACH_H);
-      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, haloData, tierColor, meta.about || '', rarityScore, barId, barHash);
+      initMachineBand(machCanvas, dims.w, dims.h, MACHINE, KERNEL_ENTROPY, meta.machine_fingerprint, BAR_SPEC, barFragments.machine, machineTraits, entropyTraits, sigilData, tierColor, meta.about || '', rarityScore, barId, barHash);
     }, 0);
   }
 
