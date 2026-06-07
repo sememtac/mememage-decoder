@@ -492,6 +492,8 @@ body {
   padding: 0.65rem 0.85rem;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 0.15rem;
   font-family: inherit;
   font-size: 0.78rem;
@@ -503,7 +505,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   transition: background 160ms, border-color 160ms;
 }
 .conception-action:hover {
@@ -518,17 +520,20 @@ body {
   font-family: ui-monospace, "JetBrains Mono", monospace;
   font-weight: 400;
 }
+/* Primary action — same brushed-gold family as the per-surface
+   "Download soul" buttons (.conception-surface-dl) and Conceive, so the
+   whole conceived view reads with one motif instead of a lone green button. */
 .conception-action-primary {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.2)),
-    rgba(123, 196, 160, 0.14);
-  border-color: rgba(123, 196, 160, 0.3);
+  background: linear-gradient(180deg, rgba(60, 50, 20, 0.75) 0%, rgba(18, 14, 8, 0.7) 40%, rgba(14, 10, 6, 0.75) 100%);
+  border-color: rgba(200, 170, 80, 0.35);
+  color: #c8a850;
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.15), 0 1px 1px rgba(0,0,0,0.4);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 .conception-action-primary:hover {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(0,0,0,0.18)),
-    rgba(123, 196, 160, 0.22);
-  border-color: rgba(123, 196, 160, 0.5);
+  color: #e0c070;
+  border-color: rgba(224, 192, 112, 0.55);
+  background: linear-gradient(180deg, rgba(72, 60, 24, 0.8) 0%, rgba(24, 18, 10, 0.75) 40%, rgba(18, 14, 8, 0.8) 100%);
 }
 
 /* --- Facts list (identifier, hash, gps, constellation, rarity) --- */
