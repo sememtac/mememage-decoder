@@ -466,7 +466,15 @@ function renderCert(meta, options) {
     if (_v === null || _v === undefined || _v === '') continue;
     if (typeof _v === 'object') continue;  // dicts/arrays don't fit a single cell
     var _label = _k.replace(/[_-]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
-    GEN_PARAMS.push({l: _label, v: '' + _v, span: 3});
+    var _vs = '' + _v;
+    // Pack short creator/EXIF fields tighter instead of one full-width row
+    // each: a 3-char ISO or "f/1.8" no longer hogs a whole line, so a photo's
+    // dozen small EXIF fields fill ~a third the rows. span 1 = one-third
+    // (3 per row), 2 = two-thirds, 3 = full. gen-band truncates anything that
+    // overflows a cell, so these thresholds only affect packing, not clipping.
+    var _span = (_vs.length <= 16 && _label.length <= 16) ? 1
+              : (_vs.length <= 34 ? 2 : 3);
+    GEN_PARAMS.push({l: _label, v: _vs, span: _span});
   }
 
   // Build PLANET_DATA from birth
