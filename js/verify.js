@@ -64,6 +64,10 @@ const HASH_INCLUDED_V1 = new Set([
   'parent_id',
   // 'thumbnail' — post-mint, protected by Ed25519 signature instead
   'constellation_name', 'heart_star_id', 'constellation_index',
+  // constellation cadence — hashed so the heart-reset size (which
+  // constellation_index is derived from) is tamper-evident. Keep in
+  // lockstep with core.py _HASH_INCLUDED_V1.
+  'constellation_size',
   'decoder_hash', 'age',
   // Signer identity — IN the hash (signer-swap defense). Stripping
   // signature+public_key, dropping in an attacker's own key, and
