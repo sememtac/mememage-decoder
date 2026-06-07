@@ -1434,6 +1434,9 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 }
 .mint-action {
   flex: 1 1 8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   padding: 0.6rem 0.8rem;
   font-family: inherit;
