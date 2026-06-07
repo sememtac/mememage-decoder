@@ -465,7 +465,10 @@ function renderCert(meta, options) {
     var _v = origin[_k];
     if (_v === null || _v === undefined || _v === '') continue;
     if (typeof _v === 'object') continue;  // dicts/arrays don't fit a single cell
-    var _label = _k.replace(/[_-]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+    // Title-case the key, then restore common acronyms so EXIF-derived
+    // labels read "GPS Latitude" / "ISO", not "Gps Latitude" / "Iso".
+    var _label = _k.replace(/[_-]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();})
+      .replace(/\b(Gps|Iso|Id|Url|Rgb|Gpu|Cpu|Dpi|Hdr|Exif|Ai|Ram)\b/g, function(m){return m.toUpperCase();});
     var _vs = '' + _v;
     // Pack short creator/EXIF fields tighter instead of one full-width row
     // each: a 3-char ISO or "f/1.8" no longer hogs a whole line, so a photo's
