@@ -1413,9 +1413,24 @@ setInterval(function() {
   els.fileInput.addEventListener('change', function(e) {
     if (e.target.files.length) handleFile(e.target.files[0]);
   });
-  els.cancel.addEventListener('click', reset);
-  els.again.addEventListener('click', reset);
-  els.retry.addEventListener('click', reset);
+  // Cancel / Conceive another / Retry are explicit "done with this ticket"
+  // actions — drop the server-side session AND its staged upload, then clear
+  // the view. (Bare reset() stays non-destructive so a tab-switch / navigate-
+  // away keeps the session resumable via the pending list.) Without this the
+  // staged image lingered in ~/.mememage/uploads until the 7/30-day reaper.
+  async function clearSession() {
+    var tok = state.token;
+    if (tok) {
+      try {
+        await fetch('/api/mint/' + encodeURIComponent(tok),
+                    { method: 'DELETE', headers: authHeaders() });
+      } catch (e) { /* best-effort — clear the view regardless */ }
+    }
+    reset();
+  }
+  els.cancel.addEventListener('click', clearSession);
+  els.again.addEventListener('click', clearSession);
+  els.retry.addEventListener('click', clearSession);
   if (els.deleteSession) {
     els.deleteSession.addEventListener('click', async function() {
       if (!state.token) { reset(); return; }
