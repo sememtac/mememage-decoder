@@ -2161,7 +2161,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .payload-section-add:hover { background: rgba(220, 80, 220, 0.12); border-color: #dc50dc; }
 
 /* Editor rows */
-.payload-entries, .payload-layers-editor, .payload-frozen-editor {
+.payload-entries, .payload-layers-editor, .payload-pinned-editor {
   display: flex; flex-direction: column;
 }
 .payload-edit-row {
@@ -2206,8 +2206,8 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .payload-edit-row.layer-row {
   grid-template-columns: minmax(110px, 1fr) 60px 60px minmax(140px, 1.5fr) 28px;
 }
-/* Frozen row: position | role | entries (chips) | delete */
-.payload-edit-row.frozen-row {
+/* Pinned row: position | role | entries (chips) | delete */
+.payload-edit-row.pinned-row {
   grid-template-columns: 60px minmax(110px, 1fr) minmax(220px, 2fr) 28px;
 }
 
@@ -2361,7 +2361,7 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .payload-edit-header.layer-header {
   grid-template-columns: minmax(110px, 1fr) 60px 60px minmax(140px, 1.5fr) 28px;
 }
-.payload-edit-header.frozen-header {
+.payload-edit-header.pinned-header {
   grid-template-columns: 60px minmax(110px, 1fr) minmax(220px, 2fr) 28px;
 }
 

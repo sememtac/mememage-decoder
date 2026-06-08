@@ -1779,7 +1779,7 @@ setInterval(function() {
 // =====================================================================
 // PAYLOAD TAB — chain payload configuration editor.
 //
-// Reads/writes the active chain's chain.json (entries, layers, frozen
+// Reads/writes the active chain's chain.json (entries, layers, pinned
 // positions). Operates on a working copy in memory; nothing is persisted
 // until the user clicks Save. Refresh re-fetches; Discard reverts to the
 // last-saved snapshot.
@@ -1799,10 +1799,10 @@ setInterval(function() {
     validation:   document.getElementById('payloadValidation'),
     entries:      document.getElementById('payloadEntries'),
     layers:       document.getElementById('payloadLayersEditor'),
-    frozen:       document.getElementById('payloadFrozenEditor'),
+    pinned:       document.getElementById('payloadPinnedEditor'),
     entriesCount: document.getElementById('entriesCount'),
     layersCount:  document.getElementById('layersCount'),
-    frozenCount:  document.getElementById('frozenCount'),
+    pinnedCount:  document.getElementById('pinnedCount'),
     ageStatus:    document.getElementById('payloadAgeStatus'),
     refreshBtn:   document.getElementById('payloadRefreshBtn'),
     buildBtn:     document.getElementById('payloadBuildBtn'),
@@ -1818,7 +1818,7 @@ setInterval(function() {
     constellationHint:  document.getElementById('payloadConstellationHint'),
     addEntryBtn:  document.getElementById('addEntryBtn'),
     addLayerBtn:  document.getElementById('addLayerBtn'),
-    addFrozenBtn: document.getElementById('addFrozenBtn'),
+    addPinnedBtn: document.getElementById('addPinnedBtn'),
     modal:        document.getElementById('payloadModal'),
     modalTitle:   document.getElementById('payloadModalTitle'),
     modalMeta:    document.getElementById('payloadModalMeta'),
@@ -1830,7 +1830,7 @@ setInterval(function() {
     presetNewBlankBtn:  document.getElementById('payloadNewBlankBtn'),
     presetList:   document.getElementById('payloadPresetList'),
   };
-  if (!els.entries || !els.layers || !els.frozen) return; // panel missing — bail
+  if (!els.entries || !els.layers || !els.pinned) return; // panel missing — bail
 
   // Every layer chunks the same way (gzip → base64 → split). No type knob.
 
@@ -1973,12 +1973,12 @@ setInterval(function() {
     }
     // Apply to chain: needs unsaved edits, no validation errors, the
     // chain to be in EDITABLE state, AND a non-empty template (at least
-    // one layer or frozen entry — the server's chain_config.validate()
+    // one layer or pinned entry — the server's chain_config.validate()
     // refuses a fully empty one). Allowed mid-Age — the apply stages the
     // config for the next seal and cannot disturb the running Age, so there
     // is no lock to wait on.
     var w = state.working || {};
-    var isIncomplete = (w.layers || []).length === 0 && (w.frozen || []).length === 0;
+    var isIncomplete = (w.layers || []).length === 0 && (w.pinned || []).length === 0;
     if (els.applyBtn) {
       els.applyBtn.disabled = !dirty || hasErrors || isIncomplete;
       if (state.chainLocked === true && dirty && !hasErrors && !isIncomplete) {
@@ -1986,7 +1986,7 @@ setInterval(function() {
       } else if (hasErrors) {
         els.applyBtn.title = 'Fix the validation errors below before applying.';
       } else if (isIncomplete) {
-        els.applyBtn.title = 'Template needs at least one layer or frozen position before it can be applied.';
+        els.applyBtn.title = 'Template needs at least one layer or pinned position before it can be applied.';
       } else if (!dirty) {
         els.applyBtn.title = 'No draft changes to apply.';
       } else {
@@ -2001,15 +2001,15 @@ setInterval(function() {
     if (!cfg) return msgs;
     var nEntries = Object.keys(cfg.entries || {}).length;
     var nLayers = (cfg.layers || []).length;
-    var nFrozen = (cfg.frozen || []).length;
-    // "No layer/frozen yet" stays informational — the editor lets you
+    var nPinned = (cfg.pinned || []).length;
+    // "No layer/pinned yet" stays informational — the editor lets you
     // build in any order. Apply-to-chain has its own guard that blocks
     // an incomplete template from being committed.
-    if (nLayers === 0 && nFrozen === 0) {
+    if (nLayers === 0 && nPinned === 0) {
       if (nEntries === 0) {
-        msgs.push({severity: 'info', text: 'Blank template \u2014 add entries, layers, and frozen positions to build it out.'});
+        msgs.push({severity: 'info', text: 'Blank template \u2014 add entries, layers, and pinned positions to build it out.'});
       } else {
-        msgs.push({severity: 'info', text: 'Add at least one layer or frozen position before applying to chain.'});
+        msgs.push({severity: 'info', text: 'Add at least one layer or pinned position before applying to chain.'});
       }
     }
     // M ≥ max(K_i)
@@ -2063,24 +2063,24 @@ setInterval(function() {
       }
     });
     var seen = {};
-    (cfg.frozen || []).forEach(function(fz, i) {
+    (cfg.pinned || []).forEach(function(fz, i) {
       if (fz.position < 0 || fz.position >= (cfg.M || 0)) {
         msgs.push({severity:'error',
-                   text: 'Frozen #' + (i+1) + ' (role ' + (fz.role||'?') + '): position ' + fz.position + ' out of [0, ' + (cfg.M-1) + '].'});
+                   text: 'Pinned #' + (i+1) + ' (role ' + (fz.role||'?') + '): position ' + fz.position + ' out of [0, ' + (cfg.M-1) + '].'});
       }
       var key = fz.position + '/' + (fz.role || '');
       if (seen[key]) msgs.push({severity:'error',
-                                 text:'Duplicate frozen at position ' + fz.position + ' role ' + fz.role + '.'});
+                                 text:'Duplicate pinned at position ' + fz.position + ' role ' + fz.role + '.'});
       seen[key] = true;
       (fz.entries || []).forEach(function(en) {
         if (!entries[en]) {
           msgs.push({severity:'error',
-                     text: 'Frozen ' + fz.role + ': entry ' + JSON.stringify(en) + ' not defined.'});
+                     text: 'Pinned ' + fz.role + ': entry ' + JSON.stringify(en) + ' not defined.'});
         }
       });
       if (!fz.entries || fz.entries.length === 0) {
         msgs.push({severity:'error',
-                   text: 'Frozen ' + (fz.role||'?') + ' has no entries.'});
+                   text: 'Pinned ' + (fz.role||'?') + ' has no entries.'});
       }
     });
     return msgs;
@@ -2113,11 +2113,11 @@ setInterval(function() {
     }
     state.working.entries[newName] = state.working.entries[oldName];
     delete state.working.entries[oldName];
-    // Propagate to layers/frozen
+    // Propagate to layers/pinned
     (state.working.layers || []).forEach(function(ly) {
       if (ly.entry === oldName) ly.entry = newName;
     });
-    (state.working.frozen || []).forEach(function(fz) {
+    (state.working.pinned || []).forEach(function(fz) {
       fz.entries = (fz.entries || []).map(function(e) { return e === oldName ? newName : e; });
     });
   }
@@ -2332,19 +2332,19 @@ setInterval(function() {
     els.layers.innerHTML = header + rows;
   }
 
-  // ===== Rendering: frozen =====
-  function renderFrozen() {
-    var frozen = state.working.frozen || [];
-    els.frozenCount.textContent = '(' + frozen.length + ')';
-    var header = '<div class="payload-edit-header frozen-header">' +
+  // ===== Rendering: pinned =====
+  function renderPinned() {
+    var pinned = state.working.pinned || [];
+    els.pinnedCount.textContent = '(' + pinned.length + ')';
+    var header = '<div class="payload-edit-header pinned-header">' +
       '<span>Pos</span><span>Role</span><span>Entries (concatenated if multiple)</span><span></span></div>';
-    if (frozen.length === 0) {
-      els.frozen.innerHTML = header + '<div class="payload-edit-row frozen-row">' +
-        '<span style="grid-column:1/-1; opacity:0.5; font-style:italic;">No frozen positions defined.</span></div>';
+    if (pinned.length === 0) {
+      els.pinned.innerHTML = header + '<div class="payload-edit-row pinned-row">' +
+        '<span style="grid-column:1/-1; opacity:0.5; font-style:italic;">No pinned positions defined.</span></div>';
       return;
     }
     var allEntries = entryNames();
-    var rows = frozen.map(function(fz, i) {
+    var rows = pinned.map(function(fz, i) {
       var linked = fz.entries || [];
       // Chips for each linked entry (mark missing ones in red).
       var chips = linked.map(function(name) {
@@ -2353,7 +2353,7 @@ setInterval(function() {
         var title = missing ? 'Entry "' + name + '" is not defined' : 'Entry "' + name + '"';
         return '<span class="' + cls + '" title="' + escapeHtml(title) + '">' +
           escapeHtml(name) +
-          ' <button class="chip-remove" data-action="remove-frozen-entry" data-frozen="' + i + '" data-entry="' + escapeHtml(name) + '" title="Remove">\u00d7</button>' +
+          ' <button class="chip-remove" data-action="remove-pinned-entry" data-pinned="' + i + '" data-entry="' + escapeHtml(name) + '" title="Remove">\u00d7</button>' +
           '</span>';
       }).join('');
       // Picker: lists entries not already linked. Defaults to a placeholder.
@@ -2361,23 +2361,23 @@ setInterval(function() {
       var pickerOpts = '<option value="">+ add entry</option>' + available.map(function(n) {
         return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>';
       }).join('');
-      var picker = '<select class="chip-add-select" data-action="add-frozen-entry" data-frozen="' + i + '" title="Add a defined entry to this frozen position">' + pickerOpts + '</select>';
+      var picker = '<select class="chip-add-select" data-action="add-pinned-entry" data-pinned="' + i + '" title="Add a defined entry to this pinned position">' + pickerOpts + '</select>';
 
-      return '<div class="payload-edit-row frozen-row" data-frozen="' + i + '">' +
+      return '<div class="payload-edit-row pinned-row" data-pinned="' + i + '">' +
         '<input class="payload-edit-input numeric" data-field="position" type="number" min="0" value="' + fz.position + '">' +
         '<input class="payload-edit-input" data-field="role" type="text" value="' + escapeHtml(fz.role || '') + '">' +
         '<div class="chip-container">' + chips + picker + '</div>' +
-        '<button class="payload-edit-delete" data-action="delete-frozen" title="Delete frozen">\u00d7</button>' +
+        '<button class="payload-edit-delete" data-action="delete-pinned" title="Delete pinned">\u00d7</button>' +
       '</div>';
     }).join('');
-    els.frozen.innerHTML = header + rows;
+    els.pinned.innerHTML = header + rows;
   }
 
   function renderAll() {
     renderChainBar();
     renderEntries();
     renderLayers();
-    renderFrozen();
+    renderPinned();
     renderValidation();
     refreshDirtyUI();
     renderBuildBadge();
@@ -2387,7 +2387,7 @@ setInterval(function() {
   function wireDelegation() {
     function onChange(e) {
       var t = e.target;
-      var row = t.closest && t.closest('[data-entry], [data-layer], [data-frozen]');
+      var row = t.closest && t.closest('[data-entry], [data-layer], [data-pinned]');
       if (!row) return;
 
       if (row.hasAttribute('data-entry')) {
@@ -2427,9 +2427,9 @@ setInterval(function() {
         else if (field2 === 'reserved') ly.reserved = parseInt(t.value, 10) || 0;
         else if (field2 === 'entry') ly.entry = t.value;
         setDirty();
-      } else if (row.hasAttribute('data-frozen')) {
-        var fidx = parseInt(row.getAttribute('data-frozen'), 10);
-        var fz = state.working.frozen[fidx];
+      } else if (row.hasAttribute('data-pinned')) {
+        var fidx = parseInt(row.getAttribute('data-pinned'), 10);
+        var fz = state.working.pinned[fidx];
         if (!fz) return;
         var field3 = t.getAttribute('data-field');
         if (field3 === 'position') fz.position = parseInt(t.value, 10) || 0;
@@ -2442,17 +2442,17 @@ setInterval(function() {
     els.entries.addEventListener('change', onChange);
     els.layers.addEventListener('input', onChange);
     els.layers.addEventListener('change', onChange);
-    els.frozen.addEventListener('input', onChange);
-    els.frozen.addEventListener('change', onChange);
+    els.pinned.addEventListener('input', onChange);
+    els.pinned.addEventListener('change', onChange);
 
     function onClick(e) {
       var btn = e.target.closest && e.target.closest('[data-action]');
       if (!btn) return;
       var action = btn.getAttribute('data-action');
-      var row = btn.closest('[data-entry], [data-layer], [data-frozen]');
+      var row = btn.closest('[data-entry], [data-layer], [data-pinned]');
       if (action === 'delete-entry') {
         var name = row.getAttribute('data-entry');
-        if (!window.confirm('Delete entry "' + name + '"? Any layers/frozen positions that reference it will be invalid.')) return;
+        if (!window.confirm('Delete entry "' + name + '"? Any layers/pinned positions that reference it will be invalid.')) return;
         // Capture the entry's source paths BEFORE deleting so we can
         // sweep any now-orphaned uploads off disk.
         var orphanCandidates = ((state.working.entries[name] || {}).sources || []).slice();
@@ -2559,25 +2559,25 @@ setInterval(function() {
         var idx = parseInt(row.getAttribute('data-layer'), 10);
         state.working.layers.splice(idx, 1);
         renderAll();
-      } else if (action === 'delete-frozen') {
-        var fidx = parseInt(row.getAttribute('data-frozen'), 10);
-        state.working.frozen.splice(fidx, 1);
+      } else if (action === 'delete-pinned') {
+        var fidx = parseInt(row.getAttribute('data-pinned'), 10);
+        state.working.pinned.splice(fidx, 1);
         renderAll();
-      } else if (action === 'remove-frozen-entry') {
-        var fidx2 = parseInt(btn.getAttribute('data-frozen'), 10);
+      } else if (action === 'remove-pinned-entry') {
+        var fidx2 = parseInt(btn.getAttribute('data-pinned'), 10);
         var entryName = btn.getAttribute('data-entry');
-        var fz = state.working.frozen[fidx2];
+        var fz = state.working.pinned[fidx2];
         if (!fz) return;
         fz.entries = (fz.entries || []).filter(function(n) { return n !== entryName; });
         renderAll();
       }
     }
     function onPickerChange(e) {
-      var sel = e.target.closest && e.target.closest('[data-action="add-frozen-entry"]');
+      var sel = e.target.closest && e.target.closest('[data-action="add-pinned-entry"]');
       if (!sel) return;
       if (!sel.value) return; // placeholder selected
-      var fidx = parseInt(sel.getAttribute('data-frozen'), 10);
-      var fz = state.working.frozen[fidx];
+      var fidx = parseInt(sel.getAttribute('data-pinned'), 10);
+      var fz = state.working.pinned[fidx];
       if (!fz) return;
       fz.entries = fz.entries || [];
       if (fz.entries.indexOf(sel.value) < 0) fz.entries.push(sel.value);
@@ -2586,8 +2586,8 @@ setInterval(function() {
     }
     els.entries.addEventListener('click', onClick);
     els.layers.addEventListener('click', onClick);
-    els.frozen.addEventListener('click', onClick);
-    els.frozen.addEventListener('change', onPickerChange);
+    els.pinned.addEventListener('click', onClick);
+    els.pinned.addEventListener('change', onPickerChange);
   }
 
   // ===== Add buttons =====
@@ -2611,11 +2611,11 @@ setInterval(function() {
     });
     renderAll();
   }
-  function onAddFrozen() {
+  function onAddPinned() {
     var firstName = entryNames()[0] || '';
-    state.working.frozen.push({
+    state.working.pinned.push({
       position: 0,
-      role: 'frozen_' + (state.working.frozen.length + 1),
+      role: 'pinned_' + (state.working.pinned.length + 1),
       entries: firstName ? [firstName] : [],
       combine: false,
     });
@@ -2967,7 +2967,7 @@ setInterval(function() {
   }
 
   // ===== Presets =====
-  // Presets are payload templates (entries + layers + frozen + M) without
+  // Presets are payload templates (entries + layers + pinned + M) without
   // per-chain identity. Saving snapshots the current chain's config;
   // loading stages it in state.working so the user can review + Save it
   // into the active chain. Identity (id/name/visibility) is preserved
@@ -3109,6 +3109,11 @@ setInterval(function() {
         name: current.name,
         visibility: current.visibility,
       });
+      // Legacy "frozen" key -> "pinned" for presets saved before the rename.
+      if (state.working.pinned == null && state.working.frozen != null) {
+        state.working.pinned = state.working.frozen;
+      }
+      delete state.working.frozen;
       // Strip any legacy chunk_type/type fields a preset might carry.
       (state.working.layers || []).forEach(function(ly) {
         if ('chunk_type' in ly) delete ly.chunk_type;
@@ -3163,7 +3168,7 @@ setInterval(function() {
 
   function newBlankTemplate() {
     // Clear the editor to an empty template — no entries, no layers, no
-    // frozen positions. Preserves the active chain's identity (id, name,
+    // pinned positions. Preserves the active chain's identity (id, name,
     // visibility) and M so the cleared draft is still a valid frame the
     // user can build into.
     if (isDirty() && !window.confirm(
@@ -3179,7 +3184,7 @@ setInterval(function() {
       schema_version: current.schema_version || 2,
       entries: {},
       layers: [],
-      frozen: [],
+      pinned: [],
     };
     // Not derived from any preset.
     state.lastPresetName = '';
@@ -3204,7 +3209,7 @@ setInterval(function() {
       M: identity.M,
       constellation_size: (typeof identity.constellation_size === 'number') ? identity.constellation_size : 12,
       layers: [],
-      frozen: [],
+      pinned: [],
       entries: {},
     };
   }
@@ -3217,6 +3222,12 @@ setInterval(function() {
       var chainCfg = await fetchJson('/api/chain/config');
       state.constellationLocked = !!chainCfg.constellation_size_locked;
       delete chainCfg.constellation_size_locked;
+      // Legacy "frozen" key -> "pinned" so the editor (which reads
+      // .pinned) works against configs written before the rename.
+      if (chainCfg.pinned == null && chainCfg.frozen != null) {
+        chainCfg.pinned = chainCfg.frozen;
+      }
+      delete chainCfg.frozen;
       // Normalize legacy fields the same way loadConfig does so the
       // saved baseline is comparable to the working draft.
       (chainCfg.layers || []).forEach(function(ly) {
@@ -3243,12 +3254,17 @@ setInterval(function() {
         try {
           var pd = await fetchJson('/api/payload/presets/' + encodeURIComponent(presetName));
           var preset = pd.config || {};
-          // Preset wins for layers/frozen/entries/M; chain identity
+          // Preset wins for layers/pinned/entries/M; chain identity
           // wins for id/name/visibility (those are per-chain, not
           // portable). Identity does NOT include M — stamping chain's
           // M onto a preset designed for a different M breaks
-          // validation (M-smaller-than-K, frozen-out-of-range).
+          // validation (M-smaller-than-K, pinned-out-of-range).
           state.working = Object.assign({}, preset, identity);
+          // Legacy "frozen" key -> "pinned" for pre-rename presets.
+          if (state.working.pinned == null && state.working.frozen != null) {
+            state.working.pinned = state.working.frozen;
+          }
+          delete state.working.frozen;
           (state.working.layers || []).forEach(function(ly) {
             if ('chunk_type' in ly) delete ly.chunk_type;
             if ('type' in ly) delete ly.type;
@@ -3333,15 +3349,15 @@ setInterval(function() {
     var dismissed = _nuxDismissed();
     var w = state.working || {};
     var hasContent = (w.layers && w.layers.length)
-                  || (w.frozen && w.frozen.length)
+                  || (w.pinned && w.pinned.length)
                   || (w.entries && Object.keys(w.entries).length);
     // Auto-show when: not dismissed AND the chain is in a fresh state
-    // (no layers/frozen/entries on disk yet). Once content exists, the
+    // (no layers/pinned/entries on disk yet). Once content exists, the
     // user has graduated past the NUX; hide unless they explicitly
     // re-open it.
     var savedHasContent = state.saved && (
       (state.saved.layers && state.saved.layers.length) ||
-      (state.saved.frozen && state.saved.frozen.length) ||
+      (state.saved.pinned && state.saved.pinned.length) ||
       (state.saved.entries && Object.keys(state.saved.entries).length)
     );
     var shouldShow = !dismissed && !savedHasContent;
@@ -3371,7 +3387,7 @@ setInterval(function() {
     payloadRoot.addEventListener('input', markTouched);
     payloadRoot.addEventListener('change', markTouched);
   }
-  [els.addEntryBtn, els.addLayerBtn, els.addFrozenBtn].forEach(function(btn) {
+  [els.addEntryBtn, els.addLayerBtn, els.addPinnedBtn].forEach(function(btn) {
     if (btn) btn.addEventListener('click', markTouched);
   });
 
@@ -3420,7 +3436,7 @@ setInterval(function() {
   els.sealBtn.addEventListener('click', sealAge);
   els.addEntryBtn.addEventListener('click', onAddEntry);
   els.addLayerBtn.addEventListener('click', onAddLayer);
-  els.addFrozenBtn.addEventListener('click', onAddFrozen);
+  els.addPinnedBtn.addEventListener('click', onAddPinned);
   if (els.presetBtn) els.presetBtn.addEventListener('click', togglePresetPanel);
   if (els.presetSavePresetBtn) els.presetSavePresetBtn.addEventListener('click', function() { savePreset(); });
   if (els.presetSaveAsBtn) els.presetSaveAsBtn.addEventListener('click', function() { savePreset({forcePrompt: true}); });
@@ -4444,7 +4460,7 @@ setInterval(function() {
   // (MEMEMAGE_PASSWORD, anything not surfaced) edit .env directly.
 
   // renderEasterEgg removed: easter eggs are chain-dependent now,
-  // configured per-chain via the Payload tab's frozen-entry editor.
+  // configured per-chain via the Payload tab's pinned-entry editor.
 
   async function saveCreatorName() {
     var input = document.getElementById('configCreatorName');

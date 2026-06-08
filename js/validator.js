@@ -648,7 +648,7 @@ folderInp.addEventListener('change',function(){
 // Two flavors of stored chunk:
 //   - indexed   — chunks that carry {index, total} (decoder, truth, proof,
 //                 schematic). Stored as {[role]: {total, chunks: {idx: entry}}}.
-//   - single    — frozen chunks with no index (claim, easter_egg, custom).
+//   - single    — pinned chunks with no index (claim, easter_egg, custom).
 //                 Stored as {[role]: entry}.
 //
 // Validator UI keys off the chunk *role name* (the key inside record.chunks),
@@ -1002,7 +1002,7 @@ async function _renderObservatoryFromCache() {
   }
 
   // Propagate age_name across each chain. Dark-day / epagomenal /
-  // frozen-only records carry no decoder chunk and therefore no
+  // pinned-only records carry no decoder chunk and therefore no
   // age_name in assignAgeKey's first pass — they'd otherwise form
   // their own "Age I" tab and sort ahead of "Age of Aries" records.
   // Adopt the age_name from any chain peer that has one so the whole
@@ -1030,7 +1030,7 @@ async function _renderObservatoryFromCache() {
     var bck = b._ageKey ? b._ageKey.split('#')[0] : '';
     if (ack !== bck) return ack < bck ? -1 : 1;
     // Within a chain: outer_position is the canonical record order.
-    // Universal across canonical (with decoder) and frozen-only records,
+    // Universal across canonical (with decoder) and pinned-only records,
     // so dark days T360-T364 render between T359 and the next age, not
     // ahead of T0.
     var ap = (a.outer_position != null) ? a.outer_position : Infinity;
@@ -1079,7 +1079,7 @@ async function _renderObservatoryFromCache() {
 
   // Accumulate chunks from these records — generic walk over each record's
   // chunks dict. Indexed chunks (have index+total) go into collected.indexed,
-  // single frozen chunks go into collected.single. The role name is the
+  // single pinned chunks go into collected.single. The role name is the
   // chunk key from record.chunks (decoder, proof, truth, schematic,
   // easter_egg, claim, anything else the chain emits).
   for (var ci = 0; ci < valid.length; ci++) {
@@ -1188,7 +1188,7 @@ async function _renderObservatoryFromCache() {
     // Generic layer iteration for the cycle-position panel — every layer
     // a chain authored gets its own row, regardless of name. Canonical
     // names (decoder/truth/proof) keep their curated labels via roleMeta;
-    // anything else gets title-cased fallback. Frozen roles (schematic/
+    // anything else gets title-cased fallback. Pinned roles (schematic/
     // claim/easter_egg) are excluded — they have their own dedicated rows.
     var _FROZEN_ROLES = {schematic:1, claim:1, easter_egg:1};
     var rLayers = [];
@@ -1328,7 +1328,7 @@ async function _renderObservatoryFromCache() {
       html+='</div>';
     }
 
-    // Cycle position — one row per authored layer, plus frozen-role
+    // Cycle position — one row per authored layer, plus pinned-role
     // overlays + Age / decoder_hash / constellation. Generalized: any
     // chain whose layers aren't decoder/truth/proof still gets rendered;
     // the row label comes from roleMeta() (curated for canonical names,
@@ -1831,7 +1831,7 @@ function buildOrbitInspector(records, collected) {
               : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index)));
     // Chains that don't author 'decoder' or 'truth' layers (custom
     // single-layer chains, demo configurations) still need a grid
-    // position. Fall back to any non-schematic, non-frozen layer's
+    // position. Fall back to any non-schematic, non-pinned layer's
     // index — same pattern cert-renderer.js uses for constellation
     // indexing. Layer name is irrelevant; what matters is the
     // chunk's position within its cycle.
@@ -2266,7 +2266,7 @@ function buildOrbitInspector(records, collected) {
           if (USE_CALENDAR && {decoder:1, truth:1, proof:1, epag:1, egg:1}[key]) return;
           if ((' ' + types + ' ').indexOf(' ' + key + ' ') < 0) types += ' ' + key;
         });
-        // Frozen chunks (no index, single position) belong only to THIS
+        // Pinned chunks (no index, single position) belong only to THIS
         // cell — not the whole cycle. Tag the specific cell so its
         // filter highlights it without lighting the rest of the row.
         if (rec && rec.chunks && typeof rec.chunks === 'object') {
@@ -2427,7 +2427,7 @@ function buildOrbitInspector(records, collected) {
           });
         }
       });
-      // Single-role downloads — one frozen chunk per role.
+      // Single-role downloads — one pinned chunk per role.
       singleRoles.forEach(function(role) {
         var meta = roleMeta(role);
         var entry = collected.single[role];
@@ -2533,7 +2533,7 @@ function buildOrbitInspector(records, collected) {
       }
       // Custom layer filter — read the total from observed chunks.
       if (bucket && bucket.total > 0) return { len: bucket.total, off: 0 };
-      // Frozen-style filter (egg / epag / single-position custom role)
+      // Pinned-style filter (egg / epag / single-position custom role)
       // — find any record carrying a chunk under this filter's role
       // and treat it as a cycle of 1 at that position. Handles canonical
       // names (egg → easter_egg, epag → claim/schematic) too.
@@ -3093,7 +3093,7 @@ function renderAudit(rec, identifier, out) {
   // One row per authored layer (any name), plus Age + decoder_hash +
   // chain_visibility. Canonical layers (decoder/truth/proof) keep their
   // curated labels via roleMeta; custom layers render as title-cased
-  // fallback. Frozen roles (schematic/claim/easter_egg) are listed
+  // fallback. Pinned roles (schematic/claim/easter_egg) are listed
   // elsewhere — skip here to avoid duplication.
   var cycleRows = '';
   var auAgeName = AgeNames.name(rec.age);
