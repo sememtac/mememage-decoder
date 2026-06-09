@@ -5579,44 +5579,62 @@ setInterval(function() {
     var primaryStar = c.primary
       ? '<span class="config-channel-primary-star" title="Primary channel — its URL becomes record.url (bar reference, Discord toast)">\u2605</span>'
       : '';
+    // Collapsible like webhooks — a long surface list stays scannable
+    // (name / type / status on one line) instead of a wall of expanded
+    // editors. Open state is persisted per surface id (_channelOpenById) so
+    // it survives the re-renders that fire on every save/add/remove. The
+    // type + status live in the summary so the collapsed row is informative.
+    var isOpen = !!_channelOpenById[c.id];
+    var sumName = c.name || displayName;
     return '' +
-      '<div class="config-channel-row' + primaryClass + '" data-channel-idx="' + idx + '" data-channel-id="' + escapeHtml(c.id) + '">' +
-        '<div class="config-channel-head">' +
-          '<div class="config-channel-labels">' +
-            '<label class="config-channel-label-row">' +
-              '<span class="config-channel-label-key">name</span>' +
-              '<span class="config-channel-name-wrap">' + primaryStar +
-                '<input class="config-input config-channel-name-input" data-channel-name type="text" value="' + escapeHtml(c.name || '') + '" placeholder="' + escapeHtml(displayName) + '">' +
-              '</span>' +
-              '<span class="config-channel-label-hint">local dashboard label</span>' +
-            '</label>' +
-            '<label class="config-channel-label-row">' +
-              '<span class="config-channel-label-key">id</span>' +
-              '<input class="config-input config-channel-id-input" data-channel-id-input type="text" value="' + escapeHtml(c.id) + '" pattern="[A-Za-z0-9_-]+">' +
-              '<span class="config-channel-label-hint">appears on viewer certificates</span>' +
-            '</label>' +
-          '</div>' +
+      '<details class="config-channel-row' + primaryClass + '" data-channel-idx="' + idx + '" data-channel-id="' + escapeHtml(c.id) + '"' + (isOpen ? ' open' : '') + '>' +
+        '<summary class="config-channel-summary">' +
+          '<span class="config-channel-sum-chevron" aria-hidden="true">▸</span>' +
+          primaryStar +
+          '<span class="config-channel-sum-name" title="id: ' + escapeHtml(c.id) + '">' + escapeHtml(sumName) + '</span>' +
           '<span class="config-channel-type">' + escapeHtml(displayName) + '</span>' +
           '<span class="config-channel-status">' + statusBits.join(' ') + '</span>' +
+        '</summary>' +
+        '<div class="config-channel-body">' +
+          '<div class="config-channel-head">' +
+            '<div class="config-channel-labels">' +
+              '<label class="config-channel-label-row">' +
+                '<span class="config-channel-label-key">name</span>' +
+                '<input class="config-input config-channel-name-input" data-channel-name type="text" value="' + escapeHtml(c.name || '') + '" placeholder="' + escapeHtml(displayName) + '">' +
+                '<span class="config-channel-label-hint">local dashboard label</span>' +
+              '</label>' +
+              '<label class="config-channel-label-row">' +
+                '<span class="config-channel-label-key">id</span>' +
+                '<input class="config-input config-channel-id-input" data-channel-id-input type="text" value="' + escapeHtml(c.id) + '" pattern="[A-Za-z0-9_-]+">' +
+                '<span class="config-channel-label-hint">appears on viewer certificates</span>' +
+              '</label>' +
+            '</div>' +
+          '</div>' +
+          '<div class="config-channel-controls">' +
+            '<label><input type="checkbox" data-channel-enabled' + (c.enabled ? ' checked' : '') + '> enabled</label>' +
+            '<label><input type="radio" name="channelPrimary" data-channel-primary' + (c.primary ? ' checked' : '') + '> primary</label>' +
+            '<button type="button" class="config-btn config-channel-remove" data-channel-remove>Remove</button>' +
+          '</div>' +
+          // Credential overrides + non-essential config rows live behind
+          // the Advanced toggle — most users don't override env-var names
+          // or fiddle with content_type / extra headers / accept_self_signed.
+          // The dashboard's default channel set (IA, Zenodo, self-push)
+          // works without ever opening these.
+          (credFields ? '<div class="config-channel-fields advanced-only">' + credFields + '</div>' : '') +
+          (cfgFields ? '<div class="config-channel-fields advanced-only">' + cfgFields + '</div>' : '') +
         '</div>' +
-        '<div class="config-channel-controls">' +
-          '<label><input type="checkbox" data-channel-enabled' + (c.enabled ? ' checked' : '') + '> enabled</label>' +
-          '<label><input type="radio" name="channelPrimary" data-channel-primary' + (c.primary ? ' checked' : '') + '> primary</label>' +
-          '<button type="button" class="config-btn config-channel-remove" data-channel-remove>Remove</button>' +
-        '</div>' +
-        // Credential overrides + non-essential config rows live behind
-        // the Advanced toggle — most users don't override env-var names
-        // or fiddle with content_type / extra headers / accept_self_signed.
-        // The dashboard's default channel set (IA, Zenodo, self-push)
-        // works without ever opening these.
-        (credFields ? '<div class="config-channel-fields advanced-only">' + credFields + '</div>' : '') +
-        (cfgFields ? '<div class="config-channel-fields advanced-only">' + cfgFields + '</div>' : '') +
-      '</div>';
+      '</details>';
   }
 
   function _wireChannelRow(host, channel, idx) {
     var row = host.querySelector('[data-channel-idx="' + idx + '"]');
     if (!row) return;
+
+    // Persist expand/collapse per surface id so it survives the re-render
+    // that fires on every save/add/remove.
+    row.addEventListener('toggle', function() {
+      _channelOpenById[channel.id] = row.open;
+    });
 
     // Inputs that affect channels.json — enabled, primary, config
     // fields (data-channel-cfg), name, and id. Saved via /api/channels
@@ -5773,6 +5791,10 @@ setInterval(function() {
   }
 
   var _lastChannelsByIdx = {};
+  // Per-surface expand/collapse, keyed by surface id so it survives the
+  // re-renders that fire on every save/add/remove. Empty = all collapsed on
+  // load (scannable); a freshly-added surface opens so it can be configured.
+  var _channelOpenById = {};
 
   async function persistChannels(channels) {
     try {
@@ -5821,7 +5843,9 @@ setInterval(function() {
       credentials: {},
       config: config,
     };
-    // Append to current channels and persist
+    // Append to current channels and persist. Open the new surface so the
+    // user lands in its editor (the rest stay collapsed/scannable).
+    _channelOpenById[id] = true;
     var host = document.getElementById('configChannels');
     var existing = Object.values(_lastChannelsByIdx);
     existing.push(newCh);

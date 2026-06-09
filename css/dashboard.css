@@ -2514,11 +2514,46 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 .config-channel-row {
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: var(--radius-sm, 6px);
-  padding: 0.55rem 0.7rem;
   margin: 0.45rem 0;
   background: rgba(255, 255, 255, 0.45);
-  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.config-channel-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;            /* hide the default disclosure marker (Firefox) */
+}
+.config-channel-summary::-webkit-details-marker { display: none; }  /* Chrome/Safari */
+.config-channel-row[open] > .config-channel-summary {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.config-channel-sum-chevron {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: #999;
+  transition: transform 0.15s ease;
+}
+.config-channel-row[open] > .config-channel-summary .config-channel-sum-chevron {
+  transform: rotate(90deg);
+}
+.config-channel-sum-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.config-channel-body {
+  display: flex;
+  flex-direction: column;
   gap: 0.45rem;
+  padding: 0.55rem 0.7rem;
 }
 /* Primary channel — left-edge gold band + warmer fill so the row
    carrying the canonical URL (bar reference, Discord toast) is
