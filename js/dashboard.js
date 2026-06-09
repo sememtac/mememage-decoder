@@ -3631,11 +3631,10 @@ setInterval(function() {
       '  <button class="config-btn config-btn-danger advanced-only" id="configRevokeBtn"' + (hasRevCert ? '' : ' disabled title="No revocation cert on disk"') + '>Revoke key\u2026</button>' +
       '</div>' +
       '<div id="configIdentityDanger" class="config-danger-zone" style="display:none;"></div>' +
-      '<p class="config-note">Two irreversible key operations:</p>' +
-      '<ul class="config-note-list">' +
-        '<li><strong>Rotate</strong> — signs a succession record with the OLD key and uploads it to IA, so verifiers can follow the keychain to your new key.</li>' +
-        '<li><strong>Revoke</strong> — publishes the pre-signed revocation cert; every record signed by this key then shows a revocation warning.</li>' +
-      '</ul>';
+      '<p class="config-note">Two irreversible key operations: ' +
+        '<strong>Rotate</strong> <button type="button" class="glossary-link" data-glossary="rotate_key" title="What does Rotate do?">?</button>' +
+        ' · <strong>Revoke</strong> <button type="button" class="glossary-link" data-glossary="revoke_key" title="What does Revoke do?">?</button>' +
+      '</p>';
 
     document.getElementById('configSaveCreator').addEventListener('click', saveCreatorName);
     document.getElementById('configRotateBtn').addEventListener('click', openRotateConfirm);
@@ -6858,6 +6857,10 @@ setInterval(function() {
       body: 'The third pillar of creator control, beside your signing key (identity) and the content hash (integrity): an optional password that encrypts what the world sees. On a <strong>Light chain</strong> it seals only the GPS (your private time capsule); on a <strong>Dark chain</strong> it seals the whole soul. Mememage never stores or learns it — you bring the key, we hold the lock: we encrypt, keep the ciphertext, and forget. Lose it and the sealed fields are unrecoverable.' },
     { id: 'gps_source', label: 'GPS source',
       body: 'Chain-level setting for how location is captured at conception: <code>phone</code> (browser <code>watchPosition</code>, precise), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded — no time-lock puzzle). A <code>phone</code> chain automatically falls back to <code>machine</code> when no phone can reach this server (a loopback-only desktop with no Tailscale) — the conception handoff shows which source will actually be used, so the swap is never silent.' },
+    { id: 'rotate_key', label: 'Rotate key',
+      body: 'Generates a new Ed25519 keypair and signs a <strong>succession record</strong> with the OLD key, uploading it to the Internet Archive so verifiers can follow the keychain to your new key. Records signed by the old key still verify; everything minted afterward is signed by the new key. The old key is archived under <code>~/.mememage/keychain/</code>.' },
+    { id: 'revoke_key', label: 'Revoke key',
+      body: 'Publishes the <strong>pre-signed revocation cert</strong> to the Internet Archive; every record ever signed by this key then shows a revocation warning once the cert propagates. Irreversible — use only if your private key is compromised. The cert was pre-signed at keygen, so an attacker who steals the key can’t forge a revocation, but neither can you un-revoke.' },
 
     // --- Misc tech ---
     { id: 'sigil', label: 'Sigil',
