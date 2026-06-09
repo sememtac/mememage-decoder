@@ -2765,6 +2765,10 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   margin: 0.3rem 0;
   align-items: baseline;
 }
+/* A hint is the field's 3rd child; without this it auto-flows into the 110px
+   label column and wraps to a cramped 4-line sliver. Put it under the input
+   (column 2) so it reads full-width. (Reset to auto in the mobile 1-col grid.) */
+.config-field > .config-channel-field-hint { grid-column: 2; }
 .config-field-label {
   font-size: 0.66rem; letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3719,6 +3723,8 @@ label > input[type="checkbox"] {
     grid-template-columns: 1fr;
     gap: 0.2rem;
   }
+  /* Single-column grid: column 2 doesn't exist, so let the hint flow normally. */
+  .config-field > .config-channel-field-hint { grid-column: auto; }
   .config-field-with-browse {
     grid-template-columns: 1fr;
   }

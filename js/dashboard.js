@@ -3843,7 +3843,7 @@ setInterval(function() {
       '    </div>' +
       '  </div>' +
       '</div>' +
-      '<p class="config-note" style="margin-top:-0.3rem;">Word-phrase tokens are easier to read and dictate aloud than random characters. Changing the token kicks every other dashboard session.</p>' +
+      '<p class="config-note">Word-phrase tokens are easier to read and dictate aloud than random characters. Changing the token kicks every other dashboard session.</p>' +
       '<div class="config-row">' +
       '  <button class="config-btn" id="configServerSave" title="Write changes to ~/.mememage/server.json on this host">Save server settings</button>' +
       '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
