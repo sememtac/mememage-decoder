@@ -4144,19 +4144,13 @@ setInterval(function() {
         }).join('');
 
     host.innerHTML =
-      '<div class="config-field-label" style="margin-bottom:0.3rem;">Webhooks (' + list.length + ')</div>' +
+      '<div class="config-field-label" style="margin-bottom:0.3rem;">Webhooks (' + list.length + ') <button type="button" class="glossary-link" data-glossary="webhooks" title="What do webhooks do?">?</button></div>' +
       '<div class="config-webhooks-list">' + rowsHtml + '</div>' +
       '<div class="config-row" style="margin-top:0.5rem;">' +
         '<button class="config-btn" id="configWebhookAdd">+ Add webhook</button>' +
         '<button class="config-btn config-btn-primary" id="configWebhookSave" ' + (_webhooksDirty ? '' : 'disabled') + '>Save</button>' +
         '<button class="config-btn" id="configWebhookCancel" ' + (_webhooksDirty ? '' : 'disabled') + '>Cancel</button>' +
-      '</div>' +
-      '<p class="config-note">Webhooks fire on two events:</p>' +
-      '<ul class="config-note-list">' +
-        '<li><code>conceived</code> — image minted.</li>' +
-        '<li><code>ready</code> — GPS capture link generated.</li>' +
-      '</ul>' +
-      '<p class="config-note">Custom auth headers (Discord bot token, etc.) aren\u2019t editable here — set them in <code>~/.mememage/server.json</code> directly; they\u2019re preserved across saves.</p>';
+      '</div>';
 
     // Wire row controls
     host.querySelectorAll('[data-webhook-url]').forEach(function(inp) {
@@ -6860,6 +6854,8 @@ setInterval(function() {
       body: 'Generates a new Ed25519 keypair and signs a <strong>succession record</strong> with the OLD key, uploading it to the Internet Archive so verifiers can follow the keychain to your new key. Records signed by the old key still verify; everything minted afterward is signed by the new key. The old key is archived under <code>~/.mememage/keychain/</code>.' },
     { id: 'revoke_key', label: 'Revoke key',
       body: 'Publishes the <strong>pre-signed revocation cert</strong> to the Internet Archive; every record ever signed by this key then shows a revocation warning once the cert propagates. Irreversible — use only if your private key is compromised. The cert was pre-signed at keygen, so an attacker who steals the key can’t forge a revocation, but neither can you un-revoke.' },
+    { id: 'webhooks', label: 'Webhooks',
+      body: 'Outbound notifications fired on each mint — to Discord, Slack, Telegram, or a generic endpoint. Two events: <code>conceived</code> (image minted) and <code>ready</code> (the GPS-capture link is generated). Custom auth headers (e.g. a Discord bot token) aren’t editable in the dashboard — set them in <code>~/.mememage/server.json</code> directly; they’re preserved across saves.' },
 
     // --- Misc tech ---
     { id: 'sigil', label: 'Sigil',
