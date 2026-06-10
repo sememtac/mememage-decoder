@@ -2486,72 +2486,71 @@ setInterval(function() {
         var picker = document.createElement('input');
         picker.type = 'file';
         picker.style.display = 'none';
-        picker.addEventListener('change', function() {
+        picker.addEventListener('change', async function() {
           var file = picker.files && picker.files[0];
           if (!file) { document.body.removeChild(picker); return; }
-          // Hard cap: server enforces 50 MiB too, but reject early for
-          // a clearer error and to avoid base64-ing a huge file.
-          if (file.size > 50 * 1024 * 1024) {
-            showError('Upload failed: file exceeds 50 MiB cap (got ' + Math.round(file.size / 1024 / 1024) + ' MiB).');
-            document.body.removeChild(picker);
-            return;
-          }
           var prevLabel = btn.textContent;
           btn.disabled = true;
           btn.textContent = 'Uploading\u2026';
-          // Swap the × button on this source row to a spinner so the user
-          // can't accidentally click it mid-upload and so the in-flight
-          // state is visible. CSS class .uploading hides × and draws a
-          // ring-spinner via ::before. Restored in finally.
           var deleteBtn = btn.parentElement
             ? btn.parentElement.querySelector('.payload-edit-delete[data-action="remove-source"]')
             : null;
           if (deleteBtn) deleteBtn.classList.add('uploading');
-          var reader = new FileReader();
-          reader.onload = async function() {
-            try {
-              // FileReader gives us a "data:<mime>;base64,<bytes>"
-              // URL — strip the prefix to get the base64 payload the
-              // server expects.
-              var dataUrl = reader.result || '';
-              var b64 = dataUrl.split(',')[1] || '';
-              var resp = await fetchJson('/api/payload/upload', {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({filename: file.name, content: b64}),
+          try {
+            // Stream the RAW file via XHR (fetch can't report upload progress).
+            // The browser sends it directly — no base64, no whole-file-in-memory
+            // — so large sources upload fine, and xhr.upload.progress drives a
+            // live % in the button.
+            var hdrs = authHeaders();
+            hdrs['X-Payload-Filename'] = encodeURIComponent(file.name);
+            hdrs['Content-Type'] = 'application/octet-stream';
+            var resp = await new Promise(function(resolve, reject) {
+              var xhr = new XMLHttpRequest();
+              xhr.open('POST', '/api/payload/upload');
+              Object.keys(hdrs).forEach(function(k) { xhr.setRequestHeader(k, hdrs[k]); });
+              xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                  btn.textContent = 'Uploading ' + Math.round((e.loaded / e.total) * 100) + '%';
+                }
               });
-              var ent = state.working.entries[entryName3];
-              if (!ent) return;
-              ent.sources = ent.sources || [];
-              // Capture the previous path BEFORE overwriting so we can
-              // sweep it if it's an orphaned upload (re-upload case).
-              var prevPath = ent.sources[srcIdx3];
-              ent.sources[srcIdx3] = resp.path;
-              state.touched = true;
-              renderAll();
-              if (prevPath && prevPath !== resp.path &&
-                  !_isPathReferencedInPayload(prevPath)) {
-                _deletePayloadUpload(prevPath);
-              }
-            } catch (e) {
-              showError('Upload failed: ' + e.message);
-            } finally {
-              btn.disabled = false;
-              btn.textContent = prevLabel;
-              // renderAll() on success path rebuilt deleteBtn — class on
-              // the detached node is harmless. On the error path the row
-              // is unchanged, so removing the class restores ×.
-              if (deleteBtn) deleteBtn.classList.remove('uploading');
-              if (picker.parentNode) picker.parentNode.removeChild(picker);
+              xhr.addEventListener('load', function() {
+                var data = {};
+                try { data = JSON.parse(xhr.responseText); } catch (err) {}
+                if (xhr.status >= 200 && xhr.status < 300) { resolve(data); return; }
+                if (xhr.status === 413) {
+                  // 413 comes from the reverse proxy, not the mint server — its
+                  // body cap is below this file. Point at the actual knob.
+                  reject(new Error('file too large for your reverse proxy (413). ' +
+                    'If self-hosting behind nginx, raise client_max_body_size to ≥ 600m ' +
+                    'on the vhost and reload (Caddy: request_body max_size; Cloudflare free ' +
+                    'tier hard-caps uploads at 100 MB).'));
+                  return;
+                }
+                reject(new Error(data.error || ('HTTP ' + xhr.status)));
+              });
+              xhr.addEventListener('error', function() { reject(new Error('network error')); });
+              xhr.addEventListener('abort', function() { reject(new Error('upload aborted')); });
+              xhr.send(file);
+            });
+            var ent = state.working.entries[entryName3];
+            if (!ent) return;
+            ent.sources = ent.sources || [];
+            var prevPath = ent.sources[srcIdx3];
+            ent.sources[srcIdx3] = resp.path;
+            state.touched = true;
+            renderAll();
+            if (prevPath && prevPath !== resp.path &&
+                !_isPathReferencedInPayload(prevPath)) {
+              _deletePayloadUpload(prevPath);
             }
-          };
-          reader.onerror = function() {
-            showError('Upload failed: could not read file.');
+          } catch (e) {
+            showError('Upload failed: ' + e.message);
+          } finally {
             btn.disabled = false;
             btn.textContent = prevLabel;
+            if (deleteBtn) deleteBtn.classList.remove('uploading');
             if (picker.parentNode) picker.parentNode.removeChild(picker);
-          };
-          reader.readAsDataURL(file);
+          }
         });
         document.body.appendChild(picker);
         picker.click();
@@ -3631,7 +3630,7 @@ setInterval(function() {
       '  <button class="config-btn config-btn-danger advanced-only" id="configRevokeBtn"' + (hasRevCert ? '' : ' disabled title="No revocation cert on disk"') + '>Revoke key\u2026</button>' +
       '</div>' +
       '<div id="configIdentityDanger" class="config-danger-zone" style="display:none;"></div>' +
-      '<p class="config-note">Two irreversible key operations: ' +
+      '<p class="config-note advanced-only">Two irreversible key operations: ' +
         '<strong>Rotate</strong> <button type="button" class="glossary-link" data-glossary="rotate_key" title="What does Rotate do?">?</button>' +
         ' · <strong>Revoke</strong> <button type="button" class="glossary-link" data-glossary="revoke_key" title="What does Revoke do?">?</button>' +
       '</p>';
@@ -3811,6 +3810,11 @@ setInterval(function() {
       '  <input class="config-input" id="configServerPort" type="number" min="1" max="65535" value="' + escapeHtml(String(port)) + '" placeholder="8443">' +
       '  <span class="config-channel-field-hint">listen port (1–65535). Changing it needs a restart.</span>' +
       '</div>' +
+      '<p class="config-note advanced-only">TLS cert/key paths use the native file picker — no copy-pasting long paths:</p>' +
+      '<ul class="config-note-list advanced-only">' +
+        '<li>Empty = auto-detect from <code>~/.mememage/certs/</code> at startup.</li>' +
+        '<li>Cert / key / API-token changes need a server restart to take effect for new sessions.</li>' +
+      '</ul>' +
       '<div class="config-field config-field-with-browse advanced-only">' +
       '  <span class="config-field-label">TLS cert</span>' +
       '  <input class="config-input" id="configServerCert" type="text" value="' + escapeHtml(cert) + '" placeholder="/path/to/cert.pem (or auto-detect)">' +
@@ -3846,11 +3850,6 @@ setInterval(function() {
       '  <button class="config-btn" id="configServerSave" title="Write changes to ~/.mememage/server.json on this host">Save server settings</button>' +
       '  <span class="config-note" id="configServerStatus" style="margin:0;"></span>' +
       '</div>' +
-      '<p class="config-note">TLS cert/key paths use the native file picker — no copy-pasting long paths:</p>' +
-      '<ul class="config-note-list">' +
-        '<li>Empty = auto-detect from <code>~/.mememage/certs/</code> at startup.</li>' +
-        '<li>Cert / key / API-token changes need a server restart to take effect for new sessions.</li>' +
-      '</ul>' +
       '<div id="configWebhooks" class="config-webhooks"></div>';
 
     document.getElementById('configServerSave').addEventListener('click', saveServerConfig);
@@ -4648,13 +4647,7 @@ setInterval(function() {
       '  <button class="config-btn advanced-only" id="configProfileExportBtn" title="Download chains + channels (+ optionally webhooks) as a JSON file. Re-importable on this host or pushable to a peer\u2019s /api/sync/accept.">Export config\u2026</button>' +
       '  <button class="config-btn advanced-only" id="configProfileImportFileBtn" title="Import a previously-exported config file. Additive — existing entries on this host are kept untouched.">Import config\u2026</button>' +
       '</div>' +
-      '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>' +
-      '<p class="config-note">One profile is active at a time \u2014 it\u2019s the key that signs your next conception.</p>' +
-      '<ul class="config-note-list">' +
-        '<li>Different machines can carry their own profile, so a remote host never sees your primary identity.</li>' +
-        '<li>Link two profiles into one identity with <strong>Alias</strong> (run from each side), or <strong>Pair</strong> for a one-click cross-host handshake.</li>' +
-        '<li>Either way each side keeps its private key \u2014 only public keys move.</li>' +
-      '</ul>';
+      '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>';
 
     // Wire row actions
     els.profiles.querySelectorAll('[data-profile-use]').forEach(function(b) {
@@ -5464,13 +5457,7 @@ setInterval(function() {
       '  <input class="config-input config-channel-add-id" id="configChannelNewId" type="text" placeholder="surface id (e.g. ia-backup)">' +
       '  <button class="config-btn" id="configChannelAddBtn">+ Add surface</button>' +
       '  <button type="button" class="config-btn config-btn-subtle advanced-only" id="configChannelViewRaw">View raw JSON\u2026</button>' +
-      '</div>' +
-      '<p class="config-note">How surfaces distribute a soul:</p>' +
-      '<ul class="config-note-list">' +
-        '<li>The <strong>primary</strong> surface\u2019s URL becomes the bar\u2019s record link and the notification target.</li>' +
-        '<li>Every enabled + configured surface gets a copy of the soul on every mint; at least one must succeed.</li>' +
-        '<li>Credentials always live in <code>.env</code> \u2014 the fields below name the env var to read.</li>' +
-      '</ul>';
+      '</div>';
 
     // Wire row controls
     channels.forEach(function(c, i) {
@@ -6020,8 +6007,7 @@ setInterval(function() {
       '    <button class="config-btn" id="configChainNewCancel">Cancel</button>' +
       '  </div>' +
       '</div>' +
-      '<div class="config-chain-banner" id="configChainBanner" hidden></div>' +
-      '<p class="config-note">Switching chains updates the Payload tab and routes new conceptions / seals to the chosen chain immediately \u2014 no restart needed.</p>';
+      '<div class="config-chain-banner" id="configChainBanner" hidden></div>';
 
     els.chains.innerHTML = migrateBanner + rows + newForm;
 
@@ -6082,7 +6068,16 @@ setInterval(function() {
           'it. This is baked into each record and can’t be undone.\n\n' +
           '(Already-minted records are unaffected. The ~10-year time-lock is ' +
           'kept either way.)'
-        )) { loadChains(); return; }  // revert the radio
+        )) {
+          // Cancelled — revert SYNCHRONOUSLY to time-locked. Re-checking the
+          // radio here (vs an async loadChains() re-fetch) guarantees the UI
+          // never lingers on "public" and nothing is committed.
+          var group = document.getElementsByName(input.name);
+          for (var i = 0; i < group.length; i++) {
+            if (group[i].value === 'time_locked') { group[i].checked = true; break; }
+          }
+          return;
+        }
         setChainGpsVisibility(cid, input.value);
       });
     });
@@ -6803,7 +6798,7 @@ setInterval(function() {
     { id: 'constellation_size', label: 'Constellation size',
       body: 'How many stars make one constellation (heart star + siblings) — a per-chain knob, 1\u201324, default 12. The same number is the data-chunk count (one chunk per star) and the span of Bayer letters that name the stars: <strong>\u03b1</strong> for the heart star, then \u03b2, \u03b3, \u03b4 \u2026 in birth order. Staged like Age length — it takes effect on the next Age for sealed chains.' },
     { id: 'profile', label: 'Profile',
-      body: 'One Ed25519 signing identity. A human can carry many — typically one per machine — so a compromised VPS doesn\u2019t expose the laptop\u2019s primary key. Profiles link into one human identity via signed alias records, never via shared key bytes.' },
+      body: 'One Ed25519 signing identity. <strong>One profile is active at a time</strong> — it\u2019s the key that signs your next conception. A human can carry many, typically one per machine, so a remote host (e.g. a VPS) never sees your laptop\u2019s primary key. Profiles link into one human identity via signed records, never shared key bytes: use <strong>Alias</strong> (run from each side) or <strong>Pair</strong> (a one-click cross-host handshake) — either way each side keeps its private key; only public keys move.' },
     { id: 'active_profile', label: 'Active profile',
       body: 'The profile whose key signs the next conception. One profile is active at a time per host. Switching is instant; the bar / notification / cert all reflect the new signer from the next conception onward.' },
     { id: 'alias', label: 'Alias',
@@ -6815,7 +6810,9 @@ setInterval(function() {
 
     // --- Channels ---
     { id: 'channel', label: 'Surface',
-      body: 'A pluggable destination for souls — a place the soul lands. Every enabled + configured surface gets a copy on each conception; at least one must succeed. Built-in types: <code>http_push</code> (a mememage host — your own server is seeded enabled as the default primary surface), <code>internet_archive</code> and <code>zenodo</code> (both <strong>opt-in</strong> — off until you add their credentials). Authors can register more (S3, IPFS, etc.).' },
+      body: 'A pluggable destination for souls — a place the soul lands. Every enabled + configured surface gets a copy on each conception; at least one must succeed. The <strong>primary</strong> surface’s URL becomes the bar’s record link and the notification target. Credentials always live in <code>.env</code> — each surface’s fields name the env var to read. Built-in types: <code>http_push</code> (a mememage host — your own server is seeded enabled as the default primary surface), <code>internet_archive</code> and <code>zenodo</code> (both <strong>opt-in</strong> — off until you add their credentials). Authors can register more (S3, IPFS, etc.).' },
+    { id: 'surface_cleanup', label: 'Surface cleanup',
+      body: 'Hide or empty items on any configured surface — clearing test mints before genesis, or general housekeeping. Each surface decides what it can do. <strong>Hide</strong> makes items invisible to public search (on the Internet Archive: noindex). <strong>Purge</strong> deletes content (IA: every file; the bucket survives as a tombstone). Identifiers may stay reserved (IA never releases a namespace) — but new mints compute fresh ones, so this is tidiness, not collision avoidance.' },
     { id: 'primary', label: 'Primary surface',
       body: 'The one surface whose URL becomes <code>record.url</code> — the bar reference and the notification link. Exactly one surface can be primary at a time; promote / demote via the radio button.' },
     { id: 'per_profile_channels', label: 'Per-profile surfaces',

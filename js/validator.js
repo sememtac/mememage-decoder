@@ -2418,7 +2418,17 @@ function buildOrbitInspector(records, collected) {
             var sniffed = sniffBinaryType(bytes);
             var mime = (sniffed && sniffed.mime) || meta.mime;
             var ext = (sniffed && sniffed.ext) || 'bin';
-            var filename = role + '.' + ext;
+            // Prefer the original filename if the seal recorded it (single-file
+            // payload layers carry it on every chunk) — so "upload a .wav, get a
+            // .wav back". Falls back to role + sniffed ext / .bin for older
+            // seals that never stored a name.
+            var origName = '';
+            for (var _ci = 0; _ci < globalBucket.chunks.length; _ci++) {
+              if (globalBucket.chunks[_ci] && globalBucket.chunks[_ci].filename) {
+                origName = globalBucket.chunks[_ci].filename; break;
+              }
+            }
+            var filename = origName || (role + '.' + ext);
             var b = new Blob([bytes], {type: mime});
             var a = document.createElement('a');
             a.href = URL.createObjectURL(b);
