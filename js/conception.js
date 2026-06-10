@@ -177,9 +177,24 @@
   function startGpsMachine() {
     gpsBoxEl.setAttribute('data-mode', 'machine');
     gpsLabelEl.textContent = 'Machine GPS (approximate)';
-    gpsValueEl.textContent = 'Server will fetch IP geolocation on conceive';
+    gpsValueEl.textContent = 'Fetching server IP geolocation…';
     gpsHintEl.textContent = 'gps_source: machine — coarse location, no phone needed';
-    confirmBtn.disabled = false;
+    confirmBtn.disabled = false;   // conceivable regardless of the preview
+    // Live preview of the coordinates the server would use. The mint re-checks
+    // fresh at conceive (same IP → matches); this is informational, never a gate.
+    fetch('/api/mint/' + token + '/machine-gps')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && typeof d.lat === 'number' && typeof d.lon === 'number') {
+          gpsValueEl.textContent = d.lat.toFixed(4) + ', ' + d.lon.toFixed(4);
+          gpsHintEl.textContent = 'gps_source: machine — server IP geolocation (re-checked at conceive)';
+        } else {
+          gpsValueEl.textContent = 'Server will fetch IP geolocation on conceive';
+        }
+      })
+      .catch(function() {
+        gpsValueEl.textContent = 'Server will fetch IP geolocation on conceive';
+      });
   }
 
   function startGpsNone() {

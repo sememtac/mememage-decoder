@@ -1413,11 +1413,13 @@ setInterval(function() {
   els.fileInput.addEventListener('change', function(e) {
     if (e.target.files.length) handleFile(e.target.files[0]);
   });
-  // Cancel / Conceive another / Retry are explicit "done with this ticket"
-  // actions — drop the server-side session AND its staged upload, then clear
-  // the view. (Bare reset() stays non-destructive so a tab-switch / navigate-
-  // away keeps the session resumable via the pending list.) Without this the
-  // staged image lingered in ~/.mememage/uploads until the 7/30-day reaper.
+  // "Conceive another" / "Try again" are explicit "done with this ticket"
+  // actions — they drop the server-side session AND its staged upload, then
+  // clear the view (the soul, if any, is already distributed). "← Back"
+  // (mintCancel) is NON-destructive on purpose: it keeps the pending session
+  // resumable — matching its "keeps the session" label — and just returns to
+  // the list. Only an explicit Delete (or the 7-day reaper) removes a pending
+  // ticket; backing out must never silently discard a staged upload.
   async function clearSession() {
     var tok = state.token;
     if (tok) {
@@ -1428,7 +1430,7 @@ setInterval(function() {
     }
     reset();
   }
-  els.cancel.addEventListener('click', clearSession);
+  els.cancel.addEventListener('click', function() { reset(); });  // ← Back: keep the session
   els.again.addEventListener('click', clearSession);
   els.retry.addEventListener('click', clearSession);
   if (els.deleteSession) {
@@ -6312,21 +6314,28 @@ setInterval(function() {
   }
 
   async function removeChain(chainId) {
-    if (!window.confirm(
-      'Archive chain "' + chainId + '"?\n\n' +
-      'Its directory will be moved to ~/.mememage/archive/chains/. ' +
-      'You can recover it manually later if needed.'
-    )) return;
+    // Permanent delete — the honest confirm IS the safety net. Typed to make
+    // it a deliberate act (the souls it published stay; uploads, the sealed
+    // payload, and the chain's lineage are gone for good).
+    var typed = window.prompt(
+      'Permanently DELETE chain "' + chainId + '"?\n\n' +
+      'This deletes its uploaded source files, the built/sealed payload, and ' +
+      'its lineage, and frees that disk. It cannot be undone.\n\n' +
+      '(Published souls in received/ are not touched — purge those separately.)\n\n' +
+      'Type DELETE to confirm:');
+    if (typed === null) return;            // cancelled
+    if (typed.trim() !== 'DELETE') { showError('Delete cancelled — type DELETE to confirm.'); return; }
     showError('');
     try {
       var resp = await fetchJson('/api/chain/remove', {
         method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({chain_id: chainId, archive: true}),
+        body: JSON.stringify({chain_id: chainId}),
       });
       await loadChains();
-      showChainBanner('Archived to: ' + (resp.archived_to || 'unknown location'));
+      var mb = resp && resp.freed_bytes ? (resp.freed_bytes / 1048576).toFixed(1) + ' MiB' : '';
+      showChainBanner('Deleted "' + chainId + '"' + (mb ? ' — freed ' + mb : ''));
     } catch (e) {
-      showError('Remove failed: ' + e.message);
+      showError('Delete failed: ' + e.message);
     }
   }
 

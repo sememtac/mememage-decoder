@@ -3079,8 +3079,11 @@ function renderAudit(rec, identifier, out) {
   }
   if (rec.constellation_name) {
     chainRows += auditRow('Constellation', rec.constellation_name, 'audit-info');
-    // V1 records carry constellation_index (int 0-11); map to Bayer letter.
-    var _BAYER = '\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc';
+    // V1 records carry constellation_index (0-23); map to the Greek Bayer
+    // letter (\u03b1-\u03c9), matching the cert renderer's full 24-letter table. (Was
+    // truncated at \u03bc/12 \u2014 stars 13-24 on a large chain rendered "?".)
+    var _BAYER = '\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
+               + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9';
     var _ci = rec.constellation_index;
     var _starLabel = (typeof _ci === 'number' && _ci >= 0 && _ci < _BAYER.length)
       ? _BAYER[_ci] + ' (' + _ci + ')'
