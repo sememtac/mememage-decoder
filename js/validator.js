@@ -1098,6 +1098,10 @@ async function _renderObservatoryFromCache() {
           collected.indexed[role].total = entry.total;
           collected.indexed[role].chunks[entry.index] = {
             data: entry.data, hash: entry.hash || null, verified: null,
+            // Carry the original filename through (single-file payload layers
+            // stamp it on every chunk) so reassembly restores it instead of
+            // <role>.bin. Dropping it here was why the download stayed .bin.
+            filename: entry.filename || null,
           };
         } else {
           collected.single[role] = {
@@ -2422,11 +2426,12 @@ function buildOrbitInspector(records, collected) {
             // payload layers carry it on every chunk) — so "upload a .wav, get a
             // .wav back". Falls back to role + sniffed ext / .bin for older
             // seals that never stored a name.
+            // chunks is index-keyed (an object, not an array) — iterate by
+            // bucket.total, not .length (which is undefined here).
             var origName = '';
-            for (var _ci = 0; _ci < globalBucket.chunks.length; _ci++) {
-              if (globalBucket.chunks[_ci] && globalBucket.chunks[_ci].filename) {
-                origName = globalBucket.chunks[_ci].filename; break;
-              }
+            for (var _ci = 0; _ci < bucket.total; _ci++) {
+              var _c = globalBucket.chunks[_ci];
+              if (_c && _c.filename) { origName = _c.filename; break; }
             }
             var filename = origName || (role + '.' + ext);
             var b = new Blob([bytes], {type: mime});

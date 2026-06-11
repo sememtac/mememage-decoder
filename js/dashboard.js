@@ -1806,6 +1806,7 @@ setInterval(function() {
     layersCount:  document.getElementById('layersCount'),
     pinnedCount:  document.getElementById('pinnedCount'),
     ageStatus:    document.getElementById('payloadAgeStatus'),
+    sealStale:    document.getElementById('payloadSealStale'),
     refreshBtn:   document.getElementById('payloadRefreshBtn'),
     buildBtn:     document.getElementById('payloadBuildBtn'),
     applyBtn:     document.getElementById('payloadApplyBtn'),
@@ -2262,9 +2263,16 @@ setInterval(function() {
       var e = state.working.entries[name];
       var sources = e.sources || [];
       var sourceInputs = sources.map(function(src, idx) {
+        // Reflect any in-flight upload from state, so a re-render (e.g. from
+        // "add layer") rebuilds this button without wiping its live progress.
+        var upPct = (state._uploads || {})[JSON.stringify([name, idx])];
+        var uploading = (typeof upPct === 'number');
         return '<div class="entry-source-row">' +
           '<input class="payload-edit-input monospace" data-field="source-' + idx + '" type="text" value="' + escapeHtml(src) + '" placeholder="server-relative path \u2014 or click Upload">' +
-          '<button class="source-browse" data-action="upload-source" data-source-idx="' + idx + '" title="Upload a file from this computer to the server (saves under the active chain\u2019s uploads/ folder)">Upload\u2026</button>' +
+          '<button class="source-browse" data-action="upload-source" data-source-idx="' + idx + '"' +
+            (uploading ? ' disabled' : '') +
+            ' title="Upload a file from this computer to the server (saves under the active chain\u2019s uploads/ folder)">' +
+            (uploading ? ('Uploading ' + upPct + '%') : 'Upload\u2026') + '</button>' +
           '<button class="payload-edit-delete" data-action="remove-source" data-source-idx="' + idx + '" title="Remove this source">\u00d7</button>' +
           '</div>';
       }).join('');
@@ -2294,6 +2302,20 @@ setInterval(function() {
       '</div>';
     }).join('');
     els.entries.innerHTML = header + rows;
+  }
+
+  // Find the live upload button for an entry+source even after a re-render
+  // replaced the node the in-flight XHR originally captured.
+  function _findUploadBtn(entryName, idx) {
+    var btns = els.entries.querySelectorAll('[data-action="upload-source"]');
+    for (var i = 0; i < btns.length; i++) {
+      var r = btns[i].closest('[data-entry]');
+      if (r && r.getAttribute('data-entry') === entryName &&
+          parseInt(btns[i].getAttribute('data-source-idx'), 10) === idx) {
+        return btns[i];
+      }
+    }
+    return null;
   }
 
   // ===== Rendering: layers =====
@@ -2484,6 +2506,7 @@ setInterval(function() {
       } else if (action === 'upload-source') {
         var entryName3 = row.getAttribute('data-entry');
         var srcIdx3 = parseInt(btn.getAttribute('data-source-idx'), 10);
+        var upKey3 = JSON.stringify([entryName3, srcIdx3]);
         showError('');
         var picker = document.createElement('input');
         picker.type = 'file';
@@ -2491,9 +2514,10 @@ setInterval(function() {
         picker.addEventListener('change', async function() {
           var file = picker.files && picker.files[0];
           if (!file) { document.body.removeChild(picker); return; }
-          var prevLabel = btn.textContent;
           btn.disabled = true;
           btn.textContent = 'Uploading\u2026';
+          state._uploads = state._uploads || {};
+          state._uploads[upKey3] = 0;
           var deleteBtn = btn.parentElement
             ? btn.parentElement.querySelector('.payload-edit-delete[data-action="remove-source"]')
             : null;
@@ -2512,7 +2536,12 @@ setInterval(function() {
               Object.keys(hdrs).forEach(function(k) { xhr.setRequestHeader(k, hdrs[k]); });
               xhr.upload.addEventListener('progress', function(e) {
                 if (e.lengthComputable) {
-                  btn.textContent = 'Uploading ' + Math.round((e.loaded / e.total) * 100) + '%';
+                  var pct = Math.round((e.loaded / e.total) * 100);
+                  state._uploads[upKey3] = pct;
+                  // Re-find the button: a re-render (e.g. "add layer") may have
+                  // swapped out the node captured when the upload started.
+                  (_findUploadBtn(entryName3, srcIdx3) || btn).textContent =
+                    'Uploading ' + pct + '%';
                 }
               });
               xhr.addEventListener('load', function() {
@@ -2548,10 +2577,10 @@ setInterval(function() {
           } catch (e) {
             showError('Upload failed: ' + e.message);
           } finally {
-            btn.disabled = false;
-            btn.textContent = prevLabel;
+            delete state._uploads[upKey3];
             if (deleteBtn) deleteBtn.classList.remove('uploading');
             if (picker.parentNode) picker.parentNode.removeChild(picker);
+            renderEntries();   // restore the button to its clean (non-uploading) state
           }
         });
         document.body.appendChild(picker);
@@ -2852,6 +2881,21 @@ setInterval(function() {
 
   function renderBuildBadge() {
     var key = _aggregateBuildState(state.buildStatus);
+    // Stale-seal guard: the payload changed since the chain was sealed, so the
+    // change won't reach any conception until a re-seal (conceptions read the
+    // frozen Age). This is the trap that silently produces old payloads.
+    if (els.sealStale) {
+      var bs = state.buildStatus;
+      if (bs && bs.seal_stale) {
+        var layers = (bs.seal_drift_layers || []).join(', ');
+        els.sealStale.textContent = '⚠ Seal is stale—the payload changed since the last seal'
+          + (layers ? ' (' + layers + ')' : '')
+          + '. Conceptions use the sealed Age until you re-seal.';
+        els.sealStale.style.display = '';
+      } else {
+        els.sealStale.style.display = 'none';
+      }
+    }
     // The build marker now rides in the chain badge tail — re-render it from
     // current state (no network). Button + Seal gating below is unchanged.
     _renderPayloadBadge(false);
