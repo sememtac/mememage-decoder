@@ -1258,7 +1258,9 @@ function renderCert(meta, options) {
         var bayerLink = document.createElement('a');
         bayerLink.href = '#';
         bayerLink.className = 'bayer-letter';
-        bayerLink.textContent = BAYER[myChunkIdx] + ' ';
+        // Only the letter is the link — the separating space stays outside so
+        // the underline doesn't run under it.
+        bayerLink.textContent = BAYER[myChunkIdx];
         bayerLink.title = 'Previous: ' + meta.parent_id;
         bayerLink.addEventListener('click', function(e) {
           e.preventDefault();
@@ -1266,12 +1268,14 @@ function renderCert(meta, options) {
           window.scrollTo({top: 0, behavior: 'smooth'});
         });
         conDiv.appendChild(bayerLink);
+        conDiv.appendChild(document.createTextNode(' '));
       } else {
         // Genesis — no parent, the very beginning of the chain. Not a link.
         var bayerSpan = document.createElement('span');
         bayerSpan.className = 'bayer-letter';
-        bayerSpan.textContent = BAYER[myChunkIdx] + ' ';
+        bayerSpan.textContent = BAYER[myChunkIdx];
         conDiv.appendChild(bayerSpan);
+        conDiv.appendChild(document.createTextNode(' '));
       }
     }
     conDiv.appendChild(conNameEl);
