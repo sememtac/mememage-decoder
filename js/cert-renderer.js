@@ -1248,8 +1248,13 @@ function renderCert(meta, options) {
     var BAYER = ('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
                + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
     if (myChunkIdx >= 0 && myChunkIdx < BAYER.length) {
-      if (meta.parent_id && !isHeartStar) {
-        // Greek letter links to parent (previous star in chain)
+      if (meta.parent_id) {
+        // Greek letter links to parent (the previous star in the chain). This
+        // holds at the heart star (α) too: a heart star begins its
+        // CONSTELLATION but not the CHAIN — its parent_id points into the
+        // PREVIOUS constellation, so linking it is what lets you walk back
+        // across constellation boundaries all the way to genesis. Only genesis
+        // (parent_id null) has no previous.
         var bayerLink = document.createElement('a');
         bayerLink.href = '#';
         bayerLink.className = 'bayer-letter';
@@ -1262,7 +1267,7 @@ function renderCert(meta, options) {
         });
         conDiv.appendChild(bayerLink);
       } else {
-        // Heart star — α is not a link (no previous, this is the beginning)
+        // Genesis — no parent, the very beginning of the chain. Not a link.
         var bayerSpan = document.createElement('span');
         bayerSpan.className = 'bayer-letter';
         bayerSpan.textContent = BAYER[myChunkIdx] + ' ';
