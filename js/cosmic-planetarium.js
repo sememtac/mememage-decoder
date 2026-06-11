@@ -40,8 +40,8 @@ var CosmicPlanetarium = (function() {
     { color: [130, 160, 255], min: 74 }  // O
   ];
   var RARITY_TIERS = [
-    [80, '#d44040'], [70, '#8a6210'], [60, '#5a2a8a'],
-    [46, '#2a5090'], [35, '#2a7030'], [0, '#606060']
+    [88, '#d44040'], [72, '#8a6210'], [55, '#5a2a8a'],
+    [40, '#2a5090'], [25, '#2a7030'], [0, '#606060']
   ];
   var ZOOM_MIN = 0.5, ZOOM_MAX = 8.0;
   var TRANS_MS = 1500;     // cross-mode (cosmic ↔ earth)

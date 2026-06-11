@@ -1457,8 +1457,8 @@ async function _renderObservatoryFromCache() {
       ? RarityScore.fromRecord(r) : (r.rarity_score || 0);
     if(r.rarity || r.rarity_score!==undefined){
       html+='<div class="ev-sec">Rarity</div><div class="ev-g">';
-      var rs=_rs;var rTier=rs>=80?'Legendary':rs>=70?'Epic':rs>=60?'Very Rare':rs>=46?'Rare':rs>=35?'Uncommon':'Common';
-      var rCol=rs>=80?'#f87171':rs>=70?'#facc15':rs>=60?'#c084fc':rs>=46?'#60a5fa':rs>=35?'#4ade80':'#a0a0a0';
+      var rs=_rs;var rTier=rs>=88?'Legendary':rs>=72?'Epic':rs>=55?'Very Rare':rs>=40?'Rare':rs>=25?'Uncommon':'Common';
+      var rCol=rs>=88?'#f87171':rs>=72?'#facc15':rs>=55?'#c084fc':rs>=40?'#60a5fa':rs>=25?'#4ade80':'#a0a0a0';
       html+='<div class="ev-m"><div class="ev-ml">Score</div><div class="ev-mv" style="color:'+rCol+';font-weight:700;">'+rs+' \u2014 '+rTier+'</div></div>';
       if(r.machine_fingerprint)html+='<div class="ev-m"><div class="ev-ml">Fingerprint</div><div class="ev-mv">'+_h(r.machine_fingerprint)+'</div></div>';
       if(r.rarity&&typeof r.rarity==='object'){for(var rd of['celestial','machine','entropy']){var rT=r.rarity[rd];if(rT&&rT.length)html+='<div class="ev-m"><div class="ev-ml">'+rd.charAt(0).toUpperCase()+rd.slice(1)+'</div><div class="ev-mv" style="font-size:0.7rem;">'+_h(rT.map(function(t){return t.trait+' (+'+t.points+')';}).join(', '))+'</div></div>';}}
