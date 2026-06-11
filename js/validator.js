@@ -3164,6 +3164,23 @@ function renderAudit(rec, identifier, out) {
   genRows += auditRow('Size', (rec.width || '?') + ' \u00d7 ' + (rec.height || '?'));
   genRows += auditRow('Model', _gModel || '?');
   genRows += auditRow('Steps / CFG / Guidance', (_gSteps != null ? _gSteps : '?') + ' / ' + (_gCfg != null ? _gCfg : '?') + ' / ' + (_gGuide != null ? _gGuide : '?'));
+  // LoRAs — modern format is the plural `loras` list ([name, weight] pairs);
+  // older records used singular `lora` + `lora_strength`.
+  var _loraSummary = '';
+  if (Array.isArray(_ro.loras) && _ro.loras.length) {
+    _loraSummary = _ro.loras.map(function(L) {
+      if (Array.isArray(L)) return (L[1] != null) ? (L[0] + ' ×' + L[1]) : ('' + L[0]);
+      if (L && typeof L === 'object') {
+        var n = L.name || L.lora || L.file;
+        var w = (L.strength !== undefined) ? L.strength : L.weight;
+        return (w != null) ? (n + ' ×' + w) : ('' + n);
+      }
+      return '' + L;
+    }).filter(Boolean).join(', ');
+  } else if (_ro.lora) {
+    _loraSummary = (_ro.lora_strength != null) ? (_ro.lora + ' ×' + _ro.lora_strength) : ('' + _ro.lora);
+  }
+  if (_loraSummary) genRows += auditRow('LoRA', _loraSummary);
   html += auditSection('Generation', genRows);
 
   // === CELESTIAL ===

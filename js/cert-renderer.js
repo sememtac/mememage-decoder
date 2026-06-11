@@ -454,6 +454,51 @@ function renderCert(meta, options) {
   if (origin.model) _push('model', 'Model', origin.model, 3);
   if (origin.lora) _push('lora', 'LoRA', origin.lora, 3);
   if (origin.lora_strength !== undefined) _push('lora_strength', 'LoRA Str', origin.lora_strength);
+  // LoRAs, plural (modern Madeline format): a list, one entry per applied
+  // LoRA. Each entry is a [name, weight] pair, a {name/strength} dict, or a
+  // bare name string. The generic catch-all below skips arrays, so without
+  // this they'd vanish from the certificate. One full-width row each.
+  if (Array.isArray(origin.loras) && origin.loras.length) {
+    for (var _li = 0; _li < origin.loras.length; _li++) {
+      var _lora = origin.loras[_li], _ln, _lw;
+      if (Array.isArray(_lora)) { _ln = _lora[0]; _lw = _lora[1]; }
+      else if (_lora && typeof _lora === 'object') {
+        _ln = _lora.name || _lora.lora || _lora.file;
+        _lw = (_lora.strength !== undefined) ? _lora.strength : _lora.weight;
+      } else { _ln = _lora; }
+      if (_ln === undefined || _ln === null || _ln === '') continue;
+      var _lval = (_lw !== undefined && _lw !== null && _lw !== '')
+        ? (_ln + '  ×' + _lw) : ('' + _ln);
+      var _llabel = (origin.loras.length > 1) ? ('LoRA ' + (_li + 1)) : 'LoRA';
+      GEN_PARAMS.push({l: _llabel, v: _lval, span: 3});
+    }
+  }
+  _claimedKeys['loras'] = 1;
+
+  // Honest fallback: render ANY non-empty origin value, including arrays and
+  // nested dicts. A list doesn't fit one cell, but silently dropping it would
+  // make the certificate LIE about what the creator declared — the cert's
+  // promise is that it shows whatever is in `origin`, no special-casing by
+  // image source (AI gen / EXIF photo / hand-entered all flow through here).
+  // Collections flatten to a compact readable string; empty ones become ''
+  // (skipped, since there's genuinely nothing to show).
+  function _flattenOriginValue(v) {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) {
+      return v.map(function(el) {
+        if (Array.isArray(el)) return el.join(' ×');   // [name, weight] → "name ×weight"
+        if (el && typeof el === 'object') return _flattenOriginValue(el);
+        return '' + el;
+      }).filter(function(s){ return s !== ''; }).join(', ');
+    }
+    if (typeof v === 'object') {
+      return Object.keys(v).map(function(k) {
+        var s = _flattenOriginValue(v[k]);
+        return s === '' ? '' : (k + ': ' + s);
+      }).filter(function(s){ return s !== ''; }).join(', ');
+    }
+    return '' + v;
+  }
 
   // Generic catch-all: any other origin key the creator declared
   // (photographer / drawing / screenshot pipelines populate whatever
@@ -462,14 +507,12 @@ function renderCert(meta, options) {
   for (var _ki = 0; _ki < _origKeys.length; _ki++) {
     var _k = _origKeys[_ki];
     if (_claimedKeys[_k]) continue;
-    var _v = origin[_k];
-    if (_v === null || _v === undefined || _v === '') continue;
-    if (typeof _v === 'object') continue;  // dicts/arrays don't fit a single cell
+    var _vs = _flattenOriginValue(origin[_k]);
+    if (_vs === '') continue;  // nothing to show (null / empty / empty collection)
     // Title-case the key, then restore common acronyms so EXIF-derived
     // labels read "GPS Latitude" / "ISO", not "Gps Latitude" / "Iso".
     var _label = _k.replace(/[_-]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();})
       .replace(/\b(Gps|Iso|Id|Url|Rgb|Gpu|Cpu|Dpi|Hdr|Exif|Ai|Ram)\b/g, function(m){return m.toUpperCase();});
-    var _vs = '' + _v;
     // Pack short creator/EXIF fields tighter instead of one full-width row
     // each: a 3-char ISO or "f/1.8" no longer hogs a whole line, so a photo's
     // dozen small EXIF fields fill ~a third the rows. span 1 = one-third

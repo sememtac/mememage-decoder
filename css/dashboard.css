@@ -917,14 +917,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   background: rgba(255, 230, 225, 0.7);
   border-color: rgba(180, 60, 40, 0.7);
 }
-/* Recently-conceived gallery — download links styled as the recent buttons. */
-a.mint-recent-btn { text-decoration: none; display: inline-block; }
-.mint-conceived-note { font-weight: 400; opacity: 0.55; font-size: 0.66rem; }
-.mint-conceived-id {
-  font-family: monospace; font-size: 0.66rem;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  min-width: 0;
-}
 
 /* --- Mint-tab forecast widget --- */
 .mint-forecast {
@@ -2594,6 +2586,27 @@ a.mint-recent-btn { text-decoration: none; display: inline-block; }
   flex: 0 0 auto;
   text-shadow: 0 0 4px rgba(200, 168, 80, 0.4);
 }
+/* Surface-state frames — readable at a glance even when collapsed. Gold =
+   primary (above); green = enabled; gray = disabled. The star reinforces the
+   enabled/disabled state on every row (★ enabled, ☆ disabled). */
+.config-channel-row-enabled {
+  border-left: 3px solid #3fae63;
+  background: linear-gradient(90deg, rgba(63, 174, 99, 0.14), rgba(255, 255, 255, 0.45) 30%);
+}
+.config-channel-row-disabled {
+  border-left: 3px solid #b4b4b8;
+}
+.config-channel-row-disabled > .config-channel-summary { opacity: 0.68; }
+.config-channel-state-star {
+  font-size: 0.95rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.config-channel-state-star[data-enabled="1"] {
+  color: #3fae63;
+  text-shadow: 0 0 4px rgba(63, 174, 99, 0.4);
+}
+.config-channel-state-star[data-enabled="0"] { color: #a4a4a8; }
 .config-channel-head {
   display: flex; align-items: baseline; gap: 0.6rem;
   flex-wrap: wrap;
@@ -2682,10 +2695,22 @@ a.mint-recent-btn { text-decoration: none; display: inline-block; }
   gap: 0.3rem;
   cursor: pointer;
 }
+.config-channel-test {
+  font-size: 0.66rem;
+}
 .config-channel-remove {
   margin-left: auto;
   font-size: 0.66rem;
 }
+/* Live test result — neutral while probing, green/red on verdict. */
+.config-channel-test-result {
+  margin-top: 0.45rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #55555c;
+}
+.config-channel-test-result[data-ok="1"] { color: #2f8f57; }
+.config-channel-test-result[data-ok="0"] { color: #b4483f; }
 .config-channel-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
