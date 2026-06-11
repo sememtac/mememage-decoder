@@ -1414,8 +1414,13 @@ setInterval(function() {
     if (e.target.files.length) handleFile(e.target.files[0]);
   });
   // "Conceive another" / "Try again" are explicit "done with this ticket"
-  // actions — they drop the server-side session AND its staged upload, then
-  // clear the view (the soul, if any, is already distributed). "← Back"
+  // actions — they fire DELETE and clear the view. The server decides what
+  // that means by status: a COMPLETED conception is KEPT (its staged image +
+  // session feed the public catalog, so dropping it would withdraw a
+  // just-conceived image — the "minted two, only the newest showed" bug);
+  // a pending/failed draft is dropped along with its staged upload. So
+  // "Conceive another" after a success leaves the conception in the catalog;
+  // "Try again" after a failure cleans up the dead draft. "← Back"
   // (mintCancel) is NON-destructive on purpose: it keeps the pending session
   // resumable — matching its "keeps the session" label — and just returns to
   // the list. Only an explicit Delete (or the 7-day reaper) removes a pending

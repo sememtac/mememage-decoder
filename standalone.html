@@ -4893,7 +4893,7 @@ var CosmicPlanetarium = (function() {
       +   '<button data-mode="cosmic" class="active">Cosmic</button>'
       +   '<button data-mode="earth">Earth</button>'
       + '</div>'
-      + '<div class="planetarium-hint">drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint</div>'
+      + '<div class="planetarium-hint">drag to rotate · pinch or scroll to zoom · you are floating in space</div>'
       + '<button class="planetarium-close" aria-label="Close">&times;</button>';
     document.body.appendChild(modal);
     nameEl = modal.querySelector('.planetarium-name-text');
@@ -5168,7 +5168,7 @@ var CosmicPlanetarium = (function() {
     c.zoomTarget = 1.0;
     if (mode === 'cosmic') {
       if (modal) modal.classList.remove('earth-mode');
-      if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
+      if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · you are floating in space';
     } else {
       if (modal) modal.classList.add('earth-mode');
       if (hintEl) hintEl.textContent = 'drag to look around · pinch or scroll to zoom · you are standing on Earth';
@@ -5351,7 +5351,7 @@ var CosmicPlanetarium = (function() {
 
     if (modeBtns) modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === 'cosmic'); });
     if (modal) modal.classList.remove('earth-mode');
-    if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · the destiny shape is one viewpoint';
+    if (hintEl) hintEl.textContent = 'drag to rotate · pinch or scroll to zoom · you are floating in space';
 
     currentStarIndex = (typeof opts.currentStarIndex === 'number') ? opts.currentStarIndex : -1;
 

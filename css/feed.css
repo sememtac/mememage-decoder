@@ -14,7 +14,7 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(5, 1fr);   /* five across — a touch smaller than 4 */
   gap: 0;                 /* tiles flush against each other */
   padding: 0;
 }
@@ -36,8 +36,14 @@
 .feed-tile img[src] { opacity: 1; }
 .feed-tile:hover img { transform: scale(1.04); }
 
-@media (max-width: 520px) {
-  .feed-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+/* Infinite-scroll trip wire — a thin spacer below the grid. The observer fires
+   well before it reaches the viewport (rootMargin), so the next page is already
+   loading by the time you near the bottom. Invisible; just needs to exist. */
+.feed-sentinel {
+  position: relative;
+  z-index: 1;
+  height: 1px;
+  width: 100%;
 }
 
 /* Lightbox — appended to <html> (not <body>) so mememage.css's `body > *`
