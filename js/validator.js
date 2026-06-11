@@ -152,6 +152,21 @@ DropZone.attach({
   onFiles: analyze
 });
 
+// Clipboard paste — Ctrl/Cmd+V an image straight into By Sight, no save-to-disk
+// first (the decoder has the same in ui.js). One global handler (not per-zone)
+// so a single paste routes to one processor; surface the Image tab so the
+// result is visible if the user was on Audit/Observatory.
+document.addEventListener('paste', function(e) {
+  if (!e.clipboardData) return;
+  var item = Array.prototype.slice.call(e.clipboardData.items || [])
+    .find(function(i) { return i.type && i.type.indexOf('image/') === 0; });
+  if (!item) return;
+  var f = item.getAsFile();
+  if (!f) return;
+  if (typeof showTab === 'function') showTab('img');
+  analyze(f);
+});
+
 // === Reconstruct flow ===
 // User drops the three saved band PNGs; the box reads each band's
 // iTXt chunks (parent_id, parent_hash, fragment_id), confirms all

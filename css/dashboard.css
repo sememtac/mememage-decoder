@@ -917,6 +917,14 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   background: rgba(255, 230, 225, 0.7);
   border-color: rgba(180, 60, 40, 0.7);
 }
+/* Recently-conceived gallery — download links styled as the recent buttons. */
+a.mint-recent-btn { text-decoration: none; display: inline-block; }
+.mint-conceived-note { font-weight: 400; opacity: 0.55; font-size: 0.66rem; }
+.mint-conceived-id {
+  font-family: monospace; font-size: 0.66rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
 
 /* --- Mint-tab forecast widget --- */
 .mint-forecast {

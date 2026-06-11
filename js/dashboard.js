@@ -511,6 +511,8 @@ setInterval(function() {
     forecastBody:     document.getElementById('mintForecastBody'),
     recentBlock:      document.getElementById('mintRecentBlock'),
     recentList:       document.getElementById('mintRecentList'),
+    conceivedBlock:   document.getElementById('mintConceivedBlock'),
+    conceivedList:    document.getElementById('mintConceivedList'),
     retry:       document.getElementById('mintRetry'),
     failedBody:  document.getElementById('mintFailedBody'),
   };
@@ -1724,6 +1726,53 @@ setInterval(function() {
       els.recentBlock.hidden = true;
     }
   }
+  // Recently conceived — completed mints still inside the 7-day cull window.
+  // The webhook-independent, ticket-independent way to get a conceived image or
+  // soul back: open the dashboard, download it here. Image/soul are served by
+  // token (the row carries the full token); links work without auth headers
+  // because the token in the path is the gate. Dry runs are filtered out.
+  async function loadConceived() {
+    if (!els.conceivedBlock || !els.conceivedList) return;
+    try {
+      var resp = await fetch('/api/mint/sessions?status=completed&limit=12',
+        { headers: authHeaders() });
+      if (!resp.ok) { els.conceivedBlock.hidden = true; return; }
+      var data = await resp.json();
+      var rows = (data.sessions || []).filter(function(r) { return r.token && !r.dry_run; });
+      if (!rows.length) {
+        els.conceivedBlock.hidden = true;
+        els.conceivedList.innerHTML = '';
+        return;
+      }
+      els.conceivedBlock.hidden = false;
+      els.conceivedList.innerHTML = rows.map(function(r) {
+        var imgUrl = '/api/mint/' + encodeURIComponent(r.token) + '/image';
+        var soulUrl = '/api/mint/' + encodeURIComponent(r.token) + '/soul';
+        var ident = r.identifier || r.ticket;
+        var thumb = '<img class="mint-recent-thumb" src="' + imgUrl +
+          '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+        var badge = r.chain
+          ? ChainBadge.compact({ id: r.chain, name: r.chain_name,
+              visibility: r.chain_visibility, readiness: r.chain_readiness })
+          : '';
+        return '<div class="mint-recent-row mint-conceived-row" title="' + escapeHtml(ident) + '">' +
+          '<div class="mint-recent-head">' +
+            thumb +
+            '<span class="mint-recent-ticket mint-conceived-id">' + escapeHtml(ident) + '</span>' +
+            badge +
+          '</div>' +
+          '<div class="mint-recent-actions">' +
+            '<span class="mint-recent-age">' + _formatAge(r.age_seconds) + '</span>' +
+            '<a class="mint-recent-btn" href="' + imgUrl + '" download="' + escapeHtml(ident) + '.png">Image</a>' +
+            '<a class="mint-recent-btn" href="' + soulUrl + '" download>Soul</a>' +
+          '</div>' +
+          '</div>';
+      }).join('');
+    } catch (e) {
+      els.conceivedBlock.hidden = true;
+    }
+  }
+
   if (els.recentList) {
     els.recentList.addEventListener('click', async function(ev) {
       var btn = ev.target.closest('[data-recent-action]');
@@ -1750,6 +1799,7 @@ setInterval(function() {
     });
   }
   loadRecent();
+  loadConceived();
 
   // Refresh on tab activation. Mint is the default-active tab, so
   // the first activation is the page load (handled above). Subsequent
@@ -1760,6 +1810,7 @@ setInterval(function() {
       if (panelId === 'tab-mint') {
         loadForecast();
         loadRecent();
+        loadConceived();
         // Re-check chain context — most importantly, the seal state can
         // have flipped (user just sealed in the Payload tab). Refreshes
         // the unsealed-chain guardrail without a full page reload.
@@ -1774,7 +1825,7 @@ setInterval(function() {
   // Expose to the outer reset() so it can refresh the pending list
   // after a cancel/again/retry. reset() also fires the DELETE
   // server-side, so we wait briefly before re-listing.
-  window._mintReloadRecent = function() { setTimeout(loadRecent, 200); };
+  window._mintReloadRecent = function() { setTimeout(function() { loadRecent(); loadConceived(); }, 200); };
 })();
 
 
