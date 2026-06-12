@@ -188,30 +188,43 @@ function findFooterStart(px,w,y){
 function decodeEvenFill(px,w,h){
   if(h<1||w<3*HEADER_PIXELS)return null;
   var y=h-1;
-  var a=findHeaderEnd(px,w,y);
-  var b=findFooterStart(px,w,y);
-  if(a===null||b===null||(b-a)<8)return null;
-  var span=b-a;
+  var a0=findHeaderEnd(px,w,y);
+  var b0=findFooterStart(px,w,y);
+  if(a0===null||b0===null||(b0-a0)<8)return null;
   var readModes=(h>=2)?[[h-1,h-2],[h-1]]:[[h-1]];
-  for(var nBytes=EVENFILL_MIN_BYTES;nBytes<=EVENFILL_MAX_BYTES;nBytes++){
-    var n=nBytes*8;
-    for(var rm=0;rm<readModes.length;rm++){
-      var rows=readModes[rm],bits=[],ok=true;
-      for(var i=0;i<n;i++){
-        var cx=Math.round(a+(i+0.5)*span/n);
-        if(cx<0||cx>=w){ok=false;break;}
-        var acc=0;
-        for(var r=0;r<rows.length;r++){
-          var idx=(rows[r]*w+cx)*4;
-          acc+=(px[idx]+px[idx+1]+px[idx+2])/3;
+  // Band-edge detection lands on an integer pixel, but after a downscale the
+  // true sub-pixel edge can sit a pixel or two away — a shift that moves every
+  // bit center the same way and flips enough bits to exceed RS at particular
+  // scales (aliasing nulls; e.g. ~0.9x can fail while 0.92x and 0.88x pass).
+  // Sweep a few integer phase offsets on each anchor; CRC self-selects. (0,0)
+  // is tried first, so a clean image returns immediately and every previously-
+  // decodable image still decodes — a strict superset of the single-anchor read.
+  var OFF=[0,-1,1,-2,2];
+  for(var ia=0;ia<OFF.length;ia++){
+    for(var ib=0;ib<OFF.length;ib++){
+      var a=a0+OFF[ia],b=b0+OFF[ib],span=b-a;
+      if(span<8)continue;
+      for(var nBytes=EVENFILL_MIN_BYTES;nBytes<=EVENFILL_MAX_BYTES;nBytes++){
+        var n=nBytes*8;
+        for(var rm=0;rm<readModes.length;rm++){
+          var rows=readModes[rm],bits=[],ok=true;
+          for(var i=0;i<n;i++){
+            var cx=Math.round(a+(i+0.5)*span/n);
+            if(cx<0||cx>=w){ok=false;break;}
+            var acc=0;
+            for(var r=0;r<rows.length;r++){
+              var idx=(rows[r]*w+cx)*4;
+              acc+=(px[idx]+px[idx+1]+px[idx+2])/3;
+            }
+            bits.push((acc/rows.length)>=RGB_THRESHOLD?1:0);
+          }
+          if(!ok)continue;
+          var frame=decodeFrame(bits);
+          // Validate via payload (locks the right n_bytes) but return the FRAME
+          // so callers get rsErrors/rsCapacity for the forensic display.
+          if(frame){var p=decodePayload(frame.payload);if(p)return frame;}
         }
-        bits.push((acc/rows.length)>=RGB_THRESHOLD?1:0);
       }
-      if(!ok)continue;
-      var frame=decodeFrame(bits);
-      // Validate via payload (locks the right n_bytes) but return the FRAME so
-      // callers get rsErrors/rsCapacity for the forensic display.
-      if(frame){var p=decodePayload(frame.payload);if(p)return frame;}
     }
   }
   return null;
