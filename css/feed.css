@@ -8,7 +8,6 @@
   min-height: 100vh;
   margin: 0;
 }
-.feed-body .page-header { padding-top: 2.2rem; }  /* breathing room (no panel here) */
 
 /* The one bit of chrome: a quiet link to the hosted decoder / validator so a
    visitor can go verify an image. Sits right under the subtitle. */
