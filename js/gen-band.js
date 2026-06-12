@@ -10,35 +10,50 @@ function initGenBand(canvas, W, H, genParams, entropyHex, barSpec, barFragment, 
 
   // Layout
   var COL = 3, PAD = 20, GAP = 6, CELL_H = 44;
-  var cellW = Math.floor((W - PAD * 2 - GAP * (COL - 1)) / COL);
 
   // Entropy-seeded PRNG
   var seed = 0;
   if (entropyHex) for (var i = 0; i < 16 && i < entropyHex.length; i++) seed = (seed * 31 + entropyHex.charCodeAt(i)) & 0x7FFFFFFF;
   function rng() { seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF; return seed / 0x7FFFFFFF; }
 
-  // Cell positions — pack cells with `span` of 1, 2, or 3 columns.
-  // Matches the ordering from cert-renderer: full-width headers
-  // (Seed/Size/Mode/Model), then 3-col rows for shorter params.
-  var cells = [];
-  var col = 0, row = 0;
+  // Cell positions — pack cells with `span` of 1, 2, or 3 columns, then
+  // PROPORTIONALLY STRETCH each row to fill the full width. Without the
+  // stretch a lone span-2 cell (e.g. a single long catch-all field) fills only
+  // 2/3 of the row, leaving a ragged gap. With it, every row reaches both edges
+  // with cells sized in proportion to their spans — an even grid no matter what
+  // field mix cert-renderer hands us.
+  var cells = new Array(genParams.length);
+  var gridW = W - PAD * 2;
+  // 1. Group params into rows by the same wrap rule.
+  var rowsArr = [];
+  var cur = [], curSpan = 0;
   for (var ci = 0; ci < genParams.length; ci++) {
     var span = Math.min(COL, Math.max(1, genParams[ci].span || 1));
-    if (col + span > COL) { col = 0; row++; }
-    var cw = span * cellW + (span - 1) * GAP;
-    cells.push({
-      x: PAD + col * (cellW + GAP),
-      y: row * (CELL_H + GAP),  // gridY added after total row count known
-      w: cw, h: CELL_H,
-      hover: 0
-    });
-    col += span;
-    if (col >= COL) { col = 0; row++; }
+    if (curSpan + span > COL) { rowsArr.push(cur); cur = []; curSpan = 0; }
+    cur.push({ idx: ci, span: span });
+    curSpan += span;
+    if (curSpan >= COL) { rowsArr.push(cur); cur = []; curSpan = 0; }
   }
-  var rows = row + (col > 0 ? 1 : 0);
+  if (cur.length) rowsArr.push(cur);
+  // 2. Lay each row out across the full width, sized by span share.
+  var rows = rowsArr.length;
   var gridH = rows * CELL_H + Math.max(0, rows - 1) * GAP;
   var gridY = Math.floor((H - gridH) / 2);
-  for (var ck = 0; ck < cells.length; ck++) cells[ck].y += gridY;
+  for (var r = 0; r < rows; r++) {
+    var rc = rowsArr[r], n = rc.length, sumSpan = 0;
+    for (var k = 0; k < n; k++) sumSpan += rc[k].span;
+    var avail = gridW - (n - 1) * GAP;   // width left for cells after the gaps
+    var x = PAD;
+    for (var j = 0; j < n; j++) {
+      // Last cell in the row absorbs rounding so it lands flush on the edge.
+      var cw = (j === n - 1) ? (PAD + gridW - x)
+                             : Math.round(avail * rc[j].span / sumSpan);
+      cells[rc[j].idx] = {
+        x: x, y: gridY + r * (CELL_H + GAP), w: cw, h: CELL_H, hover: 0
+      };
+      x += cw + GAP;
+    }
+  }
 
   // Mouse
   var mx = -1, my = -1;
