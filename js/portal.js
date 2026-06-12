@@ -818,11 +818,12 @@ var OfflineRecords = (function() {
       var row = btn.parentElement;
       var input = row ? row.querySelector('input[type="file"]') : null;
       if (!input) return;
-      // A plain multi-file picker (the input carries accept=".soul,.json
-      // multiple"). The normal Open dialog avoids BOTH folder-picker traps: the
-      // webkitdirectory "N files will be uploaded" warning AND the File System
-      // Access API blocklist (which hard-refuses Downloads / system folders).
-      // Select all the .soul files in a folder and open.
+      // The input is a webkitdirectory picker (folder selection — files are too
+      // error-prone; that's the Observatory's exception, not here). webkitdirectory
+      // over showDirectoryPicker because the latter's File System Access blocklist
+      // hard-refuses Downloads / system folders with no override; webkitdirectory
+      // works in every folder. Its "N files will be uploaded" prompt is cosmetic
+      // — nothing is uploaded; we read .soul/.json locally and drop the rest.
       btn.addEventListener('click', function() { input.click(); });
       input.addEventListener('change', async function() {
         var files = Array.from(input.files || []).filter(function(f) {

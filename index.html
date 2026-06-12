@@ -13,10 +13,10 @@
 <meta name="twitter:title" content="Mememage">
 <meta name="twitter:description" content="Every conceived image carries a hidden signature. Drop an image to decode its origin story.">
 <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2032%2032'%3E%3Crect%20x%3D'0'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dc50dc'%2F%3E%3Crect%20x%3D'4'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dcc83c'%2F%3E%3Crect%20x%3D'8'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%233cc8dc'%2F%3E%3Crect%20x%3D'12'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23fff'%2F%3E%3Crect%20x%3D'14'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23000'%2F%3E%3Crect%20x%3D'16'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23fff'%2F%3E%3Crect%20x%3D'18'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23000'%2F%3E%3Crect%20x%3D'20'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%233cc8dc'%2F%3E%3Crect%20x%3D'24'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dcc83c'%2F%3E%3Crect%20x%3D'28'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dc50dc'%2F%3E%3C%2Fsvg%3E">
-<link rel="stylesheet" href="css/theme.css?v=b525d18">
-<link rel="stylesheet" href="css/layout.css?v=b525d18">
-<link rel="stylesheet" href="css/mememage.css?v=b525d18">
-<link rel="stylesheet" href="css/cosmic-planetarium.css?v=b525d18">
+<link rel="stylesheet" href="css/theme.css?v=1e945ac">
+<link rel="stylesheet" href="css/layout.css?v=1e945ac">
+<link rel="stylesheet" href="css/mememage.css?v=1e945ac">
+<link rel="stylesheet" href="css/cosmic-planetarium.css?v=1e945ac">
 <script>if(location.search.indexOf('from=')>=0)document.documentElement.classList.add('portal-transit');</script>
 <!--MEMEMAGE_SOULS_BASE--><!-- a self-hosted mint server replaces the preceding marker comment with a <script> setting window.MEMEMAGE_SOULS_BASE, so the decoder defaults its record Source to the local souls face; on GitHub Pages the comment stays inert and the IA default applies -->
 </head>
@@ -62,11 +62,11 @@
         </div>
         <p class="lookup-source-hint" data-mode-scope="online">Where your <em>.soul</em> files live. <code>{id}</code> = the record&rsquo;s identifier.</p>
         <div class="offline-row" data-mode-scope="offline">
-          <button type="button" class="offline-pick-btn" data-offline-pick>Load .soul files</button>
+          <button type="button" class="offline-pick-btn" data-offline-pick>Load local folder</button>
           <span class="offline-count" data-offline-count>0 records offline</span>
-          <input type="file" class="offline-input" accept=".soul,.json" multiple>
+          <input type="file" class="offline-input" webkitdirectory directory multiple>
         </div>
-        <p class="lookup-source-hint" data-mode-scope="offline">Pick your <em>.soul</em> files (select all in a folder). Kept in memory until the page reloads.</p>
+        <p class="lookup-source-hint" data-mode-scope="offline">Pick the folder your <em>.soul</em> files are in — read locally, nothing is uploaded despite the browser&rsquo;s prompt.</p>
       </details>
       <div class="drop-error" id="imageError"></div>
     </div>
@@ -90,11 +90,11 @@
         </div>
         <p class="lookup-source-hint" data-mode-scope="online">Where your <em>.soul</em> files live. <code>{id}</code> = the record&rsquo;s identifier.</p>
         <div class="offline-row" data-mode-scope="offline">
-          <button type="button" class="offline-pick-btn" data-offline-pick>Load .soul files</button>
+          <button type="button" class="offline-pick-btn" data-offline-pick>Load local folder</button>
           <span class="offline-count" data-offline-count>0 records offline</span>
-          <input type="file" class="offline-input" accept=".soul,.json" multiple>
+          <input type="file" class="offline-input" webkitdirectory directory multiple>
         </div>
-        <p class="lookup-source-hint" data-mode-scope="offline">Pick your <em>.soul</em> files (select all in a folder). Kept in memory until the page reloads.</p>
+        <p class="lookup-source-hint" data-mode-scope="offline">Pick the folder your <em>.soul</em> files are in — read locally, nothing is uploaded despite the browser&rsquo;s prompt.</p>
       </details>
       <div class="lookup-hint">Enter an identifier to fetch and verify a record from the configured source. Drop the image into <em>By Sight</em> to see the full certificate — the soul alone renders a partial read.</div>
       <div class="panel-error-head" id="lookupErrorHead"></div>
@@ -148,31 +148,31 @@
 </div>
 </div><!-- end panel-layout -->
 
-<script src="js/theme.js?v=b525d18"></script>
-<script src="js/data.js?v=b525d18"></script>
-<script src="js/rs.js?v=b525d18"></script>
-<script src="js/codec.js?v=b525d18"></script>
-<script src="js/image-decode.js?v=b525d18"></script>
-<script src="js/rng.js?v=b525d18"></script>
-<script src="js/cosmic-starfield.js?v=b525d18"></script>
-<script src="js/starfield.js?v=b525d18"></script>
-<script src="js/cosmic-planetarium.js?v=b525d18"></script>
-<script src="js/png-meta.js?v=b525d18"></script>
-<script src="js/nacl.min.js?v=b525d18"></script>
-<script src="js/html2canvas-pro.min.js?v=b525d18"></script>
-<script src="js/verify.js?v=b525d18"></script>
-<script src="js/access.js?v=b525d18"></script>
-<script src="js/birth-text.js?v=b525d18"></script>
-<script src="js/rarity-helpers.js?v=b525d18"></script>
-<script src="js/age-names.js?v=b525d18"></script>
-<script src="js/cert-renderer.js?v=b525d18"></script>
-<script src="js/sky-band.js?v=b525d18"></script>
-<script src="js/gen-band.js?v=b525d18"></script>
-<script src="js/machine-band.js?v=b525d18"></script>
-<script src="js/cosmic-audio.js?v=b525d18"></script>
-<script src="js/cosmic-player.js?v=b525d18"></script>
-<script src="js/portal.js?v=b525d18"></script>
-<script src="js/ui.js?v=b525d18"></script>
-<script src="js/typewriter.js?v=b525d18"></script>
+<script src="js/theme.js?v=1e945ac"></script>
+<script src="js/data.js?v=1e945ac"></script>
+<script src="js/rs.js?v=1e945ac"></script>
+<script src="js/codec.js?v=1e945ac"></script>
+<script src="js/image-decode.js?v=1e945ac"></script>
+<script src="js/rng.js?v=1e945ac"></script>
+<script src="js/cosmic-starfield.js?v=1e945ac"></script>
+<script src="js/starfield.js?v=1e945ac"></script>
+<script src="js/cosmic-planetarium.js?v=1e945ac"></script>
+<script src="js/png-meta.js?v=1e945ac"></script>
+<script src="js/nacl.min.js?v=1e945ac"></script>
+<script src="js/html2canvas-pro.min.js?v=1e945ac"></script>
+<script src="js/verify.js?v=1e945ac"></script>
+<script src="js/access.js?v=1e945ac"></script>
+<script src="js/birth-text.js?v=1e945ac"></script>
+<script src="js/rarity-helpers.js?v=1e945ac"></script>
+<script src="js/age-names.js?v=1e945ac"></script>
+<script src="js/cert-renderer.js?v=1e945ac"></script>
+<script src="js/sky-band.js?v=1e945ac"></script>
+<script src="js/gen-band.js?v=1e945ac"></script>
+<script src="js/machine-band.js?v=1e945ac"></script>
+<script src="js/cosmic-audio.js?v=1e945ac"></script>
+<script src="js/cosmic-player.js?v=1e945ac"></script>
+<script src="js/portal.js?v=1e945ac"></script>
+<script src="js/ui.js?v=1e945ac"></script>
+<script src="js/typewriter.js?v=1e945ac"></script>
 </body>
 </html>
