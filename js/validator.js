@@ -167,6 +167,31 @@ document.addEventListener('paste', function(e) {
   analyze(f);
 });
 
+// === Bar-image lightbox ===
+// Any `.bar-zoom` preview (the bar region + the scale/JPEG survival crops) is
+// click-to-enlarge — the source images are tiny (a few bar rows), so an
+// inspectable full-size view matters. Appended to <html> not <body> so the
+// `body > *` position rule can't break the fixed centering. Pixels stay crisp
+// (image-rendering: pixelated) — you're inspecting actual bar pixels.
+(function () {
+  var box = document.createElement('div');
+  box.className = 'bar-lightbox';
+  var img = document.createElement('img');
+  img.className = 'bar-lightbox-img';
+  img.alt = '';
+  box.appendChild(img);
+  document.documentElement.appendChild(box);
+  function close() { box.classList.remove('open'); img.removeAttribute('src'); }
+  box.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('.bar-zoom');
+    if (!t || !t.getAttribute('src')) return;
+    img.src = t.getAttribute('src');
+    box.classList.add('open');
+  });
+})();
+
 // === Reconstruct flow ===
 // User drops the three saved band PNGs; the box reads each band's
 // iTXt chunks (parent_id, parent_hash, fragment_id), confirms all
@@ -326,11 +351,13 @@ function analyze(file){
         return;
       }
 
-      // Thumbnail
-      var tw=Math.min(w,360),th=Math.round(h*tw/w);
+      // Thumbnail — sized to the panel (no upscaling) + high-quality downscale
+      // so the "Image" preview at the bottom reads clean, not blocky.
+      var tw=Math.min(w,760),th=Math.round(h*tw/w);
       var tc=document.createElement('canvas');tc.width=tw;tc.height=th;
-      tc.getContext('2d').drawImage(res.canvas,0,0,tw,th);
-      var thumbUri=tc.toDataURL('image/jpeg',0.7);
+      var tctx=tc.getContext('2d');tctx.imageSmoothingEnabled=true;tctx.imageSmoothingQuality='high';
+      tctx.drawImage(res.canvas,0,0,tw,th);
+      var thumbUri=tc.toDataURL('image/jpeg',0.92);
 
       var barOk=!!decoded;
       var cls=barOk?'both':'lost';
@@ -350,7 +377,7 @@ function analyze(file){
 
       // Bar region
       o+='<div class="ev-sec">Bar Region (bottom '+barH+'px, 4x zoom)</div>';
-      o+='<img src="'+barUri+'" class="bar-img" alt="Bar region"/>';
+      o+='<img src="'+barUri+'" class="bar-img bar-zoom" alt="Bar region"/>';
 
       // Bar results
       o+='<div class="ev-sec">Bar</div><div class="ev-g">';
@@ -382,7 +409,7 @@ function analyze(file){
           bbd.data[p+3]=255;}
         bbx.putImageData(bbd,0,0);
         var bbu=document.createElement('canvas');bbu.width=bbl*2;bbu.height=16;var bbux=bbu.getContext('2d');bbux.imageSmoothingEnabled=false;bbux.drawImage(bbc,0,0,bbl*2,16);
-        o+='<img src="'+bbu.toDataURL('image/png')+'" style="width:100%;image-rendering:pixelated;height:16px;border-radius:3px;"/>';
+        o+='<img src="'+bbu.toDataURL('image/png')+'" class="bar-zoom" style="width:100%;image-rendering:pixelated;height:16px;border-radius:3px;"/>';
         var fragile=0;for(var bi3=0;bi3<barBright.length;bi3++)if(Math.abs(barBright[bi3]-128)<30)fragile++;
         o+='<div style="font-size:0.6rem;color:#8a8a9a;margin-top:0.2rem;">'+barBright.length+' bits at '+barPpb+'px/bit \u2014 <span style="color:'+(fragile>barBright.length*0.3?'#f87171':'#4ade80')+';">'+fragile+' fragile</span></div>';
       }
@@ -513,7 +540,7 @@ function analyze(file){
             o+='</div>';
             if (sUri) {
               o+='<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Bar region @ '+s.toFixed(2)+'×</div>';
-              o+='<img src="'+sUri+'" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
+              o+='<img src="'+sUri+'" class="bar-zoom" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
             }
             o+='</div>';
           }
@@ -598,7 +625,7 @@ function analyze(file){
           html += '</div>';
           if (r.dataUrl) {
             html += '<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Bar region (post-JPEG q' + r.q + ')</div>';
-            html += '<img src="' + r.dataUrl + '" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
+            html += '<img src="' + r.dataUrl + '" class="bar-zoom" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
           }
           row.style.background = rowBg;
           row.style.borderLeftColor = rowBdr;

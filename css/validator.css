@@ -446,6 +446,28 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 }
 .bar-img { width: 100%; image-rendering: pixelated; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
 
+/* Click-to-enlarge bar previews + the full-screen lightbox they open. */
+.bar-zoom { cursor: zoom-in; }
+.bar-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 4vmin;
+  background: rgba(2, 2, 6, 0.93);
+  cursor: zoom-out;
+}
+.bar-lightbox.open { display: flex; }
+.bar-lightbox-img {
+  max-width: 96vw;
+  max-height: 92vh;
+  image-rendering: pixelated;
+  border-radius: 4px;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
+}
+
 /* NCM grid */
 .ncm { border-collapse: collapse; width: 100%; font-size: 0.5rem; }
 .ncm td { padding: 0; }
