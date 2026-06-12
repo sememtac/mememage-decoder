@@ -823,15 +823,11 @@ var OfflineRecords = (function() {
   //   - `[data-offline-pick]` → showDirectoryPicker (File System Access API):
   //     a real directory picker with NO "N files will be uploaded" prompt. The
   //     clean default. Chrome refuses sensitive folders (Downloads/system) with
-  //     it, so on unsupported browsers it falls through to the legacy input.
-  //   - `[data-offline-classic]` → the legacy webkitdirectory <input>: opens
-  //     ANY folder (incl. Downloads), at the cost of Chrome's misleading
-  //     "upload" prompt. The escape hatch for the blocked folders. Hidden when
-  //     showDirectoryPicker is unavailable (the main button is then the classic
-  //     picker already).
+  //     it (so it falls through to the legacy webkitdirectory <input> on
+  //     Firefox/Safari, which don't support the API). Chrome's blocklist
+  //     refuses Downloads/Desktop/home/system folders — by design (malware
+  //     vector); keep souls in a normal folder like ~/.mememage/received.
   function bindUI() {
-    var fsaSupported = typeof window !== 'undefined' && !!window.showDirectoryPicker;
-
     function wireInputChange(input) {
       if (!input || input.__offlineBound) return;
       input.__offlineBound = true;
@@ -860,18 +856,6 @@ var OfflineRecords = (function() {
             // a non-abort error → fall through to the legacy input
           }
         }
-        if (input) input.click();
-      });
-    });
-
-    document.querySelectorAll('[data-offline-classic]').forEach(function(link) {
-      if (link.__offlineBound) return;
-      link.__offlineBound = true;
-      if (!fsaSupported) { link.style.display = 'none'; return; }  // main btn is already classic
-      var input = (link.closest('.lookup-source') || document).querySelector('input[type="file"].offline-input');
-      wireInputChange(input);
-      link.addEventListener('click', function(e) {
-        e.preventDefault();
         if (input) input.click();
       });
     });
