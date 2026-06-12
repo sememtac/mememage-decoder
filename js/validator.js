@@ -3398,9 +3398,8 @@ function renderAudit(rec, identifier, out) {
   // this came from" pointer; discovery of additional mirrors is an
   // operational concern handled outside the artifact.
 
-  // === LINKS ===
+  // === SOURCE ===
   var linkRows = '';
-  linkRows += '<div class="audit-row"><span class="audit-label">View in Decoder</span><a href="index.html#" onclick="localStorage.setItem(\'mememage-lookup\',\'' + (rec.identifier || identifier) + '\');return true;" class="audit-val audit-info" style="text-decoration:none;">Open \u2192</a></div>';
   // Source link — whichever URL actually produced the record. For IA
   // items we swap the /download/ path for /details/ (nicer landing),
   // otherwise we link to the raw source URL so self-hosters can open
@@ -3428,11 +3427,11 @@ function renderAudit(rec, identifier, out) {
     sourceDisplay = 'archive.org/details/' + (rec.identifier || identifier);
   }
   if (sourceHref) {
-    linkRows += '<div class="audit-row"><span class="audit-label">Source</span><a href="' + sourceHref + '" target="_blank" rel="noopener" class="audit-val audit-info" style="text-decoration:none;word-break:break-all;">' + sourceDisplay + ' \u2192</a></div>';
+    linkRows += '<div class="audit-row"><span class="audit-label">Fetched from</span><a href="' + sourceHref + '" target="_blank" rel="noopener" class="audit-val audit-info" style="text-decoration:none;word-break:break-all;">' + sourceDisplay + ' \u2192</a></div>';
   } else {
-    linkRows += '<div class="audit-row"><span class="audit-label">Source</span><span class="audit-val audit-dim" style="word-break:break-all;">' + sourceDisplay + '</span></div>';
+    linkRows += '<div class="audit-row"><span class="audit-label">Fetched from</span><span class="audit-val audit-dim" style="word-break:break-all;">' + sourceDisplay + '</span></div>';
   }
-  html += auditSection('Links', linkRows);
+  html += auditSection('Source', linkRows);
 
   out.innerHTML = html;
   // Success — show sidebar and restore .how to its default help text
