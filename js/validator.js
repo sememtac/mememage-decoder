@@ -456,15 +456,15 @@ function analyze(file){
         o+='<span style="font-size:0.65rem;color:#8a8a9a;">'+w+'×'+h+' · crossover '+crossoverW+'px</span>';
         o+='</div>';
         if (isEven) {
-          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Full-width fat bits painted into both rows. The bits scale with image width, so this layout survives downscaling — and the bigger the image, the lower it can go. Expected clean-downscale floor for this image: <span style="color:#c0c0d0;font-weight:600;">'+fmtFloor(floorAt(w))+'</span>.</div>';
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Fat bits fill both rows and scale with the image, so it survives downscaling — bigger images go lower. Expected floor: <span style="color:#c0c0d0;font-weight:600;">'+fmtFloor(floorAt(w))+'</span>.</div>';
         } else {
-          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Frame split across the two rows at 3px/bit — the compact layout below the crossover. JPEG-resilient, but the bits are already at their minimum width, so it is <span style="color:#facc15;">not downscale-resilient</span>. Mint at ≥'+crossoverW+'px wide to unlock even-fill and its resize headroom.</div>';
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Compact layout below the crossover — JPEG-resilient, but bits are at minimum width, so it is <span style="color:#facc15;">not downscale-resilient</span>. Mint at ≥'+crossoverW+'px wide for even-fill.</div>';
         }
         // Resolution ladder — how the downscale floor improves with mint
         // width for this image's prefix. Surfaces the resolution feature.
         var rungs = [crossoverW, 2048, 3072, 4096].filter(function(x){ return x >= crossoverW; });
         var rungSeen = {}; rungs = rungs.filter(function(x){ if(rungSeen[x])return false; rungSeen[x]=true; return true; });
-        o+='<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Downscale floor by mint width (this prefix)</div>';
+        o+='<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Downscale floor by mint width</div>';
         o+='<div style="border:1px solid rgba(120,120,140,0.18);border-radius:4px;overflow:hidden;margin-bottom:0.5rem;">';
         for (var ri = 0; ri < rungs.length; ri++) {
           var rw = rungs[ri];
@@ -478,7 +478,7 @@ function analyze(file){
         // --- Scale Survival (revived, resolution-aware, synchronous) ---
         o+='<div class="ev-sec">Scale Survival</div>';
         if (isEven) {
-          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Downscales the image and re-reads the bar — the floor below which the fat bits blur past recovery. This is the actual measured floor for your image.</div>';
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Downscales the image and re-reads the bar — the measured floor for this image.</div>';
           var scales = [0.9, 0.75, 0.6, 0.5, 0.4, 0.3];
           var lowestOk = null;
           for (var sIdx = 0; sIdx < scales.length; sIdx++) {
@@ -515,12 +515,12 @@ function analyze(file){
           var floorTxt = lowestOk ? ('survives down to ~'+lowestOk.toFixed(2)+'×') : ('lost even at 0.90× — unusually fragile, check the source');
           o+='<div style="font-size:0.62rem;color:#c0c0d0;margin-bottom:0.3rem;">Measured floor: <span style="font-weight:600;">'+floorTxt+'</span>.</div>';
         } else {
-          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;line-height:1.5;">Skipped — this is a sequential-layout bar, which has no downscale headroom (the old “LOST on every scale” result). Resize resilience is a property of even-fill, which needs ≥'+crossoverW+'px width. JPEG Survival below still applies.</div>';
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;line-height:1.5;">Skipped — sequential bars sit at the minimum bit width, so they have no downscale headroom. Mint at ≥'+crossoverW+'px wide for even-fill’s resize resilience. JPEG Survival below still applies.</div>';
         }
       }
 
       o+='<div class="ev-sec">JPEG Survival</div>';
-      o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Re-encodes the image as JPEG at each quality and tries to read the bar. Solid=survived, dashed=lost. Every social platform JPEG-encodes uploads \u2014 this is what the bar is built to survive.</div>';
+      o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Re-encodes as JPEG at each quality and re-reads the bar (solid = survived, dashed = lost). Every platform JPEG-encodes uploads \u2014 what the bar is built to survive.</div>';
       var jpegLevels = [95, 85, 70, 50, 30];
       var jpegDone = 0;
       function jpegOneLevel(q, slotId) {
