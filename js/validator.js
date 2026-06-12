@@ -458,7 +458,12 @@ function analyze(file){
         if (isEven) {
           o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Fat bits fill both rows and scale with the image, so it survives downscaling — bigger images go lower. Expected floor: <span style="color:#c0c0d0;font-weight:600;">'+fmtFloor(floorAt(w))+'</span>.</div>';
         } else {
-          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Compact layout below the crossover — JPEG-resilient, but bits are at minimum width, so it is <span style="color:#facc15;">not downscale-resilient</span>. Mint at ≥'+crossoverW+'px wide for even-fill.</div>';
+          o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.4rem;line-height:1.5;">Compact layout below the crossover.'
+            +'<ul style="margin:0.3rem 0 0;padding-left:1.1rem;">'
+            +'<li>JPEG-resilient</li>'
+            +'<li>Bits at minimum width — <span style="color:#facc15;">not downscale-resilient</span></li>'
+            +'<li>Mint at ≥'+crossoverW+'px wide for even-fill</li>'
+            +'</ul></div>';
         }
         // Resolution ladder — how the downscale floor improves with mint
         // width for this image's prefix. Surfaces the resolution feature.
