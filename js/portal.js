@@ -802,6 +802,21 @@ var OfflineRecords = (function() {
     });
   }
 
+  // Recursively read .soul/.json files from a directory handle (File System
+  // Access API). ONLY those files are read — nothing else is touched, and
+  // nothing leaves the browser (no upload, despite the legacy picker's wording).
+  async function loadDirectory(dirHandle) {
+    for await (var entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        if (/\.(soul|json)$/i.test(entry.name)) {
+          try { await loadFile(await entry.getFile()); } catch (e) { /* skip */ }
+        }
+      } else if (entry.kind === 'directory') {
+        try { await loadDirectory(entry); } catch (e) { /* skip */ }
+      }
+    }
+  }
+
   // Auto-wire any `[data-offline-pick]` button on the page:
   //   - Click the button → opens the adjacent file input (hidden,
   //     webkitdirectory). User picks a folder.
@@ -818,7 +833,24 @@ var OfflineRecords = (function() {
       var row = btn.parentElement;
       var input = row ? row.querySelector('input[type="file"]') : null;
       if (!input) return;
-      btn.addEventListener('click', function() { input.click(); });
+      btn.addEventListener('click', async function() {
+        // Prefer the File System Access API: a real directory picker with no
+        // "Upload" button and no "N files will be uploaded to this site"
+        // warning (the legacy webkitdirectory input shows both, even though
+        // nothing is uploaded). Fall back to that input where it's unsupported
+        // (Firefox / Safari).
+        if (window.showDirectoryPicker) {
+          try {
+            var dir = await window.showDirectoryPicker({ id: 'mememage-souls', mode: 'read' });
+            await loadDirectory(dir);
+            return;
+          } catch (e) {
+            if (e && e.name === 'AbortError') return;  // user cancelled — fine
+            // any other error → fall through to the legacy picker
+          }
+        }
+        input.click();
+      });
       input.addEventListener('change', async function() {
         var files = Array.from(input.files || []).filter(function(f) {
           return /\.(soul|json)$/i.test(f.name);
