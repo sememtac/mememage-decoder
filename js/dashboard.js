@@ -3839,6 +3839,7 @@ setInterval(function() {
     var cert   = server.cert   || '';
     var keyP   = server.key    || '';
     var port   = server.port   || 8443;
+    var catalogLimit = (typeof server.catalog_limit === 'number') ? server.catalog_limit : 500;
     var tokenSet = !!env.MINT_API_TOKEN;
     // Show what the server is actually using right now. If the user
     // explicitly set a domain, that's the value; otherwise the
@@ -3860,6 +3861,11 @@ setInterval(function() {
       '  <span class="config-field-label">Port</span>' +
       '  <input class="config-input" id="configServerPort" type="number" min="1" max="65535" value="' + escapeHtml(String(port)) + '" placeholder="8443">' +
       '  <span class="config-channel-field-hint">listen port (1–65535). Changing it needs a restart.</span>' +
+      '</div>' +
+      '<div class="config-field">' +
+      '  <span class="config-field-label">Catalog</span>' +
+      '  <input class="config-input" id="configCatalogLimit" type="number" min="0" step="1" value="' + escapeHtml(String(catalogLimit)) + '" placeholder="500">' +
+      '  <span class="config-channel-field-hint">images kept on the public wall — the oldest are evicted past this count, not by age (0 = unlimited). Each kept image is staged on disk. Takes effect immediately.</span>' +
       '</div>' +
       '<p class="config-note advanced-only">TLS cert/key paths use the native file picker — no copy-pasting long paths:</p>' +
       '<ul class="config-note-list advanced-only">' +
@@ -4013,6 +4019,16 @@ setInterval(function() {
         return;
       }
       body.port = port;
+    }
+    var catEl = document.getElementById('configCatalogLimit');
+    var catStr = catEl ? (catEl.value || '').trim() : '';
+    if (catStr !== '') {
+      var cat = parseInt(catStr, 10);
+      if (isNaN(cat) || cat < 0) {
+        showError('Catalog limit must be 0 or greater (0 = unlimited).');
+        return;
+      }
+      body.catalog_limit = cat;
     }
     btn.disabled = true; btn.textContent = 'Saving\u2026';
     try {

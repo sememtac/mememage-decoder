@@ -62,7 +62,9 @@
     var nDisk = (tps != null) ? Math.min(1, tps / 400) : 0;
     var act = machine.mem_active || 0, comp = machine.mem_compressed || 0, free = machine.mem_free || 0;
     var total = act + comp + free;
-    var nMem = total > 0 ? Math.min(1, comp / total) : 0;
+    // Compression is the macOS/Linux pressure signal; Windows has no compressor
+    // stat (comp 0) so fall back to the used fraction. Mirrors rarity.py.
+    var nMem = total > 0 ? Math.min(1, (comp > 0 ? comp / total : act / total)) : 0;
     return Math.round(VIGOR_MAX * (0.5 * nLoad + 0.3 * nDisk + 0.2 * nMem));
   }
 

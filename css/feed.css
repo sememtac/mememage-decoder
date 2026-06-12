@@ -10,6 +10,26 @@
 }
 .feed-body .page-header { padding-top: 2.2rem; }  /* breathing room (no panel here) */
 
+/* The one bit of chrome: a quiet link to the hosted decoder / validator so a
+   visitor can go verify an image. Sits right under the subtitle. */
+.feed-tools {
+  position: relative;
+  z-index: 1;
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  word-spacing: 0.7rem;   /* gap between the two links (no divider) */
+  color: #6f6f7b;
+}
+.feed-tools a {
+  color: #b9b9c6;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  padding-bottom: 1px;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.feed-tools a:hover { color: #fff; border-bottom-color: rgba(255, 255, 255, 0.6); }
+
 .feed-grid {
   position: relative;
   z-index: 1;

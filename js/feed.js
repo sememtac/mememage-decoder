@@ -4,6 +4,15 @@
 // no nav, no pages — what you scroll is what you get. A conception drops off
 // when its image culls (~7 days) or its soul is removed.
 (function () {
+  // Point the header links at the hosted decoder / validator. The decode face
+  // lives on the souls host (server-injected window.MEMEMAGE_SOULS_BASE); on a
+  // single-domain install with no souls host it's served inline at /decoder.
+  var soulsBase = (window.MEMEMAGE_SOULS_BASE || '').replace(/\/+$/, '');
+  var decLink = document.getElementById('feedDecoderLink');
+  var valLink = document.getElementById('feedValidatorLink');
+  if (decLink) decLink.href = (soulsBase || '') + '/decoder';
+  if (valLink) valLink.href = (soulsBase || '') + '/validator';
+
   var grid = document.getElementById('feedGrid');
   if (!grid) return;
 
