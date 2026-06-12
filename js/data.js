@@ -18,6 +18,28 @@ const SOURCE_DEFAULT = (typeof window !== 'undefined' && window.MEMEMAGE_SOULS_B
   ? window.MEMEMAGE_SOULS_BASE
   : 'https://archive.org/download/{id}/';
 
+// Fill the Source field's <datalist> with this host's default AND Internet
+// Archive, so a self-hosted decoder (which defaults to its own souls host) still
+// offers IA as a one-click autocomplete option — no extra dropdown, no extra
+// copy. On GitHub Pages the default already IS IA, so the list dedupes to one.
+function populateSourceSuggestions() {
+  if (typeof document === 'undefined') return;
+  var dl = document.getElementById('sourceSuggest');
+  if (!dl) return;
+  var seen = {}, html = '';
+  [SOURCE_DEFAULT, 'https://archive.org/download/{id}/'].forEach(function (v) {
+    if (v && !seen[v]) { seen[v] = 1; html += '<option value="' + v + '"></option>'; }
+  });
+  dl.innerHTML = html;
+}
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', populateSourceSuggestions);
+  } else {
+    populateSourceSuggestions();
+  }
+}
+
 // =====================================================================
 // ASSET RESOLUTION — packer injects INLINE_ASSETS before this script
 // =====================================================================

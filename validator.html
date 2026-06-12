@@ -6,16 +6,19 @@
 <title>Mememage — Validator</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2032%2032'%3E%3Crect%20x%3D'0'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dc50dc'%2F%3E%3Crect%20x%3D'4'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dcc83c'%2F%3E%3Crect%20x%3D'8'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%233cc8dc'%2F%3E%3Crect%20x%3D'12'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23fff'%2F%3E%3Crect%20x%3D'14'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23000'%2F%3E%3Crect%20x%3D'16'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23fff'%2F%3E%3Crect%20x%3D'18'%20y%3D'10'%20width%3D'2'%20height%3D'12'%20fill%3D'%23000'%2F%3E%3Crect%20x%3D'20'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%233cc8dc'%2F%3E%3Crect%20x%3D'24'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dcc83c'%2F%3E%3Crect%20x%3D'28'%20y%3D'10'%20width%3D'4'%20height%3D'12'%20fill%3D'%23dc50dc'%2F%3E%3C%2Fsvg%3E">
-<link rel="stylesheet" href="css/theme.css?v=450046d">
-<link rel="stylesheet" href="css/layout.css?v=450046d">
-<link rel="stylesheet" href="css/mememage.css?v=450046d">
-<link rel="stylesheet" href="css/cosmic-planetarium.css?v=450046d">
+<link rel="stylesheet" href="css/theme.css?v=f1aefa9">
+<link rel="stylesheet" href="css/layout.css?v=f1aefa9">
+<link rel="stylesheet" href="css/mememage.css?v=f1aefa9">
+<link rel="stylesheet" href="css/cosmic-planetarium.css?v=f1aefa9">
 <script>if(location.search.indexOf('from=')>=0)document.documentElement.classList.add('portal-transit');</script>
-<link rel="stylesheet" href="css/validator.css?v=450046d">
+<link rel="stylesheet" href="css/validator.css?v=f1aefa9">
 <!--MEMEMAGE_SOULS_BASE--><!-- a self-hosted mint server replaces the preceding marker comment with a <script> setting window.MEMEMAGE_SOULS_BASE, so the validator defaults its Audit Source to the local souls face; on GitHub Pages the comment stays inert and the IA default applies -->
 </head>
 <body>
 <canvas id="starfield" data-theme="yin"></canvas>
+<!-- Source URL suggestions (this host's default + Internet Archive), filled by
+     populateSourceSuggestions() so a self-hoster can one-click switch surfaces. -->
+<datalist id="sourceSuggest"></datalist>
 
 <div class="panel-layout">
 <div class="panel-left">
@@ -77,7 +80,7 @@
     </div>
     <div class="lookup-source-row" data-mode-scope="online">
       <label>Base URL</label>
-      <input id="auditSource" type="text" placeholder="https://archive.org/download/{id}/">
+      <input id="auditSource" type="text" list="sourceSuggest" placeholder="https://archive.org/download/{id}/">
     </div>
     <p class="lookup-source-hint" data-mode-scope="online">Directory where your .soul files live. Use <code>{id}</code> where the path includes the record identifier (IA's <code>/download/{id}/</code>). Self-hosts can leave it out.</p>
     <div class="offline-row" data-mode-scope="offline">
@@ -162,31 +165,31 @@
 </div>
 </div><!-- panel-layout -->
 
-<script src="js/theme.js?v=450046d"></script>
-<script src="js/data.js?v=450046d"></script>
-<script src="js/rs.js?v=450046d"></script>
-<script src="js/codec.js?v=450046d"></script>
-<script src="js/image-decode.js?v=450046d"></script>
-<script src="js/png-meta.js?v=450046d"></script>
-<script src="js/nacl.min.js?v=450046d"></script>
-<script src="js/html2canvas-pro.min.js?v=450046d"></script>
-<script src="js/verify.js?v=450046d"></script>
-<script src="js/access.js?v=450046d"></script>
-<script src="js/birth-text.js?v=450046d"></script>
-<script src="js/rarity-helpers.js?v=450046d"></script>
-<script src="js/age-names.js?v=450046d"></script>
-<script src="js/cert-renderer.js?v=450046d"></script>
-<script src="js/sky-band.js?v=450046d"></script>
-<script src="js/gen-band.js?v=450046d"></script>
-<script src="js/machine-band.js?v=450046d"></script>
-<script src="js/rng.js?v=450046d"></script>
-<script src="js/cosmic-audio.js?v=450046d"></script>
-<script src="js/cosmic-player.js?v=450046d"></script>
-<script src="js/cosmic-starfield.js?v=450046d"></script>
-<script src="js/starfield.js?v=450046d"></script>
-<script src="js/cosmic-planetarium.js?v=450046d"></script>
-<script src="js/portal.js?v=450046d"></script>
-<script src="js/validator.js?v=450046d"></script>
-<script src="js/typewriter.js?v=450046d"></script>
+<script src="js/theme.js?v=f1aefa9"></script>
+<script src="js/data.js?v=f1aefa9"></script>
+<script src="js/rs.js?v=f1aefa9"></script>
+<script src="js/codec.js?v=f1aefa9"></script>
+<script src="js/image-decode.js?v=f1aefa9"></script>
+<script src="js/png-meta.js?v=f1aefa9"></script>
+<script src="js/nacl.min.js?v=f1aefa9"></script>
+<script src="js/html2canvas-pro.min.js?v=f1aefa9"></script>
+<script src="js/verify.js?v=f1aefa9"></script>
+<script src="js/access.js?v=f1aefa9"></script>
+<script src="js/birth-text.js?v=f1aefa9"></script>
+<script src="js/rarity-helpers.js?v=f1aefa9"></script>
+<script src="js/age-names.js?v=f1aefa9"></script>
+<script src="js/cert-renderer.js?v=f1aefa9"></script>
+<script src="js/sky-band.js?v=f1aefa9"></script>
+<script src="js/gen-band.js?v=f1aefa9"></script>
+<script src="js/machine-band.js?v=f1aefa9"></script>
+<script src="js/rng.js?v=f1aefa9"></script>
+<script src="js/cosmic-audio.js?v=f1aefa9"></script>
+<script src="js/cosmic-player.js?v=f1aefa9"></script>
+<script src="js/cosmic-starfield.js?v=f1aefa9"></script>
+<script src="js/starfield.js?v=f1aefa9"></script>
+<script src="js/cosmic-planetarium.js?v=f1aefa9"></script>
+<script src="js/portal.js?v=f1aefa9"></script>
+<script src="js/validator.js?v=f1aefa9"></script>
+<script src="js/typewriter.js?v=f1aefa9"></script>
 </body>
 </html>
