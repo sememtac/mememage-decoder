@@ -168,11 +168,13 @@ document.addEventListener('paste', function(e) {
 });
 
 // === Bar-image lightbox ===
-// Any `.bar-zoom` preview (the bar region + the scale/JPEG survival crops) is
-// click-to-enlarge — the source images are tiny (a few bar rows), so an
-// inspectable full-size view matters. Appended to <html> not <body> so the
-// `body > *` position rule can't break the fixed centering. Pixels stay crisp
-// (image-rendering: pixelated) — you're inspecting actual bar pixels.
+// Click-to-enlarge, two flavors:
+//   `.bar-zoom` — the bar region + scale/JPEG survival crops; tiny sources, so
+//     an inspectable full-size view matters and pixels stay crisp (pixelated).
+//   `.img-zoom` — the full Image preview; opens the full-resolution image
+//     (from data-full) rendered smooth, since it's a photo, not bar pixels.
+// Appended to <html> not <body> so the `body > *` position rule can't break the
+// fixed centering.
 (function () {
   var box = document.createElement('div');
   box.className = 'bar-lightbox';
@@ -185,9 +187,13 @@ document.addEventListener('paste', function(e) {
   box.addEventListener('click', close);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
   document.addEventListener('click', function (e) {
-    var t = e.target && e.target.closest && e.target.closest('.bar-zoom');
-    if (!t || !t.getAttribute('src')) return;
-    img.src = t.getAttribute('src');
+    var t = e.target && e.target.closest && e.target.closest('.bar-zoom, .img-zoom');
+    if (!t) return;
+    var smooth = t.classList.contains('img-zoom');
+    var src = (smooth && t.getAttribute('data-full')) || t.getAttribute('src');
+    if (!src) return;
+    img.src = src;
+    img.classList.toggle('smooth', smooth);
     box.classList.add('open');
   });
 })();
@@ -358,6 +364,11 @@ function analyze(file){
       var tctx=tc.getContext('2d');tctx.imageSmoothingEnabled=true;tctx.imageSmoothingQuality='high';
       tctx.drawImage(res.canvas,0,0,tw,th);
       var thumbUri=tc.toDataURL('image/jpeg',0.92);
+      // Full-resolution version for the click-to-enlarge lightbox. Images
+      // already at/under the preview width reuse the thumb (it's native size);
+      // larger ones render full-res at high quality so enlarging shows real
+      // detail, JPEG to keep the data URL from ballooning.
+      var fullUri = (w <= tw) ? thumbUri : res.canvas.toDataURL('image/jpeg', 0.95);
 
       var barOk=!!decoded;
       var cls=barOk?'both':'lost';
@@ -635,7 +646,7 @@ function analyze(file){
 
       // Image thumbnail
       o+='<div class="ev-sec">Image</div>';
-      o+='<img src="'+thumbUri+'" style="width:100%;border-radius:6px;margin:0.3rem 0;"/>';
+      o+='<img src="'+thumbUri+'" class="img-zoom" data-full="'+fullUri+'" style="width:100%;border-radius:6px;margin:0.3rem 0;"/>';
 
       // External source link intentionally omitted — the audit-link on
       // the identifier above handles "drill into this record" without

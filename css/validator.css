@@ -447,7 +447,7 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 .bar-img { width: 100%; image-rendering: pixelated; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06); }
 
 /* Click-to-enlarge bar previews + the full-screen lightbox they open. */
-.bar-zoom { cursor: zoom-in; }
+.bar-zoom, .img-zoom { cursor: zoom-in; }
 .bar-lightbox {
   position: fixed;
   inset: 0;
@@ -467,6 +467,8 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
   border-radius: 4px;
   box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
 }
+/* The full image preview enlarges smooth (a photo, not bar pixels to inspect). */
+.bar-lightbox-img.smooth { image-rendering: auto; }
 
 /* NCM grid */
 .ncm { border-collapse: collapse; width: 100%; font-size: 0.5rem; }
