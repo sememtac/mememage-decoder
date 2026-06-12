@@ -932,7 +932,7 @@ function _sealedShellFor(rec) { return (rec && rec._sealedOriginal) || rec; }
 function _dmUnlockHTML(chainKey, idPrefix) {
   var inId = idPrefix + '-pw', errId = inId + '-err';
   return '<div class="ev-sec">Unlock</div>'
-    + '<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">This record is sealed (Dark Matter). Enter the creator’s password to decrypt soul + chunks locally and verify the hash.</div>'
+    + '<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Sealed (Dark Matter). Enter the chain password to decrypt the soul + chunks locally and verify.</div>'
     + '<div style="display:flex;gap:0.3rem;align-items:center;">'
     + '<input id="' + inId + '" type="password" placeholder="Creator password" style="flex:1;background:#0a0a12;color:#c8c8d4;border:1px solid #2a2a40;border-radius:4px;padding:0.3rem 0.5rem;font-size:0.75rem;font-family:inherit;">'
     + '<button data-dm-chain="' + escapeHtml(chainKey) + '" data-dm-input="' + inId + '" data-dm-err="' + errId + '" class="dm-unlock-btn" style="padding:0.3rem 0.8rem;background:rgba(200,176,128,0.12);border:1px solid rgba(200,176,128,0.3);color:#c8b080;border-radius:4px;cursor:pointer;font-size:0.72rem;font-weight:600;letter-spacing:0.05em;">Unlock</button>'
@@ -1443,7 +1443,7 @@ async function _renderObservatoryFromCache() {
         html+='</div>';
       } else {
         html+='<div class="ev-sec">Birthplace \u2014 Not Recorded</div>';
-        html+='<div class="ev-m w" style="margin:0.3rem 0;"><div class="ev-mv" style="font-size:0.65rem;color:#8090a0;font-style:italic;line-height:1.5;">No GPS coordinates were captured at conception. The creator\u2019s chain is configured to omit location data.</div></div>';
+        html+='<div class="ev-m w" style="margin:0.3rem 0;"><div class="ev-mv" style="font-size:0.65rem;color:#8090a0;font-style:italic;line-height:1.5;">No GPS captured at conception \u2014 this chain omits location.</div></div>';
       }
 
       // GPS Password Unlock
@@ -2892,10 +2892,9 @@ function runAudit() {
     out.innerHTML = '';
     setAuditError(
       'Mixed content blocked for ' + identifier,
-      'This page is served over HTTPS, but the source is HTTP \u2014 browsers block this silently.<br>' +
-      'Open in a new tab (mixed-content rules don\u2019t apply to top-level navigation):<br>' +
-      buildProbeLinks(base, identifier, null) + '<br>' +
-      'Save and drop it into <em>Observatory</em>.'
+      'The source is HTTP but this page is HTTPS \u2014 browsers block that silently.<br>' +
+      'Open it in a new tab, then save the file and drop it into <em>Observatory</em>:<br>' +
+      buildProbeLinks(base, identifier, null)
     );
     stopSpin();
     return;
@@ -2920,7 +2919,7 @@ function runAudit() {
         'Could not find record for ' + identifier,
         probeLinks +
         'Self-hosting? Your server must send <code>Access-Control-Allow-Origin: *</code> \u2014 ' +
-        'browsers silently block cross-origin fetches without it.'
+        'browsers block cross-origin fetches without it.'
       );
     }
     stopSpin();
