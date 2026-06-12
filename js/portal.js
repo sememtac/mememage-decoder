@@ -802,37 +802,77 @@ var OfflineRecords = (function() {
     });
   }
 
-  // Auto-wire any `[data-offline-pick]` button on the page:
-  //   - Click the button → opens the adjacent file input (hidden,
-  //     webkitdirectory). User picks a folder.
-  //   - Each .soul file is parsed and added to the cache.
-  //   - `[data-offline-count]` elements update with the live count.
-  // Call bindUI() once on DOMContentLoaded (or after the elements
-  // exist in the DOM).
+  // Recursively read .soul/.json files from a File System Access directory
+  // handle. Only those files are read — nothing else is touched, nothing leaves
+  // the browser (the picker even confirms with an accurate "view files", not
+  // the legacy "upload" framing).
+  async function loadDirectory(dirHandle) {
+    for await (var entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        if (/\.(soul|json)$/i.test(entry.name)) {
+          try { await loadFile(await entry.getFile()); } catch (e) { /* skip */ }
+        }
+      } else if (entry.kind === 'directory') {
+        try { await loadDirectory(entry); } catch (e) { /* skip */ }
+      }
+    }
+  }
+
+  // Auto-wire offline-source folder pickers. Folder selection (files are too
+  // error-prone — that's the Observatory's exception). Two pickers:
+  //   - `[data-offline-pick]` → showDirectoryPicker (File System Access API):
+  //     a real directory picker with NO "N files will be uploaded" prompt. The
+  //     clean default. Chrome refuses sensitive folders (Downloads/system) with
+  //     it, so on unsupported browsers it falls through to the legacy input.
+  //   - `[data-offline-classic]` → the legacy webkitdirectory <input>: opens
+  //     ANY folder (incl. Downloads), at the cost of Chrome's misleading
+  //     "upload" prompt. The escape hatch for the blocked folders. Hidden when
+  //     showDirectoryPicker is unavailable (the main button is then the classic
+  //     picker already).
   function bindUI() {
-    var buttons = document.querySelectorAll('[data-offline-pick]');
-    buttons.forEach(function(btn) {
-      if (btn.__offlineBound) return;
-      btn.__offlineBound = true;
-      // Find the sibling file input — same parent (.offline-row).
-      var row = btn.parentElement;
-      var input = row ? row.querySelector('input[type="file"]') : null;
-      if (!input) return;
-      // The input is a webkitdirectory picker (folder selection — files are too
-      // error-prone; that's the Observatory's exception, not here). webkitdirectory
-      // over showDirectoryPicker because the latter's File System Access blocklist
-      // hard-refuses Downloads / system folders with no override; webkitdirectory
-      // works in every folder. Its "N files will be uploaded" prompt is cosmetic
-      // — nothing is uploaded; we read .soul/.json locally and drop the rest.
-      btn.addEventListener('click', function() { input.click(); });
+    var fsaSupported = typeof window !== 'undefined' && !!window.showDirectoryPicker;
+
+    function wireInputChange(input) {
+      if (!input || input.__offlineBound) return;
+      input.__offlineBound = true;
       input.addEventListener('change', async function() {
         var files = Array.from(input.files || []).filter(function(f) {
           return /\.(soul|json)$/i.test(f.name);
         });
-        for (var i = 0; i < files.length; i++) {
-          await loadFile(files[i]);
+        for (var i = 0; i < files.length; i++) await loadFile(files[i]);
+        input.value = '';  // allow re-selecting the same folder
+      });
+    }
+
+    document.querySelectorAll('[data-offline-pick]').forEach(function(btn) {
+      if (btn.__offlineBound) return;
+      btn.__offlineBound = true;
+      var input = (btn.closest('.lookup-source') || document).querySelector('input[type="file"].offline-input');
+      wireInputChange(input);
+      btn.addEventListener('click', async function() {
+        if (window.showDirectoryPicker) {
+          try {
+            var dir = await window.showDirectoryPicker({ id: 'mememage-souls', mode: 'read' });
+            await loadDirectory(dir);
+            return;
+          } catch (e) {
+            if (e && e.name === 'AbortError') return;  // user cancelled — done
+            // a non-abort error → fall through to the legacy input
+          }
         }
-        input.value = '';  // allow re-selecting same folder
+        if (input) input.click();
+      });
+    });
+
+    document.querySelectorAll('[data-offline-classic]').forEach(function(link) {
+      if (link.__offlineBound) return;
+      link.__offlineBound = true;
+      if (!fsaSupported) { link.style.display = 'none'; return; }  // main btn is already classic
+      var input = (link.closest('.lookup-source') || document).querySelector('input[type="file"].offline-input');
+      wireInputChange(input);
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (input) input.click();
       });
     });
     var counts = document.querySelectorAll('[data-offline-count]');
