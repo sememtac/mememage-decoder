@@ -721,9 +721,17 @@ var ROLE_ORDER = ['decoder', 'proof', 'truth', 'schematic', 'claim', 'easter_egg
 // Per-role display metadata — used by the download-button renderer to
 // choose label, filter color, file mime + extension. Unknown roles get
 // sensible generic defaults.
+//
+// The decoder + proof(=validator) layers download under their CANONICAL
+// filenames — index.html and validator.html — not descriptive ones. Each is a
+// fully self-contained page (inline_all / inline_html bakes in all CSS/JS/
+// assets), and they cross-link by RELATIVE href (decoder → validator.html,
+// validator → index.html). So a user who restores the pair into one directory
+// gets working DECODER↔VALIDATOR navigation out of the box; rename either and
+// the portal flip 404s. (Soul roles like truth/claim keep descriptive names.)
 var ROLE_META = {
-  decoder:    { label: 'Decoder',    color: 'decoder', mime: 'text/html',  filename: 'mememage-decoder.html'  },
-  proof:      { label: 'Proof',      color: 'proof',   mime: 'text/html',  filename: 'mememage-proof.html'    },
+  decoder:    { label: 'Decoder',    color: 'decoder', mime: 'text/html',  filename: 'index.html'             },
+  proof:      { label: 'Proof',      color: 'proof',   mime: 'text/html',  filename: 'validator.html'         },
   truth:      { label: 'Truth',      color: 'truth',   mime: 'text/plain', filename: 'mememage-truth.txt'     },
   schematic:  { label: 'Schematics', color: 'epag',    mime: 'image/svg+xml', filename: 'schematic.svg'      },
   claim:      { label: 'Claim',      color: 'epag',    mime: 'text/html',  filename: 'mememage-claim.html'    },
