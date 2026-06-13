@@ -3063,6 +3063,34 @@ function auditSection(title, rows) {
   return '<div class="audit-section"><div class="audit-section-label">' + title + '</div>' + rows + '</div>';
 }
 
+// Top-level keys the structured audit sections already render. Everything else
+// — a core soul's own fields (license, author, …), arbitrary/EXIF metadata — is
+// shown generically by the "Soul Fields" section, so nothing is silently
+// dropped just because it isn't a canonical-chain field.
+var _AUDIT_COVERED = {
+  identifier:1, content_hash:1, hash_version:1, conceived:1, rendered:1,
+  creator_name:1, signature:1, public_key:1, key_fingerprint:1,
+  parent_id:1, constellation_name:1, constellation_index:1, constellation_hash:1,
+  constellation_size:1, heart_star_id:1, age:1, chunks:1, decoder_hash:1,
+  chain_visibility:1, outer_position:1, outer_total:1,
+  origin:1, prompt:1, seed:1, steps:1, cfg:1, cfg_scale:1, guidance:1,
+  model:1, unet:1, lora:1, loras:1, lora_strength:1, width:1, height:1,
+  birth:1, machine_fingerprint:1, birth_traits:1, birth_temperament:1,
+  rarity:1, rarity_score:1, song_name:1, thumbnail:1, about:1, mode:1,
+  gps:1, gps_time_locked:1, gps_password_locked:1,
+  encrypted_soul:1, encrypted_chunks:1
+};
+
+// Render any value (string / number / boolean / array / object) as a readable,
+// length-capped string. Arrays and dicts are JSON; long strings truncate.
+function _auditFieldValue(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v.length > 240 ? v.slice(0, 240) + '…' : v;
+  if (typeof v === 'number' || typeof v === 'boolean') return '' + v;
+  try { var s = JSON.stringify(v); return s.length > 240 ? s.slice(0, 240) + '…' : s; }
+  catch (e) { return '' + v; }
+}
+
 function renderAudit(rec, identifier, out) {
   var html = '';
 
@@ -3080,22 +3108,19 @@ function renderAudit(rec, identifier, out) {
   var hashRows = '';
   var storedHash = rec.content_hash;
   if (storedHash) {
-    // Compute hash client-side — uses the per-record inclusion set from
-    // verify.js so historical records verify under their own hash_version.
-    var hashable = {};
-    var _shellC = _sealedShellFor(rec);
-    var _setC = _hashSetForRecord(_shellC);
-    _setC.forEach(function(k) { if (_shellC[k] !== undefined && _shellC[k] !== null) hashable[k] = _shellC[k]; });
-    var sorted = JSON.stringify(sortKeysDeep(hashable)).replace(/[\u0080-\uffff]/g, function(c) { return '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'); });
-    crypto.subtle.digest('SHA-256', new TextEncoder().encode(sorted)).then(function(buf) {
-      var computed = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('').slice(0, 16);
+    // Use the canonical computeContentHash (verify.js) so the Audit verdict is
+    // IDENTICAL to the WITNESSED badge: it dispatches on hash_version (V1
+    // positive list OR the "open" everything-except model), excludes `_`-prefix
+    // decoder scratch, and reads the dark-matter sealed shell. The old inline
+    // path only knew the V1 positive list, so an "open" core soul always
+    // mismatched.
+    computeContentHash(_sealedShellFor(rec)).then(function(computed) {
       var hashEl = document.getElementById('auditHashResult');
-      if (hashEl) {
-        if (computed === storedHash) {
-          hashEl.innerHTML = auditRow('Computed', computed, 'audit-pass') + auditRow('Verdict', 'MATCH \u2014 record is internally consistent', 'audit-pass');
-        } else {
-          hashEl.innerHTML = auditRow('Computed', computed, 'audit-fail') + auditRow('Stored', storedHash, 'audit-fail') + auditRow('Verdict', 'MISMATCH \u2014 record may be altered', 'audit-fail');
-        }
+      if (!hashEl) return;
+      if (computed && computed === storedHash) {
+        hashEl.innerHTML = auditRow('Computed', computed, 'audit-pass') + auditRow('Verdict', 'MATCH \u2014 record is internally consistent', 'audit-pass');
+      } else {
+        hashEl.innerHTML = auditRow('Computed', computed || '\u2014', 'audit-fail') + auditRow('Stored', storedHash, 'audit-fail') + auditRow('Verdict', 'MISMATCH \u2014 record may be altered', 'audit-fail');
       }
     });
     hashRows += auditRow('Stored Hash', storedHash);
@@ -3198,11 +3223,13 @@ function renderAudit(rec, identifier, out) {
   }
   if (cycleRows) html += auditSection('Cycle Position', cycleRows);
 
-  // === GENERATION ===
+  // === GENERATION === (canonical-chain stable-diffusion params \u2014 only the
+  // ones actually present. A core soul carries none of these; its own fields
+  // show under "Soul Fields" below, so we never render a wall of "?".)
   var genRows = '';
   var _recOrigin = rec.origin || {};
   var _recPrompt = _recOrigin.prompt || rec.prompt;   // V1 reads from origin
-  genRows += auditRow('Prompt', _recPrompt || 'encrypted/missing', _recPrompt ? '' : 'audit-dim');
+  if (_recPrompt) genRows += auditRow('Prompt', _recPrompt);
   // V1 reads from rec.origin; fall back to flat fields for legacy records.
   var _ro = rec.origin || {};
   var _gSeed = _ro.seed !== undefined ? _ro.seed : rec.seed;
@@ -3210,10 +3237,10 @@ function renderAudit(rec, identifier, out) {
   var _gCfg = _ro.cfg_scale !== undefined ? _ro.cfg_scale : (rec.cfg_scale !== undefined ? rec.cfg_scale : rec.cfg);
   var _gGuide = _ro.guidance !== undefined ? _ro.guidance : rec.guidance;
   var _gModel = _ro.model || rec.model || rec.unet;
-  genRows += auditRow('Seed', _gSeed != null ? _gSeed : '?');
-  genRows += auditRow('Size', (rec.width || '?') + ' \u00d7 ' + (rec.height || '?'));
-  genRows += auditRow('Model', _gModel || '?');
-  genRows += auditRow('Steps / CFG / Guidance', (_gSteps != null ? _gSteps : '?') + ' / ' + (_gCfg != null ? _gCfg : '?') + ' / ' + (_gGuide != null ? _gGuide : '?'));
+  if (_gSeed != null) genRows += auditRow('Seed', _gSeed);
+  if (rec.width || rec.height) genRows += auditRow('Size', (rec.width || '?') + ' \u00d7 ' + (rec.height || '?'));
+  if (_gModel) genRows += auditRow('Model', _gModel);
+  if (_gSteps != null || _gCfg != null || _gGuide != null) genRows += auditRow('Steps / CFG / Guidance', (_gSteps != null ? _gSteps : '?') + ' / ' + (_gCfg != null ? _gCfg : '?') + ' / ' + (_gGuide != null ? _gGuide : '?'));
   // LoRAs — modern format is the plural `loras` list ([name, weight] pairs);
   // older records used singular `lora` + `lora_strength`.
   var _loraSummary = '';
@@ -3231,7 +3258,7 @@ function renderAudit(rec, identifier, out) {
     _loraSummary = (_ro.lora_strength != null) ? (_ro.lora + ' ×' + _ro.lora_strength) : ('' + _ro.lora);
   }
   if (_loraSummary) genRows += auditRow('LoRA', _loraSummary);
-  html += auditSection('Generation', genRows);
+  if (genRows) html += auditSection('Generation', genRows);
 
   // === CELESTIAL ===
   var birth = rec.birth || {};
@@ -3247,11 +3274,12 @@ function renderAudit(rec, identifier, out) {
   if (rec.constellation_hash) celRows += auditRow('Constellation Hash', rec.constellation_hash);
   if (celRows) html += auditSection('Celestial', celRows);
 
-  // === MACHINE ===
+  // === MACHINE === (canonical machine reading — only when present)
   var machRows = '';
-  machRows += auditRow('Fingerprint', rec.machine_fingerprint || '?');
+  if (rec.machine_fingerprint) machRows += auditRow('Fingerprint', rec.machine_fingerprint);
   var recBirth = (typeof BirthText !== 'undefined' && rec.birth_traits)
     ? BirthText.read(rec.birth_traits) : null;
+  if ((recBirth && recBirth.temperament) || rec.birth_temperament)
   machRows += auditRow('Temperament',
     (recBirth && recBirth.temperament) || rec.birth_temperament || '?');
   if (rec.birth_traits && rec.birth_traits.length && typeof BIRTH_TRAITS !== 'undefined') {
@@ -3274,8 +3302,8 @@ function renderAudit(rec, identifier, out) {
   }
   var _recRs = (typeof RarityScore !== 'undefined')
     ? RarityScore.fromRecord(rec) : (rec.rarity_score);
-  machRows += auditRow('Rarity', (typeof _recRs === 'number') ? (_recRs + '') : '?');
-  html += auditSection('Machine', machRows);
+  if (typeof _recRs === 'number') machRows += auditRow('Rarity', _recRs + '');
+  if (machRows) html += auditSection('Machine', machRows);
 
   // === SONG FORENSICS ===
   var songRows = '';
@@ -3375,28 +3403,43 @@ function renderAudit(rec, identifier, out) {
   var moonBright = birth.moon_phase ? (moonIllumPct(birth.moon_phase) / 100) : 0.5;
   songRows += auditRow('Moon Brightness', (moonBright * 100).toFixed(0) + '% \u2192 filter cutoff & dust density');
 
-  if (songRows) html += auditSection('Song Forensics', songRows);
+  // Song forensics is a canonical-chain showcase (modal scale derived from the
+  // sky + hash). Skip it for a core soul that carries no celestial data.
+  if (songRows && (birth.sun || rec.song_name)) html += auditSection('Song Forensics', songRows);
+
+  // === SOUL FIELDS === (the record's own data, not in any section above \u2014
+  // a core/open soul's custom fields, arbitrary or EXIF-style metadata, etc.)
+  var otherRows = '';
+  Object.keys(rec).sort().forEach(function(k) {
+    if (_AUDIT_COVERED[k] || k.charAt(0) === '_') return;
+    otherRows += auditRow(k, _auditFieldValue(rec[k]));
+  });
+  if (otherRows) html += auditSection('Soul Fields', otherRows);
 
   // === FIELD COMPLETENESS ===
   var totalKeys = Object.keys(rec).length;
-  // V1 expected fields. birth_temperament is no longer persisted
-  // (derived at display from birth_traits); rarity_score is derived
-  // from the rarity dict.
-  // V1 expected: origin (free-form dict) replaces flat prompt/seed/etc.
-  var expected = ['identifier', 'content_hash', 'conceived', 'origin', 'width', 'height', 'birth', 'rarity', 'birth_traits', 'machine_fingerprint'];
-  // parent_id is only expected on non-genesis records
-  if (rec.parent_id) expected.push('parent_id');
-  var missing = expected.filter(function(k) { return rec[k] === undefined || rec[k] === null; });
   var fieldRows = '';
   fieldRows += auditRow('Total Fields', totalKeys);
-  fieldRows += auditRow('Expected Core', expected.length + ' fields');
-  if (missing.length === 0) {
-    fieldRows += auditRow('Missing', 'None \u2014 all core fields present', 'audit-pass');
+  if (rec.hash_version === 'open') {
+    // Open souls have no canonical schema \u2014 every field IS the soul (hashed
+    // except the circular pair). There's nothing to be "missing".
+    fieldRows += auditRow('Schema', 'open \u2014 every field is yours, all hashed', 'audit-info');
   } else {
-    fieldRows += auditRow('Missing', missing.join(', '), 'audit-warn');
+    // Canonical-chain V1 expectations. origin (free-form dict) replaces flat
+    // prompt/seed/etc.; birth_temperament is derived at display; rarity_score
+    // is derived from the rarity dict.
+    var expected = ['identifier', 'content_hash', 'conceived', 'origin', 'width', 'height', 'birth', 'rarity', 'birth_traits', 'machine_fingerprint'];
+    if (rec.parent_id) expected.push('parent_id');  // genesis has no parent
+    var missing = expected.filter(function(k) { return rec[k] === undefined || rec[k] === null; });
+    fieldRows += auditRow('Expected Core', expected.length + ' fields');
+    if (missing.length === 0) {
+      fieldRows += auditRow('Missing', 'None \u2014 all core fields present', 'audit-pass');
+    } else {
+      fieldRows += auditRow('Missing', missing.join(', '), 'audit-warn');
+    }
+    if (rec.thumbnail) fieldRows += auditRow('Thumbnail', 'Present (' + rec.thumbnail.length + ' chars)');
+    else fieldRows += auditRow('Thumbnail', 'Missing', 'audit-dim');
   }
-  if (rec.thumbnail) fieldRows += auditRow('Thumbnail', 'Present (' + rec.thumbnail.length + ' chars)');
-  else fieldRows += auditRow('Thumbnail', 'Missing', 'audit-dim');
   if (rec.song_name) fieldRows += auditRow('Song', rec.song_name);
   html += auditSection('Field Completeness', fieldRows);
 

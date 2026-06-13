@@ -107,9 +107,11 @@ const DEFAULT_HASH_VERSION = 1;
 
 // The "open" hash version — the raw / programmatic-adoption model. Mirrors
 // core.py: where integer versions hash a CURATED positive set, "open" INVERTS
-// the rule — hash every field except the structurally-circular pair below. So
-// an adopter's arbitrary fields are all tamper-evident with no schema to opt
-// into (identifier / hash_version / public_key are covered for free).
+// the rule — hash every field except the structurally-circular pair below AND
+// any `_`-prefixed key. `_`-prefixed top-level keys are RESERVED for decoder
+// internals (this page stamps `_source`, `_sealedOriginal`, … onto the fetched
+// record); excluding them keeps the hash stable — without it, a fetched
+// record's `_source` poisons the open hash and WITNESSED falsely fails.
 const OPEN_HASH_VERSION = 'open';
 const HASH_EXCLUDED_OPEN = new Set(['content_hash', 'signature']);
 
@@ -125,7 +127,7 @@ function _hashableFields(record) {
   var hashable = {};
   var keep;
   if (record && record.hash_version === OPEN_HASH_VERSION) {
-    keep = function(k) { return !HASH_EXCLUDED_OPEN.has(k); };
+    keep = function(k) { return !HASH_EXCLUDED_OPEN.has(k) && k.charAt(0) !== '_'; };
   } else {
     var include = _hashSetForRecord(record);
     keep = function(k) { return include.has(k); };
