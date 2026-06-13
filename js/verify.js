@@ -105,9 +105,34 @@ const HASH_INCLUDED_BY_VERSION = {
 const CURRENT_HASH_VERSION = 1;
 const DEFAULT_HASH_VERSION = 1;
 
+// The "open" hash version — the raw / programmatic-adoption model. Mirrors
+// core.py: where integer versions hash a CURATED positive set, "open" INVERTS
+// the rule — hash every field except the structurally-circular pair below. So
+// an adopter's arbitrary fields are all tamper-evident with no schema to opt
+// into (identifier / hash_version / public_key are covered for free).
+const OPEN_HASH_VERSION = 'open';
+const HASH_EXCLUDED_OPEN = new Set(['content_hash', 'signature']);
+
 function _hashSetForRecord(record) {
   var v = (record && record.hash_version) || DEFAULT_HASH_VERSION;
   return HASH_INCLUDED_BY_VERSION[v] || HASH_INCLUDED_BY_VERSION[DEFAULT_HASH_VERSION];
+}
+
+// The subset of `record` the content hash covers, per its hash_version —
+// mirrors core.py _hashable_fields. "open" → everything except the circular
+// pair; integer versions → the curated positive inclusion set.
+function _hashableFields(record) {
+  var hashable = {};
+  var keep;
+  if (record && record.hash_version === OPEN_HASH_VERSION) {
+    keep = function(k) { return !HASH_EXCLUDED_OPEN.has(k); };
+  } else {
+    var include = _hashSetForRecord(record);
+    keep = function(k) { return include.has(k); };
+  }
+  Object.keys(record).filter(keep).sort()
+    .forEach(function(k) { hashable[k] = record[k]; });
+  return hashable;
 }
 
 // Back-compat alias for callers that read the active set directly
@@ -221,11 +246,7 @@ async function sha256_16(obj) {
 
 async function computeContentHash(record) {
   try {
-    var include = _hashSetForRecord(record);
-    var hashable = {};
-    Object.keys(record).filter(function(k) { return include.has(k); }).sort()
-      .forEach(function(k) { hashable[k] = record[k]; });
-    return await sha256_16(hashable);
+    return await sha256_16(_hashableFields(record));
   } catch (e) {
     return null;
   }
