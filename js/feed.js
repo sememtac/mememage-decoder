@@ -4,14 +4,23 @@
 // no nav, no pages — what you scroll is what you get. A conception drops off
 // when its image culls (~7 days) or its soul is removed.
 (function () {
-  // Point the header links at the hosted decoder / validator. The decode face
-  // lives on the souls host (server-injected window.MEMEMAGE_SOULS_BASE); on a
-  // single-domain install with no souls host it's served inline at /decoder.
-  var soulsBase = (window.MEMEMAGE_SOULS_BASE || '').replace(/\/+$/, '');
+  // Point the header links at the decode face (decoder + validator pages).
+  // These live at the ORIGIN of the souls host — the public souls domain on a
+  // split deployment, or the local server itself on a single-domain / desktop
+  // install (which serves /decoder + /validator inline). MEMEMAGE_SOULS_BASE is
+  // the souls *read* base and can carry a path (…/api/souls/), so take its
+  // ORIGIN — a naive string append yields …/api/souls/decoder, which 404s.
+  var soulsBase = (window.MEMEMAGE_SOULS_BASE || '').trim();
+  var origin;
+  try {
+    origin = soulsBase ? new URL(soulsBase, location.href).origin : location.origin;
+  } catch (e) {
+    origin = location.origin;
+  }
   var decLink = document.getElementById('feedDecoderLink');
   var valLink = document.getElementById('feedValidatorLink');
-  if (decLink) decLink.href = (soulsBase || '') + '/decoder';
-  if (valLink) valLink.href = (soulsBase || '') + '/validator';
+  if (decLink) decLink.href = origin + '/decoder';
+  if (valLink) valLink.href = origin + '/validator';
 
   var grid = document.getElementById('feedGrid');
   if (!grid) return;
