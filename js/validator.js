@@ -930,11 +930,20 @@ var _chainPasswords = {};
 // Returns a new record with plaintext fields merged back, or the original
 // if no password is stored or decryption fails. Does not mutate the
 // caller's record — the cache stays the encrypted ciphertext shell.
-async function maybeUnlockRecord(record) {
-  if (!record || !_isDark(record.chain_visibility)) return record;
-  var key = chainDiscriminator(record);
-  var pw = _chainPasswords[key];
-  if (!pw || typeof Access === 'undefined') return record;
+// True when a record carries any encrypted envelope — a canonical dark-matter
+// chain (encrypted_soul + encrypted_chunks) OR a raw core soul sealed with
+// seal(password=…) (encrypted_soul, no chain). The unlock surface keys off
+// THIS, not chain_visibility, so both unlock the same way.
+function _isSealed(record) {
+  return !!(record && (record.encrypted_soul || record.encrypted_chunks));
+}
+
+// Decrypt a record's envelopes with `pw`, returning a NEW merged record
+// (plaintext fields in, the sealed shell kept under _sealedOriginal so the
+// hash still runs over the as-stored ciphertext) — or null if nothing decrypts
+// (wrong password, no Access, no envelopes). Never mutates the input.
+async function _decryptRecord(record, pw) {
+  if (!record || typeof Access === 'undefined' || !pw || !_isSealed(record)) return null;
   var unlocked = Object.assign({}, record);
   var anyOk = false;
   if (record.encrypted_soul) {
@@ -951,16 +960,23 @@ async function maybeUnlockRecord(record) {
       anyOk = true;
     }
   }
-  if (anyOk) unlocked._unlocked = true;
-  // Keep a reference to the as-stored sealed shell. The WITNESSED/verdict
-  // hash must run over the record AS STORED — on dark_matter chains the
-  // stored content_hash covers the sealed shell (encrypted blobs + public
-  // fields) because the hash is computed AFTER encryption strips plaintext.
-  // We merged plaintext above for DISPLAY only; hashing this merged record
-  // would include both plaintext AND leftover ciphertext → false mismatch.
-  // _sealedShellFor() routes every hash recompute back to this original.
+  if (!anyOk) return null;
+  unlocked._unlocked = true;
+  // The WITNESSED/verdict hash must run over the record AS STORED — the stored
+  // content_hash covers the sealed shell (ciphertext + public fields). We
+  // merged plaintext for DISPLAY only; hashing the merged record would poison
+  // it. _sealedShellFor() routes every hash recompute back to this original.
   unlocked._sealedOriginal = record;
   return unlocked;
+}
+
+async function maybeUnlockRecord(record) {
+  // Fire for any sealed record — dark-matter chain OR a core seal(password=…)
+  // soul — using a password stashed by chainDiscriminator (so a mixed drop
+  // unlocks one chain at a time).
+  if (!record || !(_isDark(record.chain_visibility) || _isSealed(record))) return record;
+  var unlocked = await _decryptRecord(record, _chainPasswords[chainDiscriminator(record)]);
+  return unlocked || record;
 }
 
 // The original sealed record to hash for verification. Returns the pre-merge
@@ -3091,8 +3107,32 @@ function _auditFieldValue(v) {
   catch (e) { return '' + v; }
 }
 
+// The last record the Audit tab rendered — so the unlock handler can re-render
+// it decrypted without re-fetching.
+var _auditRec = null, _auditId = null, _auditOut = null;
+
+// Unlock a sealed soul from the Audit tab: decrypt with the typed password and
+// re-render. Works for a dark-matter chain OR a core seal(password=…) soul —
+// _decryptRecord keys off the encrypted_soul/encrypted_chunks envelopes, not
+// chain_visibility. WITNESSED is unaffected (it hashes the sealed shell).
+async function auditUnlock() {
+  var pwEl = document.getElementById('auditUnlockPw');
+  if (!pwEl || !_auditRec) return;
+  var errEl = document.getElementById('auditUnlockErr');
+  var unlocked = await _decryptRecord(_auditRec, pwEl.value);
+  if (!unlocked) {
+    if (errEl) errEl.textContent = 'Wrong password — could not decrypt.';
+    return;
+  }
+  if (typeof chainDiscriminator === 'function') {
+    _chainPasswords[chainDiscriminator(_auditRec)] = pwEl.value;
+  }
+  renderAudit(unlocked, _auditId, _auditOut);
+}
+
 function renderAudit(rec, identifier, out) {
   var html = '';
+  _auditRec = rec; _auditId = identifier; _auditOut = out;   // for auditUnlock
 
   // === IDENTITY ===
   var idRows = '';
@@ -3161,6 +3201,23 @@ function renderAudit(rec, identifier, out) {
     sigRows += auditRow('Risk', 'Thumbnail and non-hashed fields are unprotected', 'audit-warn');
   }
   html += auditSection('Signature (Ed25519)', sigRows);
+
+  // === SEALED === a soul with encrypted fields (dark-matter chain OR a core
+  // seal(password=…)). WITNESSED is already confirmed above against the sealed
+  // shell — no password needed; the password only DECRYPTS the private fields,
+  // locally. Sent nowhere, stored nowhere.
+  if (_isSealed(rec) && !rec._unlocked) {
+    var sealRows =
+        '<div class="audit-row"><span class="audit-val" style="color:#8a8a9a;font-size:0.66rem;line-height:1.5;">'
+      + 'Private fields are encrypted. The record still WITNESSES without the password (the hash covers the sealed shell). Enter the password to decrypt and reveal them locally — it is never sent or stored.</span></div>'
+      + '<div class="audit-row"><span class="audit-label">Password</span><span class="audit-val" style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;">'
+      + '<input id="auditUnlockPw" type="password" placeholder="Creator password" style="flex:1;min-width:140px;background:#0a0a12;color:#c8c8d4;border:1px solid #2a2a40;border-radius:4px;padding:0.25rem 0.5rem;font-size:0.72rem;font-family:inherit;" onkeydown="if(event.key===\'Enter\')auditUnlock()">'
+      + '<button onclick="auditUnlock()" style="background:#2a2a40;color:#c8c8d4;border:1px solid #3a3a55;border-radius:4px;padding:0.25rem 0.7rem;font-size:0.72rem;font-family:inherit;cursor:pointer;">Unlock</button>'
+      + '<span id="auditUnlockErr" style="color:#e06c6c;font-size:0.66rem;"></span></span></div>';
+    html += auditSection('Sealed', sealRows);
+  } else if (rec._unlocked) {
+    html += auditSection('Sealed', auditRow('Status', 'Unlocked — private fields decrypted locally', 'audit-pass'));
+  }
 
   // === CHAIN POSITION ===
   var chainRows = '';
