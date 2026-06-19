@@ -34,6 +34,7 @@ var Starfield = (function() {
   var overlay = null;
   var renderScale = 1;
   var MAX_LONG = 1800;
+  var timer = null;            // pending tick timeout; null while paused (tab hidden)
 
   // Camera state shared with the planetarium. The planetarium reads
   // this for its constellation overlay AND mutates it on user input.
@@ -74,9 +75,19 @@ var Starfield = (function() {
     });
 
     window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', onVisibility);
     resize();
     tick();
     return true;
+  }
+
+  // Pause the render loop while the tab is backgrounded — a hidden page
+  // doesn't need to animate, and stopping the ticker frees CPU/memory on
+  // long-lived tabs (browsers also throttle background timers anyway).
+  // Resume when it returns to the foreground; the timer === null guard
+  // prevents starting a second loop if one is already pending.
+  function onVisibility() {
+    if (!document.hidden && timer === null && canvas) tick();
   }
 
   function resize() {
@@ -148,7 +159,9 @@ var Starfield = (function() {
       } catch (e) {}
     }
 
-    setTimeout(tick, 50);
+    // Reschedule only while visible; a hidden tab pauses here (timer set
+    // to null) and is restarted by onVisibility when refocused.
+    timer = document.hidden ? null : setTimeout(tick, 50);
   }
 
   function setOverlay(fn) { overlay = fn; }

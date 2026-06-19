@@ -74,7 +74,7 @@ var Access = (function() {
     return { ok: true, lat: parts[0] || '', lon: parts[1] || '' };
   }
 
-  // Convenience wrapper for the encrypted_soul envelope. The plaintext
+  // Convenience wrapper for the encrypted_fields envelope. The plaintext
   // is canonical-JSON of all PROTECTED_FIELDS as one dict.
   async function decryptSoul(envelope, password) {
     var res = await decryptEnvelope(envelope, password);

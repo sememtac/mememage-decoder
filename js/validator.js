@@ -931,11 +931,11 @@ var _chainPasswords = {};
 // if no password is stored or decryption fails. Does not mutate the
 // caller's record — the cache stays the encrypted ciphertext shell.
 // True when a record carries any encrypted envelope — a canonical dark-matter
-// chain (encrypted_soul + encrypted_chunks) OR a raw core soul sealed with
-// seal(password=…) (encrypted_soul, no chain). The unlock surface keys off
+// chain (encrypted_fields + encrypted_chunks) OR a raw core soul sealed with
+// seal(password=…) (encrypted_fields, no chain). The unlock surface keys off
 // THIS, not chain_visibility, so both unlock the same way.
 function _isSealed(record) {
-  return !!(record && (record.encrypted_soul || record.encrypted_chunks));
+  return !!(record && (record.encrypted_fields || record.encrypted_chunks));
 }
 
 // Decrypt a record's envelopes with `pw`, returning a NEW merged record
@@ -946,8 +946,8 @@ async function _decryptRecord(record, pw) {
   if (!record || typeof Access === 'undefined' || !pw || !_isSealed(record)) return null;
   var unlocked = Object.assign({}, record);
   var anyOk = false;
-  if (record.encrypted_soul) {
-    var soulRes = await Access.decryptSoul(record.encrypted_soul, pw);
+  if (record.encrypted_fields) {
+    var soulRes = await Access.decryptSoul(record.encrypted_fields, pw);
     if (soulRes.ok && soulRes.soul) {
       Object.keys(soulRes.soul).forEach(function(k) { unlocked[k] = soulRes.soul[k]; });
       anyOk = true;
@@ -1076,7 +1076,7 @@ async function _renderObservatoryFromCache() {
   // Apply any chain passwords entered since the initial drop. For each
   // dark_matter record whose chain has a stored password we replace the
   // entry in `valid` with a copy that has plaintext fields merged back
-  // (encrypted_soul → soul fields; encrypted_chunks → chunks dict).
+  // (encrypted_fields → soul fields; encrypted_chunks → chunks dict).
   // _observatoryCache stays the original ciphertext shell so a wrong
   // password can be retried without re-dropping.
   for (var ui = 0; ui < valid.length; ui++) {
@@ -1156,7 +1156,7 @@ async function _renderObservatoryFromCache() {
     // "we can't tell" from "we verified tampering".
     r._sealed = _isDark(r.chain_visibility)
                 && !r._unlocked
-                && (!!r.encrypted_soul || !!r.encrypted_chunks);
+                && (!!r.encrypted_fields || !!r.encrypted_chunks);
   }
 
   // Accumulate chunks from these records — generic walk over each record's
@@ -1808,8 +1808,8 @@ async function _renderObservatoryFromCache() {
                 && chainDiscriminator(r) === chainKey;
           });
           var probeOk = false;
-          if (probe && probe.encrypted_soul) {
-            var pr = await Access.decryptSoul(probe.encrypted_soul, pw);
+          if (probe && probe.encrypted_fields) {
+            var pr = await Access.decryptSoul(probe.encrypted_fields, pw);
             probeOk = pr.ok;
           } else if (probe && probe.encrypted_chunks) {
             var pc = await Access.decryptChunks(probe.encrypted_chunks, pw);
@@ -3094,7 +3094,7 @@ var _AUDIT_COVERED = {
   birth:1, machine_fingerprint:1, birth_traits:1, birth_temperament:1,
   rarity:1, rarity_score:1, song_name:1, thumbnail:1, about:1, mode:1,
   gps:1, gps_time_locked:1, gps_password_locked:1,
-  encrypted_soul:1, encrypted_chunks:1
+  encrypted_fields:1, encrypted_chunks:1
 };
 
 // Render any value (string / number / boolean / array / object) as a readable,
@@ -3113,7 +3113,7 @@ var _auditRec = null, _auditId = null, _auditOut = null;
 
 // Unlock a sealed soul from the Audit tab: decrypt with the typed password and
 // re-render. Works for a dark-matter chain OR a core seal(password=…) soul —
-// _decryptRecord keys off the encrypted_soul/encrypted_chunks envelopes, not
+// _decryptRecord keys off the encrypted_fields/encrypted_chunks envelopes, not
 // chain_visibility. WITNESSED is unaffected (it hashes the sealed shell).
 async function auditUnlock() {
   var pwEl = document.getElementById('auditUnlockPw');

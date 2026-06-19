@@ -95,7 +95,7 @@ const HASH_INCLUDED_V1 = new Set([
   // these blobs are what remains and they're what we hash. On light
   // chains, only gps_password_locked is typically present (when a
   // creator password is set); the other two are absent and skipped.
-  'encrypted_soul', 'encrypted_chunks', 'gps_password_locked',
+  'encrypted_fields', 'encrypted_chunks', 'gps_password_locked',
 ]);
 
 const HASH_INCLUDED_BY_VERSION = {

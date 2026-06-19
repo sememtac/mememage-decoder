@@ -1020,7 +1020,7 @@ function renderCert(meta, options) {
     // viewer hasn't provided a password yet, surface a single input
     // right under the badges. The decoder cert is otherwise nearly
     // empty for dark records (every section's data lives in
-    // encrypted_soul). One password unlocks: protected fields,
+    // encrypted_fields). One password unlocks: protected fields,
     // encrypted_chunks, and the encrypted thumbnail (which re-enables
     // the EMBODIED dHash comparison). Re-renders the cert in place.
     //
@@ -1051,7 +1051,7 @@ function renderCert(meta, options) {
       relockRow.appendChild(relockBtn);
       plate.appendChild(relockRow);
     }
-    if (!isSample && _isDarkChain && meta.encrypted_soul && !_alreadyUnlocked
+    if (!isSample && _isDarkChain && meta.encrypted_fields && !_alreadyUnlocked
         && typeof Access !== 'undefined') {
       var _chainKey = (meta.decoder_hash || meta.heart_star_id || meta.identifier || '').slice(0, 24);
       var _storedPw = '';
@@ -1091,7 +1091,7 @@ function renderCert(meta, options) {
         unlockBtn.disabled = true; var prev = unlockBtn.textContent;
         unlockBtn.textContent = 'Decrypting\u2026';
         try {
-          var soulRes = await Access.decryptSoul(meta.encrypted_soul, pw);
+          var soulRes = await Access.decryptSoul(meta.encrypted_fields, pw);
           if (!soulRes.ok) {
             unlockErr.textContent = soulRes.error || 'Wrong password.';
             return;
@@ -1161,7 +1161,7 @@ function renderCert(meta, options) {
       if (_storedPw) {
         setTimeout(function() {
           (async function() {
-            var r = await Access.decryptSoul(meta.encrypted_soul, _storedPw);
+            var r = await Access.decryptSoul(meta.encrypted_fields, _storedPw);
             if (r.ok) _doDmUnlock(_storedPw);
           })();
         }, 0);
@@ -1699,7 +1699,7 @@ function renderCert(meta, options) {
   // either mostly-empty plate or the unlock prompt baked in. Earned
   // alongside the rest of the body view.
   var _stillLocked = (meta.chain_visibility === 1 || meta.chain_visibility === 'dark_matter')
-                     && meta.encrypted_soul && !meta._unlocked;
+                     && meta.encrypted_fields && !meta._unlocked;
   if (barId && barHash && !isSample && _imageWasPresent && !_stillLocked) {
     var saveBtn = document.createElement('button');
     saveBtn.textContent = 'Save Certificate';
