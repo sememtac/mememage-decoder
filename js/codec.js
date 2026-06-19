@@ -110,15 +110,35 @@ function detectBarBands(px,w,h){
   return {m:magenta_w,y:yellow_w,c:cyan_w};
 }
 
-function extractBits(px,w,h,ppb){
+// Per-image bit threshold for the centered bar. Otsu over the middle 60% of the
+// bottom rows (avoids the M/Y/C bands, scale-robust — no fixed band offsets),
+// returned as the MIDPOINT of the two class means rather than the boundary
+// index (robust on exact pixels, where a boundary lands on a level). Returns
+// null on a flat region. Mirrors mememage/bar.py:_otsu_threshold.
+function otsuThreshold(px,w,h){
+  if(w<5||h<1)return null;
+  var x0=Math.floor(w*0.20),x1=Math.floor(w*0.80);if(x1<=x0)return null;
+  var hist=new Array(256).fill(0),total=0,y0=Math.max(0,h-SIG_ROWS);
+  for(var y=y0;y<h;y++)for(var x=x0;x<x1;x++){var i=(y*w+x)*4;
+    hist[(Math.round((px[i]+px[i+1]+px[i+2])/3))&255]++;total++;}
+  if(total===0)return null;
+  var sumAll=0;for(var k=0;k<256;k++)sumAll+=k*hist[k];
+  var sumB=0,wB=0,best=-1,thr=null;
+  for(var t=0;t<256;t++){wB+=hist[t];if(wB===0)continue;var wF=total-wB;if(wF===0)break;
+    sumB+=t*hist[t];var mB=sumB/wB,mF=(sumAll-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF);
+    if(v>best){best=v;thr=(mB+mF)/2;}}
+  return thr;
+}
+
+function extractBits(px,w,h,ppb,thr){
   // 1:1 (native pixel-scale) extraction. Use extractBitsAtScale for
   // scale-aware reading on resized images.
-  ppb=ppb||PIXELS_PER_BIT;
+  ppb=ppb||PIXELS_PER_BIT;if(thr===undefined)thr=RGB_THRESHOLD;
   const bits=[],dataPerRow=w-HEADER_PIXELS-FOOTER_PIXELS,bitsPerRow=Math.floor(dataPerRow/ppb);
   for(let row=0;row<SIG_ROWS;row++){const y=h-1-row;
     for(let b=0;b<bitsPerRow;b++){
       const cx=HEADER_PIXELS+b*ppb+Math.floor(ppb/2);
-      const i=(y*w+cx)*4;bits.push(((px[i]+px[i+1]+px[i+2])/3)>=RGB_THRESHOLD?1:0);}}
+      const i=(y*w+cx)*4;bits.push(((px[i]+px[i+1]+px[i+2])/3)>=thr?1:0);}}
   return bits;
 }
 
@@ -126,9 +146,9 @@ function extractBits(px,w,h,ppb){
 // Given an assumed scale factor, infer where each bit's center pixel
 // would have landed in the original layout, then map back to a pixel
 // in the current (scaled) image and read its luminance.
-function extractBitsAtScale(px,w,h,scale,ppb){
-  ppb=ppb||PIXELS_PER_BIT;
-  if(Math.abs(scale-1.0)<0.01) return extractBits(px,w,h,ppb);
+function extractBitsAtScale(px,w,h,scale,ppb,thr){
+  ppb=ppb||PIXELS_PER_BIT;if(thr===undefined)thr=RGB_THRESHOLD;
+  if(Math.abs(scale-1.0)<0.01) return extractBits(px,w,h,ppb,thr);
   var orig_w=Math.round(w/scale);
   var orig_data_per_row=orig_w-HEADER_PIXELS-FOOTER_PIXELS;
   var orig_bits_per_row=Math.floor(orig_data_per_row/ppb);
@@ -140,7 +160,7 @@ function extractBitsAtScale(px,w,h,scale,ppb){
       var sx=Math.round(orig_cx*scale);
       if(sx<0||sx>=w) break;
       var i=(y*w+sx)*4;
-      bits.push(((px[i]+px[i+1]+px[i+2])/3)>=RGB_THRESHOLD?1:0);
+      bits.push(((px[i]+px[i+1]+px[i+2])/3)>=thr?1:0);
     }
   }
   return bits;
@@ -185,7 +205,8 @@ function findFooterStart(px,w,y){
 // Anchors to both band edges, evenly divides [a,b] by the frame bit count
 // (swept; CRC self-selects), and reads the two rows averaged (noise immunity)
 // then the bottom row alone (survives a 1px bottom crop).
-function decodeEvenFill(px,w,h){
+function decodeEvenFill(px,w,h,thr){
+  if(thr===undefined)thr=RGB_THRESHOLD;
   if(h<1||w<3*HEADER_PIXELS)return null;
   var y=h-1;
   var a0=findHeaderEnd(px,w,y);
@@ -216,7 +237,7 @@ function decodeEvenFill(px,w,h){
               var idx=(rows[r]*w+cx)*4;
               acc+=(px[idx]+px[idx+1]+px[idx+2])/3;
             }
-            bits.push((acc/rows.length)>=RGB_THRESHOLD?1:0);
+            bits.push((acc/rows.length)>=thr?1:0);
           }
           if(!ok)continue;
           var frame=decodeFrame(bits);
@@ -236,41 +257,49 @@ function decodeEvenFill(px,w,h){
 // {identifier, content_hash} that decodes cleanly, or null.
 // Mirrors mememage/bar.py:extract_bar.
 function extractBarScaleAware(px,w,h){
-  // High-res even-fill layout — full-width, both-ends anchored.
-  var ef=decodeEvenFill(px,w,h);
-  if(ef){var efp=decodePayload(ef.payload);if(efp)return efp;}
-  // Fast 1:1 path — by far the common case (no resize).
-  if(detectBar(px,w,h)){
-    for(var ppb0 of [PIXELS_PER_BIT,2]){
-      var b0=extractBits(px,w,h,ppb0);
-      var f0=decodeFrame(b0);
-      if(f0){ var p0=decodePayload(f0.payload); if(p0) return p0; }
-    }
-  }
-  // Scale-aware path — measure band widths, estimate scale, sweep.
+  // Brightness threshold candidates: the per-image Otsu midpoint reads the
+  // centered bar (levels hug the dominant brightness); RGB_THRESHOLD (128)
+  // reads legacy absolute bars and is always present as a fallback. Otsu is
+  // tried first; CRC + RS self-select, so a wrong threshold just fails frame
+  // validation and the next candidate is tried. Mirrors bar.py:extract_bar.
+  var thrs=[];var ot=otsuThreshold(px,w,h);if(ot!==null)thrs.push(ot);thrs.push(RGB_THRESHOLD);
+
+  // Threshold-independent detection — done once, reused across candidates.
+  var hasBar=detectBar(px,w,h);
   var bands=detectBarBands(px,w,h);
-  if(!bands) return null;
-  var avg=(bands.m+bands.y+bands.c)/3;
-  var raw_scale=avg/HEADER_BAND;
-  var candidates=[];
-  if(Math.abs(raw_scale-1.0)>=0.05){
-    // Band-width measurement has ±5% noise from JPEG / interpolation,
-    // so sweep ±8% in 1% steps around the estimate. CRC self-selects
-    // the right one.
+  var scaleCands=[];
+  if(bands && Math.abs((bands.m+bands.y+bands.c)/3/HEADER_BAND-1.0)>=0.05){
+    var raw_scale=(bands.m+bands.y+bands.c)/3/HEADER_BAND;
+    // Band-width measurement has ±5% noise from JPEG / interpolation, so sweep
+    // ±8% in 1% steps around the estimate. CRC self-selects the right one.
     for(var off=-8;off<=8;off++){
       var s=Math.round((raw_scale+off*0.01)*1000)/1000;
-      if(s>0.3 && s<3.0 && Math.abs(s-1.0)>=0.005 && candidates.indexOf(s)<0){
-        candidates.push(s);
-      }
+      if(s>0.3 && s<3.0 && Math.abs(s-1.0)>=0.005 && scaleCands.indexOf(s)<0) scaleCands.push(s);
     }
   }
-  for(var ci=0;ci<candidates.length;ci++){
-    for(var ppb of [PIXELS_PER_BIT,2]){
-      var bits=extractBitsAtScale(px,w,h,candidates[ci],ppb);
-      var frame=decodeFrame(bits);
-      if(!frame) continue;
-      var p=decodePayload(frame.payload);
-      if(p) return p;
+
+  for(var ti=0;ti<thrs.length;ti++){
+    var thr=thrs[ti];
+    // High-res even-fill layout — full-width, both-ends anchored.
+    var ef=decodeEvenFill(px,w,h,thr);
+    if(ef){var efp=decodePayload(ef.payload);if(efp)return efp;}
+    // Fast 1:1 path — by far the common case (no resize).
+    if(hasBar){
+      for(var ppb0 of [PIXELS_PER_BIT,2]){
+        var b0=extractBits(px,w,h,ppb0,thr);
+        var f0=decodeFrame(b0);
+        if(f0){ var p0=decodePayload(f0.payload); if(p0) return p0; }
+      }
+    }
+    // Scale-aware path — sweep candidate scales from the measured band widths.
+    for(var ci=0;ci<scaleCands.length;ci++){
+      for(var ppb of [PIXELS_PER_BIT,2]){
+        var bits=extractBitsAtScale(px,w,h,scaleCands[ci],ppb,thr);
+        var frame=decodeFrame(bits);
+        if(!frame) continue;
+        var p=decodePayload(frame.payload);
+        if(p) return p;
+      }
     }
   }
   return null;
