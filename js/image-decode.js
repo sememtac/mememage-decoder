@@ -72,51 +72,56 @@ async function decodeImageBar(file) {
 
   var frame = null, usedPpb = 3, detected = false;
 
-  // High-res even-fill layout first (full-width, both-ends anchored,
-  // drift-free). Mirrors Python's extract_bar order.
-  var efFrame = decodeEvenFill(px, img.width, img.height);
-  if (efFrame) { frame = efFrame; detected = true; }
+  // Brightness threshold candidates: the per-image Otsu midpoint reads the
+  // centered bar (levels hug the dominant brightness — quiet on dark images);
+  // RGB_THRESHOLD (128) reads legacy absolute bars and is the always-present
+  // fallback. CRC + RS self-select, so a wrong threshold just fails frame
+  // validation. Mirrors bar.py:extract_bar / codec.js:extractBarScaleAware.
+  var thrs = [];
+  var ot = otsuThreshold(px, img.width, img.height);
+  if (ot !== null) thrs.push(ot);
+  thrs.push(RGB_THRESHOLD);
 
-  // Cheap 1:1 fast path (no resize). Bands detected at the canonical
-  // pixel positions; extract at ppb=3 then ppb=2.
-  if (!frame) {
-    detected = detectBar(px, img.width, img.height);
-    if (detected) {
-      var ppbCandidates = [3, 2];
-      for (var i = 0; i < ppbCandidates.length; i++) {
-        var ppb = ppbCandidates[i];
-        var f = decodeFrame(extractBits(px, img.width, img.height, ppb));
-        if (f) { frame = f; usedPpb = ppb; break; }
+  // Band detection is threshold-independent — do it once, reuse per candidate.
+  var hasBar = detectBar(px, img.width, img.height);
+  var bands = detectBarBands(px, img.width, img.height);
+  if (hasBar || bands) detected = true;
+  var scales = [];
+  if (bands) {
+    var raw_scale = (bands.m + bands.y + bands.c) / 3 / HEADER_BAND;
+    if (Math.abs(raw_scale - 1.0) >= 0.05) {
+      for (var off = -8; off <= 8; off++) {
+        var s = Math.round((raw_scale + off * 0.01) * 1000) / 1000;
+        if (s > 0.3 && s < 3.0 && Math.abs(s - 1.0) >= 0.005 && scales.indexOf(s) < 0) scales.push(s);
       }
     }
   }
-  // If 1:1 didn't find bands OR couldn't decode, fall through to the
-  // scale-aware sweep. detectBarBands measures actual band widths and
-  // tolerates resampled images (e.g. mememage.art receiving an image
-  // that a platform downscaled). Mirrors Python's extract_bar.
-  if (!frame) {
-    var bands = detectBarBands(px, img.width, img.height);
-    if (bands) {
-      detected = true;
-      var avg = (bands.m + bands.y + bands.c) / 3;
-      var raw_scale = avg / HEADER_BAND;
-      var scales = [];
-      if (Math.abs(raw_scale - 1.0) >= 0.05) {
-        for (var off = -8; off <= 8; off++) {
-          var s = Math.round((raw_scale + off * 0.01) * 1000) / 1000;
-          if (s > 0.3 && s < 3.0 && Math.abs(s - 1.0) >= 0.005 && scales.indexOf(s) < 0) {
-            scales.push(s);
-          }
-        }
+
+  for (var ti = 0; ti < thrs.length && !frame; ti++) {
+    var thr = thrs[ti];
+
+    // High-res even-fill layout first (full-width, both-ends anchored).
+    var efFrame = decodeEvenFill(px, img.width, img.height, thr);
+    if (efFrame) { frame = efFrame; break; }
+
+    // Cheap 1:1 fast path (no resize): ppb=3 then ppb=2.
+    if (hasBar) {
+      for (var i = 0; i < 2; i++) {
+        var ppb = [3, 2][i];
+        var f = decodeFrame(extractBits(px, img.width, img.height, ppb, thr));
+        if (f) { frame = f; usedPpb = ppb; break; }
       }
-      outer:
-      for (var si = 0; si < scales.length; si++) {
-        for (var pi = 0; pi < 2; pi++) {
-          var pb = [3, 2][pi];
-          var bits = extractBitsAtScale(px, img.width, img.height, scales[si], pb);
-          var fr = decodeFrame(bits);
-          if (fr) { frame = fr; usedPpb = pb; break outer; }
-        }
+    }
+    if (frame) break;
+
+    // Scale-aware sweep for resampled images.
+    outer:
+    for (var si = 0; si < scales.length; si++) {
+      for (var pi = 0; pi < 2; pi++) {
+        var pb = [3, 2][pi];
+        var bits = extractBitsAtScale(px, img.width, img.height, scales[si], pb, thr);
+        var fr = decodeFrame(bits);
+        if (fr) { frame = fr; usedPpb = pb; break outer; }
       }
     }
   }
