@@ -73,33 +73,6 @@
   border-color: rgba(255, 255, 255, 0.45);
   color: white;
 }
-/* Command-palette open button — circular icon-only to match the
-   glossary button next to it. Hotkey hint lives inside the palette
-   itself (footer line "⌘K / Ctrl-K to open · ↑/↓ · Enter"). */
-.page-header-palette {
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
-  font-family: inherit;
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.page-header-palette:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.45);
-  color: white;
-}
-.page-header-palette-icon { font-size: inherit; line-height: 1; }
-
 .glossary-link {
   display: inline-flex;
   align-items: center;
@@ -129,60 +102,6 @@
 .config-modal-glossary {
   width: min(720px, 100%);
   max-height: 82vh;
-}
-.config-modal-palette {
-  width: min(620px, 100%);
-  max-height: 70vh;
-}
-.palette-search {
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(0, 0, 0, 0.025);
-}
-.palette-search .config-input { width: 100%; font-size: 0.85rem; }
-.palette-list {
-  overflow: auto;
-  flex: 1;
-  padding: 0.3rem;
-}
-.palette-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.6rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.78rem;
-  color: #1a1a20;
-}
-.palette-row:hover { background: rgba(0, 0, 0, 0.05); }
-.palette-row-active {
-  background: rgba(200, 168, 80, 0.22);
-}
-.palette-label {
-  font-weight: 600;
-}
-.palette-context {
-  font-size: 0.65rem;
-  color: rgba(0, 0, 0, 0.5);
-  font-style: italic;
-  white-space: nowrap;
-}
-.palette-empty {
-  padding: 1rem;
-  text-align: center;
-  color: rgba(0, 0, 0, 0.5);
-}
-/* Brief warm-gold flash on the jumped-to control so the user sees
-   where they landed. */
-@keyframes palette-flash-anim {
-  0%   { box-shadow: 0 0 0 4px rgba(200, 168, 80, 0.7); }
-  100% { box-shadow: 0 0 0 4px rgba(200, 168, 80, 0); }
-}
-.palette-flash {
-  animation: palette-flash-anim 1.5s ease-out;
-  border-radius: 4px;
 }
 .glossary-search {
   padding: 0.5rem 1rem;
@@ -3676,7 +3595,7 @@ label > input[type="checkbox"] {
  *     staying tappable on most phones)
  *   - Complex multi-column rows (chains, channels, profiles, pending
  *     sessions, ticket cell) collapse to single-column or wrap
- *   - Modals fit the viewport; palette/glossary readable
+ *   - Modals fit the viewport; glossary readable
  *   - Header actions don't overlap the wordmark
  *   - Welcome card, forecast, recent-sessions all stack cleanly
  *
@@ -3888,11 +3807,8 @@ label > input[type="checkbox"] {
   .config-modal { padding: 0.6rem; }
   .config-modal-card { max-height: 90vh; }
   .config-modal-glossary { width: 100%; }
-  .config-modal-palette  { width: 100%; }
   .glossary-entry-label  { font-size: 0.86rem; }
   .glossary-entry-body   { font-size: 0.78rem; }
-  .palette-row           { font-size: 0.82rem; padding: 0.5rem 0.7rem; }
-  .palette-context       { display: none; }  /* secondary on mobile */
 
   /* Sync / Push categories — wider labels wrap on phones */
   .config-sync-categories label { flex-wrap: wrap; }
