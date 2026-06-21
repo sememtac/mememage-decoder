@@ -183,6 +183,15 @@
     overflow: hidden;
     transition: height var(--compact-duration) var(--compact-ease);
   }
+  /* By Word (lookup) hugs its content instead of holding the fixed 365px —
+     so when no error is showing, the box collapses to the form and the
+     preview/cert sit right beneath it (no floated empty error gap). The
+     :has(error) and layout-active rules still let it grow to fit an error. */
+  .input-panel#lookupPanel {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
   /* Mobile: the system box fits on one screen. No scrolling inside
      the box, no height expansion when Source opens. Every tab reserves
      the same height (360px) — big enough to accommodate the tallest
@@ -520,12 +529,17 @@
   }
   .panel-error-body strong { color: #2a2a32; font-weight: 500; }
   .panel-error-body em { font-style: italic; color: inherit; }
-  /* Empty slots still occupy their reserved space so the error block's
-     y-position is identical whether errors are present or not, and
-     doesn't shift when Source opens/closes or the hint varies in
-     height above. The color: transparent on empty keeps the invisible
-     reserved region from competing for attention. */
-  .panel-error-head:empty, .panel-error-body:empty { color: transparent; }
+  /* Empty error slots collapse completely — no reserved height, no
+     margin-top:auto push — so a panel without an error is compact and the
+     content below (preview, cert) sits right under the form. When an error
+     IS present the slot shows normally and the box grows to fit it (the
+     :has(error) and layout-active rules handle the expand). */
+  .panel-error-head:empty, .panel-error-body:empty {
+    color: transparent;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+  }
 
   /* By Word source configuration — mirrors validator's audit source.
      Left-aligned summary + inline row, matches the yin layout. */
