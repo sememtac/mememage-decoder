@@ -193,7 +193,7 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
     // the live canvas to an offscreen buffer and embed the bar in the
     // bottom 2 rows before PNG encoding. The live canvas is untouched
     // so the on-screen render stays visually clean.
-    if (barPayloadBytes && typeof encodeFrame === 'function' && typeof embedBits === 'function') {
+    if (barPayloadBytes && typeof embedBarPayload === 'function') {
       try {
         srcCanvas = document.createElement('canvas');
         srcCanvas.width = canvas.width;
@@ -201,9 +201,8 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
         var sctx = srcCanvas.getContext('2d');
         sctx.drawImage(canvas, 0, 0);
         var img = sctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
-        var frame = encodeFrame(barPayloadBytes);
-        var ppb = srcCanvas.width >= 1024 ? 3 : 2;
-        embedBits(img.data, srcCanvas.width, srcCanvas.height, frame, ppb);
+        // Single canonical writer (codec.js) — chooses layout + ppb itself.
+        embedBarPayload(img.data, srcCanvas.width, srcCanvas.height, barPayloadBytes);
         sctx.putImageData(img, 0, 0);
       } catch (e) {
         // Bar embed failed (e.g. canvas too narrow for fragment at 2px/bit)

@@ -81,8 +81,8 @@ function rarityCellColors(tierColor) {
 // Uses html2canvas-pro to walk the live DOM with canvas primitives —
 // no SVG foreignObject (which Chromium taints defensively regardless
 // of payload). Output canvas is extended by 2 rows so the bar embed
-// (encodeFrame + embedBits) makes the saved PNG independently
-// verifiable.
+// (embedBarPayload — the canonical codec.js writer) makes the saved
+// PNG independently verifiable.
 // =====================================================================
 function _saveViaAnchor(blob, filename) {
   // Desktop fallback path — synthesizes an <a download> click. On iOS
@@ -248,16 +248,16 @@ function _saveLivePlate(plate, barId, barHash) {
         o.fillRect(0, 0, fW, fH);
         o.drawImage(rendered, 0, 0);
 
-        if (typeof encodeFrame === 'function' && typeof embedBits === 'function') {
-          var ps = barId + '\x00' + barHash;
-          var pb = new TextEncoder().encode(ps);
-          var fb = encodeFrame(pb);
-          if (fb) {
-            var pp = fW >= 1024 ? 3 : 2;
-            var px = o.getImageData(0, 0, fW, fH);
-            embedBits(px.data, fW, fH, fb, pp);
+        if (typeof embedBarPayload === 'function') {
+          // Single canonical writer (codec.js) — same centered-brightness,
+          // dominant-tinted, layout-by-width bar the mint writes. It picks the
+          // layout + ppb itself, so no width-threshold guessing here.
+          var pb = new TextEncoder().encode(barId + '\x00' + barHash);
+          var px = o.getImageData(0, 0, fW, fH);
+          try {
+            embedBarPayload(px.data, fW, fH, pb);
             o.putImageData(px, 0, 0);
-          }
+          } catch (e) { /* too narrow for the payload — save without a bar */ }
         }
 
         out.toBlob(function(blob) {

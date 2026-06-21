@@ -370,58 +370,130 @@ function encodeFrame(payloadBytes) {
   return header.concat(codeword);
 }
 
-function embedBits(px, w, h, frameBytes, ppb) {
-  ppb = ppb || 3;
-  // Convert frame bytes to bits
-  var bits = [];
-  for (var i = 0; i < frameBytes.length; i++) {
-    for (var j = 7; j >= 0; j--) bits.push((frameBytes[i] >> j) & 1);
+// =====================================================================
+// BAR WRITER — a FAITHFUL port of mememage/bar.py:embed_into. This is the
+// single source of truth for writing a bar in the browser (Save Certificate,
+// reliquary reconstruct, band-PNG save). It MUST stay byte-for-byte identical
+// to the Python writer — enforced by tests/bar_encode_parity.cjs +
+// tests/test_bar_js_parity.py. The bar is the technique; when it evolves, both
+// sides change in lockstep and the parity test fails on any drift.
+// =====================================================================
+
+// Python round() uses banker's rounding (half-to-even); JS Math.round rounds
+// half UP. They diverge at .5 in dominant-color and even-fill math, so the
+// port needs this to match Python exactly.
+function pyRound(x) {
+  var f = Math.floor(x);
+  var d = x - f;
+  if (d < 0.5) return f;
+  if (d > 0.5) return f + 1;
+  return (f % 2 === 0) ? f : f + 1;  // exactly .5 -> nearest even
+}
+function _clamp8(v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
+function _setPx(px, w, x, y, rgb) {
+  var i = (y * w + x) * 4;
+  px[i] = rgb[0]; px[i+1] = rgb[1]; px[i+2] = rgb[2]; px[i+3] = 255;
+}
+
+// Mirror bar.py:_dominant_color — mean color of the rows just above the bar
+// (last LOCAL_CONTEXT_ROWS), or the whole image when too short.
+function _dominantColor(px, w, h) {
+  var ce = h - SIG_ROWS;
+  var cs = Math.max(0, ce - LOCAL_CONTEXT_ROWS);
+  var y0, y1;
+  if (ce <= cs) { y0 = 0; y1 = h; } else { y0 = cs; y1 = ce; }
+  var tr = 0, tg = 0, tb = 0, count = 0;
+  for (var y = y0; y < y1; y++) {
+    for (var x = 0; x < w; x++) {
+      var i = (y * w + x) * 4;
+      tr += px[i]; tg += px[i+1]; tb += px[i+2]; count++;
+    }
   }
+  if (count === 0) return [128, 128, 128];
+  return [pyRound(tr / count), pyRound(tg / count), pyRound(tb / count)];
+}
 
-  var dataPerRow = w - HEADER_PIXELS - FOOTER_PIXELS;
-  var bitsPerRow = Math.floor(dataPerRow / ppb);
-  var bitIdx = 0;
+var _HEADER_COLORS = [[255,0,255],[255,255,0],[0,255,255]];   // M, Y, C
+var _FOOTER_COLORS = [[0,255,255],[255,255,0],[255,0,255]];   // C, Y, M
+function _paintBands(px, w, y) {
+  for (var ci = 0; ci < 3; ci++)
+    for (var p = 0; p < HEADER_BAND; p++)
+      _setPx(px, w, ci * HEADER_BAND + p, y, _HEADER_COLORS[ci]);
+  for (var ci2 = 0; ci2 < 3; ci2++)
+    for (var p2 = 0; p2 < HEADER_BAND; p2++)
+      _setPx(px, w, (w - FOOTER_PIXELS) + ci2 * HEADER_BAND + p2, y, _FOOTER_COLORS[ci2]);
+}
 
-  for (var row = 0; row < SIG_ROWS; row++) {
-    var y = h - 1 - row;
-
-    // M/Y/C header bands (8px each)
-    for (var bx = 0; bx < HEADER_BAND; bx++) {
-      var pi = (y * w + bx) * 4;
-      px[pi] = 255; px[pi+1] = 0; px[pi+2] = 255; px[pi+3] = 255; // Magenta
+// Mirror bar.py:_write_even_fill
+function _writeEvenFill(px, w, h, bits, bitRgb) {
+  var a = HEADER_PIXELS, b = w - FOOTER_PIXELS, span = b - a, n = bits.length;
+  var rows = [h - 1, h - 2];
+  for (var r = 0; r < rows.length; r++) {
+    var y = rows[r];
+    _paintBands(px, w, y);
+    for (var i = 0; i < n; i++) {
+      var x0 = a + pyRound(i * span / n);
+      var x1 = a + pyRound((i + 1) * span / n);
+      var rgb = bitRgb(bits[i]);
+      for (var x = x0; x < x1; x++) _setPx(px, w, x, y, rgb);
     }
-    for (var bx2 = HEADER_BAND; bx2 < 2*HEADER_BAND; bx2++) {
-      var pi2 = (y * w + bx2) * 4;
-      px[pi2] = 255; px[pi2+1] = 255; px[pi2+2] = 0; px[pi2+3] = 255; // Yellow
-    }
-    for (var bx3 = 2*HEADER_BAND; bx3 < 3*HEADER_BAND; bx3++) {
-      var pi3 = (y * w + bx3) * 4;
-      px[pi3] = 0; px[pi3+1] = 255; px[pi3+2] = 255; px[pi3+3] = 255; // Cyan
-    }
+  }
+}
 
-    // Data pixels
-    for (var b = 0; b < bitsPerRow && bitIdx < bits.length; b++, bitIdx++) {
-      var val = bits[bitIdx] ? 192 : 64;
-      for (var p = 0; p < ppb; p++) {
-        var dx = HEADER_PIXELS + b * ppb + p;
-        var di = (y * w + dx) * 4;
-        px[di] = val; px[di+1] = val; px[di+2] = val; px[di+3] = 255;
+// Mirror bar.py:_write_sequential
+function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen) {
+  var totalDataPixels = SIG_ROWS * dataWidth;
+  var ppb = PIXELS_PER_BIT;
+  var capWide = Math.floor(Math.floor(totalDataPixels / PIXELS_PER_BIT) / 8) - 8 - RS_NSYM;
+  if (payloadLen > capWide) {
+    ppb = PIXELS_PER_BIT_NARROW;
+    var capNarrow = Math.floor(Math.floor(totalDataPixels / PIXELS_PER_BIT_NARROW) / 8) - 8 - RS_NSYM;
+    if (payloadLen > capNarrow) throw new Error('Bar payload too large for image width');
+  }
+  var bitsPerRow = Math.floor(dataWidth / ppb);
+  for (var ro = 0; ro < SIG_ROWS; ro++) {
+    var y = h - 1 - ro;
+    _paintBands(px, w, y);
+    var rowStart = ro * bitsPerRow;
+    for (var bil = 0; bil < bitsPerRow; bil++) {
+      var bi = rowStart + bil;
+      var baseX = HEADER_PIXELS + bil * ppb;
+      if (bi < bits.length) {
+        var rgb = bitRgb(bits[bi]);
+        for (var p = 0; p < ppb; p++) _setPx(px, w, baseX + p, y, rgb);
+      } else {
+        var fill = bitRgb(0);
+        for (var p2 = 0; p2 < ppb; p2++)
+          if (baseX + p2 < w - FOOTER_PIXELS) _setPx(px, w, baseX + p2, y, fill);
       }
     }
+  }
+}
 
-    // C/Y/M footer bands (mirrored)
-    for (var fx = 0; fx < HEADER_BAND; fx++) {
-      var fi = (y * w + (w - 1 - fx)) * 4;
-      px[fi] = 255; px[fi+1] = 0; px[fi+2] = 255; px[fi+3] = 255; // Magenta (outermost)
-    }
-    for (var fx2 = HEADER_BAND; fx2 < 2*HEADER_BAND; fx2++) {
-      var fi2 = (y * w + (w - 1 - fx2)) * 4;
-      px[fi2] = 255; px[fi2+1] = 255; px[fi2+2] = 0; px[fi2+3] = 255; // Yellow
-    }
-    for (var fx3 = 2*HEADER_BAND; fx3 < 3*HEADER_BAND; fx3++) {
-      var fi3 = (y * w + (w - 1 - fx3)) * 4;
-      px[fi3] = 0; px[fi3+1] = 255; px[fi3+2] = 255; px[fi3+3] = 255; // Cyan
-    }
+// Embed a bar carrying `payloadBytes` into the bottom 2 rows of an RGBA pixel
+// buffer, IN PLACE. Faithful port of bar.py:embed_into. `payloadBytes` is a
+// Uint8Array / array of bytes (e.g. TextEncoder().encode(id + "\0" + hash)).
+function embedBarPayload(px, w, h, payloadBytes) {
+  var frame = encodeFrame(payloadBytes);
+  var bits = [];
+  for (var i = 0; i < frame.length; i++)
+    for (var j = 7; j >= 0; j--) bits.push((frame[i] >> j) & 1);
+
+  var dom = _dominantColor(px, w, h);
+  var domAvg = (dom[0] + dom[1] + dom[2]) / 3;
+  var half = BAR_DELTA / 2;
+  var center = Math.max(half, Math.min(255 - half, domAvg));
+  var lo = center - half, hi = center + half;
+  function bitRgb(bit) {
+    var off = (bit ? hi : lo) - domAvg;
+    return [_clamp8(pyRound(dom[0] + off)), _clamp8(pyRound(dom[1] + off)), _clamp8(pyRound(dom[2] + off))];
+  }
+
+  var dataWidth = w - HEADER_PIXELS - FOOTER_PIXELS;
+  if (dataWidth >= PIXELS_PER_BIT * bits.length) {
+    _writeEvenFill(px, w, h, bits, bitRgb);
+  } else {
+    _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadBytes.length);
   }
   return true;
 }
@@ -429,29 +501,24 @@ function embedBits(px, w, h, frameBytes, ppb) {
 // =====================================================================
 // CANONICAL BAR GENERATOR — builds a 2-row PNG of the canonical bar
 // payload (mememage-XXXX\0<hash>) for the validator's reconstruct flow.
-// Returns a Promise<Blob> of the bar PNG. Width is derived from the
-// payload size at 2px/bit, plus the 48px M/Y/C bands.
+// Returns a Promise<Blob> of the bar PNG. Uses the same writer as everything
+// else, so the strip is exactly what Python would produce for a 2-row image.
 // =====================================================================
 function generateCanonicalBarPng(identifier, contentHash) {
-  var payload = identifier + '\x00' + contentHash;
-  var payloadBytes = new TextEncoder().encode(payload);
+  var payloadBytes = new TextEncoder().encode(identifier + '\x00' + contentHash);
   var frame = encodeFrame(payloadBytes);
   var totalBits = frame.length * 8;
-  var ppb = 2;
-  // Bits split across SIG_ROWS (2). Per-row bits = ceil(totalBits / 2).
+  // Size a 2-row strip at 2px/bit so the writer lands on the sequential layout.
   var bitsPerRow = Math.ceil(totalBits / SIG_ROWS);
-  // Width: M+Y+C left bands (24) + data + C+Y+M right bands (24).
-  var w = HEADER_PIXELS + bitsPerRow * ppb + FOOTER_PIXELS;
+  var w = HEADER_PIXELS + bitsPerRow * PIXELS_PER_BIT_NARROW + FOOTER_PIXELS;
   var h = SIG_ROWS;
   var canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   var ctx = canvas.getContext('2d');
-  // Fill with mid-gray as a neutral background (the data pixels will
-  // overwrite to 64 or 192 so the gray only shows in any unused tail).
-  ctx.fillStyle = '#808080';
+  ctx.fillStyle = '#808080';  // neutral background; the bar overwrites it
   ctx.fillRect(0, 0, w, h);
   var img = ctx.getImageData(0, 0, w, h);
-  embedBits(img.data, w, h, frame, ppb);
+  embedBarPayload(img.data, w, h, payloadBytes);
   ctx.putImageData(img, 0, 0);
   return new Promise(function(resolve) {
     canvas.toBlob(function(blob) { resolve(blob); }, 'image/png');
