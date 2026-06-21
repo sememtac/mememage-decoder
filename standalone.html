@@ -15550,6 +15550,11 @@ function tryVerifyPair() {
     meta._verification = vf;
     meta._content_hash = barHash;
     meta._identifier = meta.identifier || verifyState.barIdentifier || null;
+    // By Soul HOLDS the body (the dropped image), so it has earned the full
+    // body view — the gen/sky/machine canvas bands + BIRTHPLACE that cert
+    // renderer gates on window._lastDecodedCanvas. By Sight sets this; By Soul
+    // must too, else providing both halves still rendered a partial read.
+    window._lastDecodedCanvas = verifyState.verifyCanvas || null;
     renderCert(meta);
 
     if (vf.status === 'verified') {
