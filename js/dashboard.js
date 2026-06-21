@@ -696,8 +696,6 @@ setInterval(function() {
     els.drop.setAttribute('data-busy', '1');
     try {
       var image_b64 = await fileToBase64(file);
-      var dryRunEl = document.getElementById('mintDryRun');
-      var dryRun = dryRunEl ? dryRunEl.checked : false;
       var resp;
       try {
         resp = await fetch('/api/mint/upload', {
@@ -707,7 +705,6 @@ setInterval(function() {
             filename: file.name,
             image_data: image_b64,
             metadata: {},
-            dry_run: dryRun,
           }),
         });
       } catch (netErr) {
@@ -1305,19 +1302,14 @@ setInterval(function() {
     _wireBlobDownload(els.download, imgUrl, (s.identifier || 'image') + '.png');
     // Soul download — points at our /api/mint/<token>/soul endpoint
     // which streams the local .soul file regardless of whether IA
-    // received it. Works for both real mints (records/<id>.soul) and
-    // dry-runs (records/dryrun/<id>.soul). Falls back to the IA URL
-    // if the server didn't supply download_soul_url (older builds).
+    // received it. Falls back to the IA URL if the server didn't
+    // supply download_soul_url (older builds).
     if (els.downloadSoul) {
       els.downloadSoul.classList.remove('mint-action-disabled');
       els.downloadSoul.textContent = 'Download soul';
       els.downloadSoul.title = '';
       var soulUrl = s.download_soul_url || s.url || ('/api/mint/' + state.token + '/soul');
       _wireBlobDownload(els.downloadSoul, soulUrl, (s.identifier || 'soul') + '.soul');
-    }
-    // Dry-run badge in the Witnessed header
-    if (els.resultHead) {
-      els.resultHead.setAttribute('data-dry-run', s.dry_run ? '1' : '0');
     }
     // Per-channel blast result. Show the list only when the blast hit
     // more than one channel (or when at least one failed) — for a
@@ -1718,8 +1710,7 @@ setInterval(function() {
             tBadge +
           '</div>' +
           '<div class="mint-recent-actions">' +
-            '<span class="mint-recent-age">' + _formatAge(r.age_seconds) +
-              (r.dry_run ? ' \u00b7 dry' : '') + '</span>' +
+            '<span class="mint-recent-age">' + _formatAge(r.age_seconds) + '</span>' +
             '<button type="button" class="mint-recent-btn" data-recent-action="resume">Resume</button>' +
             '<button type="button" class="mint-recent-btn mint-recent-btn-danger" data-recent-action="delete">\u00d7</button>' +
           '</div>' +
@@ -3558,7 +3549,7 @@ setInterval(function() {
   //   conceived: identifier, content_hash, url (primary surface),
   //              distribution (multiline "label: url" for every
   //              surface the soul landed on), image_path, soul_path,
-  //              dry_run, chain_id, chain_visibility, creator_name,
+  //              chain_id, chain_visibility, creator_name,
   //              key_fingerprint, constellation, constellation_star,
   //              rarity_score, rarity_tier, gps_source
   //
@@ -6940,8 +6931,6 @@ setInterval(function() {
       body: 'Short 8-char prefix of a session token (e.g. <code>E33C9891</code>). Pasteable handle for resuming or deleting a pending session without dealing with the full token.' },
     { id: 'resume', label: 'Resume / Delete',
       body: 'Bring a pending conception back up — to keep editing its fields or copy its handoff URL again. <strong>Delete</strong> throws a pending conception away for good, instead of waiting out its 7-day expiry. Both act on a pending session by its ticket (the short code).' },
-    { id: 'dry_run', label: 'Dry run',
-      body: 'A full local rehearsal of a conception. Runs the entire pipeline — content hash, signature, bar embed, thumbnail, birth certificate — and writes the soul to a <code>dryrun/</code> folder so you can inspect the exact result and verify it By Soul. But it publishes to <strong>no surfaces</strong> and does <strong>not advance the chain</strong>: nothing leaves the machine, and the chain’s Age and position are untouched. Use it to preview a conception before committing one for real.' },
 
     // --- Verification badges ---
     { id: 'witnessed', label: 'WITNESSED',

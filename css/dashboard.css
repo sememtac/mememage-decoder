@@ -629,35 +629,6 @@
    tempting button that surfaces a confusing error on click. */
 html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
 
-/* Dry-run toggle — sits above the drop zone in the empty state so
-   the user can flip it before dropping (the upload payload locks in
-   the value at drop time; toggling post-drop would have no effect).
-   Compact row with checkbox + label + a muted explainer. */
-.mint-dryrun-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.55rem;
-  margin-bottom: 0.5rem;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: var(--radius-sm, 6px);
-  font-size: 0.76rem;
-  user-select: none;
-}
-/* Override the state-machine's generic `display: block` for our
-   data-mint-only="empty" row so the flex layout survives the show. */
-.mint-panel[data-mint-state="empty"] > .mint-dryrun-row[data-mint-only="empty"] {
-  display: flex;
-}
-/* Only the checkbox + label toggle the option; the trailing ? opens the
-   glossary (it sits outside this label so a click doesn't flip dry run). */
-.mint-dryrun-toggle {
-  display: flex; align-items: center; gap: 0.4rem; cursor: pointer;
-}
-.mint-dryrun-row input { cursor: pointer; margin: 0; }
-.mint-dryrun-label { color: #1a1a20; font-weight: 600; }
-
 /* Resume-by-ticket — empty-state convenience for pulling back a
    pending mint. Compact row so it doesn't compete with the drop
    zone above. */
@@ -1192,20 +1163,6 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   flex: none;
   margin-right: 0.5rem;
 }
-.mint-result-head[data-dry-run="1"]::after {
-  content: "DRY RUN";
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.1rem 0.45rem;
-  background: rgba(200, 176, 128, 0.22);
-  color: #6a5018;
-  font-size: 0.55rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  border: 1px solid rgba(200, 176, 128, 0.5);
-  border-radius: 999px;
-  vertical-align: middle;
-}
 .mint-result-meta {
   display: grid; grid-template-columns: max-content 1fr;
   gap: 0.4rem 0.8rem; font-size: 0.78rem; margin: 0.5rem 0 0.8rem;
@@ -1425,8 +1382,8 @@ html[data-fs-pick="none"] [data-fs-browse] { display: none !important; }
   border-color: rgba(0, 0, 0, 0.5);
 }
 /* Disabled-style for actions that aren't applicable in the current
-   state (e.g. "Soul in Discord" on dry-run — the soul didn't go to
-   IA, so we can't link to it; it's in the Discord attachment instead). */
+   state (e.g. a soul that landed only in a Discord attachment, not on
+   a fetchable surface, so there's no URL to link to). */
 .mint-action.mint-action-disabled {
   pointer-events: none;
   opacity: 0.5;
