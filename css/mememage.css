@@ -600,12 +600,12 @@
     text-align: center;
   }
 
-  /* Lock the Source disclosure's open-state height so swapping between
-     Online and Offline modes doesn't shift the prose hint + error
-     slots below. Online's url-row and Offline's offline-row have
-     slightly different intrinsic heights; reserving a common floor
-     here absorbs the delta. */
-  .lookup-source[open] { min-height: 140px; }
+  /* The Source disclosure hugs its content. (It used to reserve a 140px
+     floor so Online↔Offline mode swaps didn't shift the hint/error below,
+     but Online only needs ~90px — that floor left ~50px of dead space
+     between the hint and the result preview. The tiny mode-swap delta is
+     not worth a permanent gap; the details' max-height transition keeps
+     the swap smooth.) */
 
   /* Source mode toggle — Online (URL) vs Offline (folder picker).
      Rows inside .lookup-source are tagged with data-mode-scope;
