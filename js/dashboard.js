@@ -2249,8 +2249,18 @@ setInterval(function() {
     var names = entryNames();
     els.entriesCount.textContent = '(' + names.length + ')';
     if (names.length === 0) {
-      els.entries.innerHTML = '<div class="payload-edit-row entry-row">' +
-        '<span style="grid-column:1/-1; opacity:0.5; font-style:italic;">No entries defined.</span></div>';
+      if (state.provenanceOnly && !state.payloadStarted) {
+        // Provenance-only chain: no payload to distribute. Show an explicit
+        // empty state (matching the "No payload" badge) with an opt-in action
+        // that drops in a starter decoder scaffold, rather than auto-showing
+        // a phantom decoder entry the user never created.
+        els.entries.innerHTML = '<div class="payload-edit-row entry-row">' +
+          '<span style="grid-column:1/-1; opacity:0.6;">No payload configured — this chain is provenance-only. ' +
+          '<button class="payload-section-add" data-action="start-payload" title="Drop in a starter decoder scaffold you can build on">+ Start a payload</button></span></div>';
+      } else {
+        els.entries.innerHTML = '<div class="payload-edit-row entry-row">' +
+          '<span style="grid-column:1/-1; opacity:0.5; font-style:italic;">No entries defined.</span></div>';
+      }
       return;
     }
     var header = '<div class="payload-edit-header entry-header">' +
@@ -2469,6 +2479,19 @@ setInterval(function() {
       var btn = e.target.closest && e.target.closest('[data-action]');
       if (!btn) return;
       var action = btn.getAttribute('data-action');
+      if (action === 'start-payload') {
+        // Opt in to a payload: drop in the starter decoder scaffold (one
+        // decoder layer + one decoder entry with an empty source to fill).
+        // K is owned by constellation_size (one chunk per star). From here
+        // the editor behaves normally; Apply commits it to the chain.
+        var k = state.working.constellation_size || 12;
+        state.working.entries = {decoder: {sources: ['']}};
+        state.working.layers = [{name: 'decoder', K: k, reserved: 0, entry: 'decoder'}];
+        state.payloadStarted = true;
+        state.touched = true;
+        renderAll();
+        return;
+      }
       var row = btn.closest('[data-entry], [data-layer], [data-pinned]');
       if (action === 'delete-entry') {
         var name = row.getAttribute('data-entry');
@@ -2658,6 +2681,13 @@ setInterval(function() {
       // skews the working-vs-saved dirty comparison.
       state.constellationLocked = !!cfg.constellation_size_locked;
       delete cfg.constellation_size_locked;
+      // provenance_only: the chain carries no payload (blank() scaffold or
+      // all sources cleared). The editor shows an empty "no payload" state
+      // with a "Start a payload" action instead of the phantom decoder
+      // scaffold. Reset payloadStarted so Refresh re-shows the empty state.
+      state.provenanceOnly = !!cfg.provenance_only;
+      state.payloadStarted = false;
+      delete cfg.provenance_only;
       // Strip any legacy chunk_type/type fields the server might still emit.
       (cfg.layers || []).forEach(function(ly) {
         if ('chunk_type' in ly) delete ly.chunk_type;
@@ -2670,6 +2700,15 @@ setInterval(function() {
         if (!e.sources && e.source) e.sources = [e.source];
         if ('type' in e) delete e.type;
       });
+      // Provenance-only chains: present an EMPTY payload (matching first-open
+      // via _emptyConfigFor), not the server's blank() decoder scaffold — so
+      // Refresh stays empty, the draft isn't spuriously dirty, and the editor
+      // agrees with the "No payload" badge. The scaffold is opt-in via the
+      // "Start a payload" action in the empty state.
+      if (state.provenanceOnly) {
+        cfg = _emptyConfigFor({id: cfg.id, name: cfg.name, visibility: cfg.visibility,
+                               M: cfg.M, constellation_size: cfg.constellation_size});
+      }
       state.working = cfg;
       state.saved = deepClone(cfg);
       state.touched = false;
@@ -3263,6 +3302,12 @@ setInterval(function() {
       var chainCfg = await fetchJson('/api/chain/config');
       state.constellationLocked = !!chainCfg.constellation_size_locked;
       delete chainCfg.constellation_size_locked;
+      // provenance_only drives the empty "No payload — Start a payload" state.
+      // The no-preset branch below already starts empty via _emptyConfigFor;
+      // this flag just lets renderEntries show the explicit empty message.
+      state.provenanceOnly = !!chainCfg.provenance_only;
+      state.payloadStarted = false;
+      delete chainCfg.provenance_only;
       // Legacy "frozen" key -> "pinned" so the editor (which reads
       // .pinned) works against configs written before the rename.
       if (chainCfg.pinned == null && chainCfg.frozen != null) {
