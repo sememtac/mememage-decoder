@@ -183,14 +183,22 @@
     overflow: hidden;
     transition: height var(--compact-duration) var(--compact-ease);
   }
-  /* By Word (lookup) hugs its content instead of holding the fixed 365px —
-     so when no error is showing, the box collapses to the form and the
-     preview/cert sit right beneath it (no floated empty error gap). The
-     :has(error) and layout-active rules still let it grow to fit an error. */
-  .input-panel#lookupPanel {
+  /* When a decoded result is on screen (the preview is visible), the active
+     input panel hugs its content so the preview/cert sit right beneath the
+     form — no 365px box held open with a floated empty error slot below it.
+     This is the robust signal: narrow viewports render single-column and
+     never set layout-active, so we key off the result itself, not the layout
+     mode. An error still shows (the :has(error) rules grow the box). */
+  .input-section:has(.console-preview.visible) .input-panel.active {
     height: auto;
     min-height: 0;
     overflow: visible;
+  }
+  /* …and the empty By-Sight drop-error stops reserving its floated slot once
+     a result is up (it's display:block + min-height by default for a stable
+     y-position before decode). */
+  .input-section:has(.console-preview.visible) #imagePanel .drop-error:empty {
+    display: none;
   }
   /* Mobile: the system box fits on one screen. No scrolling inside
      the box, no height expansion when Source opens. Every tab reserves

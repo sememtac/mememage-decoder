@@ -942,7 +942,14 @@ DropZone.attach({
   accept: function(f) { return f.type.startsWith('image/'); },
   onFiles: processImage
 });
-document.addEventListener('paste',e=>{const f=Array.from(e.clipboardData.items).find(i=>i.type.startsWith('image/'));if(f)processImage(f.getAsFile());});
+document.addEventListener('paste',e=>{
+  // Image paste is a By Sight affordance only — drop an image to read its bar.
+  // By Word (identifier) and By Soul (image + .soul) have their own inputs, so
+  // a stray clipboard image must NOT hijack them into the By Sight flow.
+  var ip=document.getElementById('imagePanel');
+  if(!ip||!ip.classList.contains('active'))return;
+  const f=Array.from(e.clipboardData.items).find(i=>i.type.startsWith('image/'));if(f)processImage(f.getAsFile());
+});
 document.getElementById('lookupBtn').addEventListener('click',()=>lookupById(document.getElementById('lookupInput').value));
 document.getElementById('lookupInput').addEventListener('keydown',e=>{if(e.key==='Enter')lookupById(e.target.value);});
 
