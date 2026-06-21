@@ -943,12 +943,28 @@ DropZone.attach({
   onFiles: processImage
 });
 document.addEventListener('paste',e=>{
-  // Image paste is a By Sight affordance only — drop an image to read its bar.
-  // By Word (identifier) and By Soul (image + .soul) have their own inputs, so
-  // a stray clipboard image must NOT hijack them into the By Sight flow.
-  var ip=document.getElementById('imagePanel');
-  if(!ip||!ip.classList.contains('active'))return;
-  const f=Array.from(e.clipboardData.items).find(i=>i.type.startsWith('image/'));if(f)processImage(f.getAsFile());
+  // Clipboard paste routes by what was pasted (mirrors the validator):
+  //   - an image  → By Sight (decode the bar)
+  //   - a .soul    → By Soul (the soul slot)
+  //   - already in By Soul → fill its slots in place (image=body, soul=meta),
+  //     don't yank the user to another tab.
+  // A plain TEXT paste (an identifier) has neither a file nor an image, so we
+  // bail and let it land in the focused input — that's By Word / Audit's job.
+  if(!e.clipboardData)return;
+  var files=Array.from(e.clipboardData.files||[]);
+  var imgFile=files.find(f=>f.type&&f.type.indexOf('image/')===0);
+  if(!imgFile){var it=Array.from(e.clipboardData.items||[]).find(i=>i.type&&i.type.indexOf('image/')===0);if(it)imgFile=it.getAsFile();}
+  var soulFile=files.find(f=>!(f.type&&f.type.indexOf('image/')===0)&&(/\.(soul|json)$/i.test(f.name||'')||f.type==='application/json'));
+  if(!imgFile&&!soulFile)return;  // text paste — leave it alone
+  e.preventDefault();
+  var vp=document.getElementById('verifyPanel');
+  if(vp&&vp.classList.contains('active')){
+    if(imgFile)processVerifyImage(imgFile);
+    if(soulFile)processVerifyJson(soulFile);
+    return;
+  }
+  if(imgFile){TabBar.activateById('imagePanel');processImage(imgFile);}
+  else if(soulFile){TabBar.activateById('verifyPanel');processVerifyJson(soulFile);}
 });
 document.getElementById('lookupBtn').addEventListener('click',()=>lookupById(document.getElementById('lookupInput').value));
 document.getElementById('lookupInput').addEventListener('keydown',e=>{if(e.key==='Enter')lookupById(e.target.value);});

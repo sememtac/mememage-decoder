@@ -152,19 +152,35 @@ DropZone.attach({
   onFiles: analyze
 });
 
-// Clipboard paste — Ctrl/Cmd+V an image straight into By Sight, no save-to-disk
-// first (the decoder has the same in ui.js). One global handler (not per-zone)
-// so a single paste routes to one processor; surface the Image tab so the
-// result is visible if the user was on Audit/Observatory.
+// Clipboard paste routes by what was pasted (one global handler, not per-zone):
+//   - .soul / .json files (one OR many) → Observatory (analyzeMeta)
+//   - an image → Image tab (analyze the bar)
+//   - plain text (an identifier) → left alone so it lands in Audit's input.
+// Surfacing the right tab means a paste is visible wherever the user was.
 document.addEventListener('paste', function(e) {
   if (!e.clipboardData) return;
-  var item = Array.prototype.slice.call(e.clipboardData.items || [])
-    .find(function(i) { return i.type && i.type.indexOf('image/') === 0; });
-  if (!item) return;
-  var f = item.getAsFile();
-  if (!f) return;
-  if (typeof showTab === 'function') showTab('img');
-  analyze(f);
+  var files = Array.prototype.slice.call(e.clipboardData.files || []);
+  var imgFile = null, soulFiles = [];
+  files.forEach(function(f) {
+    if (f.type && f.type.indexOf('image/') === 0) { if (!imgFile) imgFile = f; }
+    else if (/\.(soul|json)$/i.test(f.name || '') || f.type === 'application/json') soulFiles.push(f);
+  });
+  if (!imgFile) {  // a screenshot paste may live only in items
+    var it = Array.prototype.slice.call(e.clipboardData.items || [])
+      .find(function(i) { return i.type && i.type.indexOf('image/') === 0; });
+    if (it) imgFile = it.getAsFile();
+  }
+  if (soulFiles.length) {
+    e.preventDefault();
+    if (typeof showTab === 'function') showTab('meta');
+    analyzeMeta(soulFiles);
+    return;
+  }
+  if (imgFile) {
+    e.preventDefault();
+    if (typeof showTab === 'function') showTab('img');
+    analyze(imgFile);
+  }
 });
 
 // === Bar-image lightbox ===
@@ -2831,6 +2847,19 @@ function buildOrbitInspector(records, collected) {
 // =====================================================================
 // AUDIT — full forensic report on a record fetched by identifier
 // =====================================================================
+// Each audited identifier is a browser-history step so back/forward can
+// traverse the chain the user clicked through (parent / heart-star /
+// identifier links). _auditFromPop suppresses the push when WE re-audit
+// in response to a popstate, so back/forward don't re-stack entries.
+var _auditFromPop = false;
+window.addEventListener('popstate', function(e) {
+  if (e.state && e.state.auditId) {
+    document.getElementById('auditInput').value = e.state.auditId;
+    showTab('cert');
+    _auditFromPop = true;
+    runAudit();
+  }
+});
 document.getElementById('auditInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') runAudit();
 });
@@ -2863,6 +2892,7 @@ OfflineRecords.bindUI();
 LinkClick.delegate('.audit-link', function(id) {
   document.getElementById('auditInput').value = id;
   showTab('cert');
+  runAudit();  // load the clicked record (+ pushes a history step for back/forward)
 });
 
 // Snapshot the default .how help text so we can restore it after a
@@ -2936,6 +2966,14 @@ function runAudit() {
     stopSpin();
     return;
   }
+
+  // History step (back/forward traversal). Push a new entry for a fresh
+  // identifier; skip when this run came from a popstate (else back/forward
+  // would re-stack). Same value as current state → no-op (don't dupe).
+  if (!_auditFromPop && (!history.state || history.state.auditId !== identifier)) {
+    history.pushState({ auditId: identifier }, '', '#');
+  }
+  _auditFromPop = false;
 
   // Source config — single URL field with {id} templating. Expand
   // {id} before probing so "https://archive.org/download/{id}/" and
