@@ -828,16 +828,16 @@ async function comparePortrait(droppedImageCanvas, thumbnailDataURI, lumaGridB64
     gridScore = Math.round(Math.max(mx.flatMax, mx.allMax));
     // Diagnostic: lets you confirm grid-32 ran and see why a mark did/didn't
     // trip. flatMax = worst smooth-tile deviation (LOW=4); allMax = worst
-    // anywhere (HIGH=24). If this line is ABSENT, the page is cached old JS.
-    if (typeof console !== 'undefined' && console.debug) {
-      console.debug('[embodied] luma grid-32', {
+    // anywhere (HIGH=24). console.log so it shows at the default level.
+    if (typeof console !== 'undefined') {
+      console.log('[embodied] luma grid-32', {
         flatMax: +mx.flatMax.toFixed(1), low: LUMA_LOW,
         allMax: +mx.allMax.toFixed(1), high: LUMA_HIGH,
         verdict: gridOk ? 'intact' : 'ALTERED',
       });
     }
-  } else if (lumaGridB64 && typeof console !== 'undefined' && console.debug) {
-    console.debug('[embodied] luma grid present but not the current format — '
+  } else if (lumaGridB64 && typeof console !== 'undefined') {
+    console.log('[embodied] luma grid present but not the current format — '
       + 'skipping grid check (legacy/old-JS). Hard-refresh if unexpected.');
   }
 
