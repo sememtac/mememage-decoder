@@ -574,6 +574,26 @@ function lumaResidualMaxes(dropMean, refMean, flat) {
 
 // ----- Keychain: succession and revocation checks -----
 
+// Fetch with a hard timeout via AbortController. A degraded source — most
+// painfully cors.archive.org proxying a flaky Internet Archive — can leave a
+// fetch pending indefinitely (no response, no error). Since keychain checks are
+// awaited inside the verify flow, one hung fetch stalls the entire certificate
+// until the outer 20s race fires. Bounding every network call means IA being
+// down degrades AUTHENTICATED gracefully instead of blocking the cert. Rejects
+// (AbortError) on timeout; callers already treat any throw as "source missed".
+async function _fetchTimeout(url, opts, ms) {
+  ms = ms || 5000;
+  if (typeof AbortController === 'undefined') return fetch(url, opts);
+  var ctrl = new AbortController();
+  var timer = setTimeout(function () { ctrl.abort(); }, ms);
+  var o = Object.assign({}, opts || {}, {signal: ctrl.signal});
+  try {
+    return await fetch(url, o);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function keychainIdentifier(fingerprint) {
   return 'mememage-keychain-' + fingerprint.replace(/:/g, '');
 }
@@ -597,16 +617,17 @@ async function fetchKeychainRecord(fingerprint, filename, peerRoot) {
   // First non-null record wins — both sides should agree on content
   // since records are signed.
   var chainId = keychainIdentifier(fingerprint);
-  var urls = [
-    'https://archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now(),
-    'https://cors.archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now(),
-  ];
+  // Peer (the host the soul came from) FIRST — same fast origin, IA-independent.
+  // IA is the fallback. Records are signed, so a peer can't forge them.
+  var urls = [];
   if (peerRoot) {
     urls.push(peerRoot + '/' + chainId + '/' + filename + '?t=' + Date.now());
   }
+  urls.push('https://archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now());
+  urls.push('https://cors.archive.org/download/' + chainId + '/' + filename + '?t=' + Date.now());
   for (var i = 0; i < urls.length; i++) {
     try {
-      var resp = await fetch(urls[i], {cache: 'no-store'});
+      var resp = await _fetchTimeout(urls[i], {cache: 'no-store'}, 5000);
       if (resp.ok) {
         var record = await resp.json();
         if (record && record.action) return record;
@@ -661,17 +682,17 @@ async function fetchKeychainFileList(fingerprint, peerRoot) {
   // Returns [] on any failure — alias discovery is a soft enrichment,
   // never blocks the verdict.
   var chainId = keychainIdentifier(fingerprint);
-  var urls = [
-    'https://archive.org/metadata/' + chainId + '?t=' + Date.now(),
-    'https://cors.archive.org/metadata/' + chainId + '?t=' + Date.now(),
-  ];
+  // Peer first (fast, IA-independent), IA as fallback.
+  var urls = [];
   if (peerRoot) {
     urls.push(peerRoot + '/' + chainId + '?t=' + Date.now());
   }
+  urls.push('https://archive.org/metadata/' + chainId + '?t=' + Date.now());
+  urls.push('https://cors.archive.org/metadata/' + chainId + '?t=' + Date.now());
   var merged = {};
   for (var i = 0; i < urls.length; i++) {
     try {
-      var resp = await fetch(urls[i], {cache: 'no-store'});
+      var resp = await _fetchTimeout(urls[i], {cache: 'no-store'}, 5000);
       if (!resp.ok) continue;
       var data = await resp.json();
       if (data && Array.isArray(data.files)) {

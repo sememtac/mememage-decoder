@@ -68,26 +68,31 @@ async function verifyRecord(record, barContentHash, knownIdentifier) {
         var peerRoot = (typeof peerKeychainRoot === 'function')
           ? peerKeychainRoot(record._source) : null;
         if (record.key_fingerprint) {
-          var kc = await checkKeychain(record.key_fingerprint, record.public_key, peerRoot);
-          result.keychain = kc;
-          if (kc.status === 'revoked') {
-            result.signature = false;
-            result.signatureDetail = 'Key REVOKED — ' + kc.detail;
-          } else if (kc.status === 'rotated') {
-            result.signatureDetail += ' (key rotated — ' + kc.detail + ')';
-          }
-          // Alias discovery — soft enrichment, never blocks verdict.
-          // Probes both IA AND the soul's source peer (if non-IA),
-          // merging alias-*.json file lists from each side.
-          try {
-            if (typeof discoverAliases === 'function') {
-              result.aliases = await discoverAliases(record.key_fingerprint, peerRoot);
-            } else {
-              result.aliases = [];
-            }
-          } catch (e) {
-            result.aliases = [];
-          }
+          // Keychain + alias enrichment is NETWORK (peer / IA) and only ever
+          // DOWNGRADES the local verdict (revoked / rotated). The signature was
+          // already verified locally above, so this must never block the cert.
+          // Cap the whole block: if a degraded source (e.g. IA down) doesn't
+          // answer in time, the cert renders with keychain undetermined — no
+          // revocation found = active by default, the correct graceful
+          // degradation. Per-fetch timeouts in verify.js bound each call;
+          // this bounds the total.
+          await Promise.race([
+            (async function () {
+              var kc = await checkKeychain(record.key_fingerprint, record.public_key, peerRoot);
+              result.keychain = kc;
+              if (kc.status === 'revoked') {
+                result.signature = false;
+                result.signatureDetail = 'Key REVOKED — ' + kc.detail;
+              } else if (kc.status === 'rotated') {
+                result.signatureDetail += ' (key rotated — ' + kc.detail + ')';
+              }
+              try {
+                result.aliases = (typeof discoverAliases === 'function')
+                  ? await discoverAliases(record.key_fingerprint, peerRoot) : [];
+              } catch (e) { result.aliases = []; }
+            })(),
+            new Promise(function (resolve) { setTimeout(resolve, 7000); })
+          ]);
         }
 
         // TOFU check (skip if revoked).
@@ -248,7 +253,7 @@ async function resolveMetadata(identifier, contentHash) {
 
   for (var si = 0; si < allSources.length; si++) {
     try {
-      var resp = await fetch(allSources[si] + '?t=' + Date.now(), {cache: 'no-store'});
+      var resp = await _fetchTimeout(allSources[si] + '?t=' + Date.now(), {cache: 'no-store'}, 5000);
       if (!resp.ok) continue;
       var record = await resp.json();
       if (!record || typeof record !== 'object') continue;
@@ -271,7 +276,7 @@ async function resolveMetadata(identifier, contentHash) {
 
   // Last resort: IA metadata API — discover soul file by listing item contents
   try {
-    var metaResp = await fetch('https://archive.org/metadata/' + identifier + '?t=' + Date.now(), {cache: 'no-store'});
+    var metaResp = await _fetchTimeout('https://archive.org/metadata/' + identifier + '?t=' + Date.now(), {cache: 'no-store'}, 5000);
     if (metaResp.ok) {
       var metaData = await metaResp.json();
       if (metaData && metaData.files) {
@@ -279,7 +284,7 @@ async function resolveMetadata(identifier, contentHash) {
           var fname = metaData.files[fi].name;
           if (fname.endsWith('.soul') || fname.endsWith('.json')) {
             try {
-              var fResp = await fetch('https://archive.org/download/' + identifier + '/' + fname + '?t=' + Date.now(), {cache: 'no-store'});
+              var fResp = await _fetchTimeout('https://archive.org/download/' + identifier + '/' + fname + '?t=' + Date.now(), {cache: 'no-store'}, 5000);
               if (!fResp.ok) continue;
               var fRecord = await fResp.json();
               if (fRecord && (fRecord.prompt || fRecord.seed)) {
@@ -533,7 +538,7 @@ async function fetchFromSource(baseUrl, identifier, contentHash) {
   }
   for (var i = 0; i < candidates.length; i++) {
     try {
-      var resp = await fetch(candidates[i] + '?t=' + Date.now(), {cache: 'no-store'});
+      var resp = await _fetchTimeout(candidates[i] + '?t=' + Date.now(), {cache: 'no-store'}, 5000);
       if (!resp.ok) continue;
       var record = await resp.json();
       if (!record || typeof record !== 'object') continue;
@@ -576,7 +581,7 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
     // Direct URL — fetch exactly that
     if (directUrl) {
       try {
-        var resp = await fetch(directUrl + '?t=' + Date.now(), {cache: 'no-store'});
+        var resp = await _fetchTimeout(directUrl + '?t=' + Date.now(), {cache: 'no-store'}, 5000);
         if (resp.ok) {
           meta = await resp.json();
           if (meta) meta._source = directUrl;
@@ -1246,7 +1251,7 @@ if (tryLink) {
     var exampleUrl = (typeof assetPath === 'function')
       ? assetPath('samples/example.soul')
       : 'samples/example.soul';
-    var res = await fetch(exampleUrl, { cache: 'no-store' });
+    var res = await _fetchTimeout(exampleUrl, { cache: 'no-store' }, 8000);
     if (!res.ok) throw new Error('example.soul fetch ' + res.status);
     var soul = await res.json();
     soul._identifier = EXAMPLE_ID;
