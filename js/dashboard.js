@@ -1621,8 +1621,8 @@ setInterval(function() {
       report.candidates_machine, report.fire_rate_machine);
     if (!(report.candidates_celestial || []).length
         && !(report.candidates_machine || []).length) {
-      html += '<p class="mint-forecast-empty">No candidate traits ' +
-        'right now \u2014 score will come from machine signature + ' +
+      html += '<p class="mint-forecast-empty">No candidate traits \u2014 ' +
+        'score will come from machine signature + ' +
         'rare entropy hits only.</p>';
     }
     els.forecastBody.innerHTML = html;
@@ -6494,7 +6494,7 @@ setInterval(function() {
     // Front-load the contract: Dark chains MUST have a password to
     // function. Catch this in the UI before the round-trip.
     if (visibility === 'dark_matter' && !password) {
-      showError('Dark chains require a password. Set one now or pick Light visibility.');
+      showError('Dark chains require a password. Set one or pick Light visibility.');
       return;
     }
     // Front-load the prefix format check so the user sees the rule in
