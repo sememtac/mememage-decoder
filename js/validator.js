@@ -3888,13 +3888,15 @@ async function loadOriginal() {
     hash: soul.content_hash,
     sig: soul.signature,
     pub: soul.public_key,
-    thumbDHash: thumbDHash
+    thumbDHash: thumbDHash,
+    lumaGrid: decodeLumaGrid(soul.luma_grid)   // localized-tamper reference
   };
   current = {
     record: JSON.parse(JSON.stringify(hashable)),
     sig: original.sig,
     pub: original.pub,
-    userDHash: thumbDHash   // starts matching
+    userDHash: thumbDHash,    // starts matching
+    userGrid: original.lumaGrid
   };
 }
 
@@ -3944,7 +3946,7 @@ function setStatus(currentHash, witnessed, authenticated, dist, embodied, jsonEr
   el.innerHTML = h;
 }
 
-function updateCertBadges(witnessed, authenticated, embodied, dist) {
+function updateCertBadges(witnessed, authenticated, embodied, dist, embReason) {
   var bg = resultsWrap.querySelector('.verify-badge-group');
   if (!bg) return;
   bg.innerHTML = '';
@@ -3976,8 +3978,13 @@ function updateCertBadges(witnessed, authenticated, embodied, dist) {
   } else if (embodied === false) {
     var e2 = document.createElement('div');
     e2.className = 'verify-badge verify-disembodied';
-    e2.innerHTML = '<span class="verify-icon">\u2B21</span> DISEMBODIED';
-    e2.title = 'Portrait mismatch \u2014 dHash distance ' + dist;
+    if (embReason === 'altered') {
+      e2.innerHTML = '<span class="verify-icon">\u2B21</span> ALTERED';
+      e2.title = 'Localized alteration detected \u2014 the image has been edited since conception';
+    } else {
+      e2.innerHTML = '<span class="verify-icon">\u2B21</span> DISEMBODIED';
+      e2.title = 'Portrait mismatch \u2014 dHash distance ' + dist;
+    }
     bg.appendChild(e2);
   }
 }
@@ -4028,7 +4035,21 @@ async function recompute() {
     ? hammingDistance(current.userDHash, original.thumbDHash) : null;
   var embodied = dist != null ? (dist <= PORTRAIT_THRESHOLD) : null;
 
-  updateCertBadges(witnessed, authenticated, embodied, dist);
+  // Localized-tamper half — compare the dropped image's grid against the
+  // CURRENT (possibly hand-edited) record's grid. Swapping in a defaced image
+  // breaks this; editing luma_grid to compensate breaks WITNESSED. Either way
+  // the forger can't get all-green. Reason flips DISEMBODIED -> ALTERED.
+  var embReason = null;
+  var curGrid = decodeLumaGrid(rec.luma_grid);
+  if (curGrid && current.userGrid) {
+    var gscore = lumaGridScore(current.userGrid, curGrid);
+    if (gscore > LUMA_GRID_THRESHOLD && embodied !== false) {
+      embodied = false;
+      embReason = 'altered';
+    }
+  }
+
+  updateCertBadges(witnessed, authenticated, embodied, dist, embReason);
   setStatus(displayHash, witnessed, authenticated, dist, embodied, false);
   updateDHashGrids(current.userDHash, original.thumbDHash);
 }
@@ -4043,7 +4064,8 @@ function resetAll() {
     record: JSON.parse(JSON.stringify(original.record)),
     sig: original.sig,
     pub: original.pub,
-    userDHash: original.thumbDHash
+    userDHash: original.thumbDHash,
+    userGrid: original.lumaGrid
   };
   document.getElementById('atk-record').value = JSON.stringify(original.record, null, 2);
   document.getElementById('atk-sig').value = original.sig;
@@ -4060,6 +4082,7 @@ function loadUserImage(file) {
     c.width = img.naturalWidth; c.height = img.naturalHeight;
     c.getContext('2d').drawImage(img, 0, 0);
     current.userDHash = dHashFromCanvas(c);
+    current.userGrid = computeLumaGrid(c);
     document.getElementById('atk-drop-label').textContent = file.name + ' \u2713';
     recompute();
   };

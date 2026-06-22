@@ -636,7 +636,7 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
   // Portrait comparison (EMBODIED check) — only when image was dropped
   v.portrait = null; // {match: true/false/null, distance, threshold}
   if (window._lastDecodedCanvas && meta.thumbnail) {
-    v.portrait = await comparePortrait(window._lastDecodedCanvas, meta.thumbnail);
+    v.portrait = await comparePortrait(window._lastDecodedCanvas, meta.thumbnail, meta.luma_grid);
   }
 
   // TOFU naming — first time seeing a valid signature. If the record
@@ -1125,7 +1125,7 @@ function tryVerifyPair() {
     // Portrait check
     vf.portrait = null;
     if (verifyState.verifyCanvas && meta.thumbnail) {
-      vf.portrait = await comparePortrait(verifyState.verifyCanvas, meta.thumbnail);
+      vf.portrait = await comparePortrait(verifyState.verifyCanvas, meta.thumbnail, meta.luma_grid);
     }
 
     meta._verification = vf;

@@ -89,6 +89,10 @@ const HASH_INCLUDED_V1 = new Set([
   // be placed on the Observatory grid. Hashed so position tampering
   // breaks WITNESSED.
   'outer_position', 'outer_total',
+  // Luma grid — 16x16 mean-luma map, localized-tamper half of EMBODIED. In
+  // the hash so a defacer can't swap a grid matching their altered image
+  // without breaking WITNESSED. Absent on legacy records (presence-filtered).
+  'luma_grid',
   // Creator-access-layer envelopes — hashed when present so tampering
   // with the ciphertext breaks WITNESSED. Hash is computed AFTER
   // encryption (mirrors Python pipeline), so on dark_matter records
@@ -469,6 +473,83 @@ function hammingDistance(a, b) {
   return d;
 }
 
+// ----- Luma grid: localized-tamper detection (EMBODIED, integrity half) -----
+//
+// dHash answers "same body?" (coarse, recompression-robust) but is blind to a
+// localized defacement — a drawn line and JPEG q50 are the same magnitude to a
+// perceptual hash. The luma grid keeps the magnitude dHash discards: a 16x16
+// map of mean luminance. A defacement is a localized spike in per-tile mean
+// above the uniform recompression floor. Twin of mememage/embodiment.py;
+// tests/embodiment/luma_grid_parity.cjs locks byte-parity.
+var LUMA_GRID = 16;
+// Shared with mememage/embodiment.py GRID_TAMPER_THRESHOLD — change both.
+var LUMA_GRID_THRESHOLD = 6;
+
+// Pure pixel math, kept separate from canvas access so the parity harness
+// (tests/embodiment/luma_grid_parity.cjs) can drive it under Node with no
+// canvas. `data` is RGBA over a `side`x`side` square. Integer-boundary
+// area-average — NO resize (browser resampling differs from PIL; that's the
+// parity trap). Half-up rounding (floor(x+0.5)) matches Python int(x+0.5).
+// Returns Uint8Array(256). Twin of mememage/embodiment.luma_grid_bytes.
+function lumaGridFromSquareData(data, side) {
+  var out = new Uint8Array(LUMA_GRID * LUMA_GRID);
+  for (var ty = 0; ty < LUMA_GRID; ty++) {
+    var y0 = Math.floor(ty * side / LUMA_GRID), y1 = Math.floor((ty + 1) * side / LUMA_GRID);
+    for (var tx = 0; tx < LUMA_GRID; tx++) {
+      var x0 = Math.floor(tx * side / LUMA_GRID), x1 = Math.floor((tx + 1) * side / LUMA_GRID);
+      var total = 0, count = 0;
+      for (var y = y0; y < y1; y++) {
+        for (var x = x0; x < x1; x++) {
+          var idx = (y * side + x) * 4;
+          total += data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+          count++;
+        }
+      }
+      var val = count ? Math.floor(total / count + 0.5) : 0;
+      out[ty * LUMA_GRID + tx] = val > 255 ? 255 : val;
+    }
+  }
+  return out;
+}
+
+function computeLumaGrid(canvas) {
+  var ctx = canvas.getContext('2d', {willReadFrequently: true});
+  var sq = Math.min(canvas.width, canvas.height);
+  var left = (canvas.width - sq) >> 1;
+  var top = (canvas.height - sq) >> 1;
+  var data = ctx.getImageData(left, top, sq, sq).data;
+  return lumaGridFromSquareData(data, sq);
+}
+
+// Decode a base64 luma grid (from the record) to Uint8Array. Null if malformed.
+function decodeLumaGrid(b64) {
+  if (!b64 || typeof b64 !== 'string') return null;
+  try {
+    var bin = atob(b64);
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.length === LUMA_GRID * LUMA_GRID ? out : null;
+  } catch (e) { return null; }
+}
+
+// Worst per-tile luma deviation after removing the global median shift (so a
+// uniform exposure change is absorbed but a local mark survives). Twin of
+// embodiment.luma_grid_score.
+function lumaGridScore(a, b) {
+  if (!a || !b || a.length !== b.length) return Infinity;
+  var deltas = new Array(a.length);
+  for (var i = 0; i < a.length; i++) deltas[i] = a[i] - b[i];
+  var sorted = deltas.slice().sort(function(x, y) { return x - y; });
+  var n = sorted.length, mid = n >> 1;
+  var med = (n % 2) ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  var worst = 0;
+  for (var j = 0; j < deltas.length; j++) {
+    var dev = Math.abs(deltas[j] - med);
+    if (dev > worst) worst = dev;
+  }
+  return worst;
+}
+
 // ----- Keychain: succession and revocation checks -----
 
 function keychainIdentifier(fingerprint) {
@@ -687,22 +768,44 @@ async function checkKeychain(fingerprint, publicKeyHex, peerRoot) {
 
 // ----- dHash perceptual comparison -----
 
-async function comparePortrait(droppedImageCanvas, thumbnailDataURI) {
-  // Compare the dropped image's dHash against the thumbnail stored in the record.
-  // Thumbnail is generated post-mint (has bar + watermark), so the dropped minted
-  // image and the thumbnail are apples-to-apples. Full canvas, no stripping needed.
-  // Returns: {match: true/false/null, distance: number, threshold: number}
-  if (!thumbnailDataURI) return {match: null, distance: -1, threshold: 10};
+async function comparePortrait(droppedImageCanvas, thumbnailDataURI, lumaGridB64) {
+  // EMBODIED has two halves, both over the dropped image:
+  //   1. dHash vs the stored thumbnail — "is this the same body?" (coarse,
+  //      recompression-robust; catches a substituted DIFFERENT image).
+  //   2. luma grid vs the stored grid — "has it been locally altered?"
+  //      (catches a defacement dHash is blind to — see computeLumaGrid).
+  // EMBODIED is green only if BOTH pass. reason distinguishes the failures:
+  //   'mismatch' (different image) vs 'altered' (defaced/retouched original).
+  // lumaGridB64 is absent on legacy records → grid half is skipped (legacy
+  // dHash-only grade). Returns
+  //   {match, distance, threshold, reason, gridScore, gridThreshold}.
+  if (!thumbnailDataURI) return {match: null, distance: -1, threshold: 10, reason: null};
 
   var imgHash = dHashFromCanvas(droppedImageCanvas);
   var thumbHash = await dHashFromDataURI(thumbnailDataURI);
 
-  if (!imgHash || !thumbHash) return {match: null, distance: -1, threshold: 10};
+  if (!imgHash || !thumbHash) return {match: null, distance: -1, threshold: 10, reason: null};
 
   var dist = hammingDistance(imgHash, thumbHash);
   // Threshold: 15 out of 64 bits (23.4%) — tight, security-first.
   // Thumbnail is post-mint: both sides have bar + watermark. Area-average
   // downsample dilutes per-pixel watermark noise. Clean separation.
   var threshold = 15;
-  return {match: dist <= threshold, distance: dist, threshold: threshold};
+  var dHashOk = dist <= threshold;
+
+  // Localized-tamper half. Only meaningful when the record carries a grid.
+  var gridScore = -1, gridOk = true;
+  var storedGrid = decodeLumaGrid(lumaGridB64);
+  if (storedGrid) {
+    var droppedGrid = computeLumaGrid(droppedImageCanvas);
+    gridScore = lumaGridScore(droppedGrid, storedGrid);
+    gridOk = gridScore <= LUMA_GRID_THRESHOLD;
+  }
+
+  var match = dHashOk && gridOk;
+  var reason = match ? null : (!dHashOk ? 'mismatch' : 'altered');
+  return {
+    match: match, distance: dist, threshold: threshold, reason: reason,
+    gridScore: gridScore, gridThreshold: LUMA_GRID_THRESHOLD,
+  };
 }

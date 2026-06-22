@@ -1009,7 +1009,15 @@ function renderCert(meta, options) {
       } else if (vf.portrait.match === false) {
         var embBadge2 = _div('verify-badge verify-disembodied');
         embBadge2.innerHTML = '<span class="verify-icon">&#x2B21;</span> DISEMBODIED';
-        embBadge2.title = 'Portrait mismatch \u2014 dHash distance ' + vf.portrait.distance + ' (this image may not be the original)';
+        if (vf.portrait.reason === 'altered') {
+          // dHash still matches (same body) but the luma grid flags a localized
+          // edit \u2014 a drawn mark, pasted object, stamped text, or global retouch.
+          embBadge2.innerHTML = '<span class="verify-icon">&#x2B21;</span> ALTERED';
+          embBadge2.title = 'Localized alteration detected \u2014 the image has been edited since conception '
+            + '(grid deviation ' + vf.portrait.gridScore + ', threshold ' + vf.portrait.gridThreshold + ')';
+        } else {
+          embBadge2.title = 'Portrait mismatch \u2014 dHash distance ' + vf.portrait.distance + ' (this image may not be the original)';
+        }
         badgeWrap.appendChild(embBadge2);
       }
     }
@@ -1122,7 +1130,7 @@ function renderCert(meta, options) {
           if (window._lastDecodedCanvas && typeof unlocked.thumbnail === 'string'
               && unlocked.thumbnail && typeof comparePortrait === 'function') {
             try {
-              var portrait = await comparePortrait(window._lastDecodedCanvas, unlocked.thumbnail);
+              var portrait = await comparePortrait(window._lastDecodedCanvas, unlocked.thumbnail, unlocked.luma_grid);
               var vfCopy = Object.assign({}, (unlocked._verification || {}));
               vfCopy.portrait = portrait;
               unlocked._verification = vfCopy;
