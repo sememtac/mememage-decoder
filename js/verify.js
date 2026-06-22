@@ -477,20 +477,33 @@ function hammingDistance(a, b) {
 //
 // dHash answers "same body?" (coarse, recompression-robust) but is blind to a
 // localized defacement — a drawn line and JPEG q50 are the same magnitude to a
-// perceptual hash. The luma grid keeps the magnitude dHash discards: a 16x16
-// map of mean luminance. A defacement is a localized spike in per-tile mean
-// above the uniform recompression floor. Twin of mememage/embodiment.py;
-// tests/embodiment/luma_grid_parity.cjs locks byte-parity.
-var LUMA_GRID = 16;
-// Shared with mememage/embodiment.py GRID_TAMPER_THRESHOLD — change both.
-var LUMA_GRID_THRESHOLD = 6;
+// perceptual hash. The luma grid keeps the magnitude dHash discards: a 32x32
+// map of per-tile mean luminance. A defacement is a localized spike in a tile's
+// mean above the uniform recompression floor.
+//
+// Flatness-aware: the stored blob also carries a per-tile "flat" bit (computed
+// in Python at mint — see mememage/embodiment.py). Resize ringing only hits
+// busy/edge tiles, so flat tiles carry a sensitive LOW threshold (catches a
+// small mark on a smooth area) while all tiles carry a HIGH threshold (big
+// defacement over texture). The browser never recomputes flatness — it reads
+// the bits — so only the MEAN math is a Py<->JS parity surface, locked by
+// tests/embodiment/luma_grid_parity.cjs.
+//
+// Blob layout (base64): 1024 mean bytes (uint8 row-major) + 128 flat bytes
+// (bit i = tile i flat, LSB-first).
+var LUMA_GRID = 32;
+var LUMA_MEAN_BYTES = LUMA_GRID * LUMA_GRID;       // 1024
+var LUMA_BLOB_BYTES = LUMA_MEAN_BYTES + (LUMA_MEAN_BYTES + 7 >> 3);  // 1152
+// Shared with mememage/embodiment.py LOW_THRESHOLD / HIGH_THRESHOLD.
+var LUMA_LOW = 4;
+var LUMA_HIGH = 24;
 
-// Pure pixel math, kept separate from canvas access so the parity harness
-// (tests/embodiment/luma_grid_parity.cjs) can drive it under Node with no
-// canvas. `data` is RGBA over a `side`x`side` square. Integer-boundary
-// area-average — NO resize (browser resampling differs from PIL; that's the
-// parity trap). Half-up rounding (floor(x+0.5)) matches Python int(x+0.5).
-// Returns Uint8Array(256). Twin of mememage/embodiment.luma_grid_bytes.
+// Pure pixel math, kept separate from canvas access so the parity harness can
+// drive it under Node with no canvas. `data` is RGBA over a `side`x`side`
+// square. Integer-boundary area-average — NO resize (browser resampling differs
+// from PIL; that's the parity trap). Half-up rounding (floor(x+0.5)) matches
+// Python int(x+0.5). Returns the per-tile means as Uint8Array(1024). Twin of
+// mememage/embodiment._mean_and_flat (mean half).
 function lumaGridFromSquareData(data, side) {
   var out = new Uint8Array(LUMA_GRID * LUMA_GRID);
   for (var ty = 0; ty < LUMA_GRID; ty++) {
@@ -521,33 +534,42 @@ function computeLumaGrid(canvas) {
   return lumaGridFromSquareData(data, sq);
 }
 
-// Decode a base64 luma grid (from the record) to Uint8Array. Null if malformed.
-function decodeLumaGrid(b64) {
+// Decode a stored luma-grid blob to {mean: Uint8Array(1024), flat: Uint8Array
+// (1024, 0/1)}. Null if it isn't the current format (legacy 16x16 / malformed)
+// — caller then skips the grid check (EMBODIED falls back to dHash-only).
+function decodeStoredGrid(b64) {
   if (!b64 || typeof b64 !== 'string') return null;
   try {
     var bin = atob(b64);
-    var out = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out.length === LUMA_GRID * LUMA_GRID ? out : null;
+    if (bin.length !== LUMA_BLOB_BYTES) return null;
+    var mean = new Uint8Array(LUMA_MEAN_BYTES);
+    for (var i = 0; i < LUMA_MEAN_BYTES; i++) mean[i] = bin.charCodeAt(i);
+    var flat = new Uint8Array(LUMA_MEAN_BYTES);
+    for (var j = 0; j < LUMA_MEAN_BYTES; j++) {
+      flat[j] = (bin.charCodeAt(LUMA_MEAN_BYTES + (j >> 3)) >> (j & 7)) & 1;
+    }
+    return {mean: mean, flat: flat};
   } catch (e) { return null; }
 }
 
-// Worst per-tile luma deviation after removing the global median shift (so a
-// uniform exposure change is absorbed but a local mark survives). Twin of
-// embodiment.luma_grid_score.
-function lumaGridScore(a, b) {
-  if (!a || !b || a.length !== b.length) return Infinity;
-  var deltas = new Array(a.length);
-  for (var i = 0; i < a.length; i++) deltas[i] = a[i] - b[i];
+// {flatMax, allMax}: worst per-tile mean deviation after removing the global
+// median shift (so a uniform exposure change is absorbed but a local mark
+// survives), over flat tiles and over all tiles. Twin of
+// embodiment.residual_maxes.
+function lumaResidualMaxes(dropMean, refMean, flat) {
+  var n = refMean.length;
+  var deltas = new Array(n);
+  for (var i = 0; i < n; i++) deltas[i] = dropMean[i] - refMean[i];
   var sorted = deltas.slice().sort(function(x, y) { return x - y; });
-  var n = sorted.length, mid = n >> 1;
+  var mid = n >> 1;
   var med = (n % 2) ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  var worst = 0;
-  for (var j = 0; j < deltas.length; j++) {
+  var flatMax = 0, allMax = 0;
+  for (var j = 0; j < n; j++) {
     var dev = Math.abs(deltas[j] - med);
-    if (dev > worst) worst = dev;
+    if (dev > allMax) allMax = dev;
+    if (flat[j] && dev > flatMax) flatMax = dev;
   }
-  return worst;
+  return {flatMax: flatMax, allMax: allMax};
 }
 
 // ----- Keychain: succession and revocation checks -----
@@ -778,7 +800,7 @@ async function comparePortrait(droppedImageCanvas, thumbnailDataURI, lumaGridB64
   //   'mismatch' (different image) vs 'altered' (defaced/retouched original).
   // lumaGridB64 is absent on legacy records → grid half is skipped (legacy
   // dHash-only grade). Returns
-  //   {match, distance, threshold, reason, gridScore, gridThreshold}.
+  //   {match, distance, threshold, reason, gridScore}.
   if (!thumbnailDataURI) return {match: null, distance: -1, threshold: 10, reason: null};
 
   var imgHash = dHashFromCanvas(droppedImageCanvas);
@@ -795,17 +817,21 @@ async function comparePortrait(droppedImageCanvas, thumbnailDataURI, lumaGridB64
 
   // Localized-tamper half. Only meaningful when the record carries a grid.
   var gridScore = -1, gridOk = true;
-  var storedGrid = decodeLumaGrid(lumaGridB64);
-  if (storedGrid) {
-    var droppedGrid = computeLumaGrid(droppedImageCanvas);
-    gridScore = lumaGridScore(droppedGrid, storedGrid);
-    gridOk = gridScore <= LUMA_GRID_THRESHOLD;
+  var stored = decodeStoredGrid(lumaGridB64);
+  if (stored) {
+    var dropMean = computeLumaGrid(droppedImageCanvas);
+    var mx = lumaResidualMaxes(dropMean, stored.mean, stored.flat);
+    // Two thresholds: flat tiles (smooth areas — sensitive) and all tiles
+    // (big defacement over texture). gridScore is the worst exceedance, for
+    // the badge readout.
+    gridOk = !(mx.flatMax > LUMA_LOW || mx.allMax > LUMA_HIGH);
+    gridScore = Math.round(Math.max(mx.flatMax, mx.allMax));
   }
 
   var match = dHashOk && gridOk;
   var reason = match ? null : (!dHashOk ? 'mismatch' : 'altered');
   return {
     match: match, distance: dist, threshold: threshold, reason: reason,
-    gridScore: gridScore, gridThreshold: LUMA_GRID_THRESHOLD,
+    gridScore: gridScore,
   };
 }

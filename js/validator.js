@@ -3889,14 +3889,14 @@ async function loadOriginal() {
     sig: soul.signature,
     pub: soul.public_key,
     thumbDHash: thumbDHash,
-    lumaGrid: decodeLumaGrid(soul.luma_grid)   // localized-tamper reference
+    lumaGrid: decodeStoredGrid(soul.luma_grid)   // {mean, flat} localized-tamper reference
   };
   current = {
     record: JSON.parse(JSON.stringify(hashable)),
     sig: original.sig,
     pub: original.pub,
     userDHash: thumbDHash,    // starts matching
-    userGrid: original.lumaGrid
+    userGrid: original.lumaGrid ? original.lumaGrid.mean : null
   };
 }
 
@@ -4040,10 +4040,10 @@ async function recompute() {
   // breaks this; editing luma_grid to compensate breaks WITNESSED. Either way
   // the forger can't get all-green. Reason flips DISEMBODIED -> ALTERED.
   var embReason = null;
-  var curGrid = decodeLumaGrid(rec.luma_grid);
-  if (curGrid && current.userGrid) {
-    var gscore = lumaGridScore(current.userGrid, curGrid);
-    if (gscore > LUMA_GRID_THRESHOLD && embodied !== false) {
+  var curStored = decodeStoredGrid(rec.luma_grid);
+  if (curStored && current.userGrid) {
+    var mx = lumaResidualMaxes(current.userGrid, curStored.mean, curStored.flat);
+    if ((mx.flatMax > LUMA_LOW || mx.allMax > LUMA_HIGH) && embodied !== false) {
       embodied = false;
       embReason = 'altered';
     }
@@ -4065,7 +4065,7 @@ function resetAll() {
     sig: original.sig,
     pub: original.pub,
     userDHash: original.thumbDHash,
-    userGrid: original.lumaGrid
+    userGrid: original.lumaGrid ? original.lumaGrid.mean : null
   };
   document.getElementById('atk-record').value = JSON.stringify(original.record, null, 2);
   document.getElementById('atk-sig').value = original.sig;

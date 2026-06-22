@@ -1014,7 +1014,7 @@ function renderCert(meta, options) {
           // edit \u2014 a drawn mark, pasted object, stamped text, or global retouch.
           embBadge2.innerHTML = '<span class="verify-icon">&#x2B21;</span> ALTERED';
           embBadge2.title = 'Localized alteration detected \u2014 the image has been edited since conception '
-            + '(grid deviation ' + vf.portrait.gridScore + ', threshold ' + vf.portrait.gridThreshold + ')';
+            + '(grid deviation ' + vf.portrait.gridScore + ')';
         } else {
           embBadge2.title = 'Portrait mismatch \u2014 dHash distance ' + vf.portrait.distance + ' (this image may not be the original)';
         }
