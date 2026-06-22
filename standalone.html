@@ -964,6 +964,11 @@ html.portal-transit .panel-footer { opacity: 0; }
     .verify-link { justify-content: center; padding: 0.2rem 0; }
   }
   .verify-link { display: flex; align-items: center; color: var(--text-dim); font-size: 0.7rem; letter-spacing: 0.1em; }
+  /* By Soul body preview — the uploaded image, shown beneath the Body/Soul
+     slots (mirrors By Sight's preview). Hidden until a body is dropped. */
+  .verify-preview { text-align: center; padding: 0.7rem 0 0; }
+  .verify-preview[hidden] { display: none; }
+  .verify-preview img { width: 100%; max-height: 180px; object-fit: contain; border-radius: var(--radius-sm); display: block; margin: 0 auto; }
   .verify-status { margin-top: auto; padding-top: 0.8rem; text-align: center; font-size: 0.75rem; color: var(--text-muted); min-height: 1.2em; }
   .verify-slot.ready .drop-zone { border-color: rgba(46, 196, 160, 0.4); }
   .verify-slot.ready .drop-zone::before { background: radial-gradient(ellipse at center, rgba(46, 196, 160, 0.08) 0%, transparent 70%); }
@@ -3551,7 +3556,7 @@ body.planetarium-open .panel-footer {
         <div class="verify-slot" id="verifyImageSlot">
           <div class="drop-zone" id="verifyImageDrop">
             <span class="drop-icon">&#9883;</span>
-            <p><strong>The body</strong></p>
+            <p><strong>Body</strong></p>
             <p class="drop-hint">carries proof of its soul</p>
             <input type="file" id="verifyImageInput" accept="image/*">
           </div>
@@ -3560,12 +3565,15 @@ body.planetarium-open .panel-footer {
         <div class="verify-slot" id="verifyJsonSlot">
           <div class="drop-zone" id="verifyJsonDrop">
             <span class="drop-icon">{}</span>
-            <p><strong>The soul</strong></p>
+            <p><strong>Soul</strong></p>
             <p class="drop-hint">the .soul file, from any source</p>
             <input type="file" id="verifyJsonInput">
           </div>
         </div>
       </div>
+      <!-- Body preview — shows the uploaded body image (like By Sight's
+           preview) so the creator sees what they dropped. -->
+      <div class="verify-preview" id="verifyPreview" hidden><img id="verifyPreviewImg" alt="uploaded body"></div>
       <div class="verify-status" id="verifyStatus"></div>
     </div>
   </div>
@@ -15572,6 +15580,8 @@ async function processVerifyImage(file) {
   verifyState.barHash = null;
   verifyState.barIdentifier = null;
   document.getElementById('verifyImageSlot').classList.remove('ready');
+  var _vPrev = document.getElementById('verifyPreview');
+  if (_vPrev) _vPrev.hidden = true;  // clear any prior preview while we read
   updateVerifyStatus('Reading bar from image...');
 
   var img = new Image();
@@ -15600,6 +15610,9 @@ async function processVerifyImage(file) {
   verifyState.barIdentifier = decoded.identifier;
   verifyState.verifyCanvas = canvas;
   document.getElementById('verifyImageSlot').classList.add('ready');
+  // Show what was dropped, beneath the Body/Soul slots.
+  var _vImg = document.getElementById('verifyPreviewImg');
+  if (_vPrev && _vImg) { _vImg.src = img.src; _vPrev.hidden = false; }
   updateVerifyStatus(verifyState.jsonMeta ? 'Reuniting body and soul...' : 'Body ready — fingerprint: ' + decoded.content_hash.slice(0, 8) + '... — now provide the soul');
 
   if (verifyState.jsonMeta) tryVerifyPair();

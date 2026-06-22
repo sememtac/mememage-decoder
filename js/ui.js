@@ -1153,6 +1153,8 @@ async function processVerifyImage(file) {
   verifyState.barHash = null;
   verifyState.barIdentifier = null;
   document.getElementById('verifyImageSlot').classList.remove('ready');
+  var _vPrev = document.getElementById('verifyPreview');
+  if (_vPrev) _vPrev.hidden = true;  // clear any prior preview while we read
   updateVerifyStatus('Reading bar from image...');
 
   var img = new Image();
@@ -1181,6 +1183,9 @@ async function processVerifyImage(file) {
   verifyState.barIdentifier = decoded.identifier;
   verifyState.verifyCanvas = canvas;
   document.getElementById('verifyImageSlot').classList.add('ready');
+  // Show what was dropped, beneath the Body/Soul slots.
+  var _vImg = document.getElementById('verifyPreviewImg');
+  if (_vPrev && _vImg) { _vImg.src = img.src; _vPrev.hidden = false; }
   updateVerifyStatus(verifyState.jsonMeta ? 'Reuniting body and soul...' : 'Body ready — fingerprint: ' + decoded.content_hash.slice(0, 8) + '... — now provide the soul');
 
   if (verifyState.jsonMeta) tryVerifyPair();
