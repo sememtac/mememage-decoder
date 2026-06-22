@@ -3006,7 +3006,7 @@ function runAudit() {
       setAuditError(
         'Not in the offline cache.',
         'Identifier <strong>' + identifier + '</strong> isn\u2019t among ' +
-        OfflineRecords.count() + ' record(s) currently loaded. ' +
+        OfflineRecords.count() + ' record(s) loaded. ' +
         'Load a different folder under <em>Source</em>, or switch to <em>Online</em>.'
       );
     } else {
