@@ -1008,7 +1008,9 @@ html.portal-transit .panel-footer { opacity: 0; }
     font-weight: 500;
     text-align: center;
     text-shadow: 0 1px 0 rgba(255,255,255,0.3);
-    border-top: 1px solid rgba(0,0,0,0.06);
+    /* No top border — it drew a stray line directly beneath the image
+       preview (By Soul / By Sight). The status reads as its own line, and
+       the separator above "see an example" below it is enough. */
   }
   .console-status.visible { display: block; }
   .console-status.success { color: #1a5a3a; }
