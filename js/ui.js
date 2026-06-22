@@ -1186,7 +1186,7 @@ async function processVerifyImage(file) {
   // Show what was dropped, beneath the Body/Soul slots.
   var _vImg = document.getElementById('verifyPreviewImg');
   if (_vPrev && _vImg) { _vImg.src = img.src; _vPrev.hidden = false; }
-  updateVerifyStatus(verifyState.jsonMeta ? 'Reuniting body and soul...' : 'Body ready — fingerprint: ' + decoded.content_hash.slice(0, 8) + '... — now provide the soul');
+  updateVerifyStatus(verifyState.jsonMeta ? 'Reuniting body and soul…' : 'Body ready · ' + decoded.content_hash + ' · provide the soul');
 
   if (verifyState.jsonMeta) tryVerifyPair();
 }
@@ -1202,7 +1202,7 @@ async function processVerifyJson(file) {
     if (!meta || typeof meta !== 'object') throw new Error('Not an object');
     verifyState.jsonMeta = meta;
     document.getElementById('verifyJsonSlot').classList.add('ready');
-    updateVerifyStatus(verifyState.barHash ? 'Reuniting body and soul...' : 'Soul ready — now provide the body');
+    updateVerifyStatus(verifyState.barHash ? 'Reuniting body and soul…' : 'Soul ready · provide the body');
     if (verifyState.barHash) tryVerifyPair();
   } catch (e) {
     updateVerifyStatus('Invalid soul file: ' + e.message, true);

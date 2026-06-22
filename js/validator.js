@@ -3212,7 +3212,7 @@ function renderAudit(rec, identifier, out) {
   var sigRows = '';
   if (rec.signature) {
     sigRows += auditRow('Signature', rec.signature.slice(0, 16) + '...' + rec.signature.slice(-8));
-    sigRows += auditRow('Public Key', rec.public_key ? rec.public_key.slice(0, 16) + '...' : 'missing', rec.public_key ? '' : 'audit-fail');
+    sigRows += auditRow('Public Key', rec.public_key || 'missing', rec.public_key ? '' : 'audit-fail');
     sigRows += auditRow('Fingerprint', rec.key_fingerprint || 'missing', rec.key_fingerprint ? 'audit-info' : 'audit-fail');
     if (rec.creator_name) sigRows += auditRow('Creator (TOFU)', rec.creator_name, 'audit-info');
     // Real Ed25519 verification — deferred update mirrors the content-hash
@@ -3312,7 +3312,7 @@ function renderAudit(rec, identifier, out) {
       if (e.version) cycleRows += auditRow(lbl + ' Version', e.version);
     });
   }
-  if (rec.decoder_hash) cycleRows += auditRow('Decoder Hash', rec.decoder_hash.slice(0, 12) + '...');
+  if (rec.decoder_hash) cycleRows += auditRow('Decoder Hash', rec.decoder_hash);
   if (rec.chain_visibility !== undefined && rec.chain_visibility !== null) {
     cycleRows += auditRow('Visibility', _visName(rec.chain_visibility) || String(rec.chain_visibility), _isDark(rec.chain_visibility) ? 'audit-warn' : '');
   }
