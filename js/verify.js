@@ -495,8 +495,12 @@ var LUMA_GRID = 32;
 var LUMA_MEAN_BYTES = LUMA_GRID * LUMA_GRID;       // 1024
 var LUMA_BLOB_BYTES = LUMA_MEAN_BYTES + (LUMA_MEAN_BYTES + 7 >> 3);  // 1152
 // Shared with mememage/embodiment.py LOW_THRESHOLD / HIGH_THRESHOLD.
-var LUMA_LOW = 4;
+var LUMA_LOW = 3;
 var LUMA_HIGH = 24;
+// Drop the bottom tile row from scoring — it holds the 2px bar, which the stored
+// PRE-bar grid doesn't have, so it always shows a spurious ~3-4 residual on
+// landscape/square images. See mememage/embodiment.SKIP_BOTTOM_ROWS.
+var LUMA_SKIP_BOTTOM_ROWS = 1;
 
 // Pure pixel math, kept separate from canvas access so the parity harness can
 // drive it under Node with no canvas. `data` is RGBA over a `side`x`side`
@@ -557,14 +561,15 @@ function decodeStoredGrid(b64) {
 // survives), over flat tiles and over all tiles. Twin of
 // embodiment.residual_maxes.
 function lumaResidualMaxes(dropMean, refMean, flat) {
-  var n = refMean.length;
-  var deltas = new Array(n);
-  for (var i = 0; i < n; i++) deltas[i] = dropMean[i] - refMean[i];
+  // Score all but the bottom row(s) — the bar region (see LUMA_SKIP_BOTTOM_ROWS).
+  var scored = refMean.length - LUMA_SKIP_BOTTOM_ROWS * LUMA_GRID;
+  var deltas = new Array(scored);
+  for (var i = 0; i < scored; i++) deltas[i] = dropMean[i] - refMean[i];
   var sorted = deltas.slice().sort(function(x, y) { return x - y; });
-  var mid = n >> 1;
-  var med = (n % 2) ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  var mid = scored >> 1;
+  var med = (scored % 2) ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   var flatMax = 0, allMax = 0;
-  for (var j = 0; j < n; j++) {
+  for (var j = 0; j < scored; j++) {
     var dev = Math.abs(deltas[j] - med);
     if (dev > allMax) allMax = dev;
     if (flat[j] && dev > flatMax) flatMax = dev;
