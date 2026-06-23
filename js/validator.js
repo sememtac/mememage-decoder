@@ -3889,15 +3889,21 @@ async function loadOriginal() {
     sig: soul.signature,
     pub: soul.public_key,
     thumbDHash: thumbDHash,
-    lumaGrid: decodeStoredGrid(soul.luma_grid)   // {mean, flat} localized-tamper reference
+    lumaGrid: decodeStoredGrid(soul.luma_grid)   // {mean,min,max,flat} tamper reference
   };
   current = {
     record: JSON.parse(JSON.stringify(hashable)),
     sig: original.sig,
     pub: original.pub,
     userDHash: thumbDHash,    // starts matching
-    userGrid: original.lumaGrid ? original.lumaGrid.mean : null
+    userGrid: _gridStats(original.lumaGrid)   // {mean,min,max} of the stored ref
   };
+}
+
+// The dropped-image tile stats view {mean,min,max} of a decoded stored grid —
+// used as the Attack Lab's starting (unmodified) image so it matches itself.
+function _gridStats(g) {
+  return g ? {mean: g.mean, min: g.min, max: g.max} : null;
 }
 
 function buildCertMeta(verification) {
@@ -4042,8 +4048,8 @@ async function recompute() {
   var embReason = null;
   var curStored = decodeStoredGrid(rec.luma_grid);
   if (curStored && current.userGrid) {
-    var mx = lumaResidualMaxes(current.userGrid, curStored.mean, curStored.flat);
-    if ((mx.flatMax > LUMA_LOW || mx.allMax > LUMA_HIGH) && embodied !== false) {
+    var ev = lumaEvaluate(curStored, current.userGrid);
+    if ((ev.markMax > LUMA_MARK || ev.highMax > LUMA_HIGH) && embodied !== false) {
       embodied = false;
       embReason = 'altered';
     }
@@ -4065,7 +4071,7 @@ function resetAll() {
     sig: original.sig,
     pub: original.pub,
     userDHash: original.thumbDHash,
-    userGrid: original.lumaGrid ? original.lumaGrid.mean : null
+    userGrid: _gridStats(original.lumaGrid)
   };
   document.getElementById('atk-record').value = JSON.stringify(original.record, null, 2);
   document.getElementById('atk-sig').value = original.sig;
@@ -4082,7 +4088,7 @@ function loadUserImage(file) {
     c.width = img.naturalWidth; c.height = img.naturalHeight;
     c.getContext('2d').drawImage(img, 0, 0);
     current.userDHash = dHashFromCanvas(c);
-    current.userGrid = computeLumaGrid(c);
+    current.userGrid = computeTileStats(c);
     document.getElementById('atk-drop-label').textContent = file.name + ' \u2713';
     recompute();
   };
