@@ -130,15 +130,73 @@ function otsuThreshold(px,w,h){
   return thr;
 }
 
+// ---- Asym row-3-copy camo helpers (shared encode + decode) ----------------
+// Faithful ports of mememage/bar.py:_smooth1d / _hue_floor / _asym_center_columns
+// / _asym_threshold_curve / _thr. The box blur (NOT a Gaussian) is what keeps
+// the writer byte-exact across runtimes — see data.js ASYM_BOX_RADIUS.
+function _smooth1d(values,radius){
+  var n=values.length;
+  if(n===0||radius<=0)return values.slice();
+  var width=2*radius+1,out=new Array(n);
+  for(var i=0;i<n;i++){
+    var acc=0.0;
+    for(var k=-radius;k<=radius;k++){
+      var idx=i+k; idx=idx<0?0:(idx>=n?n-1:idx);
+      acc+=values[idx];
+    }
+    out[i]=acc/width;
+  }
+  return out;
+}
+function _hueFloor(r,g,b,floor){
+  var L=0.299*r+0.587*g+0.114*b;
+  if(L>=floor)return [r,g,b];
+  if(L<2)return [floor,floor,floor];
+  var s=floor/L;
+  return [Math.min(255.0,r*s),Math.min(255.0,g*s),Math.min(255.0,b*s)];
+}
+function _asymCenterColumns(px,w,h){
+  var y=h-SIG_ROWS-1; if(y<0)y=Math.max(0,h-1);
+  var rr=new Array(w),gg=new Array(w),bb=new Array(w);
+  for(var x=0;x<w;x++){var i=(y*w+x)*4;rr[x]=px[i];gg[x]=px[i+1];bb[x]=px[i+2];}
+  rr=_smooth1d(rr,ASYM_BOX_RADIUS);gg=_smooth1d(gg,ASYM_BOX_RADIUS);bb=_smooth1d(bb,ASYM_BOX_RADIUS);
+  var centerRgb=new Array(w),centerLum=new Array(w);
+  for(var x2=0;x2<w;x2++){
+    var c=_hueFloor(rr[x2],gg[x2],bb[x2],ASYM_FLOOR);
+    centerRgb[x2]=c; centerLum[x2]=0.299*c[0]+0.587*c[1]+0.114*c[2];
+  }
+  return {centerRgb:centerRgb,centerLum:centerLum};
+}
+function _asymThresholdCurve(px,w,h){
+  var cl=_asymCenterColumns(px,w,h).centerLum,half=ASYM_DELTA/2.0,out=new Array(w);
+  for(var x=0;x<w;x++)out[x]=cl[x]-half;
+  return out;
+}
+function _thr(threshold,x){
+  if(Array.isArray(threshold)){
+    if(x>=0&&x<threshold.length)return threshold[x];
+    return threshold.length?threshold[threshold.length-1]:RGB_THRESHOLD;
+  }
+  return threshold;
+}
+
 function extractBits(px,w,h,ppb,thr){
-  // 1:1 (native pixel-scale) extraction. Use extractBitsAtScale for
-  // scale-aware reading on resized images.
+  // 1:1 (native pixel-scale) extraction. Averages ALL ppb columns of the bit
+  // (value AND per-column threshold) for JPEG noise immunity. Mirrors the
+  // scale==1 branch of mememage/bar.py:_decode_bits_at_scale.
   ppb=ppb||PIXELS_PER_BIT;if(thr===undefined)thr=RGB_THRESHOLD;
-  const bits=[],dataPerRow=w-HEADER_PIXELS-FOOTER_PIXELS,bitsPerRow=Math.floor(dataPerRow/ppb);
-  for(let row=0;row<SIG_ROWS;row++){const y=h-1-row;
-    for(let b=0;b<bitsPerRow;b++){
-      const cx=HEADER_PIXELS+b*ppb+Math.floor(ppb/2);
-      const i=(y*w+cx)*4;bits.push(((px[i]+px[i+1]+px[i+2])/3)>=thr?1:0);}}
+  var dataStart=HEADER_PIXELS,dataEnd=w-FOOTER_PIXELS;
+  var bitsPerRow=Math.floor((dataEnd-dataStart)/ppb),bits=[];
+  for(var row=0;row<SIG_ROWS;row++){var y=h-1-row;
+    for(var b=0;b<bitsPerRow;b++){
+      var x0=dataStart+b*ppb,acc=0,tacc=0,cnt=0;
+      for(var dx=0;dx<ppb;dx++){
+        var cx=x0+dx; if(cx>=dataEnd)break;
+        var i=(y*w+cx)*4; acc+=(px[i]+px[i+1]+px[i+2])/3; tacc+=_thr(thr,cx); cnt++;
+      }
+      bits.push(cnt&&acc/cnt>=tacc/cnt?1:0);
+    }
+  }
   return bits;
 }
 
@@ -149,18 +207,23 @@ function extractBits(px,w,h,ppb,thr){
 function extractBitsAtScale(px,w,h,scale,ppb,thr){
   ppb=ppb||PIXELS_PER_BIT;if(thr===undefined)thr=RGB_THRESHOLD;
   if(Math.abs(scale-1.0)<0.01) return extractBits(px,w,h,ppb,thr);
-  var orig_w=Math.round(w/scale);
-  var orig_data_per_row=orig_w-HEADER_PIXELS-FOOTER_PIXELS;
-  var orig_bits_per_row=Math.floor(orig_data_per_row/ppb);
+  var orig_w=pyRound(w/scale);
+  var orig_bits_per_row=Math.floor((orig_w-HEADER_PIXELS-FOOTER_PIXELS)/ppb);
   var bits=[];
   for(var row=0;row<SIG_ROWS;row++){
     var y=h-1-row;
     for(var b=0;b<orig_bits_per_row;b++){
-      var orig_cx=HEADER_PIXELS+b*ppb+ppb/2;
-      var sx=Math.round(orig_cx*scale);
-      if(sx<0||sx>=w) break;
-      var i=(y*w+sx)*4;
-      bits.push(((px[i]+px[i+1]+px[i+2])/3)>=thr?1:0);
+      // Average the bit's full scaled span (value AND threshold). Mirrors the
+      // scaled branch of mememage/bar.py:_decode_bits_at_scale.
+      var sx0=pyRound((HEADER_PIXELS+b*ppb)*scale);
+      var sx1=pyRound((HEADER_PIXELS+(b+1)*ppb)*scale);
+      var end=Math.max(sx0+1,sx1),acc=0,tacc=0,cnt=0;
+      for(var sx=sx0;sx<end;sx++){
+        if(sx<0||sx>=w) break;
+        var i=(y*w+sx)*4; acc+=(px[i]+px[i+1]+px[i+2])/3; tacc+=_thr(thr,sx); cnt++;
+      }
+      if(cnt===0) break;
+      bits.push(acc/cnt>=tacc/cnt?1:0);
     }
   }
   return bits;
@@ -237,7 +300,7 @@ function decodeEvenFill(px,w,h,thr){
               var idx=(rows[r]*w+cx)*4;
               acc+=(px[idx]+px[idx+1]+px[idx+2])/3;
             }
-            bits.push((acc/rows.length)>=thr?1:0);
+            bits.push((acc/rows.length)>=_thr(thr,cx)?1:0);
           }
           if(!ok)continue;
           var frame=decodeFrame(bits);
@@ -263,11 +326,17 @@ function extractBarScaleAware(px,w,h){
   // tried first; CRC + RS self-select, so a wrong threshold just fails frame
   // validation and the next candidate is tried. Mirrors bar.py:extract_bar.
   var thrs=[];var ot=otsuThreshold(px,w,h);if(ot!==null)thrs.push(ot);thrs.push(RGB_THRESHOLD);
+  // Asym camo bar — a PER-COLUMN threshold re-derived from the row above the bar
+  // (predicted "1" level minus delta/2). Tried after the scalar candidates so
+  // legacy/centered bars resolve first; CRC+RS self-selects. Mirrors bar.py.
+  try{ if(typeof ASYM_ENCODE!=='undefined' && ASYM_ENCODE) thrs.push(_asymThresholdCurve(px,w,h)); }catch(e){}
 
-  // Threshold-independent detection — done once, reused across candidates.
-  var hasBar=detectBar(px,w,h);
+  // Band detection only ADDS the resized-scale sweep. Scale 1:1 is ALWAYS tried
+  // (it isn't needed for a native-scale read, and band detection can fail on a
+  // heavily-recompressed asym bar even when the 1:1 sequential read decodes
+  // cleanly — CRC+RS guards false positives). Mirrors bar.py:extract_bar.
   var bands=detectBarBands(px,w,h);
-  var scaleCands=[];
+  var scaleCands=[1.0];
   if(bands && Math.abs((bands.m+bands.y+bands.c)/3/HEADER_BAND-1.0)>=0.05){
     var raw_scale=(bands.m+bands.y+bands.c)/3/HEADER_BAND;
     // Band-width measurement has ±5% noise from JPEG / interpolation, so sweep
@@ -283,15 +352,7 @@ function extractBarScaleAware(px,w,h){
     // High-res even-fill layout — full-width, both-ends anchored.
     var ef=decodeEvenFill(px,w,h,thr);
     if(ef){var efp=decodePayload(ef.payload);if(efp)return efp;}
-    // Fast 1:1 path — by far the common case (no resize).
-    if(hasBar){
-      for(var ppb0 of [PIXELS_PER_BIT,2]){
-        var b0=extractBits(px,w,h,ppb0,thr);
-        var f0=decodeFrame(b0);
-        if(f0){ var p0=decodePayload(f0.payload); if(p0) return p0; }
-      }
-    }
-    // Scale-aware path — sweep candidate scales from the measured band widths.
+    // Sequential layout — scale 1:1 first (common case), then swept scales.
     for(var ci=0;ci<scaleCands.length;ci++){
       for(var ppb of [PIXELS_PER_BIT,2]){
         var bits=extractBitsAtScale(px,w,h,scaleCands[ci],ppb,thr);
@@ -434,14 +495,15 @@ function _writeEvenFill(px, w, h, bits, bitRgb) {
     for (var i = 0; i < n; i++) {
       var x0 = a + pyRound(i * span / n);
       var x1 = a + pyRound((i + 1) * span / n);
-      var rgb = bitRgb(bits[i]);
-      for (var x = x0; x < x1; x++) _setPx(px, w, x, y, rgb);
+      // Per-pixel bitRgb(bit, x) — the asym center varies by column; for the
+      // centered scheme x is ignored so the value is constant across the bit.
+      for (var x = x0; x < x1; x++) _setPx(px, w, x, y, bitRgb(bits[i], x));
     }
   }
 }
 
 // Mirror bar.py:_write_sequential
-function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen) {
+function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen, fillerBit) {
   var totalDataPixels = SIG_ROWS * dataWidth;
   var ppb = PIXELS_PER_BIT;
   var capWide = Math.floor(Math.floor(totalDataPixels / PIXELS_PER_BIT) / 8) - 8 - RS_NSYM;
@@ -459,12 +521,12 @@ function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen) {
       var bi = rowStart + bil;
       var baseX = HEADER_PIXELS + bil * ppb;
       if (bi < bits.length) {
-        var rgb = bitRgb(bits[bi]);
-        for (var p = 0; p < ppb; p++) _setPx(px, w, baseX + p, y, rgb);
+        for (var p = 0; p < ppb; p++) _setPx(px, w, baseX + p, y, bitRgb(bits[bi], baseX + p));
       } else {
-        var fill = bitRgb(0);
+        // Filler past the payload. Legacy: bit-0 level. Asym: fillerBit=1 (copies
+        // row above = invisible). Mirrors bar.py:_write_sequential.
         for (var p2 = 0; p2 < ppb; p2++)
-          if (baseX + p2 < w - FOOTER_PIXELS) _setPx(px, w, baseX + p2, y, fill);
+          if (baseX + p2 < w - FOOTER_PIXELS) _setPx(px, w, baseX + p2, y, bitRgb(fillerBit, baseX + p2));
       }
     }
   }
@@ -479,21 +541,47 @@ function embedBarPayload(px, w, h, payloadBytes) {
   for (var i = 0; i < frame.length; i++)
     for (var j = 7; j >= 0; j--) bits.push((frame[i] >> j) & 1);
 
-  var dom = _dominantColor(px, w, h);
-  var domAvg = (dom[0] + dom[1] + dom[2]) / 3;
-  var half = BAR_DELTA / 2;
-  var center = Math.max(half, Math.min(255 - half, domAvg));
-  var lo = center - half, hi = center + half;
-  function bitRgb(bit) {
-    var off = (bit ? hi : lo) - domAvg;
-    return [_clamp8(pyRound(dom[0] + off)), _clamp8(pyRound(dom[1] + off)), _clamp8(pyRound(dom[2] + off))];
+  var dataWidth = w - HEADER_PIXELS - FOOTER_PIXELS;
+  // Asym camo is used ONLY for the sequential layout — its content-copying data
+  // pixels can be M/Y/C-hued and would fool the band-edge anchoring that even-fill
+  // decode depends on. Even-fill (large images) keeps the centered gray scheme.
+  // Mirrors mememage/bar.py:embed_into.
+  var isEvenFill = dataWidth >= PIXELS_PER_BIT * bits.length;
+  var useAsym = (typeof ASYM_ENCODE !== 'undefined' && ASYM_ENCODE) && !isEvenFill;
+
+  var bitRgb, fillerBit;
+  if (useAsym) {
+    // Asym camo: each bit rides a PER-COLUMN center copying the smoothed,
+    // floored content one row above. "1" = center (invisible), "0" =
+    // center-ASYM_DELTA, filler = "1". Mirrors bar.py:embed_into asym branch.
+    var centerRgb = _asymCenterColumns(px, w, h).centerRgb;
+    fillerBit = 1;
+    bitRgb = function (bit, x) {
+      var c = centerRgb[x];
+      if (bit) return [pyRound(c[0]), pyRound(c[1]), pyRound(c[2])];
+      return [Math.max(0, pyRound(c[0] - ASYM_DELTA)),
+              Math.max(0, pyRound(c[1] - ASYM_DELTA)),
+              Math.max(0, pyRound(c[2] - ASYM_DELTA))];
+    };
+  } else {
+    // Centered brightness (legacy/fallback): two levels around one clamped
+    // global dominant brightness.
+    var dom = _dominantColor(px, w, h);
+    var domAvg = (dom[0] + dom[1] + dom[2]) / 3;
+    var half = BAR_DELTA / 2;
+    var center = Math.max(half, Math.min(255 - half, domAvg));
+    var lo = center - half, hi = center + half;
+    fillerBit = 0;
+    bitRgb = function (bit, x) {
+      var off = (bit ? hi : lo) - domAvg;
+      return [_clamp8(pyRound(dom[0] + off)), _clamp8(pyRound(dom[1] + off)), _clamp8(pyRound(dom[2] + off))];
+    };
   }
 
-  var dataWidth = w - HEADER_PIXELS - FOOTER_PIXELS;
-  if (dataWidth >= PIXELS_PER_BIT * bits.length) {
+  if (isEvenFill) {
     _writeEvenFill(px, w, h, bits, bitRgb);
   } else {
-    _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadBytes.length);
+    _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadBytes.length, fillerBit);
   }
   return true;
 }

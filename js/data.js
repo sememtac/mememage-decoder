@@ -4,6 +4,11 @@
 const SIG_ROWS=2,HEADER_BAND=8,HEADER_PIXELS=24,FOOTER_PIXELS=24,PIXELS_PER_BIT=3,RGB_THRESHOLD=128;
 // Bar WRITER constants — must mirror mememage/bar.py exactly (parity-tested).
 const PIXELS_PER_BIT_NARROW=2,BAR_DELTA=64,LOCAL_CONTEXT_ROWS=6,RS_NSYM=6;
+// Asym row-3-copy camo: data bits ride a per-column center copying the smoothed
+// content one row above the bar ("1"=center invisible, "0"=center-ASYM_DELTA,
+// filler="1"). Box-blur radius (NOT Gaussian — exp diverges glibc↔V8, breaking
+// byte-exact writer parity). Mirror mememage/bar.py exactly.
+const ASYM_ENCODE=true,ASYM_DELTA=48,ASYM_FLOOR=70,ASYM_BOX_RADIUS=34;
 // Even-fill frame byte-length sweep (8B header + 37..44B payload + 6B parity = 51..58B; margin both sides).
 const EVENFILL_MIN_BYTES=49,EVENFILL_MAX_BYTES=64;
 

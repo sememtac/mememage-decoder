@@ -4,9 +4,11 @@
 // pages need identically:
 //
 //   1. Load the file as an <img>, draw to a canvas, read pixels.
-//   2. Run detectBar on the pixel buffer.
-//   3. If detected, try extractBits + decodeFrame at ppb=3 then ppb=2.
-//   4. decodePayload on the recovered frame.
+//   2. Sweep threshold candidates (Otsu, absolute 128, asym row-3 curve) ×
+//      layouts (even-fill, then sequential at scale 1:1 + band-swept scales).
+//   3. decodePayload on the first frame that passes CRC + Reed-Solomon.
+//   Mirrors codec.js:extractBarScaleAware (this variant also returns the frame
+//   for the validator's forensic report).
 //
 // Returns a structured result with the canvas + raw pixels so each
 // page can run its own post-decode logic (decoder fetches + renders a
@@ -81,12 +83,16 @@ async function decodeImageBar(file) {
   var ot = otsuThreshold(px, img.width, img.height);
   if (ot !== null) thrs.push(ot);
   thrs.push(RGB_THRESHOLD);
+  // Asym camo bar — a PER-COLUMN threshold re-derived from the row above the bar.
+  // Tried after the scalar candidates; CRC+RS self-selects. Mirrors bar.py.
+  try { if (typeof ASYM_ENCODE !== 'undefined' && ASYM_ENCODE) thrs.push(_asymThresholdCurve(px, img.width, img.height)); } catch (e) {}
 
-  // Band detection is threshold-independent — do it once, reuse per candidate.
-  var hasBar = detectBar(px, img.width, img.height);
+  // Band detection only ADDS the resized-scale sweep. Scale 1:1 is ALWAYS tried —
+  // band detection can fail on a heavily-recompressed asym bar (its content-hued
+  // data pixels mask the M/Y/C edges) even when the 1:1 read decodes cleanly.
   var bands = detectBarBands(px, img.width, img.height);
-  if (hasBar || bands) detected = true;
-  var scales = [];
+  if (detectBar(px, img.width, img.height) || bands) detected = true;
+  var scales = [1.0];
   if (bands) {
     var raw_scale = (bands.m + bands.y + bands.c) / 3 / HEADER_BAND;
     if (Math.abs(raw_scale - 1.0) >= 0.05) {
@@ -104,17 +110,7 @@ async function decodeImageBar(file) {
     var efFrame = decodeEvenFill(px, img.width, img.height, thr);
     if (efFrame) { frame = efFrame; break; }
 
-    // Cheap 1:1 fast path (no resize): ppb=3 then ppb=2.
-    if (hasBar) {
-      for (var i = 0; i < 2; i++) {
-        var ppb = [3, 2][i];
-        var f = decodeFrame(extractBits(px, img.width, img.height, ppb, thr));
-        if (f) { frame = f; usedPpb = ppb; break; }
-      }
-    }
-    if (frame) break;
-
-    // Scale-aware sweep for resampled images.
+    // Sequential layout — scale 1:1 first (common case), then swept scales.
     outer:
     for (var si = 0; si < scales.length; si++) {
       for (var pi = 0; pi < 2; pi++) {
@@ -125,6 +121,9 @@ async function decodeImageBar(file) {
       }
     }
   }
+  // A decoded frame proves a bar is present even when band detection was fooled
+  // (asym data pixels can mask the M/Y/C bands under heavy recompression).
+  if (frame) detected = true;
   if (!detected) {
     return Object.assign({ ok: false, detected: false, frame: null, decoded: null, error: 'No Mememage bar in this image.' }, base);
   }
