@@ -479,14 +479,16 @@ function hammingDistance(a, b) {
 // localized defacement — a drawn line and JPEG q50 are the same magnitude to a
 // perceptual hash. The luma grid (32x32 over the center-cropped square) keeps
 // the magnitude dHash discards, with two detectors by tile type:
-//   FLAT tiles (smooth sky/gradient) -> min/max: a dark mark drops the tile MIN,
-//     a bright mark raises its MAX. Compression pulls a flat tile's extremes
-//     INWARD while a mark drives them OUTWARD, so honest transforms can't fake
-//     it — a 1-4px mark scores ~150, JPEG/downscale stay <=20.
+//   SMOOTH tiles -> min/max: a dark mark drops the tile MIN, a bright mark
+//     raises its MAX. Compression pulls a smooth tile's extremes INWARD while a
+//     mark drives them OUTWARD, so honest transforms can't fake it — a 1-4px
+//     mark scores ~150, JPEG/downscale stay <=20. "Smooth" = low high-frequency
+//     roughness (mean adjacent-pixel diff), so it covers flat colour AND smooth
+//     gradients (a sun's glow) — both compression-safe — but NOT busy texture.
 //   ALL tiles -> mean residual vs HIGH (big defacement buried in busy texture).
-// Both exposure-normalized (global median mean-shift subtracted). Flatness is
-// computed in Python only and read here as bits, so the Py<->JS parity surface
-// is the per-tile mean/min/max math, locked by luma_grid_parity.cjs.
+// Both exposure-normalized (global median mean-shift subtracted). The smooth bit
+// (`flat` in the decoded struct) is computed in Python only and read here, so
+// the Py<->JS parity surface is the per-tile mean/min/max math.
 //
 // Blob (base64): [1024 mean][1024 min][1024 max][128 flat-bits] = 3200 bytes.
 // Older 1152/256-byte grids -> decodeStoredGrid returns null -> dHash-only.
