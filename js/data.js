@@ -3,7 +3,7 @@
 // =====================================================================
 const SIG_ROWS=2,HEADER_BAND=8,HEADER_PIXELS=24,FOOTER_PIXELS=24,PIXELS_PER_BIT=3,RGB_THRESHOLD=128;
 // Bar WRITER constants — must mirror mememage/bar.py exactly (parity-tested).
-const PIXELS_PER_BIT_NARROW=2,BAR_DELTA=96,LOCAL_CONTEXT_ROWS=6,RS_NSYM=6;
+const PIXELS_PER_BIT_NARROW=2,BAR_DELTA=64,LOCAL_CONTEXT_ROWS=6,RS_NSYM=6;
 // Even-fill frame byte-length sweep (8B header + 37..44B payload + 6B parity = 51..58B; margin both sides).
 const EVENFILL_MIN_BYTES=49,EVENFILL_MAX_BYTES=64;
 
