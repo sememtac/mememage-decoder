@@ -441,6 +441,34 @@ function analyze(file){
         o+='<div style="font-size:0.6rem;color:#8a8a9a;margin-top:0.2rem;">'+barBright.length+' bits at '+barPpb+'px/bit \u2014 <span style="color:'+(fragile>barBright.length*0.3?'#f87171':'#4ade80')+';">'+fragile+' fragile</span></div>';
       }
 
+      // Watermark (distributed DCT layer — the body's knowledge of its own name).
+      // Per-image extraction needs the content hash (from the bar) to locate the
+      // coefficient + tile layout; without a bar only a legacy watermark is blind-
+      // findable. Runs client-side (docs/js/watermark.js) — no backend.
+      try {
+        if (typeof extractWatermark === 'function') {
+          var wmHash = decoded ? decoded.content_hash : null;
+          var wm = extractWatermark(px, w, h, wmHash);
+          o += '<div class="ev-sec">Watermark</div><div class="ev-g">';
+          if (wm) {
+            var wmMatch = decoded && wm.hash === decoded.content_hash;
+            o += '<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv pass">DETECTED</div></div>';
+            o += '<div class="ev-m"><div class="ev-ml">Hash (watermark)</div><div class="ev-mv ' + (decoded ? (wmMatch ? 'pass' : 'fail') : '') + '" style="font-size:0.68rem;">' + escapeHtml(wm.hash) + '</div></div>';
+            if (decoded) o += '<div class="ev-m"><div class="ev-ml">Matches bar</div><div class="ev-mv ' + (wmMatch ? 'pass' : 'fail') + '">' + (wmMatch ? 'YES' : 'NO') + '</div></div>';
+            o += '<div class="ev-m"><div class="ev-ml">Confidence</div><div class="ev-mv">' + (wm.confidence * 100).toFixed(0) + '%</div></div>';
+            o += '<div class="ev-m"><div class="ev-ml">Sync marker</div><div class="ev-mv">' + (wm.syncOk ? 'locked (0xAD)' : 'not found') + '</div></div>';
+            o += '<div class="ev-m"><div class="ev-ml">Mode</div><div class="ev-mv" style="font-size:0.68rem;">' + escapeHtml(wm.mode) + '</div></div>';
+            o += '<div class="ev-m"><div class="ev-ml">Tile offset</div><div class="ev-mv">' + wm.offsetX + ', ' + wm.offsetY + '</div></div>';
+            o += '<div class="ev-m"><div class="ev-ml">DCT coeff</div><div class="ev-mv">(' + wm.coeffRow + ', ' + wm.coeffCol + ')</div></div>';
+            o += '<div class="ev-m"><div class="ev-ml">Blocks voting</div><div class="ev-mv">' + wm.blocks + '</div></div>';
+          } else {
+            o += '<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv">none detected</div></div>';
+            o += '<div class="ev-m w"><div class="ev-ml">Note</div><div class="ev-mv" style="font-size:0.66rem;color:#8a8a9a;">No watermark on this image — the chain has it off, or' + (decoded ? ' it didn’t survive.' : ' it’s per-image (needs the bar’s hash to locate, and the bar is gone).') + '</div></div>';
+          }
+          o += '</div>';
+        }
+      } catch (e) { /* watermark optional — never block the bar report */ }
+
       // Reed-Solomon Error Correction
       if(barFrame){
         o+='<div class="ev-sec">Reed-Solomon Error Correction</div><div class="ev-g">';
