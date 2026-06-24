@@ -6072,19 +6072,18 @@ setInterval(function() {
               '<label title="Coordinates ALSO stored in plaintext — the certificate shows the location immediately. Irreversible per record."><input type="radio" name="gpsvis-' + escapeHtml(c.id) + '" value="public" ' +
                 (gpsVisibility === 'public' ? 'checked' : '') + ' data-chain-gpsvis-set="' + escapeHtml(c.id) + '"> public</label>' +
             '</div>';
-          // Watermark — a live per-chain image toggle (read at mint time),
-          // so it lives here with the other chain settings, not in Payload.
-          // off = pristine pixels; subtle/standard embed a content-hash
-          // watermark as crop-resilient backup for the bar.
+          // Watermark — a live per-chain on/off image toggle (read at mint time),
+          // so it lives here with the other chain settings, not in Payload. off =
+          // pristine pixels; on embeds a content-hash watermark across the whole
+          // image as a crop-resilient backup for the bar. (Old subtle/standard
+          // values read as "on" — collapsed to one tuned, invisible setting.)
           var watermarkRadio =
             '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
-              '<span class="config-chain-gps-label" title="Embeds a content-hash watermark across the whole image as deeper backup for the bar. Subtle: low strength, skips flat regions (survives Discord/Twitter recompression). Standard: full strength, survives heavy cropping. Read live at mint time — toggle anytime.">Watermark</span>' +
+              '<span class="config-chain-gps-label" title="Embeds a content-hash watermark across the whole image as a deeper, crop-resilient backup for the bar. Invisible in practice, survives Discord-style resharing. Read live at mint time — toggle anytime.">Watermark</span>' +
               '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="off" ' +
                 (watermark === 'off' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> off</label>' +
-              '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="subtle" ' +
-                (watermark === 'subtle' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> subtle</label>' +
-              '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="standard" ' +
-                (watermark === 'standard' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> standard</label>' +
+              '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="on" ' +
+                (watermark !== 'off' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> on</label>' +
             '</div>';
           // Constellation size lives in the Payload tab now (it's payload
           // cadence — it drives the decoder chunk count and stages through

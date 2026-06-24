@@ -132,6 +132,22 @@ function _wmExtractAtOffset(coeffs, blocks, ox, oy, perm) {
   return { hash: hr.hash, syncOk: hr.syncOk, confidence: margin / WM_PAYLOAD_BITS };
 }
 
+// Luminance variance of an 8×8 block (the perceptual gate). Mirror bar... watermark.py.
+function _wmBlockVariance(Y, w, bx, by) {
+  var sum = 0, sq = 0;
+  for (var i = 0; i < 8; i++) {
+    var base = (by + i) * w + bx;
+    for (var j = 0; j < 8; j++) { var v = Y[base + j]; sum += v; sq += v * v; }
+  }
+  var mean = sum / 64;
+  return sq / 64 - mean * mean;
+}
+
+function _wmResult(r, syncMatched, ox, oy, mode, row, col, used) {
+  return { hash: r.hash, syncOk: syncMatched, confidence: r.confidence, mode: mode,
+           offsetX: ox, offsetY: oy, coeffRow: row, coeffCol: col, blocks: used };
+}
+
 function extractWatermark(px, w, h, contentHash) {
   var blocks = _wmAllBlocks(w, h);
   if (blocks.length < WM_PAYLOAD_BITS) return null;
@@ -142,39 +158,47 @@ function extractWatermark(px, w, h, contentHash) {
     var p = _wmDeriveParams(contentHash);
     row = p.row; col = p.col; perm = _wmBuildPerm(p.tileSeed); mode = 'per-image';
   } else {
-    // Legacy blind extraction: default coefficient + the default seeded tile perm
-    // (Python's precomputed _TILE_PERM, built from WATERMARK_SEED).
     row = WM_EMBED_ROW; col = WM_EMBED_COL; perm = _wmBuildPerm(WM_SEED); mode = 'legacy';
   }
-  // one coefficient per block (sign is what carries the bit)
-  var coeffs = new Float64Array(blocks.length);
-  for (var k = 0; k < blocks.length; k++)
+  // coefficient sign + variance per block (computed once)
+  var coeffs = new Float64Array(blocks.length), vars = new Float64Array(blocks.length);
+  for (var k = 0; k < blocks.length; k++) {
     coeffs[k] = _wmBlockCoeff(Y, w, blocks[k][0], blocks[k][1], C, row, col);
-
-  // Per-image: an offset whose hash EXACTLY matches the known content hash is
-  // definitive (~1/2^64 false-positive) — it beats the weak 8-bit sync, which
-  // collides over 72 offsets and can edge out the true offset on confidence.
-  var target = contentHash ? contentHash.slice(0, WM_HASH_BITS / 4) : null;
-  var bestSync = null, bestSyncConf = 0, bestSyncOx = 0, bestSyncOy = 0;
-  var bestAny = null, bestAnyConf = 0, bestAnyOx = 0, bestAnyOy = 0;
-  var exact = null, exactOx = 0, exactOy = 0;
-  for (var ox = 0; ox < WM_TILE_W && !exact; ox++) {
-    for (var oy = 0; oy < WM_TILE_H; oy++) {
-      var r = _wmExtractAtOffset(coeffs, blocks, ox, oy, perm);
-      if (!r) continue;
-      if (target && r.hash === target) { exact = r; exactOx = ox; exactOy = oy; break; }
-      if (r.syncOk && r.confidence > bestSyncConf) { bestSyncConf = r.confidence; bestSync = r; bestSyncOx = ox; bestSyncOy = oy; }
-      if (r.confidence > bestAnyConf) { bestAnyConf = r.confidence; bestAny = r; bestAnyOx = ox; bestAnyOy = oy; }
-    }
+    vars[k] = _wmBlockVariance(Y, w, blocks[k][0], blocks[k][1]);
   }
-  var chosen, syncMatched, cox, coy;
-  if (exact) { chosen = exact; syncMatched = true; cox = exactOx; coy = exactOy; }
-  else if (bestSync) { chosen = bestSync; syncMatched = true; cox = bestSyncOx; coy = bestSyncOy; }
-  else if (bestAnyConf >= WM_MIN_CONF_NOSYNC) { chosen = bestAny; syncMatched = false; cox = bestAnyOx; coy = bestAnyOy; }
-  else return null;
-  return {
-    hash: chosen.hash, syncOk: syncMatched, confidence: chosen.confidence,
-    mode: mode, offsetX: cox, offsetY: coy, coeffRow: row, coeffCol: col,
-    blocks: blocks.length
-  };
+  // Per-image: an offset whose hash EXACTLY matches the known content hash is
+  // definitive (~1/2^64). But embedding gates OUT smooth blocks, so the extract
+  // must too — otherwise the non-watermarked smooth blocks dilute the vote (esp.
+  // smooth-heavy images through JPEG, where a bit flips). We don't know the chain's
+  // gate, so sweep candidates and take the first that recovers the exact hash.
+  var target = contentHash ? contentHash.slice(0, WM_HASH_BITS / 4) : null;
+  var GATES = [40, 50, 30, 20, 0];
+  var best = null;
+  for (var gi = 0; gi < GATES.length; gi++) {
+    var gate = GATES[gi], fc, fb;
+    if (gate === 0) { fc = coeffs; fb = blocks; }
+    else {
+      fb = []; var fcArr = [];
+      for (var b = 0; b < blocks.length; b++) if (vars[b] >= gate) { fb.push(blocks[b]); fcArr.push(coeffs[b]); }
+      fc = fcArr;
+    }
+    if (fb.length < WM_PAYLOAD_BITS) continue;
+    var bestSync = null, bestSyncConf = 0, bsOx = 0, bsOy = 0;
+    var bestAny = null, bestAnyConf = 0, baOx = 0, baOy = 0, exact = null, exOx = 0, exOy = 0;
+    for (var ox = 0; ox < WM_TILE_W && !exact; ox++) {
+      for (var oy = 0; oy < WM_TILE_H; oy++) {
+        var r = _wmExtractAtOffset(fc, fb, ox, oy, perm);
+        if (!r) continue;
+        if (target && r.hash === target) { exact = r; exOx = ox; exOy = oy; break; }
+        if (r.syncOk && r.confidence > bestSyncConf) { bestSyncConf = r.confidence; bestSync = r; bsOx = ox; bsOy = oy; }
+        if (r.confidence > bestAnyConf) { bestAnyConf = r.confidence; bestAny = r; baOx = ox; baOy = oy; }
+      }
+    }
+    if (exact) return _wmResult(exact, true, exOx, exOy, mode, row, col, fb.length);  // definitive
+    var cand = bestSync ? { r: bestSync, sync: true, ox: bsOx, oy: bsOy, conf: bestSyncConf, used: fb.length }
+             : (bestAnyConf >= WM_MIN_CONF_NOSYNC ? { r: bestAny, sync: false, ox: baOx, oy: baOy, conf: bestAnyConf, used: fb.length } : null);
+    if (cand && (!best || cand.conf > best.conf)) best = cand;
+  }
+  if (best) return _wmResult(best.r, best.sync, best.ox, best.oy, mode, row, col, best.used);
+  return null;
 }
