@@ -252,7 +252,9 @@ function _saveLivePlate(plate, barId, barHash) {
           // Single canonical writer (codec.js) — same centered-brightness,
           // dominant-tinted, layout-by-width bar the mint writes. It picks the
           // layout + ppb itself, so no width-threshold guessing here.
-          var pb = new TextEncoder().encode(barId + '\x00' + barHash);
+          var pb = (typeof packPayload === 'function')
+            ? packPayload(barId, barHash)
+            : new TextEncoder().encode(barId + '\x00' + barHash);
           var px = o.getImageData(0, 0, fW, fH);
           try {
             embedBarPayload(px.data, fW, fH, pb);

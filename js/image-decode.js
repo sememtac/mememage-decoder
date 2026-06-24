@@ -111,10 +111,10 @@ async function decodeImageBar(file) {
     if (efFrame) { frame = efFrame; break; }
 
     // Sequential layout — scale 1:1 first (common case), then swept scales.
+    // px/bit swept widest-first (encoder picks the widest that fits); CRC/RS selects.
     outer:
     for (var si = 0; si < scales.length; si++) {
-      for (var pi = 0; pi < 2; pi++) {
-        var pb = [3, 2][pi];
+      for (var pb = PIXELS_PER_BIT_MAX; pb >= PIXELS_PER_BIT_NARROW; pb--) {
         var bits = extractBitsAtScale(px, img.width, img.height, scales[si], pb, thr);
         var fr = decodeFrame(bits);
         if (fr) { frame = fr; usedPpb = pb; break outer; }

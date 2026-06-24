@@ -160,15 +160,16 @@ function _asymCenterColumns(px,w,h){
   var rr=new Array(w),gg=new Array(w),bb=new Array(w);
   for(var x=0;x<w;x++){var i=(y*w+x)*4;rr[x]=px[i];gg[x]=px[i+1];bb[x]=px[i+2];}
   rr=_smooth1d(rr,ASYM_BOX_RADIUS);gg=_smooth1d(gg,ASYM_BOX_RADIUS);bb=_smooth1d(bb,ASYM_BOX_RADIUS);
-  var centerRgb=new Array(w),centerLum=new Array(w);
+  var centerRgb=new Array(w),centerVal=new Array(w);
   for(var x2=0;x2<w;x2++){
     var c=_hueFloor(rr[x2],gg[x2],bb[x2],ASYM_FLOOR);
-    centerRgb[x2]=c; centerLum[x2]=0.299*c[0]+0.587*c[1]+0.114*c[2];
+    // (R+G+B)/3, NOT luma — matches the decoder's per-pixel bit metric. Mirror bar.py.
+    centerRgb[x2]=c; centerVal[x2]=(c[0]+c[1]+c[2])/3;
   }
-  return {centerRgb:centerRgb,centerLum:centerLum};
+  return {centerRgb:centerRgb,centerVal:centerVal};
 }
 function _asymThresholdCurve(px,w,h){
-  var cl=_asymCenterColumns(px,w,h).centerLum,half=ASYM_DELTA/2.0,out=new Array(w);
+  var cl=_asymCenterColumns(px,w,h).centerVal,half=ASYM_DELTA/2.0,out=new Array(w);
   for(var x=0;x<w;x++)out[x]=cl[x]-half;
   return out;
 }
@@ -363,8 +364,9 @@ function extractBarScaleAware(px,w,h){
     var ef=decodeEvenFill(px,w,h,thr);
     if(ef){var efp=decodePayload(ef.payload);if(efp)return efp;}
     // Sequential layout — scale 1:1 first (common case), then swept scales.
+    // Sweep px/bit widest-first (encoder picks the widest that fits); CRC/RS selects.
     for(var ci=0;ci<scaleCands.length;ci++){
-      for(var ppb of [PIXELS_PER_BIT,2]){
+      for(var ppb=PIXELS_PER_BIT_MAX;ppb>=PIXELS_PER_BIT_NARROW;ppb--){
         var bits=extractBitsAtScale(px,w,h,scaleCands[ci],ppb,thr);
         var frame=decodeFrame(bits);
         if(!frame) continue;
@@ -515,13 +517,13 @@ function _writeEvenFill(px, w, h, bits, bitRgb) {
 // Mirror bar.py:_write_sequential
 function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen, fillerBit) {
   var totalDataPixels = SIG_ROWS * dataWidth;
-  var ppb = PIXELS_PER_BIT;
-  var capWide = Math.floor(Math.floor(totalDataPixels / PIXELS_PER_BIT) / 8) - 8 - RS_NSYM;
-  if (payloadLen > capWide) {
-    ppb = PIXELS_PER_BIT_NARROW;
-    var capNarrow = Math.floor(Math.floor(totalDataPixels / PIXELS_PER_BIT_NARROW) / 8) - 8 - RS_NSYM;
-    if (payloadLen > capNarrow) throw new Error('Bar payload too large for image width');
+  // Widest px/bit that fits (fatter = quieter + JPEG-tougher). Mirror bar.py.
+  var ppb = null;
+  for (var cand = PIXELS_PER_BIT_MAX; cand >= PIXELS_PER_BIT_NARROW; cand--) {
+    var cap = Math.floor(Math.floor(totalDataPixels / cand) / 8) - 8 - RS_NSYM;
+    if (payloadLen <= cap) { ppb = cand; break; }
   }
+  if (ppb === null) throw new Error('Bar payload too large for image width');
   var bitsPerRow = Math.floor(dataWidth / ppb);
   for (var ro = 0; ro < SIG_ROWS; ro++) {
     var y = h - 1 - ro;
@@ -601,8 +603,28 @@ function embedBarPayload(px, w, h, payloadBytes) {
 // Returns a Promise<Blob> of the bar PNG. Uses the same writer as everything
 // else, so the strip is exactly what Python would produce for a 2-row image.
 // =====================================================================
+// Build the bar payload bytes. Canonical <prefix>-<16hex> + 16hex hash pack to
+// binary [prefix_len][prefix][8 id][8 hash]; non-canonical ids fall back to ASCII
+// identifier\0hash (disjoint first byte). Mirror mememage/bar.py:_pack_payload.
+var _HEXRE = /^[0-9a-f]+$/;
+function packPayload(identifier, contentHash) {
+  var dash = identifier.lastIndexOf('-');
+  var pre = dash >= 0 ? identifier.slice(0, dash) : '';
+  var idhex = dash >= 0 ? identifier.slice(dash + 1) : '';
+  if (dash >= 0 && pre.length >= 3 && pre.length <= 10 && idhex.length === 16 && _HEXRE.test(idhex)
+      && contentHash.length === 16 && _HEXRE.test(contentHash)) {
+    var pe = new TextEncoder().encode(pre);
+    var out = new Uint8Array(1 + pe.length + 16);
+    out[0] = pe.length; out.set(pe, 1);
+    for (var i = 0; i < 8; i++) out[1 + pe.length + i] = parseInt(idhex.substr(i * 2, 2), 16);
+    for (var j = 0; j < 8; j++) out[1 + pe.length + 8 + j] = parseInt(contentHash.substr(j * 2, 2), 16);
+    return out;
+  }
+  return new TextEncoder().encode(identifier + '\x00' + contentHash);
+}
+
 function generateCanonicalBarPng(identifier, contentHash) {
-  var payloadBytes = new TextEncoder().encode(identifier + '\x00' + contentHash);
+  var payloadBytes = packPayload(identifier, contentHash);
   var frame = encodeFrame(payloadBytes);
   var totalBits = frame.length * 8;
   // Size a 2-row strip at 2px/bit so the writer lands on the sequential layout.
@@ -623,6 +645,18 @@ function generateCanonicalBarPng(identifier, contentHash) {
 }
 
 function decodePayload(payload){
+  // Packed binary form — first byte is the prefix length (3-10), disjoint from an
+  // ASCII identifier's leading letter (>=65). Mirror mememage/bar.py:_parse_payload.
+  var n=payload[0];
+  if(n>=3&&n<=10&&payload.length>=1+n+16){
+    var prefix=null;
+    try{ prefix=new TextDecoder('utf-8',{fatal:true}).decode(payload.slice(1,1+n)); }catch(e){ prefix=null; }
+    if(prefix!==null){
+      var hx=function(off){var s='';for(var i=0;i<8;i++){var b=payload[off+i];s+=(b<16?'0':'')+b.toString(16);}return s;};
+      var ident=prefix+'-'+hx(1+n);
+      return{identifier:ident,archive_id:ident,content_hash:hx(1+n+8)};
+    }
+  }
   const text=new TextDecoder().decode(payload);
   const sep=text.indexOf('\0');
   if(sep<0)return null;
