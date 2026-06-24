@@ -621,15 +621,11 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
       // Online miss: probe links + CORS hint.
       var base = (sourceBase || (directUrl ? directUrl.replace(/\/[^/]*$/, '') : ''));
       var probeHtml = buildProbeLinks(base, identifier, barContentHash);
-      var probeLinks = probeHtml
-        ? 'Open the file in a new tab to check it loads:<br>' + probeHtml + '<br>' +
-          'If it loads, save the file and drop it into <em>By Soul</em>.<br>'
-        : '';
       showPanelError(
         'Could not find the soul automatically.',
-        probeLinks +
-        'Self-hosting? Your server must send <code>Access-Control-Allow-Origin: *</code> \u2014 ' +
-        'browsers silently block cross-origin fetches without it.'
+        probeHtml
+          ? 'Open the file in a new tab to verify:<br>' + probeHtml
+          : 'Self-hosting? Your server needs <code>Access-Control-Allow-Origin: *</code>.'
       );
     }
     return false;
