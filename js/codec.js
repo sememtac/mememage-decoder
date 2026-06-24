@@ -149,13 +149,14 @@ function _smooth1d(values,radius){
   return out;
 }
 function _hueFloor(r,g,b,floor){
-  // Additive lift (NOT multiplicative) — adds the luma deficit equally to each
-  // channel so a near-black tint stays muted instead of blowing up into a
-  // saturated colour (e.g. dark-blue cave shadows -> blue bar pixels). Mirror bar.py.
+  // Multiplicative scaling — PRESERVES the content's hue so floored "1" bits match
+  // the dark colour they sit on (better camo on dark-but-coloured imagery than a
+  // grey additive lift). Edge: near-pure-black tints can amplify. Mirror bar.py.
   var L=0.299*r+0.587*g+0.114*b;
   if(L>=floor)return [r,g,b];
-  var d=floor-L;
-  return [Math.min(255.0,r+d),Math.min(255.0,g+d),Math.min(255.0,b+d)];
+  if(L<2)return [floor,floor,floor];
+  var s=floor/L;
+  return [Math.min(255.0,r*s),Math.min(255.0,g*s),Math.min(255.0,b*s)];
 }
 function _asymCenterColumns(px,w,h){
   var y=h-SIG_ROWS-1; if(y<0)y=Math.max(0,h-1);
