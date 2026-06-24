@@ -233,6 +233,10 @@ function extractBitsAtScale(px,w,h,scale,ppb,thr){
 // mememage/bar.py:_find_header_end / _find_footer_start. They return the
 // inner edges of the flush bilateral bands so the decoder can anchor to both
 // ends and even-divide the data region — no scale factor, so no drift.
+// The data-adjacent edge is COMPUTED, not measured by running the cyan count
+// into the data: asym camo data pixels can be cyan-hued and would extend the run
+// past the true edge. mag_start (image edge) and cyan_start (bounded by yellow)
+// never touch data, and span exactly two band widths. Mirrors bar.py.
 function findHeaderEnd(px,w,y){
   function rgb(x){var i=(y*w+x)*4;return [px[i],px[i+1],px[i+2]];}
   function isM(x){var c=rgb(x);return c[0]>130&&c[1]<120&&c[2]>130;}
@@ -240,13 +244,16 @@ function findHeaderEnd(px,w,y){
   function isC(x){var c=rgb(x);return c[0]<120&&c[1]>130&&c[2]>130;}
   var x=0,nm=0,ny=0,nc=0;
   while(x<w&&x<40&&!isM(x))x++;
+  var magStart=x;
   while(x<w&&isM(x)){x++;nm++;}
   while(x<w&&x<60&&!isY(x))x++;
   while(x<w&&isY(x)){x++;ny++;}
   while(x<w&&x<80&&!isC(x))x++;
+  var cyanStart=x;
   while(x<w&&isC(x)){x++;nc++;}
   if(nm<2||ny<2||nc<2)return null;
-  return x;
+  var bandWidth=(cyanStart-magStart)/2.0;
+  return pyRound(cyanStart+bandWidth);
 }
 function findFooterStart(px,w,y){
   function rgb(x){var i=(y*w+x)*4;return [px[i],px[i+1],px[i+2]];}
@@ -255,13 +262,16 @@ function findFooterStart(px,w,y){
   function isC(x){var c=rgb(x);return c[0]<120&&c[1]>130&&c[2]>130;}
   var x=w-1,nm=0,ny=0,nc=0;
   while(x>=0&&x>w-40&&!isM(x))x--;
+  var magStart=x;
   while(x>=0&&isM(x)){x--;nm++;}
   while(x>=0&&x>w-60&&!isY(x))x--;
   while(x>=0&&isY(x)){x--;ny++;}
   while(x>=0&&x>w-80&&!isC(x))x--;
+  var cyanStart=x;
   while(x>=0&&isC(x)){x--;nc++;}
   if(nm<2||ny<2||nc<2)return null;
-  return x+1;
+  var bandWidth=(magStart-cyanStart)/2.0;
+  return pyRound(cyanStart-bandWidth)+1;
 }
 
 // High-res even-fill decode. Mirrors mememage/bar.py:_decode_even_fill.
@@ -542,12 +552,11 @@ function embedBarPayload(px, w, h, payloadBytes) {
     for (var j = 7; j >= 0; j--) bits.push((frame[i] >> j) & 1);
 
   var dataWidth = w - HEADER_PIXELS - FOOTER_PIXELS;
-  // Asym camo is used ONLY for the sequential layout — its content-copying data
-  // pixels can be M/Y/C-hued and would fool the band-edge anchoring that even-fill
-  // decode depends on. Even-fill (large images) keeps the centered gray scheme.
-  // Mirrors mememage/bar.py:embed_into.
+  // Asym camo applies to BOTH layouts — the band-edge finders now COMPUTE the
+  // data edge from the data-free magenta/cyan span, so content-hued data can't
+  // fool even-fill anchoring. Mirrors mememage/bar.py:embed_into.
   var isEvenFill = dataWidth >= PIXELS_PER_BIT * bits.length;
-  var useAsym = (typeof ASYM_ENCODE !== 'undefined' && ASYM_ENCODE) && !isEvenFill;
+  var useAsym = (typeof ASYM_ENCODE !== 'undefined' && ASYM_ENCODE);
 
   var bitRgb, fillerBit;
   if (useAsym) {
