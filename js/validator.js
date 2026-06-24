@@ -3020,8 +3020,8 @@ function runAudit() {
     out.innerHTML = '';
     setAuditError(
       'Mixed content blocked for ' + identifier,
-      'The source is HTTP but this page is HTTPS \u2014 browsers block that silently.<br>' +
-      'Open it in a new tab, then save the file and drop it into <em>Observatory</em>:<br>' +
+      'Source is HTTP but page is HTTPS \u2014 browsers block that silently.<br>' +
+      'Open file in a new tab to verify:<br>' +
       buildProbeLinks(base, identifier, null)
     );
     stopSpin();
@@ -3039,15 +3039,11 @@ function runAudit() {
       );
     } else {
       var probeHtml = buildProbeLinks(base, identifier, null);
-      var probeLinks = probeHtml
-        ? 'Open the file in a new tab to check it loads:<br>' + probeHtml + '<br>' +
-          'If it loads, save the file and drop it into <em>Observatory</em>.<br>'
-        : '';
       setAuditError(
         'Could not find record for ' + identifier,
-        probeLinks +
-        'Self-hosting? Your server must send <code>Access-Control-Allow-Origin: *</code> \u2014 ' +
-        'browsers block cross-origin fetches without it.'
+        probeHtml
+          ? 'Open file in a new tab to verify:<br>' + probeHtml
+          : 'Self-hosting? Your server needs <code>Access-Control-Allow-Origin: *</code>.'
       );
     }
     stopSpin();

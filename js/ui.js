@@ -622,9 +622,9 @@ async function fetchAndRender(identifier, barContentHash, directUrl, sourceBase)
       var base = (sourceBase || (directUrl ? directUrl.replace(/\/[^/]*$/, '') : ''));
       var probeHtml = buildProbeLinks(base, identifier, barContentHash);
       showPanelError(
-        'Could not find the soul automatically.',
+        'Could not find soul automatically.',
         probeHtml
-          ? 'Open the file in a new tab to verify:<br>' + probeHtml
+          ? 'Open file in a new tab to verify:<br>' + probeHtml
           : 'Self-hosting? Your server needs <code>Access-Control-Allow-Origin: *</code>.'
       );
     }
