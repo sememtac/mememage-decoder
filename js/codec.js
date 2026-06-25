@@ -149,14 +149,17 @@ function _smooth1d(values,radius){
   return out;
 }
 function _hueFloor(r,g,b,floor){
-  // Multiplicative scaling — PRESERVES the content's hue so floored "1" bits match
-  // the dark colour they sit on (better camo on dark-but-coloured imagery than a
-  // grey additive lift). Edge: near-pure-black tints can amplify. Mirror bar.py.
+  // Saturation-capped lift toward luma `floor`: cap the multiplicative scale at
+  // ASYM_SCALE_CAP (so near-black tints don't explode into a saturated, q80-fragile
+  // pop), then top up additively (hue-neutral). Moderately-dark colour keeps its
+  // hue; near-black goes neutral. Pure arithmetic — byte-exact. Mirror bar.py.
   var L=0.299*r+0.587*g+0.114*b;
   if(L>=floor)return [r,g,b];
-  if(L<2)return [floor,floor,floor];
-  var s=floor/L;
-  return [Math.min(255.0,r*s),Math.min(255.0,g*s),Math.min(255.0,b*s)];
+  var s=(L>=2)?Math.min(floor/L,ASYM_SCALE_CAP):ASYM_SCALE_CAP;
+  var r2=r*s,g2=g*s,b2=b*s;
+  var L2=0.299*r2+0.587*g2+0.114*b2;
+  if(L2<floor){var k=floor-L2;r2+=k;g2+=k;b2+=k;}
+  return [Math.min(255.0,r2),Math.min(255.0,g2),Math.min(255.0,b2)];
 }
 function _asymCenterColumns(px,w,h){
   var y=h-SIG_ROWS-1; if(y<0)y=Math.max(0,h-1);

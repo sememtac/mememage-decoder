@@ -1405,6 +1405,30 @@ setInterval(function() {
   els.fileInput.addEventListener('change', function(e) {
     if (e.target.files.length) handleFile(e.target.files[0]);
   });
+  // Clipboard paste — parity with the decoder/validator (paste an image to
+  // start a conception). Fires ONLY when the Conceive drop is actually
+  // accepting: the mint panel must be in the empty state AND visible (its tab
+  // active, not mid-mint). A text paste (no image in the clipboard) is left
+  // untouched so it lands in whatever input is focused.
+  document.addEventListener('paste', function(e) {
+    if (!e.clipboardData) return;
+    if (state.uiState && state.uiState !== 'empty') return;
+    if (!els.drop || els.drop.offsetParent === null) return;  // tab hidden / mid-mint
+    var files = Array.prototype.slice.call(e.clipboardData.files || []);
+    var img = files.find(function(f) { return f.type && f.type.indexOf('image/') === 0; });
+    if (!img) {
+      var it = Array.prototype.slice.call(e.clipboardData.items || [])
+        .find(function(i) { return i.type && i.type.indexOf('image/') === 0; });
+      if (it) img = it.getAsFile();
+    }
+    if (!img) return;  // text/other paste — not ours, leave it for the input
+    // Clipboard images often arrive nameless; give the upload a filename.
+    if (!img.name) {
+      try { img = new File([img], 'pasted.png', {type: img.type || 'image/png'}); } catch (_) {}
+    }
+    e.preventDefault();
+    handleFile(img);
+  });
   // "Conceive another" / "Try again" are explicit "done with this ticket"
   // actions — they fire DELETE and clear the view. The server decides what
   // that means by status: a COMPLETED conception is KEPT (its staged image +
