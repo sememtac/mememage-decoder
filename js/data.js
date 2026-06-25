@@ -21,17 +21,20 @@ const EVENFILL_MIN_BYTES=33,EVENFILL_MAX_BYTES=64;
 // input (one per page; persisted in localStorage by SourceConfig).
 // A self-hosted mint server injects window.MEMEMAGE_SOULS_BASE (an
 // absolute souls read base ending in /) before this script loads, so a
-// self-served decoder/validator defaults to the local souls face. On
-// GitHub Pages nothing is injected and the IA default applies. Either
-// way the Source field stays user-overridable — source-agnostic by design.
+// self-served decoder/validator defaults to its OWN souls face. On GitHub
+// Pages nothing is injected, so the canonical public surface souls.mememage.art
+// is the default (where the canonical chain's souls live — IA is no longer the
+// canonical chain's surface). IA stays a one-click suggestion for legacy/IA-
+// hosted records. Either way the Source field is user-overridable — source-
+// agnostic by design.
 const SOURCE_DEFAULT = (typeof window !== 'undefined' && window.MEMEMAGE_SOULS_BASE)
   ? window.MEMEMAGE_SOULS_BASE
-  : 'https://archive.org/download/{id}/';
+  : 'https://souls.mememage.art/';
 
 // Fill the Source field's <datalist> with this host's default AND Internet
-// Archive, so a self-hosted decoder (which defaults to its own souls host) still
-// offers IA as a one-click autocomplete option — no extra dropdown, no extra
-// copy. On GitHub Pages the default already IS IA, so the list dedupes to one.
+// Archive, so a decoder (Pages or self-hosted) still offers IA as a one-click
+// autocomplete option for legacy/IA-hosted records — no extra dropdown, no extra
+// copy. When the default already IS IA the list dedupes to one.
 function populateSourceSuggestions() {
   if (typeof document === 'undefined') return;
   var dl = document.getElementById('sourceSuggest');
