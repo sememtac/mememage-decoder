@@ -463,7 +463,7 @@ function analyze(file){
             o += '<div class="ev-m"><div class="ev-ml">Blocks voting</div><div class="ev-mv">' + wm.blocks + '</div></div>';
           } else {
             o += '<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv">none detected</div></div>';
-            o += '<div class="ev-m w"><div class="ev-ml">Note</div><div class="ev-mv" style="font-size:0.66rem;color:#8a8a9a;">No watermark on this image — the chain has it off, or' + (decoded ? ' it didn’t survive.' : ' it’s per-image (needs the bar’s hash to locate, and the bar is gone).') + '</div></div>';
+            o += '<div class="ev-m w"><div class="ev-ml">Note</div><div class="ev-mv" style="font-size:0.66rem;color:#8a8a9a;">Not configured, or did not survive.' + (decoded ? '' : ' Per-image needs the bar to locate.') + '</div></div>';
           }
           o += '</div>';
         }
