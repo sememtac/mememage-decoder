@@ -398,6 +398,11 @@ function decodeFrame(bits){
   const rsCapacity=Math.floor(nsym/2);
   try{
     const decoded=rsDecode(codeword,nsym);
+    // Verify CRC after RS to catch rare MISCORRECTIONS (>nsym/2 errors that land
+    // near a different valid codeword). Without this, a wrong bit-read during the
+    // threshold/offset sweep can RS-"correct" into a magic-prefixed garbage frame
+    // and be accepted, returning a bogus identifier. Mirror bar.py:_try_decode_frame.
+    if(crc16(rsEncodeSimple(Array.from(decoded),nsym))!==crc) return null;
     // Count payload bytes that RS actually corrected (for forensic display)
     let rsErrors=0;
     for(let i=0;i<pLen;i++)if(codeword[i]!==decoded[i])rsErrors++;
