@@ -74,18 +74,16 @@ async function decodeImageBar(file) {
 
   var frame = null, usedPpb = 3, detected = false;
 
-  // Brightness threshold candidates: the per-image Otsu midpoint reads the
-  // centered bar (levels hug the dominant brightness — quiet on dark images);
-  // RGB_THRESHOLD (128) reads legacy absolute bars and is the always-present
-  // fallback. CRC + RS self-select, so a wrong threshold just fails frame
-  // validation. Mirrors bar.py:extract_bar / codec.js:extractBarScaleAware.
+  // Threshold candidates: the asym per-column curve (PRIMARY) + Otsu's per-image
+  // bimodal midpoint and the absolute 128 as scalar FALLBACKS that rescue hard
+  // content where the asym curve's per-channel clamp eats the delta margin (e.g.
+  // pure-saturated backgrounds). CRC + RS self-select; the post-RS CRC re-check
+  // guards miscorrections. Mirrors bar.py:extract_bar / codec.js:extractBarScaleAware.
   var thrs = [];
+  try { thrs.push(_asymThresholdCurve(px, img.width, img.height)); } catch (e) {}
   var ot = otsuThreshold(px, img.width, img.height);
   if (ot !== null) thrs.push(ot);
   thrs.push(RGB_THRESHOLD);
-  // Asym camo bar — a PER-COLUMN threshold re-derived from the row above the bar.
-  // Tried after the scalar candidates; CRC+RS self-selects. Mirrors bar.py.
-  try { if (typeof ASYM_ENCODE !== 'undefined' && ASYM_ENCODE) thrs.push(_asymThresholdCurve(px, img.width, img.height)); } catch (e) {}
 
   // Band detection only ADDS the resized-scale sweep. Scale 1:1 is ALWAYS tried —
   // band detection can fail on a heavily-recompressed asym bar (its content-hued

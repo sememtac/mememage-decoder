@@ -110,11 +110,10 @@ function detectBarBands(px,w,h){
   return {m:magenta_w,y:yellow_w,c:cyan_w};
 }
 
-// Per-image bit threshold for the centered bar. Otsu over the middle 60% of the
-// bottom rows (avoids the M/Y/C bands, scale-robust — no fixed band offsets),
-// returned as the MIDPOINT of the two class means rather than the boundary
-// index (robust on exact pixels, where a boundary lands on a level). Returns
-// null on a flat region. Mirrors mememage/bar.py:_otsu_threshold.
+// Per-image bimodal bit threshold — a scalar fallback for the asym curve (rescues
+// pure-saturated content where the per-channel clamp shrinks the (R+G+B)/3
+// margin). Otsu over the middle 60% of the bottom rows, returned as the MIDPOINT
+// of the two class means. Returns null on a flat region. Mirrors bar.py:_otsu_threshold.
 function otsuThreshold(px,w,h){
   if(w<5||h<1)return null;
   var x0=Math.floor(w*0.20),x1=Math.floor(w*0.80);if(x1<=x0)return null;
@@ -337,16 +336,15 @@ function decodeEvenFill(px,w,h,thr){
 // {identifier, content_hash} that decodes cleanly, or null.
 // Mirrors mememage/bar.py:extract_bar.
 function extractBarScaleAware(px,w,h){
-  // Brightness threshold candidates: the per-image Otsu midpoint reads the
-  // centered bar (levels hug the dominant brightness); RGB_THRESHOLD (128)
-  // reads legacy absolute bars and is always present as a fallback. Otsu is
-  // tried first; CRC + RS self-select, so a wrong threshold just fails frame
-  // validation and the next candidate is tried. Mirrors bar.py:extract_bar.
-  var thrs=[];var ot=otsuThreshold(px,w,h);if(ot!==null)thrs.push(ot);thrs.push(RGB_THRESHOLD);
-  // Asym camo bar — a PER-COLUMN threshold re-derived from the row above the bar
-  // (predicted "1" level minus delta/2). Tried after the scalar candidates so
-  // legacy/centered bars resolve first; CRC+RS self-selects. Mirrors bar.py.
-  try{ if(typeof ASYM_ENCODE!=='undefined' && ASYM_ENCODE) thrs.push(_asymThresholdCurve(px,w,h)); }catch(e){}
+  // Threshold candidates: the asym per-column curve (PRIMARY) + Otsu's per-image
+  // bimodal midpoint and the absolute 128 as scalar FALLBACKS that rescue hard
+  // content where the asym curve's per-channel clamp eats the delta margin (e.g.
+  // pure-saturated backgrounds). CRC + RS self-select; the post-RS CRC re-check
+  // guards miscorrections. Mirrors bar.py:extract_bar.
+  var thrs=[];
+  try{ thrs.push(_asymThresholdCurve(px,w,h)); }catch(e){}
+  var ot=otsuThreshold(px,w,h); if(ot!==null)thrs.push(ot);
+  thrs.push(RGB_THRESHOLD);
 
   // Band detection only ADDS the resized-scale sweep. Scale 1:1 is ALWAYS tried
   // (it isn't needed for a native-scale read, and band detection can fail on a
@@ -473,29 +471,11 @@ function pyRound(x) {
   if (d > 0.5) return f + 1;
   return (f % 2 === 0) ? f : f + 1;  // exactly .5 -> nearest even
 }
-function _clamp8(v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
 function _setPx(px, w, x, y, rgb) {
   var i = (y * w + x) * 4;
   px[i] = rgb[0]; px[i+1] = rgb[1]; px[i+2] = rgb[2]; px[i+3] = 255;
 }
 
-// Mirror bar.py:_dominant_color — mean color of the rows just above the bar
-// (last LOCAL_CONTEXT_ROWS), or the whole image when too short.
-function _dominantColor(px, w, h) {
-  var ce = h - SIG_ROWS;
-  var cs = Math.max(0, ce - LOCAL_CONTEXT_ROWS);
-  var y0, y1;
-  if (ce <= cs) { y0 = 0; y1 = h; } else { y0 = cs; y1 = ce; }
-  var tr = 0, tg = 0, tb = 0, count = 0;
-  for (var y = y0; y < y1; y++) {
-    for (var x = 0; x < w; x++) {
-      var i = (y * w + x) * 4;
-      tr += px[i]; tg += px[i+1]; tb += px[i+2]; count++;
-    }
-  }
-  if (count === 0) return [128, 128, 128];
-  return [pyRound(tr / count), pyRound(tg / count), pyRound(tb / count)];
-}
 
 var _HEADER_COLORS = [[255,0,255],[255,255,0],[0,255,255]];   // M, Y, C
 var _FOOTER_COLORS = [[0,255,255],[255,255,0],[255,0,255]];   // C, Y, M
@@ -526,7 +506,7 @@ function _writeEvenFill(px, w, h, bits, bitRgb) {
 }
 
 // Mirror bar.py:_write_sequential
-function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen, fillerBit) {
+function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen) {
   var totalDataPixels = SIG_ROWS * dataWidth;
   // Widest px/bit that fits (fatter = quieter + JPEG-tougher). Mirror bar.py.
   var ppb = null;
@@ -546,10 +526,9 @@ function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen, fillerB
       if (bi < bits.length) {
         for (var p = 0; p < ppb; p++) _setPx(px, w, baseX + p, y, bitRgb(bits[bi], baseX + p));
       } else {
-        // Filler past the payload. Legacy: bit-0 level. Asym: fillerBit=1 (copies
-        // row above = invisible). Mirrors bar.py:_write_sequential.
+        // Filler past the payload = "1" (asym copies the row above = invisible).
         for (var p2 = 0; p2 < ppb; p2++)
-          if (baseX + p2 < w - FOOTER_PIXELS) _setPx(px, w, baseX + p2, y, bitRgb(fillerBit, baseX + p2));
+          if (baseX + p2 < w - FOOTER_PIXELS) _setPx(px, w, baseX + p2, y, bitRgb(1, baseX + p2));
       }
     }
   }
@@ -565,45 +544,26 @@ function embedBarPayload(px, w, h, payloadBytes) {
     for (var j = 7; j >= 0; j--) bits.push((frame[i] >> j) & 1);
 
   var dataWidth = w - HEADER_PIXELS - FOOTER_PIXELS;
-  // Asym camo applies to BOTH layouts — the band-edge finders now COMPUTE the
-  // data edge from the data-free magenta/cyan span, so content-hued data can't
-  // fool even-fill anchoring. Mirrors mememage/bar.py:embed_into.
   var isEvenFill = dataWidth >= PIXELS_PER_BIT * bits.length;
-  var useAsym = (typeof ASYM_ENCODE !== 'undefined' && ASYM_ENCODE);
 
-  var bitRgb, fillerBit;
-  if (useAsym) {
-    // Asym camo: each bit rides a PER-COLUMN center copying the smoothed,
-    // floored content one row above. "1" = center (invisible), "0" =
-    // center-ASYM_DELTA, filler = "1". Mirrors bar.py:embed_into asym branch.
-    var centerRgb = _asymCenterColumns(px, w, h).centerRgb;
-    fillerBit = 1;
-    bitRgb = function (bit, x) {
-      var c = centerRgb[x];
-      if (bit) return [pyRound(c[0]), pyRound(c[1]), pyRound(c[2])];
-      return [Math.max(0, pyRound(c[0] - ASYM_DELTA)),
-              Math.max(0, pyRound(c[1] - ASYM_DELTA)),
-              Math.max(0, pyRound(c[2] - ASYM_DELTA))];
-    };
-  } else {
-    // Centered brightness (legacy/fallback): two levels around one clamped
-    // global dominant brightness.
-    var dom = _dominantColor(px, w, h);
-    var domAvg = (dom[0] + dom[1] + dom[2]) / 3;
-    var half = BAR_DELTA / 2;
-    var center = Math.max(half, Math.min(255 - half, domAvg));
-    var lo = center - half, hi = center + half;
-    fillerBit = 0;
-    bitRgb = function (bit, x) {
-      var off = (bit ? hi : lo) - domAvg;
-      return [_clamp8(pyRound(dom[0] + off)), _clamp8(pyRound(dom[1] + off)), _clamp8(pyRound(dom[2] + off))];
-    };
-  }
+  // Asym camo: each bit rides a PER-COLUMN center copying the smoothed, floored
+  // content one row above. "1" = center (invisible), "0" = center-ASYM_DELTA,
+  // filler = "1". The band-edge finders COMPUTE the data edge from the data-free
+  // magenta/cyan span, so content-hued data can't fool even-fill anchoring.
+  // Mirrors mememage/bar.py:embed_into.
+  var centerRgb = _asymCenterColumns(px, w, h).centerRgb;
+  var bitRgb = function (bit, x) {
+    var c = centerRgb[x];
+    if (bit) return [pyRound(c[0]), pyRound(c[1]), pyRound(c[2])];
+    return [Math.max(0, pyRound(c[0] - ASYM_DELTA)),
+            Math.max(0, pyRound(c[1] - ASYM_DELTA)),
+            Math.max(0, pyRound(c[2] - ASYM_DELTA))];
+  };
 
   if (isEvenFill) {
     _writeEvenFill(px, w, h, bits, bitRgb);
   } else {
-    _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadBytes.length, fillerBit);
+    _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadBytes.length);
   }
   return true;
 }
@@ -614,24 +574,23 @@ function embedBarPayload(px, w, h, payloadBytes) {
 // Returns a Promise<Blob> of the bar PNG. Uses the same writer as everything
 // else, so the strip is exactly what Python would produce for a 2-row image.
 // =====================================================================
-// Build the bar payload bytes. Canonical <prefix>-<16hex> + 16hex hash pack to
-// binary [prefix_len][prefix][8 id][8 hash]; non-canonical ids fall back to ASCII
-// identifier\0hash (disjoint first byte). Mirror mememage/bar.py:_pack_payload.
+// Pack the bar payload to binary [prefix_len][prefix][8 id][8 hash]. Identifiers
+// are canonical <prefix>-<16hex> + 16hex hash (the only form Mememage stamps).
+// Mirror mememage/bar.py:_pack_payload.
 var _HEXRE = /^[0-9a-f]+$/;
 function packPayload(identifier, contentHash) {
   var dash = identifier.lastIndexOf('-');
   var pre = dash >= 0 ? identifier.slice(0, dash) : '';
   var idhex = dash >= 0 ? identifier.slice(dash + 1) : '';
-  if (dash >= 0 && pre.length >= 3 && pre.length <= 10 && idhex.length === 16 && _HEXRE.test(idhex)
-      && contentHash.length === 16 && _HEXRE.test(contentHash)) {
-    var pe = new TextEncoder().encode(pre);
-    var out = new Uint8Array(1 + pe.length + 16);
-    out[0] = pe.length; out.set(pe, 1);
-    for (var i = 0; i < 8; i++) out[1 + pe.length + i] = parseInt(idhex.substr(i * 2, 2), 16);
-    for (var j = 0; j < 8; j++) out[1 + pe.length + 8 + j] = parseInt(contentHash.substr(j * 2, 2), 16);
-    return out;
-  }
-  return new TextEncoder().encode(identifier + '\x00' + contentHash);
+  if (!(dash >= 0 && pre.length >= 3 && pre.length <= 10 && idhex.length === 16 && _HEXRE.test(idhex)
+        && contentHash.length === 16 && _HEXRE.test(contentHash)))
+    throw new Error('bar identifier must be canonical <prefix>-<16 hex> + 16-hex hash');
+  var pe = new TextEncoder().encode(pre);
+  var out = new Uint8Array(1 + pe.length + 16);
+  out[0] = pe.length; out.set(pe, 1);
+  for (var i = 0; i < 8; i++) out[1 + pe.length + i] = parseInt(idhex.substr(i * 2, 2), 16);
+  for (var j = 0; j < 8; j++) out[1 + pe.length + 8 + j] = parseInt(contentHash.substr(j * 2, 2), 16);
+  return out;
 }
 
 function generateCanonicalBarPng(identifier, contentHash) {
@@ -656,29 +615,13 @@ function generateCanonicalBarPng(identifier, contentHash) {
 }
 
 function decodePayload(payload){
-  // Packed binary form — first byte is the prefix length (3-10), disjoint from an
-  // ASCII identifier's leading letter (>=65). Mirror mememage/bar.py:_parse_payload.
+  // Packed binary — first byte is the prefix length (3-10). Mirror
+  // mememage/bar.py:_parse_payload.
   var n=payload[0];
-  if(n>=3&&n<=10&&payload.length>=1+n+16){
-    var prefix=null;
-    try{ prefix=new TextDecoder('utf-8',{fatal:true}).decode(payload.slice(1,1+n)); }catch(e){ prefix=null; }
-    if(prefix!==null){
-      var hx=function(off){var s='';for(var i=0;i<8;i++){var b=payload[off+i];s+=(b<16?'0':'')+b.toString(16);}return s;};
-      var ident=prefix+'-'+hx(1+n);
-      return{identifier:ident,archive_id:ident,content_hash:hx(1+n+8)};
-    }
-  }
-  const text=new TextDecoder().decode(payload);
-  const sep=text.indexOf('\0');
-  if(sep<0)return null;
-  const first=text.slice(0,sep);
-  const contentHash=text.slice(sep+1);
-  // New format: bare identifier. Old format: URL (contains /).
-  let identifier;
-  if(first.includes('/')){
-    identifier=extractIdentifier(first)||first;
-  }else{
-    identifier=first;
-  }
-  return{identifier,archive_id:identifier,content_hash:contentHash};
+  if(!(n>=3&&n<=10&&payload.length>=1+n+16))return null;
+  var prefix;
+  try{ prefix=new TextDecoder('utf-8',{fatal:true}).decode(payload.slice(1,1+n)); }catch(e){ return null; }
+  var hx=function(off){var s='';for(var i=0;i<8;i++){var b=payload[off+i];s+=(b<16?'0':'')+b.toString(16);}return s;};
+  var ident=prefix+'-'+hx(1+n);
+  return{identifier:ident,archive_id:ident,content_hash:hx(1+n+8)};
 }
