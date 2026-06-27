@@ -624,7 +624,7 @@ function analyze(file){
       o+='<div class="ev-sec">JPEG Survival</div>';
       o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Re-encodes as JPEG at each quality and re-reads the bar (solid = survived, dashed = lost). Every platform JPEG-encodes uploads \u2014 what the bar is built to survive.</div>';
       if (barBottom < h - 1) {
-        o+='<div style="font-size:0.6rem;color:#facc15;background:rgba(250,204,21,0.08);border-left:3px solid rgba(250,204,21,0.5);border-radius:4px;padding:0.4rem 0.5rem;margin-bottom:0.4rem;line-height:1.5;">\u26a0 Bar has been <b>moved</b> (row '+barBottom+', not the bottom edge). JPEG survival depends on the bar\u2019s vertical chroma-subsampling alignment, which the bottom placement guarantees \u2014 so a relocated bar is less durable here than one at the mint position. Losses below reflect the move, not the bar\u2019s design.</div>';
+        o+='<div style="font-size:0.6rem;color:#facc15;background:rgba(250,204,21,0.08);border-left:3px solid rgba(250,204,21,0.5);border-radius:4px;padding:0.4rem 0.5rem;margin-bottom:0.4rem;line-height:1.5;">\u26a0 Bar <b>moved</b> off the bottom (row '+barBottom+') \u2014 JPEG losses here reflect the move\u2019s alignment, not the bar.</div>';
       }
       var jpegLevels = [95, 85, 70, 50, 30];
       var jpegDone = 0;
