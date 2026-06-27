@@ -4102,17 +4102,11 @@ async function recompute() {
   current.sig = sigEl.value.trim();
   current.pub = pubEl.value.trim();
 
-  // WITNESSED = canonical-equal to the untampered original.
-  // The bundled example.soul is a pre-V1 artifact (hash_version 2), so its
-  // stored hash doesn't recompute under the current V1 rules — a direct
-  // hash compare would always fail. Canonical equality of the sorted record
-  // is the honest stand-in (it never false-greens: any edit breaks it). When
-  // example.soul is regenerated as V1, switch this to computeContentHash(rec)
-  // === original.hash so non-hashed-field edits (about, thumbnail) read as the
-  // decoder would (WITNESSED stays green; AUTHENTICATED/EMBODIED catch them).
-  var origJson = JSON.stringify(sortKeysDeep(original.record));
-  var curJson = JSON.stringify(sortKeysDeep(rec));
-  var witnessed = (origJson === curJson);
+  // WITNESSED = the V1 content hash recomputes to the bar-carried hash —
+  // exactly what the decoder checks. example.soul is a real V1 record, so this
+  // is a faithful hash compare. (The editable record above holds only
+  // HASH_INCLUDED fields, so any edit moves the hash and breaks WITNESSED.)
+  var witnessed = (await computeContentHash(rec)) === original.hash;
 
   // Display hash — the stored bar hash when untampered, a drifting
   // JS-computed hash when tampered, so the user sees the hash break.
@@ -4127,10 +4121,11 @@ async function recompute() {
   if (!witnessed) {
     authenticated = false;
   } else if (/^[0-9a-f]+$/i.test(current.sig) && /^[0-9a-f]+$/i.test(current.pub)) {
-    // Signature payload binds the thumbnail too — see verify.js.
-    // Lab uses the current (possibly tampered) thumbnail field so the
-    // user can see AUTHENTICATED break when they swap the portrait.
-    var attackThumbHash = await _thumbnailHashForSig(rec);
+    // Signature payload binds the thumbnail (verify.js): id + content_hash +
+    // sha256(thumbnail). The thumbnail isn't an editable field here (the record
+    // textarea is HASH_INCLUDED-only), so verify against the STORED thumbnail —
+    // a green baseline that breaks the moment WITNESSED or the sig/key is forged.
+    var attackThumbHash = await _thumbnailHashForSig(original.soul);
     authenticated = await verifySignature(
       ATTACK_IDENTIFIER, original.hash, current.sig, current.pub, attackThumbHash
     );
