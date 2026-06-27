@@ -73,55 +73,28 @@ async function decodeImageBar(file) {
   };
 
   var frame = null, usedPpb = 3, detected = false;
+  var W = img.width, H = img.height;
 
-  // Threshold candidates: the asym per-column curve (PRIMARY) + Otsu's per-image
-  // bimodal midpoint and the absolute 128 as scalar FALLBACKS that rescue hard
-  // content where the asym curve's per-channel clamp eats the delta margin (e.g.
-  // pure-saturated backgrounds). CRC + RS self-select; the post-RS CRC re-check
-  // guards miscorrections. Mirrors bar.py:extract_bar / codec.js:extractBarScaleAware.
-  var thrs = [];
-  try { thrs.push(_asymThresholdCurve(px, img.width, img.height)); } catch (e) {}
-  var ot = otsuThreshold(px, img.width, img.height);
-  if (ot !== null) thrs.push(ot);
-  thrs.push(RGB_THRESHOLD);
+  // Presence: M/Y/C bands at the bottom (the embed position). A decoded frame
+  // (below) also proves presence even if band detection was fooled by the asym
+  // data pixels masking the M/Y/C edges under heavy recompression.
+  if (detectBar(px, W, H) || detectBarBands(px, W, H)) detected = true;
 
-  // Band detection only ADDS the resized-scale sweep. Scale 1:1 is ALWAYS tried —
-  // band detection can fail on a heavily-recompressed asym bar (its content-hued
-  // data pixels mask the M/Y/C edges) even when the 1:1 read decodes cleanly.
-  var bands = detectBarBands(px, img.width, img.height);
-  if (detectBar(px, img.width, img.height) || bands) detected = true;
-  var scales = [1.0];
-  if (bands) {
-    var raw_scale = (bands.m + bands.y + bands.c) / 3 / HEADER_BAND;
-    if (Math.abs(raw_scale - 1.0) >= 0.05) {
-      for (var off = -8; off <= 8; off++) {
-        var s = Math.round((raw_scale + off * 0.01) * 1000) / 1000;
-        if (s > 0.3 && s < 3.0 && Math.abs(s - 1.0) >= 0.005 && scales.indexOf(s) < 0) scales.push(s);
-      }
+  // Fast path: read the bar at the bottom, where the encoder always writes it.
+  var hit = _decodeFrameAtHeight(px, W, H);
+
+  // Fallback: vertical scan — read the bar wherever its band signature appears,
+  // in case it was relocated or content was appended below it AFTER minting. The
+  // encoder never moves the bar; the scan only READS one that something else
+  // moved. A cheap per-row band gate rejects most rows, and CRC+RS self-select
+  // per candidate (passing a reduced h reads a higher row pair with no pixel
+  // copying). Mirrors bar.py:extract_bar's scan fallback.
+  if (!hit) {
+    for (var b = H - 1; b >= SIG_ROWS && !hit; b--) {
+      if (detectBar(px, W, b + 1)) hit = _decodeFrameAtHeight(px, W, b + 1);
     }
   }
-
-  for (var ti = 0; ti < thrs.length && !frame; ti++) {
-    var thr = thrs[ti];
-
-    // High-res even-fill layout first (full-width, both-ends anchored).
-    var efFrame = decodeEvenFill(px, img.width, img.height, thr);
-    if (efFrame) { frame = efFrame; break; }
-
-    // Sequential layout — scale 1:1 first (common case), then swept scales.
-    // px/bit swept widest-first (encoder picks the widest that fits); CRC/RS selects.
-    outer:
-    for (var si = 0; si < scales.length; si++) {
-      for (var pb = PIXELS_PER_BIT_MAX; pb >= PIXELS_PER_BIT_NARROW; pb--) {
-        var bits = extractBitsAtScale(px, img.width, img.height, scales[si], pb, thr);
-        var fr = decodeFrame(bits);
-        if (fr) { frame = fr; usedPpb = pb; break outer; }
-      }
-    }
-  }
-  // A decoded frame proves a bar is present even when band detection was fooled
-  // (asym data pixels can mask the M/Y/C bands under heavy recompression).
-  if (frame) detected = true;
+  if (hit) { frame = hit.frame; usedPpb = hit.ppb; detected = true; }
   if (!detected) {
     return Object.assign({ ok: false, detected: false, frame: null, decoded: null, error: 'No Mememage bar in this image.' }, base);
   }
@@ -147,4 +120,53 @@ async function decodeImageBar(file) {
   }
 
   return Object.assign({ ok: true, detected: true, frame: frame, decoded: decoded, ppb: usedPpb, error: null }, base);
+}
+
+// Decode the bar whose bottom row is h-1. The px array may be taller than h —
+// only rows < h are read, so the vertical scan in decodeImageBar passes a
+// reduced h to read a bar at an arbitrary height with NO pixel copying. Returns
+// {frame, ppb} or null. The non-scanning core; mirrors bar.py:_extract_at_bottom.
+//
+// Threshold candidates: the asym per-column curve (PRIMARY) + Otsu's per-image
+// bimodal midpoint and the absolute 128 as scalar FALLBACKS that rescue hard
+// content where the asym curve's per-channel clamp eats the delta margin (e.g.
+// pure-saturated backgrounds). CRC + RS self-select; the post-RS CRC re-check
+// guards miscorrections. Band detection only ADDS the resized-scale sweep —
+// scale 1:1 is ALWAYS tried (band detection can fail on a heavily-recompressed
+// asym bar even when the 1:1 read decodes cleanly).
+function _decodeFrameAtHeight(px, w, h) {
+  var thrs = [];
+  try { thrs.push(_asymThresholdCurve(px, w, h)); } catch (e) {}
+  var ot = otsuThreshold(px, w, h);
+  if (ot !== null) thrs.push(ot);
+  thrs.push(RGB_THRESHOLD);
+
+  var bands = detectBarBands(px, w, h);
+  var scales = [1.0];
+  if (bands) {
+    var raw_scale = (bands.m + bands.y + bands.c) / 3 / HEADER_BAND;
+    if (Math.abs(raw_scale - 1.0) >= 0.05) {
+      for (var off = -8; off <= 8; off++) {
+        var s = Math.round((raw_scale + off * 0.01) * 1000) / 1000;
+        if (s > 0.3 && s < 3.0 && Math.abs(s - 1.0) >= 0.005 && scales.indexOf(s) < 0) scales.push(s);
+      }
+    }
+  }
+
+  for (var ti = 0; ti < thrs.length; ti++) {
+    var thr = thrs[ti];
+    // High-res even-fill layout first (full-width, both-ends anchored).
+    var efFrame = decodeEvenFill(px, w, h, thr);
+    if (efFrame) return { frame: efFrame, ppb: 3 };
+    // Sequential layout — scale 1:1 first (common case), then swept scales.
+    // px/bit swept widest-first (encoder picks the widest that fits); CRC/RS selects.
+    for (var si = 0; si < scales.length; si++) {
+      for (var pb = PIXELS_PER_BIT_MAX; pb >= PIXELS_PER_BIT_NARROW; pb--) {
+        var bits = extractBitsAtScale(px, w, h, scales[si], pb, thr);
+        var fr = decodeFrame(bits);
+        if (fr) return { frame: fr, ppb: pb };
+      }
+    }
+  }
+  return null;
 }

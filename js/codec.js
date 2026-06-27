@@ -538,6 +538,12 @@ function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen) {
 // buffer, IN PLACE. Faithful port of bar.py:embed_into. `payloadBytes` is a
 // Uint8Array / array of bytes (e.g. TextEncoder().encode(id + "\0" + hash)).
 function embedBarPayload(px, w, h, payloadBytes) {
+  // Asym camo reads a reference row above the 2 bar rows, so the bar needs at
+  // least one clean content row above it — 3px (1 reference + 2 data) is the
+  // floor. Fail loud, matching mememage/bar.py:embed_into.
+  if (h < SIG_ROWS + 1)
+    throw new Error('Bar needs an image at least ' + (SIG_ROWS + 1) + 'px tall ('
+      + SIG_ROWS + ' data rows + 1 reference row); got ' + h + 'px');
   var frame = encodeFrame(payloadBytes);
   var bits = [];
   for (var i = 0; i < frame.length; i++)
