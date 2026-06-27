@@ -653,7 +653,13 @@ function analyze(file){
                 // By Sight path uses (codec.js). The old sequential-only
                 // extractBits(...,3/2) was blind to high-res even-fill bars
                 // and reported LOST even at q95.
-                var jres = extractBarScaleAware(jpx, im.width, im.height);
+                // fast=true: JPEG preserves dimensions, so the bar is at scale
+                // 1.0 / anchor (0,0) exactly — the downscale scale-sweep and the
+                // even-fill 25-combo phase sweep are pure waste here (~20× the
+                // decode cost, the cause of the "analyzing…" stall on images
+                // whose bar survives JPEG). Verdict is identical; only the
+                // wasted RS decodes are dropped.
+                var jres = extractBarScaleAware(jpx, im.width, im.height, true, true);
                 var ok = !!jres;
                 // Bar region preview (4x zoom on the bar's rows, wherever found)
                 var bH = Math.min(4, im.height);

@@ -284,7 +284,7 @@ function findFooterStart(px,w,y){
 // Anchors to both band edges, evenly divides [a,b] by the frame bit count
 // (swept; CRC self-selects), and reads the two rows averaged (noise immunity)
 // then the bottom row alone (survives a 1px bottom crop).
-function decodeEvenFill(px,w,h,thr){
+function decodeEvenFill(px,w,h,thr,fast){
   if(thr===undefined)thr=RGB_THRESHOLD;
   if(h<1||w<3*HEADER_PIXELS)return null;
   var y=h-1;
@@ -299,7 +299,10 @@ function decodeEvenFill(px,w,h,thr){
   // Sweep a few integer phase offsets on each anchor; CRC self-selects. (0,0)
   // is tried first, so a clean image returns immediately and every previously-
   // decodable image still decodes — a strict superset of the single-anchor read.
-  var OFF=[0,-1,1,-2,2];
+  // fast: the phase sweep is pure DOWNSCALE-aliasing insurance — at preserved
+  // dimensions (JPEG survival) the band edge doesn't move, so (0,0) is exact and
+  // the 25-combo sweep is ~25× wasted RS decodes. Collapse to the single anchor.
+  var OFF=fast?[0]:[0,-1,1,-2,2];
   for(var ia=0;ia<OFF.length;ia++){
     for(var ib=0;ib<OFF.length;ib++){
       var a=a0+OFF[ia],b=b0+OFF[ib],span=b-a;
@@ -335,7 +338,7 @@ function decodeEvenFill(px,w,h,thr){
 // derived from the measured band widths. Returns the first
 // {identifier, content_hash} that decodes cleanly, or null.
 // Mirrors mememage/bar.py:extract_bar.
-function _extractBarAtBottom(px,w,h){
+function _extractBarAtBottom(px,w,h,fast){
   // Decode the bar at the bottom 2 rows (the embed position). The px array may
   // be taller than h — only rows < h are read — so the scan in
   // extractBarScaleAware passes a reduced h to read a relocated bar with NO copy.
@@ -353,9 +356,14 @@ function _extractBarAtBottom(px,w,h){
   // (it isn't needed for a native-scale read, and band detection can fail on a
   // heavily-recompressed asym bar even when the 1:1 sequential read decodes
   // cleanly — CRC+RS guards false positives). Mirrors bar.py:extract_bar.
+  // fast: skip the ±8% band-derived scale sweep. The sweep recovers a bar whose
+  // pixels-per-bit changed under an UNKNOWN resize (the By-Sight path). Callers
+  // that re-read at PRESERVED dimensions (JPEG survival — same w×h) know the bar
+  // is at scale 1.0 exactly, so the sweep is pure waste (~17× the decode cost).
+  // Verdict is identical at preserved dims; only the wasted attempts are dropped.
   var bands=detectBarBands(px,w,h);
   var scaleCands=[1.0];
-  if(bands && Math.abs((bands.m+bands.y+bands.c)/3/HEADER_BAND-1.0)>=0.05){
+  if(!fast && bands && Math.abs((bands.m+bands.y+bands.c)/3/HEADER_BAND-1.0)>=0.05){
     var raw_scale=(bands.m+bands.y+bands.c)/3/HEADER_BAND;
     // Band-width measurement has ±5% noise from JPEG / interpolation, so sweep
     // ±8% in 1% steps around the estimate. CRC self-selects the right one.
@@ -368,7 +376,7 @@ function _extractBarAtBottom(px,w,h){
   for(var ti=0;ti<thrs.length;ti++){
     var thr=thrs[ti];
     // High-res even-fill layout — full-width, both-ends anchored.
-    var ef=decodeEvenFill(px,w,h,thr);
+    var ef=decodeEvenFill(px,w,h,thr,fast);
     if(ef){var efp=decodePayload(ef.payload);if(efp)return efp;}
     // Sequential layout — scale 1:1 first (common case), then swept scales.
     // Sweep px/bit widest-first (encoder picks the widest that fits); CRC/RS selects.
@@ -385,7 +393,7 @@ function _extractBarAtBottom(px,w,h){
   return null;
 }
 
-function extractBarScaleAware(px,w,h,scan){
+function extractBarScaleAware(px,w,h,scan,fast){
   // Read the bar at the bottom (fast path), then fall back to a vertical scan
   // that finds it wherever its M/Y/C band signature appears — so a relocated /
   // offset bar still decodes, and the validator's Scale/JPEG survival re-reads
@@ -394,12 +402,12 @@ function extractBarScaleAware(px,w,h,scan){
   // bar.py:extract_bar / image-decode.js:decodeImageBar.
   // bottomRow = the bar's bottom row (h-1 at the bottom; the matched row when
   // scanned) so callers can crop the actual bar region instead of the bottom.
-  var r=_extractBarAtBottom(px,w,h);
+  var r=_extractBarAtBottom(px,w,h,fast);
   if(r){ r.bottomRow=h-1; return r; }
   if(scan!==false){
     for(var b=h-1;b>=SIG_ROWS;b--){
       if(detectBar(px,w,b+1)){
-        var rr=_extractBarAtBottom(px,w,b+1);
+        var rr=_extractBarAtBottom(px,w,b+1,fast);
         if(rr){ rr.bottomRow=b; return rr; }
       }
     }
