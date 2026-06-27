@@ -4103,8 +4103,13 @@ async function recompute() {
   current.pub = pubEl.value.trim();
 
   // WITNESSED = canonical-equal to the untampered original.
-  // (Stored hash on v2 soul != JS v4 recompute, so direct hash compare
-  //  would always fail. Equality of the sorted record is the honest test.)
+  // The bundled example.soul is a pre-V1 artifact (hash_version 2), so its
+  // stored hash doesn't recompute under the current V1 rules — a direct
+  // hash compare would always fail. Canonical equality of the sorted record
+  // is the honest stand-in (it never false-greens: any edit breaks it). When
+  // example.soul is regenerated as V1, switch this to computeContentHash(rec)
+  // === original.hash so non-hashed-field edits (about, thumbnail) read as the
+  // decoder would (WITNESSED stays green; AUTHENTICATED/EMBODIED catch them).
   var origJson = JSON.stringify(sortKeysDeep(original.record));
   var curJson = JSON.stringify(sortKeysDeep(rec));
   var witnessed = (origJson === curJson);
