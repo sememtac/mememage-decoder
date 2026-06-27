@@ -1216,18 +1216,19 @@ function renderCert(meta, options) {
   // wouldn't anchor to a real chain there.
   if (meta.constellation_name) {
     var conDiv = _div('lineage-text');
-    // Constellation name is always a planetarium-opening link — the
-    // stargazing view is meaningful regardless of how the viewer
-    // arrived: drop-image, chain-traversal, or sample-cert preview.
-    // Earlier the sample branch rendered a plain span (defensive
-    // about wiring on the preview surface), but accidentally enabling
-    // it during traversal turned out to be a positive change. Made
-    // it permanent + extended to sample too: every cert with a
-    // constellation name opens the stellarium.
-    var conNameEl = document.createElement('a');
-    conNameEl.href = '#';
+    // EXAMPLE / Attack-Lab certs aren't anchored to a real chain, so the Bayer
+    // letter (-> parent) and the stellarium walk into nothing and are buggy.
+    // Disable both on example certs; real lookups (By Word / Audit) keep them.
+    var _exampleCert = window._exampleMode;
+    // Constellation name opens the planetarium (stellarium) on every REAL cert
+    // — drop-image, By Soul, or chain-traversal lookup — since the stargazing
+    // view is meaningful regardless of how the viewer arrived. On example certs
+    // it's plain text (the planetarium can't anchor to a non-existent chain).
+    var conNameEl = document.createElement(_exampleCert ? 'span' : 'a');
     conNameEl.textContent = meta.constellation_name;
-    conNameEl.addEventListener('click', function(e) {
+    if (!_exampleCert) {
+      conNameEl.href = '#';
+      conNameEl.addEventListener('click', function(e) {
       e.preventDefault();
       if (typeof CosmicPlanetarium !== 'undefined') {
         CosmicPlanetarium.open({
@@ -1251,7 +1252,8 @@ function renderCert(meta, options) {
         lookupById(meta.heart_star_id);
         window.scrollTo({top: 0, behavior: 'smooth'});
       }
-    });
+      });
+    }
     // Bayer designation — Greek letters by birth order.
     // Letter navigates to parent (one step back), name navigates to
     // heart star. Full 24-letter Greek alphabet covers K up to 24;
@@ -1259,7 +1261,7 @@ function renderCert(meta, options) {
     var BAYER = ('\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03b8\u03b9\u03ba\u03bb\u03bc'
                + '\u03bd\u03be\u03bf\u03c0\u03c1\u03c3\u03c4\u03c5\u03c6\u03c7\u03c8\u03c9').split('');
     if (myChunkIdx >= 0 && myChunkIdx < BAYER.length) {
-      if (meta.parent_id) {
+      if (meta.parent_id && !_exampleCert) {
         // Greek letter links to parent (the previous star in the chain). This
         // holds at the heart star (α) too: a heart star begins its
         // CONSTELLATION but not the CHAIN — its parent_id points into the
@@ -1281,7 +1283,8 @@ function renderCert(meta, options) {
         conDiv.appendChild(bayerLink);
         conDiv.appendChild(document.createTextNode(' '));
       } else {
-        // Genesis — no parent, the very beginning of the chain. Not a link.
+        // Not a link: genesis (no parent, the beginning of the chain) OR an
+        // example/Attack-Lab cert (chain traversal disabled).
         var bayerSpan = document.createElement('span');
         bayerSpan.className = 'bayer-letter';
         bayerSpan.textContent = BAYER[myChunkIdx];
@@ -1377,6 +1380,7 @@ function renderCert(meta, options) {
 
   // Sample mode: stop after Birth Temperament — the spirit reveals the rest
   var isSample = window._sampleMode;
+  window._exampleMode = false; // consume example flag (chain-nav/stellarium disable)
   if (isSample) {
     window._sampleMode = false; // consume flag
     plate.classList.add('plate-sample');

@@ -4247,6 +4247,10 @@ async function activate() {
   // after renderCert replaces the contents.
   PanelSwap(resultsWrap, function() {
     window._sampleMode = true;
+    // Attack-Lab example cert isn't anchored to a real chain — disable chain
+    // traversal (Bayer letter) + the stellarium (buggy off a non-anchored
+    // chain). Real lookups by identifier are unaffected.
+    window._exampleMode = true;
     renderCert(buildCertMeta(verification), {
       target: resultsWrap, activateLayout: false, injectPlayer: false
     });

@@ -1277,6 +1277,10 @@ if (tryLink) {
       inputSection.classList.add('example-active');
       tryLink.textContent = 'dismiss example';
       window._sampleMode = true;
+      // Example cert isn't anchored to a real chain — disable chain traversal
+      // (Bayer letter) + the stellarium so a click doesn't walk into nothing.
+      // Real lookups (By Word / Audit) leave this unset and keep traversal.
+      window._exampleMode = true;
       if (history.pushState) history.pushState({ id: EXAMPLE_ID }, '', '#');
       renderCert(_exampleSoul);
     });
