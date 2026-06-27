@@ -477,8 +477,9 @@ function hammingDistance(a, b) {
 //
 // dHash answers "same body?" (coarse, recompression-robust) but is blind to a
 // localized defacement — a drawn line and JPEG q50 are the same magnitude to a
-// perceptual hash. The luma grid (32x32 over the center-cropped square) keeps
-// the magnitude dHash discards, with two detectors by tile type:
+// perceptual hash. The luma grid (32x32 over the FULL frame — not center-cropped,
+// so margin defacement is covered) keeps the magnitude dHash discards, with two
+// detectors by tile type:
 //   SMOOTH tiles -> min/max: a dark mark drops the tile MIN, a bright mark
 //     raises its MAX. Compression pulls a smooth tile's extremes INWARD while a
 //     mark drives them OUTWARD, so honest transforms can't fake it — a 1-4px
@@ -490,11 +491,15 @@ function hammingDistance(a, b) {
 // (`flat` in the decoded struct) is computed in Python only and read here, so
 // the Py<->JS parity surface is the per-tile mean/min/max math.
 //
-// Blob (base64): [1024 mean][1024 min][1024 max][128 flat-bits] = 3200 bytes.
-// Older 1152/256-byte grids -> decodeStoredGrid returns null -> dHash-only.
+// Blob (base64): [1024 mean][1024 min][1024 max][128 flat-bits][1 version] = 3201.
+// The trailing version byte distinguishes the FULL-FRAME grid (v2) from the old
+// unversioned 3200-byte CENTER-SQUARE grid — same bytes, different region — so an
+// old soul degrades to dHash-only instead of crying wolf. Older/other -> null.
 var LUMA_GRID = 32;
 var LUMA_TILES = LUMA_GRID * LUMA_GRID;                 // 1024
-var LUMA_BLOB_BYTES = LUMA_TILES * 3 + (LUMA_TILES + 7 >> 3);   // 3200
+var LUMA_BLOB_BYTES = LUMA_TILES * 3 + (LUMA_TILES + 7 >> 3);   // 3200 (data)
+var LUMA_GRID_VERSION = 2;                              // full-frame format
+var LUMA_STORED_BYTES = LUMA_BLOB_BYTES + 1;            // 3201 (data + version)
 // Shared with mememage/embodiment.py MARK_THRESHOLD / HIGH_THRESHOLD.
 var LUMA_MARK = 40;
 var LUMA_HIGH = 24;
@@ -507,18 +512,18 @@ var LUMA_SKIP_BOTTOM_ROWS = 1;
 // differs from PIL; the parity trap). Half-up rounding matches Python int(x+0.5).
 // Returns {mean, min, max} as Uint8Array(1024) each. Twin of
 // mememage/embodiment.tile_stats.
-function lumaTileStatsFromSquareData(data, side) {
+function lumaTileStatsFromData(data, w, h) {
   var mean = new Uint8Array(LUMA_TILES);
   var mn = new Uint8Array(LUMA_TILES);
   var mx = new Uint8Array(LUMA_TILES);
   for (var ty = 0; ty < LUMA_GRID; ty++) {
-    var y0 = Math.floor(ty * side / LUMA_GRID), y1 = Math.floor((ty + 1) * side / LUMA_GRID);
+    var y0 = Math.floor(ty * h / LUMA_GRID), y1 = Math.floor((ty + 1) * h / LUMA_GRID);
     for (var tx = 0; tx < LUMA_GRID; tx++) {
-      var x0 = Math.floor(tx * side / LUMA_GRID), x1 = Math.floor((tx + 1) * side / LUMA_GRID);
+      var x0 = Math.floor(tx * w / LUMA_GRID), x1 = Math.floor((tx + 1) * w / LUMA_GRID);
       var total = 0, count = 0, lo = 1e9, hi = -1e9;
       for (var y = y0; y < y1; y++) {
         for (var x = x0; x < x1; x++) {
-          var idx = (y * side + x) * 4;
+          var idx = (y * w + x) * 4;
           var lum = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
           total += lum;
           if (lum < lo) lo = lum;
@@ -537,22 +542,27 @@ function lumaTileStatsFromSquareData(data, side) {
   return {mean: mean, min: mn, max: mx};
 }
 
+// Back-compat shim: square inputs (the parity harness drives both square and
+// full-frame cases). Twin of mememage/embodiment.tile_stats math.
+function lumaTileStatsFromSquareData(data, side) {
+  return lumaTileStatsFromData(data, side, side);
+}
+
 function computeTileStats(canvas) {
   var ctx = canvas.getContext('2d', {willReadFrequently: true});
-  var sq = Math.min(canvas.width, canvas.height);
-  var left = (canvas.width - sq) >> 1;
-  var top = (canvas.height - sq) >> 1;
-  var data = ctx.getImageData(left, top, sq, sq).data;
-  return lumaTileStatsFromSquareData(data, sq);
+  var w = canvas.width, h = canvas.height;
+  // FULL frame (not center-cropped) so margin defacement is covered.
+  var data = ctx.getImageData(0, 0, w, h).data;
+  return lumaTileStatsFromData(data, w, h);
 }
 
 // Decode a stored grid to {mean, min, max, flat} Uint8Arrays. Null if it isn't
-// the current 3200-byte format (legacy/malformed -> dHash-only EMBODIED).
+// the current full-frame v2 format (legacy center-square/malformed -> dHash-only).
 function decodeStoredGrid(b64) {
   if (!b64 || typeof b64 !== 'string') return null;
   try {
     var bin = atob(b64);
-    if (bin.length !== LUMA_BLOB_BYTES) return null;
+    if (bin.length !== LUMA_STORED_BYTES || bin.charCodeAt(LUMA_BLOB_BYTES) !== LUMA_GRID_VERSION) return null;
     var mean = new Uint8Array(LUMA_TILES), mn = new Uint8Array(LUMA_TILES), mx = new Uint8Array(LUMA_TILES);
     var flat = new Uint8Array(LUMA_TILES);
     var fbase = LUMA_TILES * 3;
