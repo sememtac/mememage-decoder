@@ -636,14 +636,20 @@ function generateCanonicalBarPng(identifier, contentHash) {
   var payloadBytes = packPayload(identifier, contentHash);
   var frame = encodeFrame(payloadBytes);
   var totalBits = frame.length * 8;
-  // Size a 2-row strip at 2px/bit so the writer lands on the sequential layout.
+  // Size the strip at 2px/bit so the writer lands on the sequential layout.
+  // Height = SIG_ROWS data rows + 1 REFERENCE row above them: the asym camo
+  // encodes each bit relative to the row above the bar, so a bare 2-row strip
+  // is undecodable (no reference) — and embedBarPayload now rejects h < 3. The
+  // extra row stays neutral gray; the asym decoder re-predicts the "1" level
+  // from it, so the strip verifies standalone when dropped back in. (bitsPerRow
+  // still divides by SIG_ROWS — only the 2 data rows carry bits.)
   var bitsPerRow = Math.ceil(totalBits / SIG_ROWS);
   var w = HEADER_PIXELS + bitsPerRow * PIXELS_PER_BIT_NARROW + FOOTER_PIXELS;
-  var h = SIG_ROWS;
+  var h = SIG_ROWS + 1;
   var canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   var ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#808080';  // neutral background; the bar overwrites it
+  ctx.fillStyle = '#808080';  // neutral background + asym reference row
   ctx.fillRect(0, 0, w, h);
   var img = ctx.getImageData(0, 0, w, h);
   embedBarPayload(img.data, w, h, payloadBytes);
