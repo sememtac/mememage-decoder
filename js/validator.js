@@ -338,7 +338,14 @@ function analyze(file){
     var decoded = res.decoded;
     var barFrame = res.frame;
     var barPpb = res.ppb || 3;
-    var barBright = detected ? extractBitBrightness(px, w, h, barPpb) : null;
+    // The bar may be relocated/offset — decodeImageBar reports its bottom row.
+    // Read EVERY bar measurement at barRow (effective height = barRow+1) so bit
+    // confidence, band purity, etc. read the BAR, not the bottom/black fill. The
+    // bar-pixel readers take (px,w,h) and read rows < h, so a reduced h reads a
+    // higher row pair with no copy — the same trick the decoder/scan use.
+    var barBottom = (res.barRow == null ? h - 1 : res.barRow);
+    var barEffH = barBottom + 1;
+    var barBright = detected ? extractBitBrightness(px, w, barEffH, barPpb) : null;
 
     // Bar region crop (bottom 16px, 4x zoom) — redraw from the canvas
     // already built by decodeImageBar so we don't hold onto a second
@@ -347,7 +354,6 @@ function analyze(file){
     // Crop the window ENDING at the bar's bottom row — h-1 when it sits at the
     // bottom (identical to the old crop), or wherever the vertical scan found a
     // relocated/offset bar (decodeImageBar reports res.barRow).
-    var barBottom=(res.barRow==null?h-1:res.barRow);
     var barTop=Math.max(0,barBottom-barH+1);
     var bc=document.createElement('canvas');bc.width=w;bc.height=barH*4;
     var bctx=bc.getContext('2d');bctx.imageSmoothingEnabled=false;
@@ -357,7 +363,7 @@ function analyze(file){
     // Color band measurement + purity
     var bands={},bandRaw={};
     var idealBands={M:[255,0,255],Y:[255,255,0],C:[0,255,255]};
-    if(h>=2&&w>=50){var y=h-1,mid=Math.floor(HEADER_BAND/2);
+    if(h>=2&&w>=50){var y=barBottom,mid=Math.floor(HEADER_BAND/2);
       for(var bi=0;bi<3;bi++){var bpos=bi*HEADER_BAND+mid;var idx=(y*w+bpos)*4;var lbl=['M','Y','C'][bi];
         bands[lbl]='rgb('+px[idx]+','+px[idx+1]+','+px[idx+2]+')';bandRaw[lbl]=[px[idx],px[idx+1],px[idx+2]];}}
 
@@ -585,7 +591,9 @@ function analyze(file){
               var sres = extractBarScaleAware(spx, sw, sh);
               sok = !!sres;
               var sbH = Math.min(6, sh);
-              var sRow = sres ? sres.bottomRow : sh - 1;   // crop where the bar actually is
+              // Where the bar IS if re-found; else where it SHOULD be (the
+              // original row scaled by s) — never the bottom for an offset bar.
+              var sRow = sres ? sres.bottomRow : Math.max(0, Math.min(sh - 1, Math.round(barBottom * s)));
               var sbc = document.createElement('canvas'); sbc.width = sw; sbc.height = sbH * 4;
               var sbx = sbc.getContext('2d'); sbx.imageSmoothingEnabled = false;
               sbx.drawImage(sc, 0, Math.max(0, sRow - sbH + 1), sw, sbH, 0, 0, sw, sbH * 4);
@@ -646,7 +654,7 @@ function analyze(file){
                 var ok = !!jres;
                 // Bar region preview (4x zoom on the bar's rows, wherever found)
                 var bH = Math.min(4, im.height);
-                var jRow = jres ? jres.bottomRow : im.height - 1;
+                var jRow = jres ? jres.bottomRow : barBottom;   // JPEG keeps dims; bar stays at barBottom
                 var bc = document.createElement('canvas');
                 bc.width = im.width; bc.height = bH * 4;
                 var bx = bc.getContext('2d');
