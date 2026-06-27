@@ -526,12 +526,18 @@ function analyze(file){
         // engages when the data region (width minus 48px of flush bands)
         // holds the whole frame at >=3px/bit; below the crossover the bar
         // falls back to the sequential split-row layout. We can name which
-        // one this image uses from width + identifier length alone
-        // (identifier = prefix + '-' + 16 hex => prefixLen = id.length - 17;
-        // frame = prefix + 48 bytes => frameBits = (prefixLen + 48) * 8).
+        // one this image uses from width + identifier length alone.
+        // identifier = prefix + '-' + 16 hex => prefixLen = id.length - 17.
+        // Packed frame (mememage/bar.py:embed_into): payload = [1B prefix_len]
+        // [prefix][8B id][8B hash] = prefixLen + 17, then the Gen I frame adds an
+        // 8B header (2 magic + 1 gen + 1 nsym + 2 payload_len + 2 CRC) and 6 RS
+        // parity bytes => frame = prefixLen + 31 bytes => frameBits = that × 8.
+        // (Was +48 — the pre-packed-format payload size; the packed refactor
+        // shrank the frame, so the old constant over-stated the crossover and
+        // mislabeled wide even-fill bars as SEQUENTIAL.)
         var fid = decoded.identifier || '';
         var prefixLen = Math.max(1, fid.length - 17);
-        var frameBits = (prefixLen + 48) * 8;
+        var frameBits = (prefixLen + 31) * 8;
         var crossoverW = frameBits * 3 + 48;
         var isEven = (w - 48) >= frameBits * 3;
         // Empirical downscale floor: a fat even-fill bit survives until it
