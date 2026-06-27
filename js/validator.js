@@ -493,18 +493,24 @@ function analyze(file){
         o+='</div>';
       }
 
-      // Color Band Purity
+      // Color Band Purity — exactly three bands, so lay them out 3-up in one
+      // row instead of the default 2-col .ev-g (which leaves Cyan alone on a
+      // second row). Each cell: label, swatch + %, thin purity bar.
       if(bandRaw.M){
-        o+='<div class="ev-sec">Color Band Purity</div><div class="ev-g">';
+        o+='<div class="ev-sec">Color Band Purity</div>';
+        o+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.3rem;">';
         var bLabels={M:'Magenta',Y:'Yellow',C:'Cyan'};
         for(var bl of['M','Y','C']){var act=bandRaw[bl],ide=idealBands[bl];
           var dist2=Math.sqrt(Math.pow(act[0]-ide[0],2)+Math.pow(act[1]-ide[1],2)+Math.pow(act[2]-ide[2],2));
           var pur=Math.max(0,1-dist2/441.7),pPct=Math.round(pur*100);
           var pCol=pur>0.8?'#4ade80':pur>0.5?'#facc15':'#f87171';
-          o+='<div class="ev-m"><div class="ev-ml">'+bLabels[bl]+'</div><div style="display:flex;align-items:center;gap:0.4rem;">';
+          o+='<div class="ev-m" style="text-align:center;">';
+          o+='<div class="ev-ml">'+bLabels[bl]+'</div>';
+          o+='<div style="display:flex;align-items:center;justify-content:center;gap:0.35rem;margin:0.25rem 0;">';
           o+='<div style="width:10px;height:10px;border-radius:2px;background:rgb('+act[0]+','+act[1]+','+act[2]+');border:1px solid rgba(255,255,255,0.15);"></div>';
-          o+='<div style="flex:1;height:6px;background:rgba(40,40,50,0.5);border-radius:3px;overflow:hidden;"><div style="width:'+pPct+'%;height:100%;background:'+pCol+';"></div></div>';
-          o+='<span style="font-size:0.7rem;color:'+pCol+';">'+pPct+'%</span></div></div>';}
+          o+='<span style="font-size:0.72rem;color:'+pCol+';font-weight:600;">'+pPct+'%</span></div>';
+          o+='<div style="height:5px;background:rgba(40,40,50,0.5);border-radius:3px;overflow:hidden;"><div style="width:'+pPct+'%;height:100%;background:'+pCol+';"></div></div>';
+          o+='</div>';}
         o+='</div>';
       }
 
