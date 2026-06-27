@@ -191,8 +191,9 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
     var srcCanvas = canvas;
     // If we have a bar fragment payload AND the codec is loaded, copy
     // the live canvas to an offscreen buffer and embed the bar in the
-    // bottom 2 rows before PNG encoding. The live canvas is untouched
-    // so the on-screen render stays visually clean.
+    // bottom 2 data rows (asym reads the band content one row above as its
+    // reference) before PNG encoding. The live canvas is untouched so the
+    // on-screen render stays visually clean.
     if (barPayloadBytes && typeof embedBarPayload === 'function') {
       try {
         srcCanvas = document.createElement('canvas');
@@ -201,8 +202,12 @@ function enableCanvasSave(canvas, metadata, barPayloadBytes) {
         var sctx = srcCanvas.getContext('2d');
         sctx.drawImage(canvas, 0, 0);
         var img = sctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
-        // Single canonical writer (codec.js) — chooses layout + ppb itself.
-        embedBarPayload(img.data, srcCanvas.width, srcCanvas.height, barPayloadBytes);
+        // Canonical writer (codec.js), forced to the SEQUENTIAL layout: these
+        // are band fragments (tag-prefixed, non-canonical payloads). The
+        // even-fill decoder only validates canonical payloads, so a fragment
+        // written even-fill on a wide (HiDPI) band would be unreadable;
+        // sequential decodes at any width. iTXt still carries the fragment too.
+        embedBarPayload(img.data, srcCanvas.width, srcCanvas.height, barPayloadBytes, true);
         sctx.putImageData(img, 0, 0);
       } catch (e) {
         // Bar embed failed (e.g. canvas too narrow for fragment at 2px/bit)

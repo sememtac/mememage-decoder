@@ -249,9 +249,10 @@ function _saveLivePlate(plate, barId, barHash) {
         o.drawImage(rendered, 0, 0);
 
         if (typeof embedBarPayload === 'function') {
-          // Single canonical writer (codec.js) — same centered-brightness,
-          // dominant-tinted, layout-by-width bar the mint writes. It picks the
-          // layout + ppb itself, so no width-threshold guessing here.
+          // Single canonical writer (codec.js) — the same asym-camouflaged,
+          // layout-by-width bar the mint writes (canonical payload, so even-fill
+          // is fine here). It picks the layout + ppb itself; the plate is tall,
+          // so the cert's own bottom content row is the asym reference.
           var pb = (typeof packPayload === 'function')
             ? packPayload(barId, barHash)
             : new TextEncoder().encode(barId + '\x00' + barHash);

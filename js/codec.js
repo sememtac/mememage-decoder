@@ -570,10 +570,16 @@ function _writeSequential(px, w, h, dataWidth, bits, bitRgb, payloadLen) {
 // Embed a bar carrying `payloadBytes` into the bottom 2 rows of an RGBA pixel
 // buffer, IN PLACE. Faithful port of bar.py:embed_into. `payloadBytes` is a
 // Uint8Array / array of bytes (e.g. TextEncoder().encode(id + "\0" + hash)).
-function embedBarPayload(px, w, h, payloadBytes) {
+function embedBarPayload(px, w, h, payloadBytes, forceSequential) {
   // Asym camo reads a reference row above the 2 bar rows, so the bar needs at
   // least one clean content row above it — 3px (1 reference + 2 data) is the
   // floor. Fail loud, matching mememage/bar.py:embed_into.
+  // forceSequential: keep the sequential layout even on a wide image. Band
+  // FRAGMENTS (tag-prefixed payloads, not canonical <prefix>-<hex>) use this:
+  // the even-fill DECODER validates each candidate via decodePayload, which
+  // only accepts canonical payloads, so a fragment written even-fill is
+  // unreadable. Sequential's reader returns on CRC alone, so fragments decode
+  // at any width. Canonical mints/cert-save never pass it (even-fill as before).
   if (h < SIG_ROWS + 1)
     throw new Error('Bar needs an image at least ' + (SIG_ROWS + 1) + 'px tall ('
       + SIG_ROWS + ' data rows + 1 reference row); got ' + h + 'px');
@@ -583,7 +589,7 @@ function embedBarPayload(px, w, h, payloadBytes) {
     for (var j = 7; j >= 0; j--) bits.push((frame[i] >> j) & 1);
 
   var dataWidth = w - HEADER_PIXELS - FOOTER_PIXELS;
-  var isEvenFill = dataWidth >= PIXELS_PER_BIT * bits.length;
+  var isEvenFill = !forceSequential && dataWidth >= PIXELS_PER_BIT * bits.length;
 
   // Asym camo: each bit rides a PER-COLUMN center copying the smoothed, floored
   // content one row above. "1" = center (invisible), "0" = center-ASYM_DELTA,
