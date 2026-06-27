@@ -252,7 +252,7 @@ function _renderReconstruct() {
   if (fids.length === 0) {
     statusEl.textContent = '';
   } else if (fids.length === 3) {
-    statusEl.textContent = 'the relics are gathered \u2014 the spirit of ' + (pids[0] || '?') + ' can re-form.';
+    statusEl.textContent = 'the relics are gathered. the spirit of ' + (pids[0] || '?') + ' can re-form.';
   } else {
     var missing = ['gen', 'sky', 'machine'].filter(function(f) { return !_recState[f]; });
     statusEl.textContent = 'gathered ' + fids.join(' + ') + '. drop ' + missing.join(' + ') + ' to call the spirit back.';
