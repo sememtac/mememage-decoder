@@ -156,7 +156,11 @@ body > *:not(#starfield):not(.touch-tooltip):not(.planetarium):not(.cosmic-playe
 .atk-dhash-pair td { width: 3px; height: 3px; }
 .atk-dhash-pair td.on { background: #6ea8fe; }
 .atk-dhash-pair td.off { background: rgba(255,255,255,0.06); }
-.atk-dhash-pair td.diff { background: #f87171; }
+/* A differing cell tints by THIS grid's own bit: set => bright red, unset =>
+   faded red. At a diff position the two grids hold opposite bits, so one reads
+   bright and the other faded — the fingerprints look different, as they should. */
+.atk-dhash-pair td.on.diff { background: #f87171; }
+.atk-dhash-pair td.off.diff { background: rgba(248,113,113,0.28); }
 .atk-dhash-label { font-size: 0.5rem; color: #5a5a70; letter-spacing: 0.12em; text-transform: uppercase; }
 
 /* Drop zones — yin palette overrides. Structure (padding, transitions,

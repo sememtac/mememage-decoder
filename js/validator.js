@@ -4011,7 +4011,12 @@ function renderDHashGrid(el, bits, diffMask) {
     h += '<tr>';
     for (var x = 0; x < 8; x++) {
       var i = y * 8 + x;
-      var cls = diffMask && diffMask[i] ? 'diff' : (bits[i] ? 'on' : 'off');
+      // Each grid shows its OWN bit (on/off) so "your image" and "original"
+      // are visually distinct fingerprints. A differing cell adds `diff`,
+      // which tints by this grid's bit (set vs unset) — so at a diff position
+      // one grid reads bright, the other faded. (The old code rendered every
+      // diff cell the same red in BOTH grids, making them look identical.)
+      var cls = (bits[i] ? 'on' : 'off') + (diffMask && diffMask[i] ? ' diff' : '');
       h += '<td class="' + cls + '"></td>';
     }
     h += '</tr>';
