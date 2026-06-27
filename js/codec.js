@@ -335,12 +335,15 @@ function decodeEvenFill(px,w,h,thr){
 // derived from the measured band widths. Returns the first
 // {identifier, content_hash} that decodes cleanly, or null.
 // Mirrors mememage/bar.py:extract_bar.
-function extractBarScaleAware(px,w,h){
+function _extractBarAtBottom(px,w,h){
+  // Decode the bar at the bottom 2 rows (the embed position). The px array may
+  // be taller than h — only rows < h are read — so the scan in
+  // extractBarScaleAware passes a reduced h to read a relocated bar with NO copy.
   // Threshold candidates: the asym per-column curve (PRIMARY) + Otsu's per-image
   // bimodal midpoint and the absolute 128 as scalar FALLBACKS that rescue hard
   // content where the asym curve's per-channel clamp eats the delta margin (e.g.
   // pure-saturated backgrounds). CRC + RS self-select; the post-RS CRC re-check
-  // guards miscorrections. Mirrors bar.py:extract_bar.
+  // guards miscorrections. Mirrors bar.py:_extract_at_bottom.
   var thrs=[];
   try{ thrs.push(_asymThresholdCurve(px,w,h)); }catch(e){}
   var ot=otsuThreshold(px,w,h); if(ot!==null)thrs.push(ot);
@@ -376,6 +379,26 @@ function extractBarScaleAware(px,w,h){
         if(!frame) continue;
         var p=decodePayload(frame.payload);
         if(p) return p;
+      }
+    }
+  }
+  return null;
+}
+
+function extractBarScaleAware(px,w,h,scan){
+  // Read the bar at the bottom (fast path), then fall back to a vertical scan
+  // that finds it wherever its M/Y/C band signature appears — so a relocated /
+  // offset bar still decodes, and the validator's Scale/JPEG survival re-reads
+  // pick it up. Passing a reduced h reads a higher row pair with NO pixel copy.
+  // scan defaults on. CRC+RS self-select per candidate row. Mirrors
+  // bar.py:extract_bar / image-decode.js:decodeImageBar.
+  var r=_extractBarAtBottom(px,w,h);
+  if(r) return r;
+  if(scan!==false){
+    for(var b=h-1;b>=SIG_ROWS;b--){
+      if(detectBar(px,w,b+1)){
+        var rr=_extractBarAtBottom(px,w,b+1);
+        if(rr) return rr;
       }
     }
   }
