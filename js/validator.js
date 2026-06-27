@@ -573,49 +573,76 @@ function analyze(file){
         }
         o+='</div>';
 
-        // --- Scale Survival (revived, resolution-aware, synchronous) ---
+        // --- Scale Survival (resolution-aware, async) ---
         o+='<div class="ev-sec">Scale Survival</div>';
         if (isEven) {
           o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Downscales the image and re-reads the bar — the measured floor for this image.</div>';
           var scales = [0.9, 0.75, 0.6, 0.5, 0.4, 0.3];
-          var lowestOk = null;
-          for (var sIdx = 0; sIdx < scales.length; sIdx++) {
-            var s = scales[sIdx];
-            var sw = Math.max(1, Math.round(w * s)), sh = Math.max(1, Math.round(h * s));
-            var sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
-            var sx = sc.getContext('2d'); sx.imageSmoothingEnabled = true; sx.imageSmoothingQuality = 'high';
-            sx.drawImage(res.canvas, 0, 0, sw, sh);
-            var sok = false, sUri = null;
-            try {
-              var spx = sx.getImageData(0, 0, sw, sh).data;
-              var sres = extractBarScaleAware(spx, sw, sh);
-              sok = !!sres;
-              var sbH = Math.min(6, sh);
-              // Where the bar IS if re-found; else where it SHOULD be (the
-              // original row scaled by s) — never the bottom for an offset bar.
-              var sRow = sres ? sres.bottomRow : Math.max(0, Math.min(sh - 1, Math.round(barBottom * s)));
-              var sbc = document.createElement('canvas'); sbc.width = sw; sbc.height = sbH * 4;
-              var sbx = sbc.getContext('2d'); sbx.imageSmoothingEnabled = false;
-              sbx.drawImage(sc, 0, Math.max(0, sRow - sbH + 1), sw, sbH, 0, 0, sw, sbH * 4);
-              sUri = sbc.toDataURL('image/png');
-            } catch (e) { sok = false; }
-            if (sok) lowestOk = s;
-            var sBg = sok ? 'rgba(74,158,74,0.08)' : 'rgba(180,60,60,0.06)';
-            var sBd = sok ? 'rgba(74,158,74,0.5)' : 'rgba(180,60,60,0.4)';
-            o+='<div style="padding:0.4rem 0.5rem;background:'+sBg+';border-left:3px solid '+sBd+';border-radius:4px;margin-bottom:0.3rem;">';
-            o+='<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">';
-            o+='<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">'+s.toFixed(2)+'×</span>';
-            o+='<span style="font-size:0.65rem;color:#8a8a9a;">'+sw+'×'+sh+'</span>';
-            o+='<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;background:'+(sok?'rgba(74,158,74,0.15)':'rgba(180,60,60,0.15)')+';color:'+(sok?'#4ade80':'#f87171')+';font-weight:600;">Bar '+(sok?'SURVIVED':'LOST')+'</span>';
-            o+='</div>';
-            if (sUri) {
-              o+='<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Bar region @ '+s.toFixed(2)+'×</div>';
-              o+='<img src="'+sUri+'" class="bar-zoom" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
+          // Placeholder rows + floor, filled async (mirrors JPEG Survival).
+          // The per-scale work (downscale + re-read) is heavy — the even-fill
+          // anchor sweep is LEGITIMATE here because the dims change, so unlike
+          // JPEG survival we keep the full sweep (no `fast`). Running it
+          // synchronously froze the panel render on large even-fill images;
+          // deferring + yielding between scales keeps the UI alive and fills
+          // each row progressively.
+          scales.forEach(function(s, i){
+            o += '<div id="scaleRow-' + i + '" style="padding:0.4rem 0.5rem;background:rgba(40,40,60,0.05);border-left:3px solid rgba(120,120,140,0.3);border-radius:4px;margin-bottom:0.3rem;">';
+            o += '<div style="display:flex;align-items:center;gap:0.6rem;">';
+            o += '<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">' + s.toFixed(2) + '×</span>';
+            o += '<span style="font-size:0.65rem;color:#8a8a9a;">analyzing…</span>';
+            o += '</div></div>';
+          });
+          o += '<div id="scaleFloor" style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Measuring floor…</div>';
+          // Defer the heavy re-reads until after the panel is in the DOM.
+          setTimeout(async function(){
+            var lowestOk = null;
+            for (var sIdx = 0; sIdx < scales.length; sIdx++) {
+              var s = scales[sIdx];
+              var sw = Math.max(1, Math.round(w * s)), sh = Math.max(1, Math.round(h * s));
+              var sok = false, sUri = null;
+              try {
+                var sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
+                var sx = sc.getContext('2d'); sx.imageSmoothingEnabled = true; sx.imageSmoothingQuality = 'high';
+                sx.drawImage(res.canvas, 0, 0, sw, sh);
+                var spx = sx.getImageData(0, 0, sw, sh).data;
+                var sres = extractBarScaleAware(spx, sw, sh);
+                sok = !!sres;
+                var sbH = Math.min(6, sh);
+                // Where the bar IS if re-found; else where it SHOULD be (the
+                // original row scaled by s) — never the bottom for an offset bar.
+                var sRow = sres ? sres.bottomRow : Math.max(0, Math.min(sh - 1, Math.round(barBottom * s)));
+                var sbc = document.createElement('canvas'); sbc.width = sw; sbc.height = sbH * 4;
+                var sbx = sbc.getContext('2d'); sbx.imageSmoothingEnabled = false;
+                sbx.drawImage(sc, 0, Math.max(0, sRow - sbH + 1), sw, sbH, 0, 0, sw, sbH * 4);
+                sUri = sbc.toDataURL('image/png');
+              } catch (e) { sok = false; }
+              if (sok) lowestOk = s;
+              var row = document.getElementById('scaleRow-' + sIdx);
+              if (row) {
+                var sBg = sok ? 'rgba(74,158,74,0.08)' : 'rgba(180,60,60,0.06)';
+                var sBd = sok ? 'rgba(74,158,74,0.5)' : 'rgba(180,60,60,0.4)';
+                var html = '';
+                html += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">';
+                html += '<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">' + s.toFixed(2) + '×</span>';
+                html += '<span style="font-size:0.65rem;color:#8a8a9a;">' + sw + '×' + sh + '</span>';
+                html += '<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;background:' + (sok?'rgba(74,158,74,0.15)':'rgba(180,60,60,0.15)') + ';color:' + (sok?'#4ade80':'#f87171') + ';font-weight:600;">Bar ' + (sok?'SURVIVED':'LOST') + '</span>';
+                html += '</div>';
+                if (sUri) {
+                  html += '<div style="font-size:0.55rem;color:#8a8a9a;margin-bottom:2px;">Bar region @ ' + s.toFixed(2) + '×</div>';
+                  html += '<img src="' + sUri + '" class="bar-zoom" style="width:100%;image-rendering:pixelated;border-radius:3px;opacity:0.85;"/>';
+                }
+                row.style.background = sBg; row.style.borderLeftColor = sBd; row.innerHTML = html;
+              }
+              // Yield so the UI can paint between heavy scales.
+              await new Promise(function(r){ setTimeout(r, 0); });
             }
-            o+='</div>';
-          }
-          var floorTxt = lowestOk ? ('survives down to ~'+lowestOk.toFixed(2)+'×') : ('lost even at 0.90× — unusually fragile, check the source');
-          o+='<div style="font-size:0.62rem;color:#c0c0d0;margin-bottom:0.3rem;">Measured floor: <span style="font-weight:600;">'+floorTxt+'</span>.</div>';
+            var floor = document.getElementById('scaleFloor');
+            if (floor) {
+              var floorTxt = lowestOk ? ('survives down to ~'+lowestOk.toFixed(2)+'×') : ('lost even at 0.90× — unusually fragile, check the source');
+              floor.innerHTML = 'Measured floor: <span style="font-weight:600;">'+floorTxt+'</span>.';
+              floor.style.color = '#c0c0d0';
+            }
+          }, 0);
         } else {
           o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;line-height:1.5;">Skipped — sequential bars sit at the minimum bit width, so they have no downscale headroom. Mint at ≥'+crossoverW+'px wide for even-fill’s resize resilience. JPEG Survival below still applies.</div>';
         }
