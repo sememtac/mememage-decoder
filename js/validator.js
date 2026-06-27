@@ -344,9 +344,14 @@ function analyze(file){
     // already built by decodeImageBar so we don't hold onto a second
     // Image element.
     var barH=Math.min(16,h);
+    // Crop the window ENDING at the bar's bottom row — h-1 when it sits at the
+    // bottom (identical to the old crop), or wherever the vertical scan found a
+    // relocated/offset bar (decodeImageBar reports res.barRow).
+    var barBottom=(res.barRow==null?h-1:res.barRow);
+    var barTop=Math.max(0,barBottom-barH+1);
     var bc=document.createElement('canvas');bc.width=w;bc.height=barH*4;
     var bctx=bc.getContext('2d');bctx.imageSmoothingEnabled=false;
-    bctx.drawImage(res.canvas,0,h-barH,w,barH,0,0,w,barH*4);
+    bctx.drawImage(res.canvas,0,barTop,w,barH,0,0,w,barH*4);
     var barUri=bc.toDataURL('image/png');
 
     // Color band measurement + purity
@@ -403,7 +408,7 @@ function analyze(file){
       o+='<div class="ev-body">';
 
       // Bar region
-      o+='<div class="ev-sec">Bar Region (bottom '+barH+'px, 4x zoom)</div>';
+      o+='<div class="ev-sec">Bar Region ('+(barBottom<h-1?'offset @ row '+barBottom:'bottom')+', '+barH+'px, 4x zoom)</div>';
       o+='<img src="'+barUri+'" class="bar-img bar-zoom" alt="Bar region"/>';
 
       // Bar results
@@ -577,11 +582,13 @@ function analyze(file){
             var sok = false, sUri = null;
             try {
               var spx = sx.getImageData(0, 0, sw, sh).data;
-              sok = !!extractBarScaleAware(spx, sw, sh);
+              var sres = extractBarScaleAware(spx, sw, sh);
+              sok = !!sres;
               var sbH = Math.min(6, sh);
+              var sRow = sres ? sres.bottomRow : sh - 1;   // crop where the bar actually is
               var sbc = document.createElement('canvas'); sbc.width = sw; sbc.height = sbH * 4;
               var sbx = sbc.getContext('2d'); sbx.imageSmoothingEnabled = false;
-              sbx.drawImage(sc, 0, sh - sbH, sw, sbH, 0, 0, sw, sbH * 4);
+              sbx.drawImage(sc, 0, Math.max(0, sRow - sbH + 1), sw, sbH, 0, 0, sw, sbH * 4);
               sUri = sbc.toDataURL('image/png');
             } catch (e) { sok = false; }
             if (sok) lowestOk = s;
@@ -635,14 +642,16 @@ function analyze(file){
                 // By Sight path uses (codec.js). The old sequential-only
                 // extractBits(...,3/2) was blind to high-res even-fill bars
                 // and reported LOST even at q95.
-                var ok = !!extractBarScaleAware(jpx, im.width, im.height);
-                // Bar region preview (4x zoom on bottom 4 rows)
+                var jres = extractBarScaleAware(jpx, im.width, im.height);
+                var ok = !!jres;
+                // Bar region preview (4x zoom on the bar's rows, wherever found)
                 var bH = Math.min(4, im.height);
+                var jRow = jres ? jres.bottomRow : im.height - 1;
                 var bc = document.createElement('canvas');
                 bc.width = im.width; bc.height = bH * 4;
                 var bx = bc.getContext('2d');
                 bx.imageSmoothingEnabled = false;
-                bx.drawImage(jc, 0, im.height - bH, im.width, bH, 0, 0, im.width, bH * 4);
+                bx.drawImage(jc, 0, Math.max(0, jRow - bH + 1), im.width, bH, 0, 0, im.width, bH * 4);
                 URL.revokeObjectURL(url);
                 resolve({q:q, ok:ok, dataUrl:bc.toDataURL('image/png'), dims:[im.width, im.height], blobSize:blob.size});
               } catch (e) {

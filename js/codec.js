@@ -392,13 +392,15 @@ function extractBarScaleAware(px,w,h,scan){
   // pick it up. Passing a reduced h reads a higher row pair with NO pixel copy.
   // scan defaults on. CRC+RS self-select per candidate row. Mirrors
   // bar.py:extract_bar / image-decode.js:decodeImageBar.
+  // bottomRow = the bar's bottom row (h-1 at the bottom; the matched row when
+  // scanned) so callers can crop the actual bar region instead of the bottom.
   var r=_extractBarAtBottom(px,w,h);
-  if(r) return r;
+  if(r){ r.bottomRow=h-1; return r; }
   if(scan!==false){
     for(var b=h-1;b>=SIG_ROWS;b--){
       if(detectBar(px,w,b+1)){
         var rr=_extractBarAtBottom(px,w,b+1);
-        if(rr) return rr;
+        if(rr){ rr.bottomRow=b; return rr; }
       }
     }
   }

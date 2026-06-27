@@ -74,6 +74,7 @@ async function decodeImageBar(file) {
 
   var frame = null, usedPpb = 3, detected = false;
   var W = img.width, H = img.height;
+  var barRow = H - 1;   // bottom row of the bar (h-1 at the bottom; the scan updates it)
 
   // Presence: M/Y/C bands at the bottom (the embed position). A decoded frame
   // (below) also proves presence even if band detection was fooled by the asym
@@ -91,7 +92,7 @@ async function decodeImageBar(file) {
   // copying). Mirrors bar.py:extract_bar's scan fallback.
   if (!hit) {
     for (var b = H - 1; b >= SIG_ROWS && !hit; b--) {
-      if (detectBar(px, W, b + 1)) hit = _decodeFrameAtHeight(px, W, b + 1);
+      if (detectBar(px, W, b + 1)) { hit = _decodeFrameAtHeight(px, W, b + 1); if (hit) barRow = b; }
     }
   }
   if (hit) { frame = hit.frame; usedPpb = hit.ppb; detected = true; }
@@ -116,10 +117,10 @@ async function decodeImageBar(file) {
         error: 'This is the ' + fid + ' band of a saved certificate \u2014 drop it into the validator\u2019s Reliquary to gather the bar.'
       }, base);
     }
-    return Object.assign({ ok: false, detected: true, frame: frame, decoded: null, ppb: usedPpb, error: 'Bar detected but the payload is unreadable.' }, base);
+    return Object.assign({ ok: false, detected: true, frame: frame, decoded: null, ppb: usedPpb, barRow: barRow, error: 'Bar detected but the payload is unreadable.' }, base);
   }
 
-  return Object.assign({ ok: true, detected: true, frame: frame, decoded: decoded, ppb: usedPpb, error: null }, base);
+  return Object.assign({ ok: true, detected: true, frame: frame, decoded: decoded, ppb: usedPpb, barRow: barRow, error: null }, base);
 }
 
 // Decode the bar whose bottom row is h-1. The px array may be taller than h —
