@@ -499,7 +499,6 @@ setInterval(function() {
     resultUrl:     document.getElementById('mintResultUrl'),
     resultUrlCopy: document.getElementById('mintResultUrlCopy'),
     resultUrlOpen: document.getElementById('mintResultUrlOpen'),
-    viewCert:      document.getElementById('mintViewCert'),
     resultChannels:     document.getElementById('mintResultChannels'),
     resultChannelsList: document.getElementById('mintResultChannelsList'),
     resultImage:    document.getElementById('mintResultImage'),
@@ -1262,21 +1261,6 @@ setInterval(function() {
     // the two common actions.
     if (els.resultUrl) els.resultUrl.value = s.url || '';
     if (els.resultUrlOpen) els.resultUrlOpen.href = s.url || '#';
-    // "View certificate" — hand off to the bundled decoder with the soul
-    // URL (so it fetches the exact blasted record) or the bare identifier.
-    // Only shown once the soul is actually reachable on a surface; a mint
-    // with no blasted URL can't be fetched remotely, so we hide it.
-    if (els.viewCert) {
-      var handoff = s.url || s.identifier || '';
-      if (handoff && window.MEMEMAGE_DECODER_URL) {
-        var base = window.MEMEMAGE_DECODER_URL;
-        els.viewCert.href = base + (base.indexOf('?') >= 0 ? '&' : '?') +
-          'id=' + encodeURIComponent(handoff);
-        els.viewCert.hidden = !s.url;  // need a fetchable surface to view remotely
-      } else {
-        els.viewCert.hidden = true;
-      }
-    }
     // Prefer the server-built absolute download URL (uses
     // externally-reachable host via _external_host) so the link is
     // shareable across devices on the same tailnet. Fall back to a
