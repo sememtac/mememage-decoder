@@ -40,7 +40,6 @@ var Theme = {
       'between the prompt and the world, a certificate',
       'every pixel has a lineage',
       'the bar in the pixels never lies',
-      'the ghost in the GAN, signed and dated',
       'two pixels, one truth',
       'the silicon remembers what the prompt forgot',
       'every image is a witness to its own birth',
@@ -49,10 +48,9 @@ var Theme = {
       'every conception leaves a record',
       'the spirit moved over the pixels',
       'for when "trust me bro" isn\u2019t enough',
-      'ai images come with receipts now',
-      'yes, this was \u201cinspired by\u201d something \u2014 let\u2019s see what',
       'every image has a back side',
-      'ai images go to confession here'
+      'every image confesses its origin',
+      'the pixels confess their making'
     ],
     validator: [
       'validate the living memory of the cosmic chain',
@@ -75,8 +73,7 @@ var Theme = {
       'where the body meets its soul',
       'three witnesses, one truth',
       'forge nothing \u2014 the chain is watching',
-      'ai forgeries get found here',
-      'audit hour for the silicon',
+      'every record confesses to the hash',
       'every forgery shall be made known'
     ],
     dashboard: [
