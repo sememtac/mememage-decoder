@@ -2644,20 +2644,15 @@ function buildOrbitInspector(records, collected) {
             c.style.background = ''; c.style.opacity = ''; c.style.color = '';
             return;
           }
-          var sup = c.classList.contains('supplied');
-          var p = parseInt(c.dataset.pos);
-          // Cells holding a pinned (single) chunk get a subtle tint from that
-          // role's own color, so pinned content stands out in the all view.
-          var _pinF = pinnedAt[p];
-          var _pinRole = _pinF ? Object.keys(_pinF.roles)[0] : null;
-          var _pinRGB = _pinRole ? getRoleColor(_pinRole) : null;
-          c.style.opacity = '1';
-          c.style.background = _pinRGB
-            ? (sup ? 'rgba(' + _pinRGB + ',0.35)' : 'rgba(' + _pinRGB + ',0.1)')
-            : (sup ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.02)');
-          c.style.border = 'none';
+          // Returning to "all": clear every inline style a filter may have
+          // set so the cell falls back to its CSS appearance — identical to
+          // first render. Pinned cells look like any other cell here; their
+          // distinction shows only when you filter by that role.
+          c.style.opacity = '';
+          c.style.background = '';
+          c.style.color = '';
+          c.style.border = '';
           c.style.borderTop = ''; c.style.borderRight = ''; c.style.borderBottom = ''; c.style.borderLeft = '';
-          c.style.color = sup ? (_pinRGB ? 'rgb(' + _pinRGB + ')' : 'rgba(255,255,255,0.65)') : '#38383e';
         });
         applyTamperedOverride();
         applySelectionHighlight();
