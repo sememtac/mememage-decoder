@@ -435,23 +435,19 @@ var CosmicPlayer = (function() {
 
     // Star name: Bayer designation or identifier. V1 stores
     // constellation_index as a top-level int (0=α, 1=β, …, 11=μ).
-    // Falls back to legacy decoder_chunk_index for older records,
-    // and to any layer chunk's index for chains without a decoder.
+    // The record's top-level index is primary; fall back to any cycling
+    // (indexed) layer's chunk index for records without one.
     var starName;
     if (meta.constellation_name) {
       var idx;
       if (typeof meta.constellation_index === 'number') {
         idx = meta.constellation_index;
-      } else if (typeof meta.decoder_chunk_index === 'number') {
-        idx = meta.decoder_chunk_index;
       } else if (meta.chunks && typeof meta.chunks === 'object') {
         idx = 0;
         var _names = Object.keys(meta.chunks);
         for (var _i = 0; _i < _names.length; _i++) {
-          var _n = _names[_i];
-          if (_n === 'schematic' || _n === 'claim' || _n === 'easter_egg') continue;
-          var _e = meta.chunks[_n];
-          if (_e && typeof _e.index === 'number') { idx = _e.index; break; }
+          var _e = meta.chunks[_names[_i]];
+          if (_e && typeof _e.index === 'number' && typeof _e.total === 'number') { idx = _e.index; break; }
         }
       } else {
         idx = 0;

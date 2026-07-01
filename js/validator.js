@@ -813,85 +813,35 @@ folderInp.addEventListener('change',function(){
 // Persistent chunk collection (survives across multiple drops).
 //
 // Two flavors of stored chunk:
-//   - indexed   — chunks that carry {index, total} (decoder, truth, validator,
-//                 schematic). Stored as {[role]: {total, chunks: {idx: entry}}}.
-//   - single    — pinned chunks with no index (claim, easter_egg, custom).
-//                 Stored as {[role]: entry}.
+//   - indexed — chunks that carry {index, total}. Stored as
+//               {[role]: {total, chunks: {idx: entry}}}.
+//   - single  — pinned chunks with no index. Stored as {[role]: entry}.
 //
-// Validator UI keys off the chunk *role name* (the key inside record.chunks),
-// not on a hardcoded list. Whatever a chain decides to emit is collected
-// and rendered.
+// Everything keys off the chunk *role name* (the key inside record.chunks),
+// never a hardcoded list — whatever a chain emits is collected and rendered.
 var collected = { indexed: {}, single: {} };
 
-// Curated render order for known role names. Anything else falls to the
-// end in observation order so unknown roles don't disappear.
-var ROLE_ORDER = ['decoder', 'validator', 'truth', 'schematic', 'claim', 'easter_egg'];
-
-// Per-role display metadata — used by the download-button renderer to
-// choose label, filter color, file mime + extension. Unknown roles get
-// sensible generic defaults.
-//
-// The decoder + validator layers download under their CANONICAL
-// filenames — index.html and validator.html — not descriptive ones. Each is a
-// fully self-contained page (inline_all / inline_html bakes in all CSS/JS/
-// assets), and they cross-link by RELATIVE href (decoder → validator.html,
-// validator → index.html). So a user who restores the pair into one directory
-// gets working DECODER↔VALIDATOR navigation out of the box; rename either and
-// the portal flip 404s. (Soul roles like truth/claim keep descriptive names.)
-var ROLE_META = {
-  decoder:    { label: 'Decoder',    color: 'decoder', mime: 'text/html',  filename: 'index.html'             },
-  validator:  { label: 'Validator',  color: 'validator', mime: 'text/html', filename: 'validator.html'         },
-  truth:      { label: 'Truth',      color: 'truth',   mime: 'text/plain', filename: 'mememage-truth.txt'     },
-  schematic:  { label: 'Schematics', color: 'epag',    mime: 'application/pdf', filename: 'schematic.pdf'     },
-  claim:      { label: 'Claim',      color: 'epag',    mime: 'text/html',  filename: 'mememage-claim.html'    },
-  easter_egg: { label: 'Easter Egg', color: 'egg',     mime: 'text/html',  filename: 'easter-egg.html'        },
-};
-
+// Per-role display metadata for the download buttons + filters — derived
+// entirely from the role name: a title-cased label and a color key (the role
+// name itself, hashed to a stable hue by getRoleColor). The download name and
+// file type are decided from the bytes at download time, not here.
 function roleMeta(role) {
-  if (ROLE_META[role]) return ROLE_META[role];
-  // Generic fallback: title-case the role name, derive a stable color
-  // from the role name itself (so every custom layer gets its own
-  // distinct color across sessions), binary download.
   return {
-    label: role.replace(/[-_]/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();}),
+    label: role.replace(/[-_]/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); }),
     color: role,
-    mime: 'application/octet-stream',
-    filename: role + '.bin',
   };
 }
 
-// Shared palette + deterministic per-role color resolver. Curated
-// roles + filter keys map to the curated palette; everything else gets
-// a hue hashed from the role/filter name. Same name → same color across
-// sessions, so a chain author can trust their layer's color to be stable.
-var ROLE_COLORS = {
-  all:        '255,255,255',
-  decoder:    '123,196,160',
-  truth:      '136,152,184',
-  validator:  '184,152,216',
-  epag:       '212,184,123',
-  egg:        '196,123,187',
-  // Curated role names that happen to color via different filter keys.
-  schematic:  '212,184,123',
-  claim:      '212,184,123',
-  easter_egg: '196,123,187',
-};
-
+// Deterministic per-role color resolver: a hue hashed from the role/filter
+// name, same name → same color across sessions, so a chain author can trust
+// their layer's color to be stable. 'all' (the no-filter view) is white.
 function getRoleColor(name) {
-  if (ROLE_COLORS[name]) return ROLE_COLORS[name];
-  if (!name) return '255,255,255';
+  if (name === 'all' || !name) return '255,255,255';
   // Deterministic hash → hue. Keeps S/L in a band that reads well on
   // both yang and yin backgrounds.
   var h = 0;
   for (var i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0;
   var hue = h % 360;
-  // Nudge away from the curated hues so custom roles look distinct
-  // from decoder (green ~140), truth (blue ~220), validator (purple ~270),
-  // epag (gold ~45), egg (pink ~315). Skip ±15° around each.
-  var skip = [140, 220, 270, 45, 315];
-  for (var k = 0; k < skip.length; k++) {
-    if (Math.abs(hue - skip[k]) < 15) { hue = (hue + 30) % 360; }
-  }
   var s = 0.45, l = 0.62;
   var c = (1 - Math.abs(2 * l - 1)) * s;
   var x = c * (1 - Math.abs((hue / 60) % 2 - 1));
@@ -936,17 +886,14 @@ function chainDiscriminator(r) {
 // Assign _ageKey / _ageName to a record. Called once for every parsed
 // soul before row HTML is generated, so filter/grid lookups match.
 function assignAgeKey(r) {
-  var rDec = (typeof getChunk === 'function') ? getChunk(r, 'decoder') : null;
-  var displayName = AgeNames.name(r.age) || '_';
+  var displayName = AgeNames.forRecord(r) || '_';
   r._ageName = displayName;
   r._ageKey = chainDiscriminator(r) + '#' + displayName;
 }
 
 function sortRoles(roles) {
-  // Curated roles first in ROLE_ORDER, then unknowns in observation order.
-  var canonical = ROLE_ORDER.filter(function(r) { return roles.indexOf(r) >= 0; });
-  var extras = roles.filter(function(r) { return ROLE_ORDER.indexOf(r) < 0; });
-  return canonical.concat(extras);
+  // Stable, deterministic ordering across drops: alphabetical by role name.
+  return roles.slice().sort();
 }
 
 async function verifyChunkHash(data,expectedHash){
@@ -1020,34 +967,79 @@ function sniffBinaryType(bytes) {
   return null;
 }
 
-// Render a sealed-identity easter-egg JSON (name + photo + birth details)
-// into a self-contained HTML page — the "photo + text" the chunk promises,
-// so the download opens as a page instead of dumping raw JSON. The chunk's
-// data contract (see site_pack.extract_easter_egg) is a JSON blob; a chain
-// whose egg is already HTML never reaches here (it isn't valid JSON).
-function buildEasterEggHtml(egg) {
-  var fmt = (egg.image_format || 'jpeg').replace(/[^a-z0-9+.\-]/gi, '');
-  var img = egg.image_b64
-    ? '<img src="data:image/' + fmt + ';base64,' + egg.image_b64 + '" alt="' + escapeHtml(egg.name || '') + '">'
-    : '';
-  var details = {};
-  Object.keys(egg).forEach(function(k) {
-    if (k !== 'image_b64') details[k] = egg[k];   // everything but the bulky blob
-  });
-  return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
-    + '<title>' + escapeHtml(egg.name || 'Easter Egg') + '</title>'
-    + '<style>body{margin:0;background:#0b0b12;color:#e8e6f0;'
-    + 'font:14px/1.6 -apple-system,system-ui,sans-serif;display:flex;'
-    + 'flex-direction:column;align-items:center;padding:40px 16px}'
-    + 'img{max-width:min(90vw,560px);border-radius:10px;'
-    + 'box-shadow:0 10px 40px rgba(0,0,0,.5)}'
-    + 'h1{font-weight:600;letter-spacing:.02em;margin:24px 0 4px}'
-    + 'pre{max-width:640px;white-space:pre-wrap;word-break:break-word;'
-    + 'background:#15151f;padding:16px 20px;border-radius:10px;'
-    + 'color:#b9b6c8;font-size:12px}</style></head><body>'
-    + img + '<h1>' + escapeHtml(egg.name || '') + '</h1>'
-    + '<pre>' + escapeHtml(JSON.stringify(details, null, 2)) + '</pre>'
-    + '</body></html>';
+// Does this base64 string decode to a COMPLETE gzip member (magic 1f 8b)?
+// A whole payload chunk (a file, gzip+base64) does; a fragment of a larger
+// base64 string does not. This is how a role's chunks are classified with no
+// role names: every chunk a complete gzip → they're separate files; otherwise
+// they're fragments to concatenate and then decode.
+function _isGzipB64(s) {
+  if (!s || s.length < 4) return false;
+  try {
+    var head = atob(s.slice(0, 8));
+    return head.charCodeAt(0) === 0x1f && head.charCodeAt(1) === 0x8b;
+  } catch (e) { return false; }
+}
+
+function _saveBlob(bytes, name, mime) {
+  var b = new Blob([bytes], {type: mime || 'application/octet-stream'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = name;
+  a.click();
+}
+
+// Pick a download name for a blob: prefer a seal-recorded filename, else the
+// role name + a sniffed extension (falling back to json/txt for text, bin for
+// opaque bytes). idx (when set) suffixes multi-file downloads.
+function _downloadName(bytes, storedName, role, idx) {
+  if (storedName) return storedName;
+  var sniffed = sniffBinaryType(bytes);
+  var ext = sniffed && sniffed.ext;
+  if (!ext) {
+    try {
+      var t = new TextDecoder('utf-8', {fatal: true}).decode(bytes.slice(0, 512)).trim();
+      ext = (t.charAt(0) === '{' || t.charAt(0) === '[') ? 'json' : 'txt';
+    } catch (e) { ext = 'bin'; }
+  }
+  return role + (idx != null ? '-' + (idx + 1) : '') + '.' + ext;
+}
+
+// Download one role's payload, deciding form entirely from the data:
+//   - every chunk a complete gzip file  → separate downloads (one per chunk)
+//   - a single complete gzip file       → one download
+//   - fragments                         → concatenate, then gunzip if the join
+//                                          is gzip, else treat as plain text
+// chunkList is the chunks in index order (a single pinned role = one element).
+async function downloadRoleChunks(role, chunkList) {
+  var list = chunkList.filter(function(c) { return c && c.data; });
+  if (!list.length) return;
+  var separate = list.every(function(c) { return _isGzipB64(c.data); });
+  if (separate && list.length > 1) {
+    for (var i = 0; i < list.length; i++) {
+      var b = await gunzipBytes(list[i].data);
+      var sn = sniffBinaryType(b);
+      _saveBlob(b, _downloadName(b, list[i].filename, role, i), (sn && sn.mime) || 'application/octet-stream');
+    }
+    return;
+  }
+  if (separate) {
+    var b0 = await gunzipBytes(list[0].data);
+    var s0 = sniffBinaryType(b0);
+    _saveBlob(b0, _downloadName(b0, list[0].filename, role, null), (s0 && s0.mime) || 'application/octet-stream');
+    return;
+  }
+  // Fragments — reassemble in order.
+  var joined = list.map(function(c) { return c.data; }).join('');
+  var storedName = '';
+  for (var j = 0; j < list.length; j++) { if (list[j].filename) { storedName = list[j].filename; break; } }
+  if (_isGzipB64(joined)) {
+    var bytes = await gunzipBytes(joined);
+    var sn2 = sniffBinaryType(bytes);
+    _saveBlob(bytes, _downloadName(bytes, storedName, role, null), (sn2 && sn2.mime) || 'application/octet-stream');
+  } else {
+    var enc = new TextEncoder().encode(joined);
+    _saveBlob(enc, _downloadName(enc, storedName, role, null), 'text/plain');
+  }
 }
 
 // HASH_INCLUDED, sortKeysDeep, sha256_16 — loaded from js/verify.js
@@ -1300,9 +1292,8 @@ async function _renderObservatoryFromCache() {
 
   // Accumulate chunks from these records — generic walk over each record's
   // chunks dict. Indexed chunks (have index+total) go into collected.indexed,
-  // single pinned chunks go into collected.single. The role name is the
-  // chunk key from record.chunks (decoder, validator, truth, schematic,
-  // easter_egg, claim, anything else the chain emits).
+  // single pinned chunks go into collected.single. The role name is whatever
+  // key the chain used inside record.chunks — no names are assumed.
   for (var ci = 0; ci < valid.length; ci++) {
     var cr = valid[ci];
     var chDict = cr.chunks && typeof cr.chunks === 'object' ? cr.chunks : null;
@@ -1333,33 +1324,6 @@ async function _renderObservatoryFromCache() {
         }
       });
     }
-    // Legacy flat-shape fallback. Older records (pre-nested-chunks)
-    // store chunk data at top-level keys: decoder_chunk, decoder_chunk_index,
-    // truth_chunk, etc. The getChunk() helper normalizes those into the
-    // nested shape on demand. Probe each curated role here so records
-    // that lived through that earlier schema still surface in the auto-
-    // adapt UI.
-    var CANONICAL_PROBE = ['decoder', 'truth', 'validator', 'schematic', 'claim', 'easter_egg'];
-    CANONICAL_PROBE.forEach(function(role) {
-      if (chDict && chDict[role]) return; // already collected above
-      var entry = getChunk(cr, role);
-      if (!entry || entry.data === undefined) return;
-      if (entry.index !== undefined && entry.total !== undefined) {
-        if (!collected.indexed[role]) {
-          collected.indexed[role] = { total: entry.total, chunks: {} };
-        }
-        collected.indexed[role].total = entry.total;
-        collected.indexed[role].chunks[entry.index] = {
-          data: entry.data, hash: entry.hash || null, verified: null,
-        };
-      } else {
-        collected.single[role] = {
-          data: entry.data, hash: entry.hash || null,
-          text: entry.text || null, image: entry.image || null,
-          verified: null,
-        };
-      }
-    });
   }
   // Verify chunk hashes asynchronously. Walk every collected role.
   for (var ir in collected.indexed) {
@@ -1402,63 +1366,44 @@ async function _renderObservatoryFromCache() {
     // text-style rendering on platforms that default to color emoji),
     // keeping the badge column visually homogeneous with ✓ / ✗ / —.
     var rBadge=r._sealed?'\uD83D\uDD12\uFE0E':r._match?'\u2713':r.content_hash?'\u2717':'\u2014';
-    // Pull chunk metadata once via the shared helper (handles both
-    // nested + legacy flat shapes; see portal.js getChunk).
-    var rDec = getChunk(r,'decoder');
-    var rTruth = getChunk(r,'truth');
-    var rValidator = getChunk(r,'validator');
-    var rSch  = getChunk(r,'schematic');
-    var rClm  = getChunk(r,'claim');
-    var rEgg  = getChunk(r,'easter_egg');
-    // Generic layer iteration for the cycle-position panel — every layer
-    // a chain authored gets its own row, regardless of name. Known
-    // names keep their curated labels via roleMeta;
-    // anything else gets title-cased fallback. Pinned roles (schematic/
-    // claim/easter_egg) are excluded — they have their own dedicated rows.
-    var _FROZEN_ROLES = {schematic:1, claim:1, easter_egg:1};
+    // Split the record's chunks by structure, no role names: INDEXED chunks
+    // (have index/total) are cycling layers — one row each; SINGLE chunks
+    // (no index) are pinned content — their own rows. Labels come from
+    // roleMeta (title-cased from the role name).
     var rLayers = [];
+    var rSingles = [];
     if (r.chunks && typeof r.chunks === 'object') {
       Object.keys(r.chunks).sort().forEach(function(role) {
-        if (_FROZEN_ROLES[role]) return;
         var e = r.chunks[role];
-        if (!e || typeof e !== 'object' || e.index === undefined) return;
-        rLayers.push({role: role, entry: e});
+        if (!e || typeof e !== 'object') return;
+        if (e.index !== undefined && e.total !== undefined) rLayers.push({role: role, entry: e});
+        else if (e.data !== undefined) rSingles.push({role: role, entry: e});
       });
     }
-    var ti = rTruth ? rTruth.index : (r.truth_chunk_index !== undefined ? r.truth_chunk_index : null);
-    var di_ = rDec ? rDec.index : (r.decoder_chunk_index !== undefined ? r.decoder_chunk_index : null);
-    // Fallback compact-label indices for chains that authored neither
-    // decoder nor truth (custom-layer chains). Use the first layer's
-    // index so the row label has SOMETHING informative.
-    if (ti == null && di_ == null && rLayers.length) {
-      di_ = rLayers[0].entry.index;
-    }
-    var ageName = AgeNames.name(r.age) || '';
-    var _pinRole=r.chunks&&(r.chunks.schematic?'dark':(r.chunks.claim||r.chunks.easter_egg)?'epag':null),isDk2=_pinRole==='dark',isEp2=_pinRole==='epag';
+    // Grid anchor + compact index: the record's outer position places it on
+    // the grid; the compact label lists each layer's index. First layer's
+    // index is the fallback anchor for records without an outer_position.
+    var di_ = rLayers.length ? rLayers[0].entry.index : null;
+    var _outerPos = (r.outer_position != null) ? r.outer_position : di_;
+    var ageName = AgeNames.forRecord(r) || '';
+    var hasPinned = rSingles.length > 0;
 
     // Compact row — white labels, green only for verified badge
     // Records can come from user-dropped .soul files in the Observatory
     // tab — every field is attacker-controllable. Escape on every
     // interpolation. _h is a local alias for portal.js's escapeHtml.
     var _h = escapeHtml;
-    html+='<div id="rec-'+(ti!=null?ti:ri)+'" data-identifier="'+_h(r.identifier||'')+'" data-age="'+_h(ageName)+'" data-age-key="'+_h(r._ageKey||'')+'" data-con="'+_h(r.constellation_name||'')+'" data-chunk="'+(di_!=null?+di_:'')+'" style="border-bottom:1px solid #1a1a2a;">';
+    html+='<div id="rec-'+(_outerPos!=null?_outerPos:ri)+'" data-identifier="'+_h(r.identifier||'')+'" data-age="'+_h(ageName)+'" data-age-key="'+_h(r._ageKey||'')+'" data-con="'+_h(r.constellation_name||'')+'" data-chunk="'+(di_!=null?+di_:'')+'" style="border-bottom:1px solid #1a1a2a;">';
     html+='<div class="meta-row" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="padding:0.35rem 0.8rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'none\'">';
     html+='<span style="font-size:0.72rem;color:'+rBadgeCol+';min-width:1rem;">'+rBadge+'</span>';
     html+='<span style="font-size:0.7rem;font-family:monospace;min-width:10rem;color:#d0d0d8;">'+_h(r.identifier?r.identifier.slice(-16):(r._fn||'').slice(-16))+'</span>';
-    // Compact position label. Chains with decoder + truth layers show "T<truth> D<decoder>";
-    // custom-layer chains show "<X><idx>" for each layer using the first
-    // letter of the layer name (so "test" layer at position 0 → "T0").
-    // The 'T'-as-truth convention only applies when a truth chunk exists.
-    var _posLabel = '';
-    if (rTruth || rDec) {
-      if (ti != null) _posLabel = 'T' + (+ti);
-      if (di_ != null) _posLabel += (ti != null ? ' ' : '') + 'D' + (+di_);
-    } else if (rLayers.length) {
-      _posLabel = rLayers.map(function(l) {
-        return (l.role.charAt(0).toUpperCase() || '?') + l.entry.index;
-      }).join(' ');
-    }
-    if (_posLabel) html+='<span style="font-size:0.6rem;color:'+(isEp2?'#d4b87b':isDk2?'#8a7050':'#6a6a80')+';">'+_h(_posLabel)+'</span>';
+    // Compact position label: one token per cycling layer — the first letter
+    // of the layer's role name + its chunk index (e.g. a "truth" layer at
+    // index 5 → "T5"), joined for a scannable per-record fingerprint.
+    var _posLabel = rLayers.map(function(l) {
+      return (l.role.charAt(0).toUpperCase() || '?') + l.entry.index;
+    }).join(' ');
+    if (_posLabel) html+='<span style="font-size:0.6rem;color:'+(hasPinned?'#8a8a9a':'#6a6a80')+';">'+_h(_posLabel)+'</span>';
     if(r.constellation_name)html+='<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+_h(r.constellation_name)+'</span>';
     html+='</div>';
 
@@ -1553,22 +1498,21 @@ async function _renderObservatoryFromCache() {
       html+='</div>';
     }
 
-    // Cycle position — one row per authored layer, plus pinned-role
-    // overlays + Age / decoder_hash / constellation. Generalized: any
-    // chain whose layers aren't the curated set still gets rendered;
-    // the row label comes from roleMeta() (curated for known names,
-    // title-cased fallback for everything else).
-    if(rLayers.length || rSch || rClm || rEgg){
+    // Cycle position — one row per cycling layer (index / total), then any
+    // pinned single-chunk roles, plus Age / decoder_hash / constellation.
+    // Every label comes from roleMeta (title-cased from the role name), so a
+    // chain with any layer names renders the same way.
+    if(rLayers.length || rSingles.length){
       html+='<div class="ev-sec">Cycle Position</div><div class="ev-g">';
       rLayers.forEach(function(l) {
-        var lbl = (typeof roleMeta === 'function') ? (roleMeta(l.role).label || l.role) : l.role;
+        var lbl = roleMeta(l.role).label;
         var total = l.entry.total || '?';
         html+='<div class="ev-m"><div class="ev-ml">'+_h(lbl)+'</div><div class="ev-mv">'+_h(l.entry.index)+' / '+_h(total)+'</div></div>';
         if (l.entry.version) {
           html+='<div class="ev-m"><div class="ev-ml">'+_h(lbl)+' Version</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(l.entry.version)+'</div></div>';
         }
       });
-      var _ageN=AgeNames.name(r.age); if(_ageN)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(_ageN)+'</div></div>';
+      var _ageN=AgeNames.forRecord(r); if(_ageN)html+='<div class="ev-m"><div class="ev-ml">Age</div><div class="ev-mv">'+_h(_ageN)+'</div></div>';
       if(r.decoder_hash)html+='<div class="ev-m"><div class="ev-ml">Decoder Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+_h(r.decoder_hash)+'</div></div>';
       if(r.constellation_name)html+='<div class="ev-m"><div class="ev-ml">Constellation</div><div class="ev-mv">'+_h(r.constellation_name)+'</div></div>';
       if(r.heart_star_id){
@@ -1578,9 +1522,10 @@ async function _renderObservatoryFromCache() {
           : '<a href="#" class="audit-link" data-id="'+safeHS+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+safeHS+'</a>';
         html+='<div class="ev-m"><div class="ev-ml">Heart Star</div><div class="ev-mv" style="font-size:0.68rem;">'+hsCell+'</div></div>';
       }
-      if(rSch)html+='<div class="ev-m"><div class="ev-ml">Schematic</div><div class="ev-mv" style="color:#8a7050;">Dark day '+_h((rSch.index||0)+1)+'</div></div>';
-      if(rClm)html+='<div class="ev-m"><div class="ev-ml">Claim</div><div class="ev-mv" style="color:#d4b87b;">Epagomenal</div></div>';
-      if(rEgg)html+='<div class="ev-m"><div class="ev-ml">Easter Egg</div><div class="ev-mv" style="color:#c47bbb;">Madeline</div></div>';
+      rSingles.forEach(function(s) {
+        var _pos = (s.entry.position != null) ? s.entry.position : (r.outer_position != null ? r.outer_position : '—');
+        html+='<div class="ev-m"><div class="ev-ml">'+_h(roleMeta(s.role).label)+'</div><div class="ev-mv" style="color:rgb('+getRoleColor(s.role)+');">pinned @ '+_h(_pos)+'</div></div>';
+      });
       html+='</div>';
     }
 
@@ -1818,18 +1763,18 @@ async function _renderObservatoryFromCache() {
       var conMap = {};
       chainRecs.forEach(function(r2) {
         var cn = r2.constellation_name || '_none';
-        if (!conMap[cn]) conMap[cn] = {recs: [], heart: null, chunks: new Set(), decoderK: 0, smallestLayerK: 0};
+        if (!conMap[cn]) conMap[cn] = {recs: [], heart: null, positions: new Set(), sizeK: 0, smallestLayerK: 0};
         conMap[cn].recs.push(r2);
-        var d2 = getChunk(r2, 'decoder');
-        var dIdx = d2 ? d2.index : (r2.decoder_chunk_index !== undefined ? r2.decoder_chunk_index : undefined);
-        if (dIdx !== undefined) conMap[cn].chunks.add(dIdx);
-        if (d2 && typeof d2.total === 'number') conMap[cn].decoderK = d2.total;
-        else if (typeof r2.decoder_total_chunks === 'number') conMap[cn].decoderK = r2.decoder_total_chunks;
+        // Cadence (K) is the record's declared inner-cycle size; completion
+        // counts distinct constellation positions.
+        if (typeof r2.constellation_size === 'number' && r2.constellation_size > 0) conMap[cn].sizeK = r2.constellation_size;
+        var _cidx = (typeof r2.constellation_index === 'number') ? r2.constellation_index
+                  : (r2.outer_position != null ? r2.outer_position : r2._gridPos);
+        if (_cidx != null) conMap[cn].positions.add(_cidx);
         var ch2 = r2.chunks && typeof r2.chunks === 'object' ? r2.chunks : null;
         if (ch2) Object.keys(ch2).forEach(function(role) {
           var ent = ch2[role];
-          if (!ent || typeof ent.total !== 'number' || ent.total <= 0) return;
-          if (role === 'schematic') return;
+          if (!ent || ent.index === undefined || typeof ent.total !== 'number' || ent.total <= 0) return;
           conMap[cn].smallestLayerK = conMap[cn].smallestLayerK === 0 ? ent.total : Math.min(conMap[cn].smallestLayerK, ent.total);
         });
         if (r2.heart_star_id) conMap[cn].heart = r2.heart_star_id;
@@ -1839,17 +1784,13 @@ async function _renderObservatoryFromCache() {
         html += '<div class="ev-sec">Constellations (' + conNames.length + ')</div>';
         for (var cni = 0; cni < conNames.length; cni++) {
           var cn2 = conNames[cni], cd = conMap[cn2];
-          var conK = cd.decoderK || cd.smallestLayerK || 12;
+          var conK = cd.sizeK || cd.smallestLayerK || cd.recs.length;
           cd.recs.sort(function(a, b) {
-            var ap = (a.outer_position != null) ? a.outer_position
-                   : (a._gridPos != null ? a._gridPos
-                   : (typeof a.decoder_chunk_index === 'number' ? a.decoder_chunk_index : 0));
-            var bp = (b.outer_position != null) ? b.outer_position
-                   : (b._gridPos != null ? b._gridPos
-                   : (typeof b.decoder_chunk_index === 'number' ? b.decoder_chunk_index : 0));
+            var ap = (a.outer_position != null) ? a.outer_position : (a._gridPos != null ? a._gridPos : 0);
+            var bp = (b.outer_position != null) ? b.outer_position : (b._gridPos != null ? b._gridPos : 0);
             return ap - bp;
           });
-          var present = cd.chunks.size || cd.recs.length;
+          var present = cd.positions.size || cd.recs.length;
           var cc = present === conK;
           html += '<div style="margin:0.3rem 0;padding:0.25rem 0.4rem;background:rgba(60,60,80,0.08);border-left:2px solid ' + (cc ? 'rgba(74,158,74,0.4)' : 'rgba(180,160,60,0.3)') + ';border-radius:3px;">';
           html += '<div style="display:flex;justify-content:space-between;"><span style="font-size:0.7rem;color:#c0c0d0;font-weight:600;">' + escapeHtml(cn2) + '</span><span style="font-size:0.55rem;color:' + (cc ? '#4ade80' : '#facc15') + ';">' + present + '/' + conK + '</span></div>';
@@ -1858,8 +1799,7 @@ async function _renderObservatoryFromCache() {
             var cr2 = cd.recs[cri];
             var isH = cr2.identifier && cr2.identifier === cd.heart;
             var pos2 = (cr2.outer_position != null) ? cr2.outer_position
-                     : (cr2._gridPos != null ? cr2._gridPos
-                     : (typeof cr2.decoder_chunk_index === 'number' ? cr2.decoder_chunk_index : cri));
+                     : (cr2._gridPos != null ? cr2._gridPos : cri);
             var letterIdx = ((pos2 % conK) + conK) % conK;
             // V1 records carry constellation_index (int); fall back to
             // computed letterIdx for sibling records that don't have it
@@ -1875,7 +1815,7 @@ async function _renderObservatoryFromCache() {
       // Age — single line for this chain
       var ageNames = {};
       chainRecs.forEach(function(r2) {
-        var an = AgeNames.name(r2.age);
+        var an = AgeNames.forRecord(r2);
         if (an) ageNames[an] = true;
       });
       var ageList = Object.keys(ageNames);
@@ -2002,26 +1942,25 @@ function buildOrbitInspector(records, collected) {
   // render side-by-side with different grid shapes. ``inferAgeDims``
   // takes the records for a single Age and returns its derived layout.
   function inferAgeDims(ageRecs) {
-    var m = 0, decoderK = 0, smallestLayerK = 0;
+    // M (grid size) = the declared outer cycle; K (columns) = the declared
+    // inner-cycle cadence when a record carries one, else the smallest layer
+    // total. Both come from record data — no layer names, no magic sizes.
+    var m = 0, innerK = 0, smallestLayerK = 0;
     ageRecs.forEach(function(r) {
       if (typeof r.outer_cycle === 'number') m = Math.max(m, r.outer_cycle);
+      if (typeof r.outer_total === 'number') m = Math.max(m, r.outer_total);
+      if (typeof r.outer_position === 'number') m = Math.max(m, r.outer_position + 1);
+      if (typeof r.constellation_size === 'number' && r.constellation_size > 0) innerK = r.constellation_size;
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
       if (ch) Object.keys(ch).forEach(function(role) {
         var entry = ch[role];
-        if (!entry || typeof entry.total !== 'number') return;
+        if (!entry || typeof entry.total !== 'number' || entry.total <= 0) return;
         m = Math.max(m, entry.total);
-        if (role === 'schematic' || entry.total <= 0) return;
-        if (role === 'decoder') decoderK = entry.total;
         smallestLayerK = smallestLayerK === 0 ? entry.total : Math.min(smallestLayerK, entry.total);
       });
-      if (!decoderK && typeof r.decoder_total_chunks === 'number') decoderK = r.decoder_total_chunks;
-      if (typeof r.outer_position === 'number') m = Math.max(m, r.outer_position + 1);
-      if (typeof r.truth_chunk_index === 'number' && typeof r.truth_total_chunks === 'number') {
-        m = Math.max(m, r.truth_total_chunks);
-      }
     });
-    if (!m) m = 365;
-    var k = decoderK || smallestLayerK || 12;
+    if (!m) m = 1;
+    var k = innerK || smallestLayerK || m;
     if (k > m) k = m;
     var rows = Math.max(1, Math.ceil(m / k));
     return {
@@ -2050,25 +1989,14 @@ function buildOrbitInspector(records, collected) {
       ageOrder.push(key);
     }
     ages[key].recs.push(r);
-    var rDec = getChunk(r, 'decoder');
-    var rTruth = getChunk(r, 'truth');
-    var ti = r.outer_position != null ? r.outer_position
-           : (rTruth && rTruth.index != null ? rTruth.index
-           : (rDec && rDec.index != null ? rDec.index
-              : (r.truth_chunk_index != null ? r.truth_chunk_index : r.decoder_chunk_index)));
-    // Chains that don't author 'decoder' or 'truth' layers (custom
-    // single-layer chains, demo configurations) still need a grid
-    // position. Fall back to any non-schematic, non-pinned layer's
-    // index — same pattern cert-renderer.js uses for constellation
-    // indexing. Layer name is irrelevant; what matters is the
-    // chunk's position within its cycle.
+    // Grid position = the record's declared outer position. Fallback for a
+    // record without one: any cycling (indexed) layer's chunk index.
+    var ti = (r.outer_position != null) ? r.outer_position : null;
     if (ti == null && r.chunks && typeof r.chunks === 'object') {
       var _names = Object.keys(r.chunks);
       for (var _ni = 0; _ni < _names.length; _ni++) {
-        var _n = _names[_ni];
-        if (_n === 'schematic' || _n === 'claim' || _n === 'easter_egg') continue;
-        var _e = r.chunks[_n];
-        if (_e && typeof _e.index === 'number') { ti = _e.index; break; }
+        var _e = r.chunks[_names[_ni]];
+        if (_e && typeof _e.index === 'number' && typeof _e.total === 'number') { ti = _e.index; break; }
       }
     }
     if (ti != null) ages[key].byPos[ti] = r;
@@ -2156,64 +2084,40 @@ function buildOrbitInspector(records, collected) {
     // then freezes for the remainder. Nothing is assumed about which layer
     // it is or where it stops — a K=7 layer freezes wherever 7 stops
     // dividing M, a K=12 layer wherever 12 does.
-    var layerFreeze = {};   // filter key → first frozen position
+    var layerFreeze = {};   // role → first frozen position
     ad.recs.forEach(function(r) {
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
-      if (ch) Object.keys(ch).forEach(function(role) {
+      if (!ch) return;
+      Object.keys(ch).forEach(function(role) {
         var e = ch[role];
         if (!e || e.index === undefined || typeof e.total !== 'number' || e.total <= 0) return;
-        // Curated role → filter key alias (egg/epag) so the existing
-        // filter dropdown keys match the cell tags.
-        var key = role;
-        if (role === 'easter_egg') key = 'egg';
-        else if (role === 'claim' || role === 'schematic') key = 'epag';
-        ageRoleKeys[key] = true;
-        // Pinned roles (egg/epag) don't cycle — only cycling layers freeze.
-        if (key !== 'egg' && key !== 'epag' && chainM > 0) {
-          layerFreeze[key] = Math.floor(chainM / e.total) * e.total;
-        }
+        ageRoleKeys[role] = true;
+        if (chainM > 0) layerFreeze[role] = Math.floor(chainM / e.total) * e.total;
       });
-      if (typeof r.decoder_chunk_index === 'number') {
-        ageRoleKeys.decoder = true;
-        if (layerFreeze.decoder === undefined && typeof r.decoder_total_chunks === 'number'
-            && r.decoder_total_chunks > 0 && chainM > 0) {
-          layerFreeze.decoder = Math.floor(chainM / r.decoder_total_chunks) * r.decoder_total_chunks;
-        }
-      }
     });
 
-    // Pinned content positions, DERIVED from where records actually carry a
-    // pinned chunk (schematic / claim / easter_egg) — no assumption they sit
-    // in a frozen tail. The author can place them on any date (the claim on a
-    // meaningful day, the easter egg on a birthday) and the Observatory marks
-    // + filters them exactly there. Visual class: schematic → 'dark', claim /
-    // easter_egg → 'epag'. Filter key: schematic / claim → 'epag',
-    // easter_egg → 'egg'.
-    var pinnedAt = {};   // gridPos → { cls: 'dark'|'epag', epag: bool, egg: bool }
+    // Pinned content positions, DERIVED from where records carry a SINGLE
+    // (non-indexed) chunk. Indexed layers cycle across the grid; a single
+    // chunk is pinned to one position. The author can place a pinned role on
+    // any position and the Observatory marks + filters it exactly there.
+    var pinnedAt = {};   // gridPos → { roles: {roleName: true} }
     ad.recs.forEach(function(r) {
       var p = r._gridPos;
       if (p == null || !r.chunks || typeof r.chunks !== 'object') return;
       Object.keys(r.chunks).forEach(function(role) {
-        var cls, fk;
-        if (role === 'schematic') { cls = 'dark'; fk = 'epag'; }
-        else if (role === 'claim') { cls = 'epag'; fk = 'epag'; }
-        else if (role === 'easter_egg') { cls = 'epag'; fk = 'egg'; }
-        else return;
-        var slot = pinnedAt[p] || (pinnedAt[p] = {});
-        slot[fk] = true;
-        // 'epag' (claim/egg) takes visual precedence over 'dark' (schematic).
-        if (cls === 'epag' || !slot.cls) slot.cls = cls;
+        var e = r.chunks[role];
+        if (!e || e.index !== undefined || e.data === undefined) return;   // single chunks only
+        var slot = pinnedAt[p] || (pinnedAt[p] = { roles: {} });
+        slot.roles[role] = true;
       });
     });
     // Aggregate pinned content up to rows — for the row marker + the
     // sector-mode filter collapse. Row index = floor(pos / TOTAL_COLS).
-    var rowPin = {};   // row → { epag, egg, cls }
+    var rowPin = {};   // row → { roles: {roleName: true} }
     Object.keys(pinnedAt).forEach(function(ps) {
-      var ri2 = Math.floor((+ps) / TOTAL_COLS), s = pinnedAt[ps];
-      var rp = rowPin[ri2] || (rowPin[ri2] = {});
-      if (s.epag) rp.epag = true;
-      if (s.egg) rp.egg = true;
-      if (s.cls === 'epag' || !rp.cls) rp.cls = s.cls;
+      var ri2 = Math.floor((+ps) / TOTAL_COLS);
+      var rp = rowPin[ri2] || (rowPin[ri2] = { roles: {} });
+      Object.keys(pinnedAt[ps].roles).forEach(function(role) { rp.roles[role] = true; });
     });
 
     // Row → constellation name map (uses cached _gridPos from above)
@@ -2332,40 +2236,17 @@ function buildOrbitInspector(records, collected) {
     ctl.appendChild(sb);
 
     var sel = mk('select', 'orbit-filter');
-    // Build the dropdown from what's actually present in this Age's
-    // records — curated filter names appear only when their role is
-    // observed (or, for Epag, when any record sits in the frozen-tail /
-    // epagomenal range). Custom layer roles each get their own
-    // filter option with the role's display label.
+    // Build the dropdown from the roles actually present in this Age's
+    // records — one option per role, labeled from the role name. Sorted
+    // for a stable order across drops.
     var observedRoles = {};
-    var hasEpagPos = false;
-    var CANONICAL_PROBE = ['decoder', 'truth', 'validator', 'schematic', 'claim', 'easter_egg'];
     ad.recs.forEach(function(r) {
-      if (r.chunks && (r.chunks.claim || r.chunks.schematic)) hasEpagPos = true;
-      // Walk nested chunks dict (new shape).
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
       if (ch) Object.keys(ch).forEach(function(role) { observedRoles[role] = true; });
-      // Probe curated names via getChunk (handles flat-shape legacy
-      // records too) so old samples surface the curated-role filters.
-      CANONICAL_PROBE.forEach(function(role) {
-        if (observedRoles[role]) return;
-        if (getChunk(r, role)) observedRoles[role] = true;
-      });
     });
-    // Curated role → filter key mapping. Determines whether the
-    // curated filter option appears in the dropdown.
     var opts = {all: 'All'};
-    if (observedRoles.decoder)    opts.decoder = 'Decoder';
-    if (observedRoles.truth)      opts.truth   = 'Truth';
-    if (observedRoles.validator)  opts.validator = 'Validator';
-    if (hasEpagPos || observedRoles.claim || observedRoles.schematic) opts.epag = 'Epag';
-    if (observedRoles.easter_egg) opts.egg     = 'Egg';
-    // Everything else — custom layer roles. Sorted for determinism.
     Object.keys(observedRoles).sort().forEach(function(role) {
-      if (role === 'decoder' || role === 'truth' || role === 'validator' ||
-          role === 'easter_egg' || role === 'claim' || role === 'schematic') return;
-      var meta = (typeof roleMeta === 'function') ? roleMeta(role) : {label: role};
-      opts[role] = meta.label || role;
+      opts[role] = roleMeta(role).label;
     });
     for (var k in opts) { var o = document.createElement('option'); o.value = k; o.textContent = opts[k]; sel.appendChild(o); }
     // If the previously-selected filter is gone from this set, fall back to "all".
@@ -2416,9 +2297,9 @@ function buildOrbitInspector(records, collected) {
       var base = ri * TOTAL_COLS;
       var cn = rowCon[ri];
       if (cn && selectedCons.has(cn)) tr.classList.add('row-selected');
-      // A row is "special" if it actually holds pinned content (schematic /
-      // claim / easter_egg), derived from pinnedAt — not a frozen-tail
-      // boundary. The pinned cells carry the styling; the row gets a marker.
+      // A row is "special" if it actually holds pinned (single-chunk)
+      // content, derived from pinnedAt — no frozen-tail assumption. The
+      // pinned cells carry the styling; the row gets a marker.
       var special = !!rowPin[ri];
 
       // Label cell
@@ -2468,9 +2349,6 @@ function buildOrbitInspector(records, collected) {
         cell.dataset.row = ri;
 
         var rec = ad.byPos[pos];
-        var _pinM = pinnedAt[pos];
-        var isDk = !!(_pinM && _pinM.cls === 'dark');
-        var isEp = !!(_pinM && _pinM.cls === 'epag');
 
         if (rec) {
           cell.classList.add('supplied');
@@ -2519,9 +2397,6 @@ function buildOrbitInspector(records, collected) {
           cell.textContent = '\u00b7';
         }
 
-        if (isDk) cell.classList.add('dark');
-        if (isEp) cell.classList.add('epag');
-
         // Cell filter membership, both derived: (1) each cycling layer up to
         // its own freeze; (2) pinned content at its actual position.
         var types = '';
@@ -2532,18 +2407,14 @@ function buildOrbitInspector(records, collected) {
         // there (e.g. a K=7 layer cycles four positions past a K=12 one).
         Object.keys(ageRoleKeys).forEach(function(key) {
           var frz = layerFreeze[key];
-          if (frz === undefined) return;   // pinned role (egg/epag) — tagged per-cell below
+          if (frz === undefined) return;
           if (pos < frz) types += ' ' + key;
         });
-        // Pinned-content filters (epag / egg) — tagged at the ACTUAL position
-        // where a schematic / claim / easter_egg sits, from pinnedAt. No
-        // frozen-tail assumption: a claim on Dec 25 or an easter egg on a
-        // birthday lights that exact cell, not the tail.
+        // Pinned single-chunk roles — tagged at the ACTUAL position where the
+        // chunk sits (from pinnedAt), by the role's own name. No frozen-tail
+        // assumption: a pinned role on any position lights that exact cell.
         var _pin = pinnedAt[pos];
-        if (_pin) {
-          if (_pin.epag) types += ' epag';
-          if (_pin.egg) types += ' egg';
-        }
+        if (_pin) Object.keys(_pin.roles).forEach(function(role) { types += ' ' + role; });
         cell.dataset.types = types.trim();
 
         td.appendChild(cell);
@@ -2562,9 +2433,8 @@ function buildOrbitInspector(records, collected) {
     // — no hardcoded list. The same generic loop the global collector
     // uses, scoped to this Age's records.
     var stats = mk('div', 'orbit-stats');
-    var ageIndexed = {};  // role → {total, indices: Set}
+    var ageIndexed = {};  // role → {total, indices}
     var ageSingle  = {};  // role → true
-    var CANONICAL_STATS_PROBE = ['decoder', 'truth', 'validator', 'schematic', 'claim', 'easter_egg'];
     function bucketEntry(role, entry) {
       if (!entry || entry.data === undefined) return;
       if (entry.index !== undefined && entry.total !== undefined) {
@@ -2577,18 +2447,7 @@ function buildOrbitInspector(records, collected) {
     }
     ad.recs.forEach(function(r) {
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
-      var seen = {};
-      if (ch) {
-        Object.keys(ch).forEach(function(role) {
-          seen[role] = true;
-          bucketEntry(role, ch[role]);
-        });
-      }
-      // Probe curated names via getChunk for legacy flat-shape records.
-      CANONICAL_STATS_PROBE.forEach(function(role) {
-        if (seen[role]) return;
-        bucketEntry(role, getChunk(r, role));
-      });
+      if (ch) Object.keys(ch).forEach(function(role) { bucketEntry(role, ch[role]); });
     });
     // Sealed records can't be verified without a password — count them
     // separately so "0/3 verified" doesn't read as failure when the
@@ -2608,11 +2467,9 @@ function buildOrbitInspector(records, collected) {
 
     // === Reassembly downloads ===
     // The button bar is driven entirely by what's observed in this Age's
-    // records. Curated roles (those defined in ROLE_META) keep their
-    // special labels + colors; anything else gets a generic
-    // "Download <role>" button. Indexed
-    // roles only appear when the count matches the chunk-declared total;
-    // single roles appear as soon as one is present.
+    // records — one button per role, labeled + colored from the role name.
+    // Indexed roles only appear when the count matches the chunk-declared
+    // total; single roles appear as soon as one is present.
     var indexedRoles = sortRoles(Object.keys(ageIndexed));
     var singleRoles  = sortRoles(Object.keys(ageSingle));
     var hasComplete  = indexedRoles.some(function(r) {
@@ -2635,125 +2492,31 @@ function buildOrbitInspector(records, collected) {
         b.onclick = onclick;
         ra.appendChild(b);
       }
-      // Indexed-role downloads — reassemble chunks 0..total-1.
+      // Indexed-role downloads — a role's chunks in index order. The form
+      // (separate files vs one reassembled file, binary vs text) is decided
+      // from the bytes by downloadRoleChunks, so no role is special-cased.
       indexedRoles.forEach(function(role) {
         var bucket = ageIndexed[role];
         // Defensive: layers with total=0 (malformed seal, empty layer)
         // shouldn't surface a download button.
         if (!bucket || !bucket.total || bucket.total <= 0) return;
-        var have = Object.keys(bucket.indices).length;
-        if (have !== bucket.total) return;
-        var meta = roleMeta(role);
+        if (Object.keys(bucket.indices).length !== bucket.total) return;
         var globalBucket = collected.indexed[role];
         if (!globalBucket) return;
-        if (role === 'schematic') {
-          // Multiple files — one per chunk. Sniff each so PDFs land as .pdf,
-          // SVGs as .svg, images as their own type — whatever figures the
-          // chain sealed, downloaded with the right extension.
-          dlBtnColored(meta.label, meta.color, async function() {
-            for (var i = 0; i < bucket.total; i++) {
-              var c = globalBucket.chunks[i];
-              if (!c) continue;
-              var bytes = await gunzipBytes(c.data);
-              var sniffed = sniffBinaryType(bytes);
-              var mime = (sniffed && sniffed.mime) || meta.mime;
-              var ext = (sniffed && sniffed.ext) || 'bin';
-              var b = new Blob([bytes], {type: mime});
-              var a = document.createElement('a');
-              a.href = URL.createObjectURL(b);
-              a.download = 'schematic-' + (i + 1) + '.' + ext;
-              a.click();
-            }
-          });
-        } else {
-          dlBtnColored(meta.label, meta.color, async function() {
-            // Curated text layers → assemble as
-            // string so the result is human-readable HTML/text.
-            // Unknown / binary roles → assemble as bytes and sniff the
-            // file type so the download lands with the right extension
-            // (PNG, JPG, PDF, SVG…) instead of a generic .bin.
-            var isCanonicalText = meta.mime === 'text/html' || meta.mime === 'text/plain';
-            if (isCanonicalText) {
-              var h = await assembleChunks(globalBucket.chunks, bucket.total);
-              if (!h) return;
-              var b = new Blob([h], {type: meta.mime});
-              var a = document.createElement('a');
-              a.href = URL.createObjectURL(b);
-              a.download = meta.filename;
-              a.click();
-              return;
-            }
-            var bytes = await assembleChunksBytes(globalBucket.chunks, bucket.total);
-            if (!bytes) return;
-            var sniffed = sniffBinaryType(bytes);
-            var mime = (sniffed && sniffed.mime) || meta.mime;
-            var ext = (sniffed && sniffed.ext) || 'bin';
-            // Prefer the original filename if the seal recorded it (single-file
-            // payload layers carry it on every chunk) — so "upload a .wav, get a
-            // .wav back". Falls back to role + sniffed ext / .bin for older
-            // seals that never stored a name.
-            // chunks is index-keyed (an object, not an array) — iterate by
-            // bucket.total, not .length (which is undefined here).
-            var origName = '';
-            for (var _ci = 0; _ci < bucket.total; _ci++) {
-              var _c = globalBucket.chunks[_ci];
-              if (_c && _c.filename) { origName = _c.filename; break; }
-            }
-            var filename = origName || (role + '.' + ext);
-            var b = new Blob([bytes], {type: mime});
-            var a = document.createElement('a');
-            a.href = URL.createObjectURL(b);
-            a.download = filename;
-            a.click();
-          });
-        }
+        var meta = roleMeta(role);
+        dlBtnColored(meta.label, meta.color, async function() {
+          var list = [];
+          for (var i = 0; i < bucket.total; i++) list.push(globalBucket.chunks[i]);
+          await downloadRoleChunks(role, list);
+        });
       });
       // Single-role downloads — one pinned chunk per role.
       singleRoles.forEach(function(role) {
-        var meta = roleMeta(role);
         var entry = collected.single[role];
         if (!entry) return;
+        var meta = roleMeta(role);
         dlBtnColored(meta.label, meta.color, async function() {
-          if (meta.mime === 'text/html' || meta.mime === 'text/plain') {
-            var data = await gunzip(entry.data);
-            // Easter egg: the chunk is a sealed identity JSON (name + photo +
-            // birth details). Render it into a self-contained page so the
-            // photo shows, instead of downloading raw JSON. A non-JSON egg
-            // (already HTML) falls through and downloads verbatim.
-            if (role === 'easter_egg') {
-              var eggHtml = data;
-              try {
-                var egg = JSON.parse(data);
-                if (egg && egg.image_b64) eggHtml = buildEasterEggHtml(egg);
-              } catch (e) { /* not JSON — keep verbatim */ }
-              var eb = new Blob([eggHtml], {type: 'text/html'});
-              var ea = document.createElement('a');
-              ea.href = URL.createObjectURL(eb);
-              ea.download = meta.filename;
-              ea.click();
-              return;
-            }
-            // Auto-correct mime if a "claim"-style entry is plain text vs HTML.
-            var isHtml = data.indexOf('<!DOCTYPE') >= 0 || data.indexOf('<html') >= 0;
-            var mime = meta.mime;
-            var filename = meta.filename;
-            if (role === 'claim' && !isHtml) {
-              mime = 'text/plain';
-              filename = 'mememage-claim.txt';
-            }
-            var b = new Blob([data], {type: mime});
-            var a = document.createElement('a');
-            a.href = URL.createObjectURL(b);
-            a.download = filename;
-            a.click();
-          } else {
-            var bytes = await gunzipBytes(entry.data);
-            var b = new Blob([bytes], {type: meta.mime});
-            var a = document.createElement('a');
-            a.href = URL.createObjectURL(b);
-            a.download = meta.filename;
-            a.click();
-          }
+          await downloadRoleChunks(role, [entry]);
         });
       });
       el.appendChild(ra);
@@ -2784,9 +2547,13 @@ function buildOrbitInspector(records, collected) {
         // cycling-layer filter hides rows past that layer's own freeze (no
         // chunks there); a pinned filter hides rows lacking its content.
         var _lf = layerFreeze[curFilter];
-        if (_lf !== undefined && base >= _lf) { tr.classList.add('collapsed'); return; }
-        if (curFilter === 'epag' && !(rowPin[i] && rowPin[i].epag)) { tr.classList.add('collapsed'); return; }
-        if (curFilter === 'egg' && !(rowPin[i] && rowPin[i].egg)) { tr.classList.add('collapsed'); return; }
+        if (_lf !== undefined) {
+          // Cycling-layer filter — hide rows past that layer's own freeze.
+          if (base >= _lf) { tr.classList.add('collapsed'); return; }
+        } else if (curFilter !== 'all') {
+          // Pinned (single) role filter — hide rows that don't hold it.
+          if (!(rowPin[i] && rowPin[i].roles && rowPin[i].roles[curFilter])) { tr.classList.add('collapsed'); return; }
+        }
 
         // Constellation selection filter — collapse unselected constellations.
         // Rows holding pinned content (with records) always stay visible.
@@ -2806,60 +2573,26 @@ function buildOrbitInspector(records, collected) {
     // Derived filter cycle lengths + offsets. Custom layer filters
     // derive their (length, offset) from the observed chunks at
     // render time — see resolveFilterCycle() below.
-    // Cycling-layer cadences only. Pinned filters (epag / egg) are NOT here —
-    // they sit at single positions, so resolveFilterCycle's pinned-style
-    // branch highlights their actual cells instead of drawing a cadence.
-    var CL = {decoder: chainKInner, truth: chainM, validator: dims.smallestK};
-    var CO = {decoder: 0, truth: 0, validator: 0};
-    // Curated filter colors. Custom filters fall through to
-    // getRoleColor(filter_name) which hashes the name to a hue.
-    var CC = {decoder:'#7bc4a0', truth:'#8898b8', validator:'#b898d8', epag:'#d4b87b', egg:'#c47bbb'};
-
     function resolveFilterCycle(filterKey) {
+      // Cycling (indexed) role: the cadence length is its observed chunk
+      // total, drawn from position 0. Prefer this Age's observed total so a
+      // chain of any inner K draws its own cadence boundaries.
       var bucket = ageIndexed[filterKey];
-      var canonOff = CO[filterKey] || 0;
-      // Cadence layers with offset 0: the cycle LENGTH is per-chain (each
-      // layer's K, and M), so prefer THIS Age's observed total over the
-      // derived fallback. When they match it's a visual no-op; when a chain
-      // uses different layer K's or M it draws the cadence boundaries at the
-      // chain's real interval. Fall back to the derived length only when no
-      // chunks of this layer were observed.
-      if (canonOff === 0 && CL[filterKey] != null) {
-        return { len: (bucket && bucket.total > 0) ? bucket.total : CL[filterKey], off: 0 };
-      }
-      // Curated specials with a fixed offset (epag/egg) only apply when
-      // their position is in range for this chain's M. For a small chain
-      // (M=20, etc.) CO.egg=364 / CO.epag=360 land off the grid and gEdge
-      // math wraps to nonsense, so fall through to the data-derived path.
-      if (CL[filterKey] != null && canonOff < chainM) {
-        return { len: CL[filterKey], off: canonOff };
-      }
-      // Custom layer filter — read the total from observed chunks.
       if (bucket && bucket.total > 0) return { len: bucket.total, off: 0 };
-      // Pinned-style filter (egg / epag / single-position custom role)
-      // — find any record carrying a chunk under this filter's role
-      // and treat it as a cycle of 1 at that position. Handles curated
-      // names (egg → easter_egg, epag → claim/schematic) too.
-      var roles = [filterKey];
-      if (filterKey === 'egg') roles.push('easter_egg');
-      if (filterKey === 'epag') roles.push('claim', 'schematic');
+      // Pinned (single) role: no cadence — find the record carrying this
+      // role's chunk and treat it as a cycle of 1 at that exact position.
       for (var i = 0; i < ad.recs.length; i++) {
         var r = ad.recs[i];
         var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
-        if (!ch) continue;
-        for (var j = 0; j < roles.length; j++) {
-          if (ch[roles[j]] !== undefined) {
-            return { len: 1, off: (r._gridPos != null ? r._gridPos : 0) };
-          }
+        if (ch && ch[filterKey] !== undefined) {
+          return { len: 1, off: (r._gridPos != null ? r._gridPos : 0) };
         }
       }
       return { len: chainM, off: 0 };
     }
 
     function resolveFilterColor(filterKey) {
-      if (CC[filterKey]) return CC[filterKey];
-      // Custom filter — convert getRoleColor's "R,G,B" to "#RRGGBB" so
-      // the existing hx() helper keeps working.
+      // Convert getRoleColor's "R,G,B" to "#RRGGBB" so the hx() helper works.
       var rgb = getRoleColor(filterKey).split(',');
       function h(n) { var s = parseInt(n, 10).toString(16); return s.length < 2 ? '0' + s : s; }
       return '#' + h(rgb[0]) + h(rgb[1]) + h(rgb[2]);
@@ -2913,16 +2646,18 @@ function buildOrbitInspector(records, collected) {
           }
           var sup = c.classList.contains('supplied');
           var p = parseInt(c.dataset.pos);
-          // Special days apply only when the chain has a frozen tail.
+          // Cells holding a pinned (single) chunk get a subtle tint from that
+          // role's own color, so pinned content stands out in the all view.
           var _pinF = pinnedAt[p];
-          var dk = !!(_pinF && _pinF.cls === 'dark');
-          var ep = !!(_pinF && _pinF.cls === 'epag');
+          var _pinRole = _pinF ? Object.keys(_pinF.roles)[0] : null;
+          var _pinRGB = _pinRole ? getRoleColor(_pinRole) : null;
           c.style.opacity = '1';
-          c.style.background = sup ? (ep ? 'rgba(200,176,128,0.35)' : dk ? 'rgba(180,152,112,0.35)' : 'rgba(255,255,255,0.1)') :
-            (ep ? 'rgba(200,176,128,0.08)' : dk ? 'rgba(138,112,80,0.1)' : 'rgba(255,255,255,0.02)');
+          c.style.background = _pinRGB
+            ? (sup ? 'rgba(' + _pinRGB + ',0.35)' : 'rgba(' + _pinRGB + ',0.1)')
+            : (sup ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.02)');
           c.style.border = 'none';
           c.style.borderTop = ''; c.style.borderRight = ''; c.style.borderBottom = ''; c.style.borderLeft = '';
-          c.style.color = sup ? (ep ? '#c8b080' : dk ? '#b89870' : 'rgba(255,255,255,0.65)') : '#38383e';
+          c.style.color = sup ? (_pinRGB ? 'rgb(' + _pinRGB + ')' : 'rgba(255,255,255,0.65)') : '#38383e';
         });
         applyTamperedOverride();
         applySelectionHighlight();
@@ -2955,7 +2690,6 @@ function buildOrbitInspector(records, collected) {
           c.style.color = sup ? col : hx(col, 0.2);
           // Cadence boundaries — solid for supplied, dashed for empty
           var e = gEdge(p - co, cn);
-          if (curFilter === 'decoder') { e.t = true; e.b = true; } // decoder rows are always top/bottom bordered
           var eb = sup ? '2px solid ' + hx(col, 0.8) : '2px dashed ' + hx(col, 0.4);
           var ib = 'none';
           c.style.borderTop = e.t ? eb : ib;
@@ -3480,23 +3214,23 @@ function renderAudit(rec, identifier, out) {
   html += auditSection('Chain Position', chainRows);
 
   // === CYCLE INTEGRITY ===
-  // One row per authored layer (any name), plus Age + decoder_hash +
-  // chain_visibility. Curated layers keep their
-  // curated labels via roleMeta; custom layers render as title-cased
-  // fallback. Pinned roles (schematic/claim/easter_egg) are listed
-  // elsewhere — skip here to avoid duplication.
+  // One row per cycling (indexed) layer, then any pinned single-chunk roles,
+  // plus Age + decoder_hash + chain_visibility. Every label comes from
+  // roleMeta (title-cased from the role name).
   var cycleRows = '';
-  var auAgeName = AgeNames.name(rec.age);
+  var auAgeName = AgeNames.forRecord(rec);
   if (auAgeName) cycleRows += auditRow('Age', auAgeName);
   if (rec.chunks && typeof rec.chunks === 'object') {
-    var _FROZEN = {schematic:1, claim:1, easter_egg:1};
     Object.keys(rec.chunks).sort().forEach(function(role) {
-      if (_FROZEN[role]) return;
       var e = rec.chunks[role];
-      if (!e || typeof e !== 'object' || e.index === undefined) return;
-      var lbl = (typeof roleMeta === 'function') ? (roleMeta(role).label || role) : role;
-      cycleRows += auditRow(lbl + ' Chunk', (e.index + 1) + ' of ' + (e.total || '?'));
-      if (e.version) cycleRows += auditRow(lbl + ' Version', e.version);
+      if (!e || typeof e !== 'object') return;
+      var lbl = roleMeta(role).label;
+      if (e.index !== undefined && e.total !== undefined) {
+        cycleRows += auditRow(lbl + ' Chunk', (e.index + 1) + ' of ' + (e.total || '?'));
+        if (e.version) cycleRows += auditRow(lbl + ' Version', e.version);
+      } else if (e.data !== undefined) {
+        cycleRows += auditRow(lbl, 'pinned');
+      }
     });
   }
   if (rec.decoder_hash) cycleRows += auditRow('Decoder Hash', rec.decoder_hash);

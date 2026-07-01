@@ -866,8 +866,8 @@ setInterval(function() {
   }
 
   // Origin field editor — replaces the read-only metadata grid.
-  // Seeded from PNG-extracted fields (Madeline-style flows write
-  // prompt/seed/sampler etc. into PNG text chunks). Users can add,
+  // Seeded from PNG-extracted fields (tools that write prompt/seed/sampler
+  // etc. into PNG text chunks). Users can add,
   // edit, or delete fields. width/height are derived from the image
   // and shown read-only since the bar embedding step needs them.
   // The mint pipeline reads whatever's here as the record's "origin"
@@ -3558,7 +3558,7 @@ setInterval(function() {
 
 
 // =====================================================================
-// CONFIG TAB — identity, server, credentials, easter egg.
+// CONFIG TAB — identity, server, credentials.
 //
 //   GET  /api/config                — scrubbed config snapshot
 //   POST /api/config/creator        — update creator.txt
@@ -4560,8 +4560,8 @@ setInterval(function() {
   // to the Server section. Power users who need other env vars
   // (MEMEMAGE_PASSWORD, anything not surfaced) edit .env directly.
 
-  // renderEasterEgg removed: easter eggs are chain-dependent now,
-  // configured per-chain via the Payload tab's pinned-entry editor.
+  // Pinned payload content is configured per-chain via the Payload tab's
+  // pinned-entry editor — nothing chain-specific lives here.
 
   async function saveCreatorName() {
     var input = document.getElementById('configCreatorName');

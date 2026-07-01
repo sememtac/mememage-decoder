@@ -457,10 +457,10 @@ function renderCert(meta, options) {
   if (origin.model) _push('model', 'Model', origin.model, 3);
   if (origin.lora) _push('lora', 'LoRA', origin.lora, 3);
   if (origin.lora_strength !== undefined) _push('lora_strength', 'LoRA Str', origin.lora_strength);
-  // LoRAs, plural (modern Madeline format): a list, one entry per applied
-  // LoRA. Each entry is a [name, weight] pair, a {name/strength} dict, or a
-  // bare name string. The generic catch-all below skips arrays, so without
-  // this they'd vanish from the certificate. One full-width row each.
+  // LoRAs, plural: a list, one entry per applied LoRA. Each entry is a
+  // [name, weight] pair, a {name/strength} dict, or a bare name string. The
+  // generic catch-all below skips arrays, so without this they'd vanish from
+  // the certificate. One full-width row each.
   if (Array.isArray(origin.loras) && origin.loras.length) {
     for (var _li = 0; _li < origin.loras.length; _li++) {
       var _lora = origin.loras[_li], _ln, _lw;
@@ -673,22 +673,15 @@ function renderCert(meta, options) {
   // Fallback chain: constellation_hash → constellation_name → content_hash (legacy)
   var conSeed = meta.constellation_hash || meta.constellation_name || meta.content_hash || meta._content_hash || '';
   // Record's position within its constellation cycle ("which Bayer
-  // letter is this record"). V1 stores constellation_index as a
-  // top-level int (0..11) — the canonical source. Fall back to chunk
-  // indices for any pre-V1 / weird-shape records that don't carry it.
+  // letter is this record"). The record's top-level index (0-based) is the
+  // primary source; fall back to any cycling layer's chunk index for records
+  // that don't carry it.
   var myChunkIdx = (typeof meta.constellation_index === 'number') ? meta.constellation_index : -1;
-  if (myChunkIdx < 0) {
-    var _dec = (meta.chunks && meta.chunks.decoder) || null;
-    if (_dec && _dec.index !== undefined) myChunkIdx = _dec.index;
-    else if (meta.decoder_chunk_index !== undefined) myChunkIdx = meta.decoder_chunk_index;
-  }
   if (myChunkIdx < 0 && meta.chunks && typeof meta.chunks === 'object') {
     var _roles = Object.keys(meta.chunks);
     for (var _ri = 0; _ri < _roles.length; _ri++) {
-      var _role = _roles[_ri];
-      if (_role === 'schematic') continue;
-      var _e = meta.chunks[_role];
-      if (_e && typeof _e.index === 'number') { myChunkIdx = _e.index; break; }
+      var _e = meta.chunks[_roles[_ri]];
+      if (_e && typeof _e.index === 'number' && typeof _e.total === 'number') { myChunkIdx = _e.index; break; }
     }
   }
   var isHeartStar = meta.heart_star_id && meta.heart_star_id === meta._identifier;

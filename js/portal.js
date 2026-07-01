@@ -1114,15 +1114,8 @@ function getChunk(record, type) {
   if ((type + '_total_chunks')  in record) out.total   = record[type + '_total_chunks'];
   if ((type + '_chunk_hash')    in record) out.hash    = record[type + '_chunk_hash'];
   if ((type + '_version')       in record) out.version = record[type + '_version'];
-  if (type === 'decoder') {
-    if ('decoder_age'        in record) out.age        = record.decoder_age;
-    if ('decoder_age_name'   in record) out.age_name   = record.decoder_age_name;
-    if ('decoder_reassembly' in record) out.reassembly = record.decoder_reassembly;
-  }
-  if (type === 'schematic') {
-    if ('schematic_index' in record) out.index = record.schematic_index;
-    if ('schematic_total' in record) out.total = record.schematic_total;
-  }
+  if ((type + '_index')         in record) out.index   = record[type + '_index'];
+  if ((type + '_total')         in record) out.total   = record[type + '_total'];
   return out;
 }
 
