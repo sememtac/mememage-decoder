@@ -1020,6 +1020,36 @@ function sniffBinaryType(bytes) {
   return null;
 }
 
+// Render a sealed-identity easter-egg JSON (name + photo + birth details)
+// into a self-contained HTML page — the "photo + text" the chunk promises,
+// so the download opens as a page instead of dumping raw JSON. The chunk's
+// data contract (see site_pack.extract_easter_egg) is a JSON blob; a chain
+// whose egg is already HTML never reaches here (it isn't valid JSON).
+function buildEasterEggHtml(egg) {
+  var fmt = (egg.image_format || 'jpeg').replace(/[^a-z0-9+.\-]/gi, '');
+  var img = egg.image_b64
+    ? '<img src="data:image/' + fmt + ';base64,' + egg.image_b64 + '" alt="' + escapeHtml(egg.name || '') + '">'
+    : '';
+  var details = {};
+  Object.keys(egg).forEach(function(k) {
+    if (k !== 'image_b64') details[k] = egg[k];   // everything but the bulky blob
+  });
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+    + '<title>' + escapeHtml(egg.name || 'Easter Egg') + '</title>'
+    + '<style>body{margin:0;background:#0b0b12;color:#e8e6f0;'
+    + 'font:14px/1.6 -apple-system,system-ui,sans-serif;display:flex;'
+    + 'flex-direction:column;align-items:center;padding:40px 16px}'
+    + 'img{max-width:min(90vw,560px);border-radius:10px;'
+    + 'box-shadow:0 10px 40px rgba(0,0,0,.5)}'
+    + 'h1{font-weight:600;letter-spacing:.02em;margin:24px 0 4px}'
+    + 'pre{max-width:640px;white-space:pre-wrap;word-break:break-word;'
+    + 'background:#15151f;padding:16px 20px;border-radius:10px;'
+    + 'color:#b9b6c8;font-size:12px}</style></head><body>'
+    + img + '<h1>' + escapeHtml(egg.name || '') + '</h1>'
+    + '<pre>' + escapeHtml(JSON.stringify(details, null, 2)) + '</pre>'
+    + '</body></html>';
+}
+
 // HASH_INCLUDED, sortKeysDeep, sha256_16 — loaded from js/verify.js
 
 // Dark Matter unlock state.
@@ -2686,6 +2716,23 @@ function buildOrbitInspector(records, collected) {
         dlBtnColored(meta.label, meta.color, async function() {
           if (meta.mime === 'text/html' || meta.mime === 'text/plain') {
             var data = await gunzip(entry.data);
+            // Easter egg: the chunk is a sealed identity JSON (name + photo +
+            // birth details). Render it into a self-contained page so the
+            // photo shows, instead of downloading raw JSON. A non-JSON egg
+            // (already HTML) falls through and downloads verbatim.
+            if (role === 'easter_egg') {
+              var eggHtml = data;
+              try {
+                var egg = JSON.parse(data);
+                if (egg && egg.image_b64) eggHtml = buildEasterEggHtml(egg);
+              } catch (e) { /* not JSON — keep verbatim */ }
+              var eb = new Blob([eggHtml], {type: 'text/html'});
+              var ea = document.createElement('a');
+              ea.href = URL.createObjectURL(eb);
+              ea.download = meta.filename;
+              ea.click();
+              return;
+            }
             // Auto-correct mime if a "claim"-style entry is plain text vs HTML.
             var isHtml = data.indexOf('<!DOCTYPE') >= 0 || data.indexOf('<html') >= 0;
             var mime = meta.mime;
