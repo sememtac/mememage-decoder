@@ -324,6 +324,21 @@ document.getElementById('reconstructBtn').addEventListener('click', function(e) 
 // Raw bit brightness for forensic strip
 function extractBitBrightness(px,w,h,ppb){ppb=ppb||PIXELS_PER_BIT;var v=[],dpr=w-HEADER_PIXELS-FOOTER_PIXELS,bpr=Math.floor(dpr/ppb);for(var row=0;row<SIG_ROWS;row++){var y=h-1-row;for(var b=0;b<bpr;b++){var cx=HEADER_PIXELS+b*ppb+Math.floor(ppb/2);var i=(y*w+cx)*4;v.push((px[i]+px[i+1]+px[i+2])/3);}}return v;}
 
+// Run fn once the element with id `elId` is actually in the DOM. The forensic
+// panel is inserted through PanelSwap, whose cross-fade path (when a result is
+// already on screen — e.g. right after a Reliquary reform) DEFERS the insertion
+// by a transition. A plain setTimeout(0) fill would then fire before its rows
+// exist, get null from getElementById, and leave every row stuck on
+// "analyzing…". Poll a few frames for the row to mount, then run (capped so it
+// always runs even if the element never appears).
+function _runWhenMounted(elId, fn) {
+  var tries = 0;
+  (function poll() {
+    if (document.getElementById(elId) || tries++ > 120) { fn(); return; }
+    requestAnimationFrame(poll);
+  })();
+}
+
 function analyze(file){
   clearOtherResults('img');
   imgResults.innerHTML='';
@@ -606,7 +621,7 @@ function analyze(file){
           });
           o += '<div id="scaleFloor" style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Measuring floor…</div>';
           // Defer the heavy re-reads until after the panel is in the DOM.
-          setTimeout(async function(){
+          _runWhenMounted('scaleRow-0', async function(){
             var lowestOk = null;
             for (var sIdx = 0; sIdx < scales.length; sIdx++) {
               var s = scales[sIdx];
@@ -654,7 +669,7 @@ function analyze(file){
               floor.innerHTML = 'Measured floor: <span style="font-weight:600;">'+floorTxt+'</span>.';
               floor.style.color = '#c0c0d0';
             }
-          }, 0);
+          });
         } else {
           o+='<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;line-height:1.5;">Skipped — sequential bars sit at the minimum bit width, so they have no downscale headroom. Mint at ≥'+crossoverW+'px wide for even-fill’s resize resilience. JPEG Survival below still applies.</div>';
         }
@@ -727,8 +742,9 @@ function analyze(file){
         o += '<span style="font-size:0.65rem;color:#8a8a9a;">analyzing\u2026</span>';
         o += '</div></div>';
       });
-      // Defer the actual rendering until after the panel is in the DOM.
-      setTimeout(async function(){
+      // Fill the rows once they're actually mounted (PanelSwap may defer the
+      // insertion via a cross-fade — see _runWhenMounted).
+      _runWhenMounted('jpegRow-95', async function(){
         for (var qi = 0; qi < jpegLevels.length; qi++) {
           var r = await jpegOneLevel(jpegLevels[qi]);
           var row = document.getElementById('jpegRow-' + r.q);
@@ -751,7 +767,7 @@ function analyze(file){
           row.style.borderLeftColor = rowBdr;
           row.innerHTML = html;
         }
-      }, 0);
+      });
 
       // Image thumbnail
       o+='<div class="ev-sec">Image</div>';
