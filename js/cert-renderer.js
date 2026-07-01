@@ -13,7 +13,7 @@
 //   7. Footer
 // =====================================================================
 
-// --- Rarity tier lookup (Age of Aries thresholds) ---
+// --- Rarity tier lookup (reference-chain thresholds) ---
 var RARITY_TIERS = [[88,'Legendary','#d44040'],[72,'Epic','#8a6210'],[55,'Very Rare','#5a2a8a'],[40,'Rare','#2a5090'],[25,'Uncommon','#2a7030'],[0,'Common','#606060']];
 
 function getRarityTier(score) {
@@ -435,8 +435,8 @@ function renderCert(meta, options) {
 
   var GEN_PARAMS = [];
   // span: 3 = full width, 2 = two-thirds, 1 = one-third of the grid.
-  // Canonical AI-gen layout (Seed/Size full-width, Steps|CFG|Guidance on
-  // one row, etc). Anything in origin that's NOT one of these canonical
+  // Preferred layout for common generation fields (Seed/Size full-width,
+  // Steps|CFG|Guidance on one row, etc). Anything in origin that's NOT one of these known
   // keys gets rendered after as a generic title-cased label/value pair —
   // photographer/screenshot/drawing pipelines can drop any custom field.
   var _claimedKeys = {prompt: 1};   // prompt is rendered separately above the panel
@@ -1117,7 +1117,7 @@ function renderCert(meta, options) {
             if (thumbRes.ok) unlocked.thumbnail = thumbRes.plaintext;
           }
           // Encrypted chunks (if present) — needed for any chain that
-          // distributes the canonical decoder/truth bytes through
+          // distributes its layer chunk bytes through
           // dark-matter records.
           if (meta.encrypted_chunks) {
             var chunksRes = await Access.decryptChunks(meta.encrypted_chunks, pw);

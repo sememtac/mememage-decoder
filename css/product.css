@@ -10,6 +10,12 @@
 }
 
 .product-body {
+  /* Opt out of the shared `body { display: flex }` (that's for the decoder's
+     centered panel). The product page is a normal scrolling document; as a
+     flex item the wrap couldn't shrink below the code block's intrinsic width,
+     which overflowed the page on mobile. Block lets it shrink + the code block
+     scrolls within. */
+  display: block;
   background: #060609;
   color: #d8d8e2;
   margin: 0;
@@ -117,7 +123,7 @@
   border-top-width: 2px;
   border-radius: 6px;
   padding: 0.95rem 0.9rem;
-  background: rgba(255,255,255,0.015);
+  background: #0c0c14;
 }
 .tri-cell h4 {
   margin: 0 0 0.35rem;

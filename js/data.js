@@ -23,9 +23,9 @@ const EVENFILL_MIN_BYTES=33,EVENFILL_MAX_BYTES=64;
 // A self-hosted mint server injects window.MEMEMAGE_SOULS_BASE (an
 // absolute souls read base ending in /) before this script loads, so a
 // self-served decoder/validator defaults to its OWN souls face. On GitHub
-// Pages nothing is injected, so the canonical public surface souls.mememage.art
-// is the default (where the canonical chain's souls live — IA is no longer the
-// canonical chain's surface). IA stays a one-click suggestion for legacy/IA-
+// Pages nothing is injected, so the reference public surface souls.mememage.art
+// is the default (where the reference chain's souls live — IA is no longer the
+// reference chain's surface). IA stays a one-click suggestion for legacy/IA-
 // hosted records. Either way the Source field is user-overridable — source-
 // agnostic by design.
 const SOURCE_DEFAULT = (typeof window !== 'undefined' && window.MEMEMAGE_SOULS_BASE)

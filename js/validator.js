@@ -813,7 +813,7 @@ folderInp.addEventListener('change',function(){
 // Persistent chunk collection (survives across multiple drops).
 //
 // Two flavors of stored chunk:
-//   - indexed   — chunks that carry {index, total} (decoder, truth, proof,
+//   - indexed   — chunks that carry {index, total} (decoder, truth, validator,
 //                 schematic). Stored as {[role]: {total, chunks: {idx: entry}}}.
 //   - single    — pinned chunks with no index (claim, easter_egg, custom).
 //                 Stored as {[role]: entry}.
@@ -823,15 +823,15 @@ folderInp.addEventListener('change',function(){
 // and rendered.
 var collected = { indexed: {}, single: {} };
 
-// Canonical render order for known role names. Anything else falls to the
+// Curated render order for known role names. Anything else falls to the
 // end in observation order so unknown roles don't disappear.
-var ROLE_ORDER = ['decoder', 'proof', 'truth', 'schematic', 'claim', 'easter_egg'];
+var ROLE_ORDER = ['decoder', 'validator', 'truth', 'schematic', 'claim', 'easter_egg'];
 
 // Per-role display metadata — used by the download-button renderer to
 // choose label, filter color, file mime + extension. Unknown roles get
 // sensible generic defaults.
 //
-// The decoder + proof(=validator) layers download under their CANONICAL
+// The decoder + validator layers download under their CANONICAL
 // filenames — index.html and validator.html — not descriptive ones. Each is a
 // fully self-contained page (inline_all / inline_html bakes in all CSS/JS/
 // assets), and they cross-link by RELATIVE href (decoder → validator.html,
@@ -840,7 +840,7 @@ var ROLE_ORDER = ['decoder', 'proof', 'truth', 'schematic', 'claim', 'easter_egg
 // the portal flip 404s. (Soul roles like truth/claim keep descriptive names.)
 var ROLE_META = {
   decoder:    { label: 'Decoder',    color: 'decoder', mime: 'text/html',  filename: 'index.html'             },
-  proof:      { label: 'Proof',      color: 'proof',   mime: 'text/html',  filename: 'validator.html'         },
+  validator:  { label: 'Validator',  color: 'validator', mime: 'text/html', filename: 'validator.html'         },
   truth:      { label: 'Truth',      color: 'truth',   mime: 'text/plain', filename: 'mememage-truth.txt'     },
   schematic:  { label: 'Schematics', color: 'epag',    mime: 'image/svg+xml', filename: 'schematic.svg'      },
   claim:      { label: 'Claim',      color: 'epag',    mime: 'text/html',  filename: 'mememage-claim.html'    },
@@ -860,7 +860,7 @@ function roleMeta(role) {
   };
 }
 
-// Shared palette + deterministic per-role color resolver. Canonical
+// Shared palette + deterministic per-role color resolver. Curated
 // roles + filter keys map to the curated palette; everything else gets
 // a hue hashed from the role/filter name. Same name → same color across
 // sessions, so a chain author can trust their layer's color to be stable.
@@ -868,10 +868,10 @@ var ROLE_COLORS = {
   all:        '255,255,255',
   decoder:    '123,196,160',
   truth:      '136,152,184',
-  proof:      '184,152,216',
+  validator:  '184,152,216',
   epag:       '212,184,123',
   egg:        '196,123,187',
-  // Canonical role names that happen to color via different filter keys.
+  // Curated role names that happen to color via different filter keys.
   schematic:  '212,184,123',
   claim:      '212,184,123',
   easter_egg: '196,123,187',
@@ -885,8 +885,8 @@ function getRoleColor(name) {
   var h = 0;
   for (var i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0;
   var hue = h % 360;
-  // Nudge away from the canonical hues so custom roles look distinct
-  // from decoder (green ~140), truth (blue ~220), proof (purple ~270),
+  // Nudge away from the curated hues so custom roles look distinct
+  // from decoder (green ~140), truth (blue ~220), validator (purple ~270),
   // epag (gold ~45), egg (pink ~315). Skip ±15° around each.
   var skip = [140, 220, 270, 45, 315];
   for (var k = 0; k < skip.length; k++) {
@@ -918,7 +918,7 @@ function _visName(v) {
 }
 
 // Group records by their chain identity. Two independently sealed
-// chains can both call their first Age "Age of Aries"; without a
+// chains can both name their first Age the same thing; without a
 // discriminator they collide. Prefers decoder_hash when present;
 // otherwise derives a stable signature from the record's layer layout
 // (role names + totals).
@@ -943,7 +943,7 @@ function assignAgeKey(r) {
 }
 
 function sortRoles(roles) {
-  // Canonical roles first in ROLE_ORDER, then unknowns in observation order.
+  // Curated roles first in ROLE_ORDER, then unknowns in observation order.
   var canonical = ROLE_ORDER.filter(function(r) { return roles.indexOf(r) >= 0; });
   var extras = roles.filter(function(r) { return ROLE_ORDER.indexOf(r) < 0; });
   return canonical.concat(extras);
@@ -1192,10 +1192,10 @@ async function _renderObservatoryFromCache() {
     valid[ui] = await maybeUnlockRecord(valid[ui]);
   }
 
-  // Propagate age_name across each chain. Dark-day / epagomenal /
-  // pinned-only records carry no decoder chunk and therefore no
+  // Propagate age_name across each chain. Frozen-tail and pinned-only
+  // records carry no decoder chunk and therefore no
   // age_name in assignAgeKey's first pass — they'd otherwise form
-  // their own "Age I" tab and sort ahead of "Age of Aries" records.
+  // their own untitled tab and sort ahead of the named records.
   // Adopt the age_name from any chain peer that has one so the whole
   // chain renders as a single Age.
   var _chainAgeNames = {};
@@ -1221,9 +1221,9 @@ async function _renderObservatoryFromCache() {
     var bck = b._ageKey ? b._ageKey.split('#')[0] : '';
     if (ack !== bck) return ack < bck ? -1 : 1;
     // Within a chain: outer_position is the canonical record order.
-    // Universal across canonical (with decoder) and pinned-only records,
-    // so dark days T360-T364 render between T359 and the next age, not
-    // ahead of T0.
+    // Universal across cycling (with decoder) and pinned-only records,
+    // so the frozen-tail positions render between the last cycling
+    // position and the next age, not ahead of position 0.
     var ap = (a.outer_position != null) ? a.outer_position : Infinity;
     var bp = (b.outer_position != null) ? b.outer_position : Infinity;
     if (ap !== bp) return ap - bp;
@@ -1271,7 +1271,7 @@ async function _renderObservatoryFromCache() {
   // Accumulate chunks from these records — generic walk over each record's
   // chunks dict. Indexed chunks (have index+total) go into collected.indexed,
   // single pinned chunks go into collected.single. The role name is the
-  // chunk key from record.chunks (decoder, proof, truth, schematic,
+  // chunk key from record.chunks (decoder, validator, truth, schematic,
   // easter_egg, claim, anything else the chain emits).
   for (var ci = 0; ci < valid.length; ci++) {
     var cr = valid[ci];
@@ -1306,10 +1306,10 @@ async function _renderObservatoryFromCache() {
     // Legacy flat-shape fallback. Older records (pre-nested-chunks)
     // store chunk data at top-level keys: decoder_chunk, decoder_chunk_index,
     // truth_chunk, etc. The getChunk() helper normalizes those into the
-    // nested shape on demand. Probe each canonical role here so records
+    // nested shape on demand. Probe each curated role here so records
     // that lived through that earlier schema still surface in the auto-
     // adapt UI.
-    var CANONICAL_PROBE = ['decoder', 'truth', 'proof', 'schematic', 'claim', 'easter_egg'];
+    var CANONICAL_PROBE = ['decoder', 'truth', 'validator', 'schematic', 'claim', 'easter_egg'];
     CANONICAL_PROBE.forEach(function(role) {
       if (chDict && chDict[role]) return; // already collected above
       var entry = getChunk(cr, role);
@@ -1376,13 +1376,13 @@ async function _renderObservatoryFromCache() {
     // nested + legacy flat shapes; see portal.js getChunk).
     var rDec = getChunk(r,'decoder');
     var rTruth = getChunk(r,'truth');
-    var rProof = getChunk(r,'proof');
+    var rValidator = getChunk(r,'validator');
     var rSch  = getChunk(r,'schematic');
     var rClm  = getChunk(r,'claim');
     var rEgg  = getChunk(r,'easter_egg');
     // Generic layer iteration for the cycle-position panel — every layer
-    // a chain authored gets its own row, regardless of name. Canonical
-    // names (decoder/truth/proof) keep their curated labels via roleMeta;
+    // a chain authored gets its own row, regardless of name. Known
+    // names keep their curated labels via roleMeta;
     // anything else gets title-cased fallback. Pinned roles (schematic/
     // claim/easter_egg) are excluded — they have their own dedicated rows.
     var _FROZEN_ROLES = {schematic:1, claim:1, easter_egg:1};
@@ -1404,7 +1404,7 @@ async function _renderObservatoryFromCache() {
       di_ = rLayers[0].entry.index;
     }
     var ageName = AgeNames.name(r.age) || '';
-    var isDk2=ti!=null&&ti>=360&&ti<=363,isEp2=ti===364;
+    var _pinRole=r.chunks&&(r.chunks.schematic?'dark':(r.chunks.claim||r.chunks.easter_egg)?'epag':null),isDk2=_pinRole==='dark',isEp2=_pinRole==='epag';
 
     // Compact row — white labels, green only for verified badge
     // Records can come from user-dropped .soul files in the Observatory
@@ -1415,7 +1415,7 @@ async function _renderObservatoryFromCache() {
     html+='<div class="meta-row" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="padding:0.35rem 0.8rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;transition:background 0.1s;" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'none\'">';
     html+='<span style="font-size:0.72rem;color:'+rBadgeCol+';min-width:1rem;">'+rBadge+'</span>';
     html+='<span style="font-size:0.7rem;font-family:monospace;min-width:10rem;color:#d0d0d8;">'+_h(r.identifier?r.identifier.slice(-16):(r._fn||'').slice(-16))+'</span>';
-    // Compact position label. Canonical chains show "T<truth> D<decoder>";
+    // Compact position label. Chains with decoder + truth layers show "T<truth> D<decoder>";
     // custom-layer chains show "<X><idx>" for each layer using the first
     // letter of the layer name (so "test" layer at position 0 → "T0").
     // The 'T'-as-truth convention only applies when a truth chunk exists.
@@ -1525,8 +1525,8 @@ async function _renderObservatoryFromCache() {
 
     // Cycle position — one row per authored layer, plus pinned-role
     // overlays + Age / decoder_hash / constellation. Generalized: any
-    // chain whose layers aren't decoder/truth/proof still gets rendered;
-    // the row label comes from roleMeta() (curated for canonical names,
+    // chain whose layers aren't the curated set still gets rendered;
+    // the row label comes from roleMeta() (curated for known names,
     // title-cased fallback for everything else).
     if(rLayers.length || rSch || rClm || rEgg){
       html+='<div class="ev-sec">Cycle Position</div><div class="ev-g">';
@@ -1968,7 +1968,7 @@ function buildOrbitInspector(records, collected) {
 
   // Per-Age M / K_inner / row-col dimensions are computed inside
   // render() from that Age's records only. This lets two chains
-  // (e.g. a canonical 365-day Age of Aries and a 3-record fox Age I)
+  // (e.g. a 365-position year-chain and a 3-record fox chain)
   // render side-by-side with different grid shapes. ``inferAgeDims``
   // takes the records for a single Age and returns its derived layout.
   function inferAgeDims(ageRecs) {
@@ -1993,16 +1993,18 @@ function buildOrbitInspector(records, collected) {
     if (!m) m = 365;
     var k = decoderK || smallestLayerK || 12;
     if (k > m) k = m;
-    var useCalendar = (m === 365);
-    var rows = useCalendar ? Math.ceil(365 / k) : Math.max(1, Math.ceil(m / k));
-    return { M: m, K: k, COLS: k, ROWS: rows, USE_CALENDAR: useCalendar };
+    var rows = Math.max(1, Math.ceil(m / k));
+    return {
+      M: m, K: k, COLS: k, ROWS: rows,
+      smallestK: smallestLayerK || k,
+    };
   }
 
   // Group by (chain, age). The grouping key combines a chain
   // discriminator (decoder_hash if present, else a signature derived
   // from the record's layer layout) with the age_name. Without this,
   // two independently sealed chains that both happen to call their
-  // first Age "Age of Aries" would collide into one bucket and the
+  // first Age the same name would collide into one bucket and the
   // grid would silently overwrite cells. The carousel still displays
   // human-readable age_name; the key is internal.
   // (chainDiscriminator is hoisted to module scope so analyzeMeta can
@@ -2044,7 +2046,7 @@ function buildOrbitInspector(records, collected) {
   });
 
   // Disambiguate age labels when multiple chains share the same age_name
-  // (e.g. five chains all called "Age of Aries"). Without this, the
+  // (e.g. five chains all naming their first Age alike). Without this, the
   // carousel renders five identical tabs and the user can't tell which
   // is which. We suffix each duplicate with a short chain hash.
   var ageDisplayCounts = {};
@@ -2106,33 +2108,82 @@ function buildOrbitInspector(records, collected) {
 
     // Per-Age dimensions — each Age in the inspector renders with its
     // own grid shape, so a fox-only Age I (3×1) can sit beside a
-    // canonical Age of Aries (12×31) without one bleeding into the other.
+    // larger year-chain (its own M×K) without one bleeding into the other.
     var dims = inferAgeDims(ad.recs);
     var chainM = dims.M;
     var chainKInner = dims.K;
     var TOTAL_COLS = dims.COLS;
     var TOTAL_ROWS = dims.ROWS;
-    var USE_CALENDAR = dims.USE_CALENDAR;
 
     // Indexed-role set for this Age. Used during cell tagging so every
     // cell — including empty ones — is marked as "in" each observed
     // layer's cycle. Without this, custom-layer filters only highlight
     // cells where a record happens to sit, breaking the dashed-cycle
-    // boundary cadence the canonical filters get for free.
+    // boundary cadence the curated filters get for free.
     var ageRoleKeys = {};
+    // Per-layer freeze, DERIVED from each cycling layer's own K: a K-chunk
+    // layer tiles floor(M/K) whole cycles (positions 0 .. that product − 1)
+    // then freezes for the remainder. Nothing is assumed about which layer
+    // it is or where it stops — a K=7 layer freezes wherever 7 stops
+    // dividing M, a K=12 layer wherever 12 does.
+    var layerFreeze = {};   // filter key → first frozen position
     ad.recs.forEach(function(r) {
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
       if (ch) Object.keys(ch).forEach(function(role) {
         var e = ch[role];
         if (!e || e.index === undefined || typeof e.total !== 'number' || e.total <= 0) return;
-        // Canonical role → filter key alias (egg/epag) so the existing
+        // Curated role → filter key alias (egg/epag) so the existing
         // filter dropdown keys match the cell tags.
         var key = role;
         if (role === 'easter_egg') key = 'egg';
         else if (role === 'claim' || role === 'schematic') key = 'epag';
         ageRoleKeys[key] = true;
+        // Pinned roles (egg/epag) don't cycle — only cycling layers freeze.
+        if (key !== 'egg' && key !== 'epag' && chainM > 0) {
+          layerFreeze[key] = Math.floor(chainM / e.total) * e.total;
+        }
       });
-      if (typeof r.decoder_chunk_index === 'number') ageRoleKeys.decoder = true;
+      if (typeof r.decoder_chunk_index === 'number') {
+        ageRoleKeys.decoder = true;
+        if (layerFreeze.decoder === undefined && typeof r.decoder_total_chunks === 'number'
+            && r.decoder_total_chunks > 0 && chainM > 0) {
+          layerFreeze.decoder = Math.floor(chainM / r.decoder_total_chunks) * r.decoder_total_chunks;
+        }
+      }
+    });
+
+    // Pinned content positions, DERIVED from where records actually carry a
+    // pinned chunk (schematic / claim / easter_egg) — no assumption they sit
+    // in a frozen tail. The author can place them on any date (the claim on a
+    // meaningful day, the easter egg on a birthday) and the Observatory marks
+    // + filters them exactly there. Visual class: schematic → 'dark', claim /
+    // easter_egg → 'epag'. Filter key: schematic / claim → 'epag',
+    // easter_egg → 'egg'.
+    var pinnedAt = {};   // gridPos → { cls: 'dark'|'epag', epag: bool, egg: bool }
+    ad.recs.forEach(function(r) {
+      var p = r._gridPos;
+      if (p == null || !r.chunks || typeof r.chunks !== 'object') return;
+      Object.keys(r.chunks).forEach(function(role) {
+        var cls, fk;
+        if (role === 'schematic') { cls = 'dark'; fk = 'epag'; }
+        else if (role === 'claim') { cls = 'epag'; fk = 'epag'; }
+        else if (role === 'easter_egg') { cls = 'epag'; fk = 'egg'; }
+        else return;
+        var slot = pinnedAt[p] || (pinnedAt[p] = {});
+        slot[fk] = true;
+        // 'epag' (claim/egg) takes visual precedence over 'dark' (schematic).
+        if (cls === 'epag' || !slot.cls) slot.cls = cls;
+      });
+    });
+    // Aggregate pinned content up to rows — for the row marker + the
+    // sector-mode filter collapse. Row index = floor(pos / TOTAL_COLS).
+    var rowPin = {};   // row → { epag, egg, cls }
+    Object.keys(pinnedAt).forEach(function(ps) {
+      var ri2 = Math.floor((+ps) / TOTAL_COLS), s = pinnedAt[ps];
+      var rp = rowPin[ri2] || (rowPin[ri2] = {});
+      if (s.epag) rp.epag = true;
+      if (s.egg) rp.egg = true;
+      if (s.cls === 'epag' || !rp.cls) rp.cls = s.cls;
     });
 
     // Row → constellation name map (uses cached _gridPos from above)
@@ -2252,36 +2303,36 @@ function buildOrbitInspector(records, collected) {
 
     var sel = mk('select', 'orbit-filter');
     // Build the dropdown from what's actually present in this Age's
-    // records — canonical filter names appear only when their role is
-    // observed (or, for Epag, when any record sits in the 360-364 dark
-    // days / epagomenal range). Custom layer roles each get their own
+    // records — curated filter names appear only when their role is
+    // observed (or, for Epag, when any record sits in the frozen-tail /
+    // epagomenal range). Custom layer roles each get their own
     // filter option with the role's display label.
     var observedRoles = {};
     var hasEpagPos = false;
-    var CANONICAL_PROBE = ['decoder', 'truth', 'proof', 'schematic', 'claim', 'easter_egg'];
+    var CANONICAL_PROBE = ['decoder', 'truth', 'validator', 'schematic', 'claim', 'easter_egg'];
     ad.recs.forEach(function(r) {
-      if (r._gridPos != null && r._gridPos >= 360 && r._gridPos <= 364) hasEpagPos = true;
+      if (r.chunks && (r.chunks.claim || r.chunks.schematic)) hasEpagPos = true;
       // Walk nested chunks dict (new shape).
       var ch = r.chunks && typeof r.chunks === 'object' ? r.chunks : null;
       if (ch) Object.keys(ch).forEach(function(role) { observedRoles[role] = true; });
-      // Probe canonical names via getChunk (handles flat-shape legacy
-      // records too) so old samples surface decoder/truth/proof filters.
+      // Probe curated names via getChunk (handles flat-shape legacy
+      // records too) so old samples surface the curated-role filters.
       CANONICAL_PROBE.forEach(function(role) {
         if (observedRoles[role]) return;
         if (getChunk(r, role)) observedRoles[role] = true;
       });
     });
-    // Canonical role → filter key mapping. Determines whether the
-    // canonical filter option appears in the dropdown.
+    // Curated role → filter key mapping. Determines whether the
+    // curated filter option appears in the dropdown.
     var opts = {all: 'All'};
     if (observedRoles.decoder)    opts.decoder = 'Decoder';
     if (observedRoles.truth)      opts.truth   = 'Truth';
-    if (observedRoles.proof)      opts.proof   = 'Proof';
+    if (observedRoles.validator)  opts.validator = 'Validator';
     if (hasEpagPos || observedRoles.claim || observedRoles.schematic) opts.epag = 'Epag';
     if (observedRoles.easter_egg) opts.egg     = 'Egg';
     // Everything else — custom layer roles. Sorted for determinism.
     Object.keys(observedRoles).sort().forEach(function(role) {
-      if (role === 'decoder' || role === 'truth' || role === 'proof' ||
+      if (role === 'decoder' || role === 'truth' || role === 'validator' ||
           role === 'easter_egg' || role === 'claim' || role === 'schematic') return;
       var meta = (typeof roleMeta === 'function') ? roleMeta(role) : {label: role};
       opts[role] = meta.label || role;
@@ -2335,9 +2386,10 @@ function buildOrbitInspector(records, collected) {
       var base = ri * TOTAL_COLS;
       var cn = rowCon[ri];
       if (cn && selectedCons.has(cn)) tr.classList.add('row-selected');
-      // "Special" rows (dark days / epagomenal) only exist on the
-      // canonical 365-day calendar. Smaller chains skip them entirely.
-      var special = USE_CALENDAR && base >= 360;
+      // A row is "special" if it actually holds pinned content (schematic /
+      // claim / easter_egg), derived from pinnedAt — not a frozen-tail
+      // boundary. The pinned cells carry the styling; the row gets a marker.
+      var special = !!rowPin[ri];
 
       // Label cell
       var lbl = mk('td', 'orbit-lbl');
@@ -2368,7 +2420,7 @@ function buildOrbitInspector(records, collected) {
           };
         })(cn, lbl, tr);
       } else if (special) {
-        lbl.textContent = base >= 364 ? '\u2609 Epag' : '\u25c6 Dark';
+        lbl.textContent = '\u25c6';   // marker: this row holds pinned content
         lbl.style.color = '#8a7050';
       } else {
         lbl.textContent = (ri + 1);
@@ -2386,8 +2438,9 @@ function buildOrbitInspector(records, collected) {
         cell.dataset.row = ri;
 
         var rec = ad.byPos[pos];
-        var isDk = USE_CALENDAR && pos >= 360 && pos <= 363;
-        var isEp = USE_CALENDAR && pos === 364;
+        var _pinM = pinnedAt[pos];
+        var isDk = !!(_pinM && _pinM.cls === 'dark');
+        var isEp = !!(_pinM && _pinM.cls === 'epag');
 
         if (rec) {
           cell.classList.add('supplied');
@@ -2439,40 +2492,27 @@ function buildOrbitInspector(records, collected) {
         if (isDk) cell.classList.add('dark');
         if (isEp) cell.classList.add('epag');
 
-        // Cycle membership for filter. Two sources of truth:
-        //   1. Canonical 365-day calendar positions (decoder at 0-359,
-        //      proof at 0-363, dark days at 360-363, epag at 364) when
-        //      USE_CALENDAR. These tag empty cells based on position
-        //      alone so the canonical dashed-cadence pattern works.
-        //   2. Every layer role observed in this Age — applied to ALL
-        //      cells, not just cells with records. A layer cycle covers
-        //      every outer position, so every cell is "in" that filter.
+        // Cell filter membership, both derived: (1) each cycling layer up to
+        // its own freeze; (2) pinned content at its actual position.
         var types = '';
-        if (USE_CALENDAR) {
-          types = 'truth';
-          if (pos < 360) types += ' decoder';
-          if (pos < 364) types += ' proof';
-          if (pos >= 360) types += ' epag';
-          if (pos === 364) types += ' egg';
-        }
+        // Each cycling layer is active from position 0 up to its OWN
+        // derived freeze; tag every cell (empty ones too) so the dashed
+        // cadence pattern draws. No layer name or freeze position is
+        // hardcoded — a layer reaches into the tail iff its own K takes it
+        // there (e.g. a K=7 layer cycles four positions past a K=12 one).
         Object.keys(ageRoleKeys).forEach(function(key) {
-          // Skip canonical keys already applied by the calendar branch
-          // (avoid double-tagging in canonical chains).
-          if (USE_CALENDAR && {decoder:1, truth:1, proof:1, epag:1, egg:1}[key]) return;
-          if ((' ' + types + ' ').indexOf(' ' + key + ' ') < 0) types += ' ' + key;
+          var frz = layerFreeze[key];
+          if (frz === undefined) return;   // pinned role (egg/epag) — tagged per-cell below
+          if (pos < frz) types += ' ' + key;
         });
-        // Pinned chunks (no index, single position) belong only to THIS
-        // cell — not the whole cycle. Tag the specific cell so its
-        // filter highlights it without lighting the rest of the row.
-        if (rec && rec.chunks && typeof rec.chunks === 'object') {
-          Object.keys(rec.chunks).forEach(function(role) {
-            var e = rec.chunks[role];
-            if (!e || e.index !== undefined) return; // indexed already handled
-            var fkey = role;
-            if (role === 'easter_egg') fkey = 'egg';
-            else if (role === 'claim' || role === 'schematic') fkey = 'epag';
-            if ((' ' + types + ' ').indexOf(' ' + fkey + ' ') < 0) types += ' ' + fkey;
-          });
+        // Pinned-content filters (epag / egg) — tagged at the ACTUAL position
+        // where a schematic / claim / easter_egg sits, from pinnedAt. No
+        // frozen-tail assumption: a claim on Dec 25 or an easter egg on a
+        // birthday lights that exact cell, not the tail.
+        var _pin = pinnedAt[pos];
+        if (_pin) {
+          if (_pin.epag) types += ' epag';
+          if (_pin.egg) types += ' egg';
         }
         cell.dataset.types = types.trim();
 
@@ -2494,7 +2534,7 @@ function buildOrbitInspector(records, collected) {
     var stats = mk('div', 'orbit-stats');
     var ageIndexed = {};  // role → {total, indices: Set}
     var ageSingle  = {};  // role → true
-    var CANONICAL_STATS_PROBE = ['decoder', 'truth', 'proof', 'schematic', 'claim', 'easter_egg'];
+    var CANONICAL_STATS_PROBE = ['decoder', 'truth', 'validator', 'schematic', 'claim', 'easter_egg'];
     function bucketEntry(role, entry) {
       if (!entry || entry.data === undefined) return;
       if (entry.index !== undefined && entry.total !== undefined) {
@@ -2514,7 +2554,7 @@ function buildOrbitInspector(records, collected) {
           bucketEntry(role, ch[role]);
         });
       }
-      // Probe canonical names via getChunk for legacy flat-shape records.
+      // Probe curated names via getChunk for legacy flat-shape records.
       CANONICAL_STATS_PROBE.forEach(function(role) {
         if (seen[role]) return;
         bucketEntry(role, getChunk(r, role));
@@ -2538,9 +2578,9 @@ function buildOrbitInspector(records, collected) {
 
     // === Reassembly downloads ===
     // The button bar is driven entirely by what's observed in this Age's
-    // records. Canonical roles (decoder/proof/truth/schematic/claim/
-    // easter_egg) keep their special labels + colors via ROLE_META;
-    // anything else gets a generic "Download <role>" button. Indexed
+    // records. Curated roles (those defined in ROLE_META) keep their
+    // special labels + colors; anything else gets a generic
+    // "Download <role>" button. Indexed
     // roles only appear when the count matches the chunk-declared total;
     // single roles appear as soon as one is present.
     var indexedRoles = sortRoles(Object.keys(ageIndexed));
@@ -2550,7 +2590,7 @@ function buildOrbitInspector(records, collected) {
     }) || singleRoles.length > 0;
     if (hasComplete) {
       var ra = mk('div', 'orbit-assembly');
-      // Filter colors come from getRoleColor(): canonical role/filter
+      // Filter colors come from getRoleColor(): curated role/filter
       // names map to the curated palette, anything else gets a stable
       // hue hashed from the role name itself.
       function dlBtnColored(label, color, onclick) {
@@ -2592,7 +2632,7 @@ function buildOrbitInspector(records, collected) {
           });
         } else {
           dlBtnColored(meta.label, meta.color, async function() {
-            // Canonical text layers (decoder/proof/truth) → assemble as
+            // Curated text layers → assemble as
             // string so the result is human-readable HTML/text.
             // Unknown / binary roles → assemble as bytes and sniff the
             // file type so the download lands with the right extension
@@ -2677,7 +2717,7 @@ function buildOrbitInspector(records, collected) {
         if (mode !== 'sector') return;
         var base = i * TOTAL_COLS;
         var isCon = !!rowCon[i];
-        var isSpecial = USE_CALENDAR && base >= 360;
+        var isSpecial = !!rowPin[i];   // row holds pinned content (derived)
         var hasRec = false;
         for (var ci = 0; ci < TOTAL_COLS && base + ci < chainM; ci++) {
           if (ad.byPos[base + ci]) { hasRec = true; break; }
@@ -2688,12 +2728,16 @@ function buildOrbitInspector(records, collected) {
           return;
         }
 
-        // Filter-aware collapse: hide rows outside the filter's range
-        if (curFilter === 'decoder' && isSpecial) { tr.classList.add('collapsed'); return; }
-        if ((curFilter === 'epag' || curFilter === 'egg') && !isSpecial) { tr.classList.add('collapsed'); return; }
+        // Filter-aware collapse, derived (no frozen-tail boundary): a
+        // cycling-layer filter hides rows past that layer's own freeze (no
+        // chunks there); a pinned filter hides rows lacking its content.
+        var _lf = layerFreeze[curFilter];
+        if (_lf !== undefined && base >= _lf) { tr.classList.add('collapsed'); return; }
+        if (curFilter === 'epag' && !(rowPin[i] && rowPin[i].epag)) { tr.classList.add('collapsed'); return; }
+        if (curFilter === 'egg' && !(rowPin[i] && rowPin[i].egg)) { tr.classList.add('collapsed'); return; }
 
-        // Constellation selection filter — collapse unselected constellations
-        // Special rows (dark/epag) with records always stay visible
+        // Constellation selection filter — collapse unselected constellations.
+        // Rows holding pinned content (with records) always stay visible.
         if (hasSel) {
           if (isCon && selectedCons.has(rowCon[i])) {
             // Selected constellation — stay visible
@@ -2707,30 +2751,31 @@ function buildOrbitInspector(records, collected) {
     }
 
     // === Filter handler — with cadence boundary outlines ===
-    // Canonical filter cycle lengths + offsets. Custom layer filters
+    // Derived filter cycle lengths + offsets. Custom layer filters
     // derive their (length, offset) from the observed chunks at
     // render time — see resolveFilterCycle() below.
-    var CL = {decoder:12, truth:365, proof:7, epag:5, egg:1};
-    var CO = {decoder:0, truth:0, proof:0, epag:360, egg:364};
-    // Canonical filter colors. Custom filters fall through to
+    // Cycling-layer cadences only. Pinned filters (epag / egg) are NOT here —
+    // they sit at single positions, so resolveFilterCycle's pinned-style
+    // branch highlights their actual cells instead of drawing a cadence.
+    var CL = {decoder: chainKInner, truth: chainM, validator: dims.smallestK};
+    var CO = {decoder: 0, truth: 0, validator: 0};
+    // Curated filter colors. Custom filters fall through to
     // getRoleColor(filter_name) which hashes the name to a hue.
-    var CC = {decoder:'#7bc4a0', truth:'#8898b8', proof:'#b898d8', epag:'#d4b87b', egg:'#c47bbb'};
+    var CC = {decoder:'#7bc4a0', truth:'#8898b8', validator:'#b898d8', epag:'#d4b87b', egg:'#c47bbb'};
 
     function resolveFilterCycle(filterKey) {
       var bucket = ageIndexed[filterKey];
       var canonOff = CO[filterKey] || 0;
-      // Canonical cadence layers (decoder/truth/proof, offset 0): the cycle
-      // LENGTH is per-chain (decoder K, M, proof K), so prefer THIS Age's
-      // observed total over the canonical constant. On a canonical chain the
-      // observed total equals the CL value (12/365/7), so this is a visual
-      // no-op there; on a non-canonical chain (decoder K ≠ 12, proof K ≠ 7,
-      // M ≠ 365) it draws the cadence boundaries at the chain's real interval
-      // instead of the canon. Fall back to the CL constant only when no
+      // Cadence layers with offset 0: the cycle LENGTH is per-chain (each
+      // layer's K, and M), so prefer THIS Age's observed total over the
+      // derived fallback. When they match it's a visual no-op; when a chain
+      // uses different layer K's or M it draws the cadence boundaries at the
+      // chain's real interval. Fall back to the derived length only when no
       // chunks of this layer were observed.
       if (canonOff === 0 && CL[filterKey] != null) {
         return { len: (bucket && bucket.total > 0) ? bucket.total : CL[filterKey], off: 0 };
       }
-      // Canonical specials with a fixed offset (epag/egg) only apply when
+      // Curated specials with a fixed offset (epag/egg) only apply when
       // their position is in range for this chain's M. For a small chain
       // (M=20, etc.) CO.egg=364 / CO.epag=360 land off the grid and gEdge
       // math wraps to nonsense, so fall through to the data-derived path.
@@ -2741,7 +2786,7 @@ function buildOrbitInspector(records, collected) {
       if (bucket && bucket.total > 0) return { len: bucket.total, off: 0 };
       // Pinned-style filter (egg / epag / single-position custom role)
       // — find any record carrying a chunk under this filter's role
-      // and treat it as a cycle of 1 at that position. Handles canonical
+      // and treat it as a cycle of 1 at that position. Handles curated
       // names (egg → easter_egg, epag → claim/schematic) too.
       var roles = [filterKey];
       if (filterKey === 'egg') roles.push('easter_egg');
@@ -2769,8 +2814,8 @@ function buildOrbitInspector(records, collected) {
     }
 
     // Compute which edges of a cell are group boundaries. cols and
-    // wrap come from the per-Age dimensions so non-canonical chains
-    // (M ≠ 365 or K_inner ≠ 12) get correct cadence borders.
+    // wrap come from the per-Age dimensions so chains of any shape
+    // (any M or inner K) get correct cadence borders.
     function gEdge(p, groupLen) {
       if (!groupLen || groupLen <= 0) return {t:false,b:false,l:false,r:false};
       var g = Math.floor(p / groupLen), c = p % TOTAL_COLS;
@@ -2816,9 +2861,10 @@ function buildOrbitInspector(records, collected) {
           }
           var sup = c.classList.contains('supplied');
           var p = parseInt(c.dataset.pos);
-          // Canonical-calendar special days only apply for M=365 chains.
-          var dk = USE_CALENDAR && p >= 360 && p <= 363;
-          var ep = USE_CALENDAR && p === 364;
+          // Special days apply only when the chain has a frozen tail.
+          var _pinF = pinnedAt[p];
+          var dk = !!(_pinF && _pinF.cls === 'dark');
+          var ep = !!(_pinF && _pinF.cls === 'epag');
           c.style.opacity = '1';
           c.style.background = sup ? (ep ? 'rgba(200,176,128,0.35)' : dk ? 'rgba(180,152,112,0.35)' : 'rgba(255,255,255,0.1)') :
             (ep ? 'rgba(200,176,128,0.08)' : dk ? 'rgba(138,112,80,0.1)' : 'rgba(255,255,255,0.02)');
@@ -3209,7 +3255,7 @@ function auditSection(title, rows) {
 // Top-level keys the structured audit sections already render. Everything else
 // — a core soul's own fields (license, author, …), arbitrary/EXIF metadata — is
 // shown generically by the "Soul Fields" section, so nothing is silently
-// dropped just because it isn't a canonical-chain field.
+// dropped just because it isn't a reference-chain field.
 var _AUDIT_COVERED = {
   identifier:1, content_hash:1, hash_version:1, conceived:1, rendered:1,
   creator_name:1, signature:1, public_key:1, key_fingerprint:1,
@@ -3383,7 +3429,7 @@ function renderAudit(rec, identifier, out) {
 
   // === CYCLE INTEGRITY ===
   // One row per authored layer (any name), plus Age + decoder_hash +
-  // chain_visibility. Canonical layers (decoder/truth/proof) keep their
+  // chain_visibility. Curated layers keep their
   // curated labels via roleMeta; custom layers render as title-cased
   // fallback. Pinned roles (schematic/claim/easter_egg) are listed
   // elsewhere — skip here to avoid duplication.
@@ -3407,7 +3453,7 @@ function renderAudit(rec, identifier, out) {
   }
   if (cycleRows) html += auditSection('Cycle Position', cycleRows);
 
-  // === GENERATION === (canonical-chain stable-diffusion params \u2014 only the
+  // === GENERATION === (reference-chain origin params \u2014 only the
   // ones actually present. A core soul carries none of these; its own fields
   // show under "Soul Fields" below, so we never render a wall of "?".)
   var genRows = '';
@@ -3458,7 +3504,7 @@ function renderAudit(rec, identifier, out) {
   if (rec.constellation_hash) celRows += auditRow('Constellation Hash', rec.constellation_hash);
   if (celRows) html += auditSection('Celestial', celRows);
 
-  // === MACHINE === (canonical machine reading — only when present)
+  // === MACHINE === (reference-chain machine reading — only when present)
   var machRows = '';
   if (rec.machine_fingerprint) machRows += auditRow('Fingerprint', rec.machine_fingerprint);
   var recBirth = (typeof BirthText !== 'undefined' && rec.birth_traits)
@@ -3587,7 +3633,7 @@ function renderAudit(rec, identifier, out) {
   var moonBright = birth.moon_phase ? (moonIllumPct(birth.moon_phase) / 100) : 0.5;
   songRows += auditRow('Moon Brightness', (moonBright * 100).toFixed(0) + '% \u2192 filter cutoff & dust density');
 
-  // Song forensics is a canonical-chain showcase (modal scale derived from the
+  // Song forensics is a reference-chain showcase (modal scale derived from the
   // sky + hash). Skip it for a core soul that carries no celestial data.
   if (songRows && (birth.sun || rec.song_name)) html += auditSection('Song Forensics', songRows);
 
@@ -3609,7 +3655,7 @@ function renderAudit(rec, identifier, out) {
     // except the circular pair). There's nothing to be "missing".
     fieldRows += auditRow('Schema', 'open \u2014 every field is yours, all hashed', 'audit-info');
   } else {
-    // Canonical-chain V1 expectations. origin (free-form dict) replaces flat
+    // Reference-chain V1 expectations. origin (free-form dict) replaces flat
     // prompt/seed/etc.; birth_temperament is derived at display; rarity_score
     // is derived from the rarity dict.
     var expected = ['identifier', 'content_hash', 'conceived', 'origin', 'width', 'height', 'birth', 'rarity', 'birth_traits', 'machine_fingerprint'];

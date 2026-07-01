@@ -2043,7 +2043,7 @@ setInterval(function() {
         if (cfg.M % ly.K !== 0) {
           var name = ly.name || ('#' + (i + 1));
           msgs.push({severity: 'info',
-                     text: 'Layer "' + name + '" (' + ly.K + ' chunks) doesn\u2019t divide evenly into the Age (' + cfg.M + '), so its last cycle each Age is partial.'});
+                     text: 'Layer "' + name + '" (' + ly.K + ' chunks) doesn\u2019t divide evenly into the Age (' + cfg.M + '); last cycle is partial.'});
         }
       });
     }
@@ -2170,8 +2170,7 @@ setInterval(function() {
       out += '<span class="payload-lock-badge" data-state="unknown">checking…</span>';
     } else if (state.chainLocked) {
       out += '<span class="payload-lock-badge" data-state="in-age" title="' +
-        escapeHtml('An Age is in progress. Edits are allowed — they take effect on the next Age ' +
-          '(the current Age keeps its sealed payload).') +
+        escapeHtml('An Age is in progress. Edits are allowed — they take effect on the next Age.') +
         '">MID-AGE</span>';
     } else {
       out += '<span class="payload-lock-badge" data-state="editable" title="' +
@@ -2285,7 +2284,7 @@ setInterval(function() {
           '<input class="payload-edit-input monospace" data-field="source-' + idx + '" type="text" value="' + escapeHtml(src) + '" placeholder="server-relative path \u2014 or click Upload">' +
           '<button class="source-browse" data-action="upload-source" data-source-idx="' + idx + '"' +
             (uploading ? ' disabled' : '') +
-            ' title="Upload a file from this computer to the server (saves under the active chain\u2019s uploads/ folder)">' +
+            ' title="Upload a file to the server (saves under the active chain\u2019s uploads/ folder)">' +
             (uploading ? ('Uploading ' + upPct + '%') : 'Upload\u2026') + '</button>' +
           '<button class="payload-edit-delete" data-action="remove-source" data-source-idx="' + idx + '" title="Remove this source">\u00d7</button>' +
           '</div>';
@@ -2338,7 +2337,7 @@ setInterval(function() {
     els.layersCount.textContent = '(' + layers.length + ')';
     var allEntries = entryNames();
     var header = '<div class="payload-edit-header layer-header">' +
-      '<span>Name</span><span title="How many chunks this layer’s payload is split across. One chunk rides each record, so it also = how many records it takes to collect one full copy of the layer.">Chunks</span><span>Reserved</span><span>Entry</span><span></span></div>';
+      '<span>Name</span><span title="How many chunks this layer’s payload is split across. One rides each record, so it also = records needed to collect one full copy of the layer.">Chunks</span><span>Reserved</span><span>Entry</span><span></span></div>';
     if (layers.length === 0) {
       els.layers.innerHTML = header + '<div class="payload-edit-row layer-row">' +
         '<span style="grid-column:1/-1; opacity:0.5; font-style:italic;">No layers defined.</span></div>';
@@ -3726,8 +3725,8 @@ setInterval(function() {
       '</div>' +
       '<div id="configIdentityDanger" class="config-danger-zone" style="display:none;"></div>' +
       '<p class="config-note advanced-only">Two irreversible key operations: ' +
-        '<strong>Rotate</strong> <button type="button" class="glossary-link" data-glossary="rotate_key" title="What does Rotate do?">?</button>' +
-        ' · <strong>Revoke</strong> <button type="button" class="glossary-link" data-glossary="revoke_key" title="What does Revoke do?">?</button>' +
+        '<strong>Rotate</strong> <button type="button" class="glossary-link" data-glossary="rotate_key" title="Rotate key">?</button>' +
+        ' · <strong>Revoke</strong> <button type="button" class="glossary-link" data-glossary="revoke_key" title="Revoke key">?</button>' +
       '</p>';
 
     document.getElementById('configSaveCreator').addEventListener('click', saveCreatorName);
@@ -3909,12 +3908,12 @@ setInterval(function() {
       '<div class="config-field">' +
       '  <span class="config-field-label">Catalog</span>' +
       '  <input class="config-input" id="configCatalogLimit" type="number" min="0" step="1" value="' + escapeHtml(String(catalogLimit)) + '" placeholder="500">' +
-      '  <span class="config-channel-field-hint">images kept on the public wall — the oldest are evicted past this count, not by age (0 = unlimited). Each kept image is staged on disk. Takes effect immediately.</span>' +
+      '  <span class="config-channel-field-hint">images kept on the public wall — oldest evicted past this count, not by age (0 = unlimited). Each is staged on disk. Takes effect immediately.</span>' +
       '</div>' +
-      '<p class="config-note advanced-only">TLS cert/key paths use the native file picker — no copy-pasting long paths:</p>' +
+      '<p class="config-note advanced-only">TLS cert/key paths use the native file picker:</p>' +
       '<ul class="config-note-list advanced-only">' +
         '<li>Empty = auto-detect from <code>~/.mememage/certs/</code> at startup.</li>' +
-        '<li>Cert / key / API-token changes need a server restart to take effect for new sessions.</li>' +
+        '<li>Cert / key / API-token changes need a server restart.</li>' +
       '</ul>' +
       '<div class="config-field config-field-with-browse advanced-only">' +
       '  <span class="config-field-label">TLS cert</span>' +
@@ -4754,9 +4753,9 @@ setInterval(function() {
       '  <button class="config-btn" id="configProfileNewBtn">+ New profile</button>' +
       '  <button class="config-btn advanced-only" id="configProfileImportBtn">Import existing key\u2026</button>' +
       '  <button class="config-btn advanced-only" id="configProfilePairBtn">Pair with another mememage\u2026</button>' +
-      '  <button class="config-btn advanced-only" id="configProfileSyncBtn" title="Push your chains / channels / webhooks to another mememage host (additive — peer keeps anything it already has)">Push config\u2026</button>' +
-      '  <button class="config-btn advanced-only" id="configProfileExportBtn" title="Download chains + channels (+ optionally webhooks) as a JSON file. Re-importable on this host or pushable to a peer\u2019s /api/sync/accept.">Export config\u2026</button>' +
-      '  <button class="config-btn advanced-only" id="configProfileImportFileBtn" title="Import a previously-exported config file. Additive — existing entries on this host are kept untouched.">Import config\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfileSyncBtn" title="Push your chains / channels / webhooks to another mememage host (additive)">Push config\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfileExportBtn" title="Download chains + channels (+ optionally webhooks) as a JSON file">Export config\u2026</button>' +
+      '  <button class="config-btn advanced-only" id="configProfileImportFileBtn" title="Import a previously-exported config file (additive)">Import config\u2026</button>' +
       '</div>' +
       '<div id="configProfileDanger" class="config-danger-zone" style="display:none;"></div>';
 
@@ -4918,7 +4917,7 @@ setInterval(function() {
     host.innerHTML =
       '<div class="config-pair-form">' +
       '  <p class="config-pair-head">Export config to file</p>' +
-      '  <p class="config-note">Downloads a JSON snapshot of your chains + channels (no credentials). Re-importable on this host or pushable to a peer via the existing Push flow.</p>' +
+      '  <p class="config-note">Downloads a JSON snapshot of your chains + channels (no credentials). Re-importable here or pushable to a peer.</p>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">Include</span>' +
       '    <div class="config-sync-categories">' +
@@ -5012,7 +5011,7 @@ setInterval(function() {
     host.innerHTML =
       '<div class="config-pair-form">' +
       '  <p class="config-pair-head">Import config from file</p>' +
-      '  <p class="config-note">Reads a JSON file previously produced by Export config (or a peer\u2019s sync export). Applies additively \u2014 entries this host already has are kept untouched, new ones are appended.</p>' +
+      '  <p class="config-note">Reads a JSON file produced by Export config (or a peer\u2019s sync export). Applies additively \u2014 existing entries are kept, new ones appended.</p>' +
       '  <div class="config-field">' +
       '    <span class="config-field-label">File</span>' +
       '    <input class="config-input" type="file" id="configImportFile" accept="application/json,.json">' +
@@ -5999,7 +5998,7 @@ setInterval(function() {
         '    <span class="config-field-label">Migrate into chain id</span>' +
         '    <input class="config-input" id="configChainMigrateId" type="text" value="aries" placeholder="aries / testing / scratch">' +
         '  </div>' +
-        '  <p class="config-note" style="margin-top:0.2rem;">If this was just testing and you want a clean slate, park it under a name like <code>testing</code> and create a fresh <code>aries</code> chain afterward via <em>+ New chain</em>.</p>' +
+        '  <p class="config-note" style="margin-top:0.2rem;">For a clean slate, park this under a name like <code>testing</code> and create a fresh <code>aries</code> chain via <em>+ New chain</em>.</p>' +
         '  <div class="config-row">' +
         '    <button class="config-btn config-btn-primary" id="configChainMigrateBtn">Migrate</button>' +
         '  </div>' +
@@ -6087,7 +6086,7 @@ setInterval(function() {
           // values read as "on" — collapsed to one tuned, invisible setting.)
           var watermarkRadio =
             '<div class="config-chain-gps" data-chain-id="' + escapeHtml(c.id) + '">' +
-              '<span class="config-chain-gps-label" title="Embeds a content-hash watermark across the whole image as a deeper, crop-resilient backup for the bar. Invisible in practice, survives Discord-style resharing. Read live at mint time — toggle anytime.">Watermark</span>' +
+              '<span class="config-chain-gps-label" title="Embeds a content-hash watermark across the whole image — a crop-resilient backup for the bar. Invisible in practice, survives Discord-style resharing. Read at mint time; toggle anytime.">Watermark</span>' +
               '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="off" ' +
                 (watermark === 'off' ? 'checked' : '') + ' data-chain-wm-set="' + escapeHtml(c.id) + '"> off</label>' +
               '<label><input type="radio" name="wm-' + escapeHtml(c.id) + '" value="on" ' +
@@ -6127,7 +6126,7 @@ setInterval(function() {
       '    <input class="config-input" id="configChainNewPrefix" type="text" maxlength="10" placeholder="mememage (default)" pattern="^[A-Za-z][A-Za-z0-9_-]{1,8}[A-Za-z0-9]$"></div>' +
       '  <p class="config-note advanced-only" id="configChainNewPrefixHint" style="margin-top:0;">' +
       '    Optional. Sets the identifier shape for this chain: <code>&lt;prefix&gt;-&lt;16 hex&gt;</code>. ' +
-      '    Leave blank to use the default <code>mememage</code>. ' +
+      '    Blank uses the default <code>mememage</code>. ' +
       '    Letters (any case), digits, <code>-</code>, <code>_</code>; 3\u201310 chars; ' +
       '    must start with a letter and end with a letter or digit. ' +
       '    Case is preserved \u2014 <code>MeMeMaGe</code> and <code>mememage</code> are distinct on IA. ' +
@@ -6335,7 +6334,7 @@ setInterval(function() {
       '<p class="config-note" style="margin-top:0.4rem;">Stored locally in <code>~/.mememage/chains/' + escapeHtml(chainId) + '/chain.json</code> at 0600 perms (owner-only).</p>' +
       '<ul class="config-note-list">' +
         '<li>Same threat model as your Ed25519 private key.</li>' +
-        '<li>To keep the password out of files entirely, leave this blank and set <code>MEMEMAGE_PASSWORD</code> in <code>.env</code> instead.</li>' +
+        '<li>To keep the password out of files, leave this blank and set <code>MEMEMAGE_PASSWORD</code> in <code>.env</code> instead.</li>' +
       '</ul>';
     var save = document.getElementById('configChainPwSave');
     var clear = document.getElementById('configChainPwClear');
@@ -6921,24 +6920,24 @@ setInterval(function() {
   var ENTRIES = [
     // --- The model ---
     { id: 'soul', label: 'Soul',
-      body: 'The metadata record — a structured JSON document carrying every fact about a conception. Stored as <code>.soul</code> files; lives wherever your surfaces carry it (peer mirror, archive, content-addressed network) plus your local disk. The soul is the meaning; the image is the body.' +
+      body: 'The metadata record — a JSON document carrying every fact about a conception. Stored as <code>.soul</code> files; lives wherever your surfaces carry it (peer mirror, archive, content-addressed network) plus your local disk. The soul is the meaning; the image is the body.' +
         '<pre class="glossary-snippet">{\n  "identifier":   "mememage-\u2026",\n  "content_hash": "\u2026",\n  "origin":       { /* your fields */ },\n  "birth":        { /* sky + machine + GPS */ },\n  "signature":    "\u2026",\n  /* \u2026more fields\u2026 */\n}</pre>' },
     { id: 'bar', label: 'Bar',
-      body: 'The 2-pixel-tall steganographic strip at the bottom of every conceived image. Carries the identifier (so any decoder can look up the soul) and the content hash (so tampering is detectable). Reed-Solomon FEC + color delimiter bands make it survive JPEG re-encoding and crops down to common social-media sizes.' },
+      body: 'The 2-pixel-tall steganographic strip at the bottom of every conceived image. Carries the identifier (so any decoder can look up the soul) and the content hash (so tampering is detectable). Reed-Solomon FEC + color delimiter bands let it survive JPEG re-encoding and crops down to common social-media sizes.' },
     { id: 'conception', label: 'Conception',
       body: 'The conscious act of binding a body (image) to a soul (metadata): the server hashes the record, signs it with your active key, writes the bar into the image, blasts the soul to your surfaces. GPS is mandatory by default; chains can opt out via <code>gps_source: none</code>.' },
     { id: 'identifier', label: 'Identifier',
-      body: 'The key for finding a soul. Format: <code>&lt;prefix&gt;-&lt;16 hex&gt;</code>. The prefix is set once per chain (default <code>mememage</code>, then locked), so each chain owns its namespace — you see <code>mememage-XXXX</code> on the chain cards. The 16 hex are a fingerprint of the conception: its details plus the moment it happened, so every conception is unique — even two mints of the same image. Lives in the bar; readers fetch the soul with it from any source — no URL in the pixels.' },
+      body: 'The key for finding a soul. Format: <code>&lt;prefix&gt;-&lt;16 hex&gt;</code>. The prefix is set once per chain (default <code>mememage</code>, then locked), so each chain owns its namespace — you see <code>mememage-XXXX</code> on the chain cards. The 16 hex are a fingerprint of the conception: its details plus the moment it happened, so every one is unique — even two mints of the same image. Lives in the bar; readers fetch the soul with it from any source — no URL in the pixels.' },
     { id: 'content_hash', label: 'Content hash',
       body: 'SHA-256 of the soul\u2019s canonical JSON, first 16 hex chars. Baked into the bar so anyone can verify a soul matches the image even when the file came from a stranger. The integrity authority — independent of where the soul was retrieved from.' },
 
     { id: 'origin', label: 'Origin fields',
-      body: 'The soul\u2019s open section: fields you declare about your image \u2014 title, creator, camera, a story, anything you want to attest to. Add, edit, or remove freely; the certificate\u2019s Origin panel shows whatever you put here. If the dropped image already carries embedded metadata (e.g. PNG text fields), it prefills these to save you typing.' },
+      body: 'The soul\u2019s open section: fields you declare about your image \u2014 title, creator, camera, a story, anything you want to attest to. Add, edit, or remove freely; the certificate\u2019s Origin panel shows whatever you put here. Embedded image metadata (e.g. PNG text fields) prefills these to save you typing.' },
     // --- Chains + Profiles ---
     { id: 'chain', label: 'Chain',
-      body: 'A universe of conceptions. Multiple chains let one host run separate provenance streams (a public art chain, a password-gated private chain, a test chain). Each chain has its own Age cycle, records, visibility setting, and (optionally) password. Chain shape — cycle length, payload layout, GPS contract — is per-chain configuration.' },
+      body: 'A universe of conceptions. Multiple chains let one host run separate provenance streams (a public art chain, a password-gated private chain, a test chain). Each has its own Age cycle, records, visibility, and (optionally) password. Chain shape — cycle length, payload layout, GPS contract — is per-chain configuration.' },
     { id: 'chain_badge', label: 'Chain badge',
-      body: 'The little badge shown on every chain — in Conceive, Payload, Config, on tickets, and on the conception page — so you always know which chain you’re on. It carries the <strong>official id</strong> (the slug, e.g. <code>watermark</code>) and the <strong>friendly name</strong> you can rename, plus a colored <strong>status dot</strong> that tells you the chain’s readiness at a glance:' +
+      body: 'The badge shown on every chain — in Conceive, Payload, Config, on tickets, and on the conception page — so you always know which chain you’re on. It carries the <strong>official id</strong> (the slug, e.g. <code>watermark</code>), a renameable <strong>friendly name</strong>, and a colored <strong>status dot</strong> for the chain’s readiness at a glance:' +
         '<div class="glossary-badge-legend">' +
           '<div><span class="chain-dot" data-state="ready"></span> <strong>Green — Ready.</strong> Sealed and good to conceive.</div>' +
           '<div><span class="chain-dot" data-state="nopayload"></span> <strong>Yellow — No payload.</strong> Provenance works; no distribution set up.</div>' +
@@ -6946,73 +6945,73 @@ setInterval(function() {
           '<div><span class="chain-dot" data-state="notready"></span> <strong>Red — Not ready.</strong> Needs a password, or no sealed Age yet.</div>' +
         '</div>' },
     { id: 'age', label: 'Age',
-      body: 'A version epoch of a chain. Records minted during an Age share the same decoder, ruleset, and cycle-position counter. Sealing locks the Age in place; the next Age begins fresh. Cycle length is per-chain configuration — the demo chain runs a 365-position year, but any chain can define its own cadence.' },
+      body: 'A version epoch of a chain. Records minted during an Age share the same decoder, ruleset, and cycle-position counter. Sealing locks the Age; the next begins fresh. Cycle length is per-chain — the demo chain runs a 365-position year, but any chain can define its own cadence.' },
     { id: 'constellation', label: 'Constellation',
-      body: 'A group of conceptions forming one constellation within an Age. The first conception (the <em>heart star</em>) names the family from its sky and conditions; subsequent stars are lettered in conception order. Family claims (constellation name + heart star id + position) are tamper-evident in the content hash.' },
+      body: 'A group of conceptions within an Age. The first (the <em>heart star</em>) names the family from its sky and conditions; subsequent stars are lettered in conception order. Family claims (constellation name + heart star id + position) are tamper-evident in the content hash.' },
     { id: 'heart_star', label: 'Heart star',
-      body: 'The first conception in a constellation — α. Its identifier names the family; the conditions at its conception (sky, vitals) seed the constellation\u2019s identity. Every subsequent star in the same constellation references back to this anchor.' },
+      body: 'The first conception in a constellation — α. Its identifier names the family; the conditions at its conception (sky, vitals) seed the constellation\u2019s identity. Every subsequent star references back to this anchor.' },
     { id: 'constellation_size', label: 'Constellation size',
       body: 'How many stars make one constellation (heart star + siblings) — a per-chain knob, 1\u201324, default 12. The same number is the data-chunk count (one chunk per star) and the span of Bayer letters that name the stars: <strong>\u03b1</strong> for the heart star, then \u03b2, \u03b3, \u03b4 \u2026 in birth order. Staged like Age length — it takes effect on the next Age for sealed chains.' },
     { id: 'profile', label: 'Profile',
-      body: 'One Ed25519 signing identity. <strong>One profile is active at a time</strong> — it\u2019s the key that signs your next conception. A human can carry many, typically one per machine, so a remote host (e.g. a VPS) never sees your laptop\u2019s primary key. Profiles link into one human identity via signed records, never shared key bytes: use <strong>Alias</strong> (run from each side) or <strong>Pair</strong> (a one-click cross-host handshake) — either way each side keeps its private key; only public keys move.' },
+      body: 'One Ed25519 signing identity. <strong>One profile is active at a time</strong> — the key that signs your next conception. A human can carry many, typically one per machine, so a remote host (e.g. a VPS) never sees your laptop\u2019s primary key. Profiles link into one human identity via signed records, never shared key bytes: use <strong>Alias</strong> (run from each side) or <strong>Pair</strong> (a one-click cross-host handshake) — either way each side keeps its private key; only public keys move.' },
     { id: 'active_profile', label: 'Active profile',
-      body: 'The profile whose key signs the next conception. One profile is active at a time per host. Switching is instant; the bar / notification / cert all reflect the new signer from the next conception onward.' },
+      body: 'The profile whose key signs the next conception. One is active at a time per host. Switching is instant; the bar / notification / cert all reflect the new signer from the next conception onward.' },
     { id: 'alias', label: 'Alias',
       body: 'A signed record naming another profile as a sibling. When both profiles sign matching aliases pointing at each other (bidirectional), verifiers recognize the keys as one human even though they\u2019re different keys.' },
     { id: 'pair', label: 'Pair (cross-host alias handshake)',
       body: 'One-click cross-host pairing: this host calls the peer, both sides sign aliases naming the other, both records get published. Achieves a bidirectional alias in one round-trip without copying private keys.' },
     { id: 'sync', label: 'Sync (config push)',
-      body: 'One-shot push of your chains + channels (+ optionally webhooks) to a peer host. Peer applies additively — existing entries are kept untouched. No private keys, no API tokens, no channel credentials cross the wire (webhooks excepted, with explicit opt-in).' },
+      body: 'One-shot push of your chains + channels (+ optionally webhooks) to a peer host. Peer applies additively — existing entries are kept. No private keys, no API tokens, no channel credentials cross the wire (webhooks excepted, with explicit opt-in).' },
 
     // --- Channels ---
     { id: 'channel', label: 'Surface',
-      body: 'A pluggable destination for souls — a place the soul lands. Every enabled + configured surface gets a copy on each conception; at least one must succeed. The <strong>primary</strong> surface’s URL becomes the bar’s record link and the notification target. Credentials always live in <code>.env</code> — each surface’s fields name the env var to read. Built-in types: <code>http_push</code> (a mememage host — your own server is seeded enabled as the default primary surface), <code>internet_archive</code> and <code>zenodo</code> (both <strong>opt-in</strong> — off until you add their credentials). Authors can register more (S3, IPFS, etc.).' },
+      body: 'A pluggable destination for souls. Every enabled + configured surface gets a copy on each conception; at least one must succeed. The <strong>primary</strong> surface’s URL becomes the bar’s record link and the notification target. Credentials live in <code>.env</code> — each surface’s fields name the env var to read. Built-in types: <code>http_push</code> (a mememage host — your own server is seeded enabled as the default primary surface), <code>internet_archive</code> and <code>zenodo</code> (both <strong>opt-in</strong> — off until you add their credentials). Authors can register more (S3, IPFS, etc.).' },
     { id: 'surface_cleanup', label: 'Surface cleanup',
-      body: 'Hide or empty items on any configured surface — clearing test mints before genesis, or general housekeeping. Each surface decides what it can do. <strong>Hide</strong> makes items invisible to public search (on the Internet Archive: noindex). <strong>Purge</strong> deletes content (IA: every file; the bucket survives as a tombstone). Identifiers may stay reserved (IA never releases a namespace) — but new mints compute fresh ones, so this is tidiness, not collision avoidance.' },
+      body: 'Hide or empty items on any configured surface — clearing test mints before genesis, or general housekeeping. Each surface decides what it can do. <strong>Hide</strong> makes items invisible to public search (Internet Archive: noindex). <strong>Purge</strong> deletes content (IA: every file; the bucket survives as a tombstone). Identifiers may stay reserved (IA never releases a namespace) — but new mints compute fresh ones, so this is tidiness, not collision avoidance.' },
     { id: 'primary', label: 'Primary surface',
       body: 'The one surface whose URL becomes <code>record.url</code> — the bar reference and the notification link. Exactly one surface can be primary at a time; promote / demote via the radio button.' },
     { id: 'per_profile_channels', label: 'Per-profile surfaces',
-      body: 'Each profile owns its own set of surfaces (its <code>channels.json</code>). Switching the active profile switches the whole blast setup \u2014 surfaces and their credentials \u2014 with no reconfiguring. A conception publishes to every enabled + configured surface in the active profile\u2019s set. To keep a profile (e.g. a VPS key) off a public archive, just don\u2019t add that surface to it.' },
+      body: 'Each profile owns its own set of surfaces (its <code>channels.json</code>). Switching the active profile switches the whole blast setup \u2014 surfaces and their credentials \u2014 no reconfiguring. A conception publishes to every enabled + configured surface in the active profile\u2019s set. To keep a profile (e.g. a VPS key) off a public archive, don\u2019t add that surface to it.' },
     { id: 'distribution', label: 'Distribution',
-      body: 'The server-side publish-results map (<code>{channel_id \u2192 url}</code>) returned by <code>channels.blast()</code>. Surfaced in webhook templates as <code>{{distribution}}</code> and in the dashboard handoff card after a mint completes. Not written into the soul itself \u2014 the artifact is surface-agnostic; mirror discovery is an operational concern handled by whoever serves the soul. Sovereignty signal lives in the system\u2019s design (any number of mirrors can serve any soul), not in a list baked into every record.' },
+      body: 'The server-side publish-results map (<code>{channel_id \u2192 url}</code>) returned by <code>channels.blast()</code>. Surfaced in webhook templates as <code>{{distribution}}</code> and in the dashboard handoff card after a mint completes. Not written into the soul itself \u2014 the artifact is surface-agnostic; mirror discovery is handled by whoever serves the soul. Any number of mirrors can serve any soul, so this is never baked into a record.' },
 
     // --- Sessions + Tickets ---
     { id: 'session', label: 'Session',
-      body: 'A pending conception not yet confirmed. Created when an image is staged on the dashboard, completes when the conception page POSTs back (with GPS if the chain requires it). Lives 7 days unless explicitly deleted.' },
+      body: 'A pending conception not yet confirmed. Created when an image is staged on the dashboard, completed when the conception page POSTs back (with GPS if the chain requires it). Lives 7 days unless deleted.' },
     { id: 'ticket', label: 'Ticket',
       body: 'Short 8-char prefix of a session token (e.g. <code>E33C9891</code>). Pasteable handle for resuming or deleting a pending session without dealing with the full token.' },
     { id: 'resume', label: 'Resume / Delete',
-      body: 'Bring a pending conception back up — to keep editing its fields or copy its handoff URL again. <strong>Delete</strong> throws a pending conception away for good, instead of waiting out its 7-day expiry. Both act on a pending session by its ticket (the short code).' },
+      body: 'Bring a pending conception back up — to keep editing its fields or copy its handoff URL again. <strong>Delete</strong> throws it away for good, instead of waiting out its 7-day expiry. Both act on a pending session by its ticket (the short code).' },
 
     // --- Verification badges ---
     { id: 'witnessed', label: 'WITNESSED',
       body: 'Hash match: the image\u2019s bar carries the same content_hash the soul claims. Body and soul are joined. Verifiable from any source — the hash is the authority.' },
     { id: 'authenticated', label: 'AUTHENTICATED',
-      body: 'Ed25519 signature verifies: only the holder of the signing key could have produced this record. The signature also binds the image\u2019s thumbnail (its hash is part of what is signed), so swapping the portrait breaks authorship — not just the visual EMBODIED check. Trust is silent (TOFU — Trust On First Use): the creator\u2019s name auto-appears on first encounter with no prompt, and later records under the same key inherit it.' },
+      body: 'Ed25519 signature verifies: only the holder of the signing key could have produced this record. The signature also binds the image\u2019s thumbnail hash, so swapping the portrait breaks authorship — not just the visual EMBODIED check. Trust is silent (TOFU — Trust On First Use): the creator\u2019s name auto-appears on first encounter, and later records under the same key inherit it.' },
     { id: 'embodied', label: 'EMBODIED',
       body: 'Portrait match via dHash: the image you have IS the original body (not a re-encode that happens to share the bar). Post-conception thumbnail comparison — protected by signature, not by the content hash.' },
 
     // --- Chain visibility + GPS ---
     { id: 'light_energy', label: 'Light chain',
-      body: 'Public chain. The soul is unencrypted — anyone with the identifier fetches and verifies it fully. GPS is the exception: coordinates are always sealed in a time-lock puzzle (recoverable by anyone in ~10 years), and a chain password, if set, lets the creator unlock them instantly.' },
+      body: 'Public chain. The soul is unencrypted — anyone with the identifier fetches and verifies it fully. GPS is the exception: coordinates are always sealed in a time-lock puzzle (recoverable by anyone in ~10 years), and a chain password, if set, unlocks them instantly for the creator.' },
     { id: 'dark_matter', label: 'Dark chain',
-      body: 'Password-gated chain. The whole soul is encrypted — your origin fields, dimensions, birth certificate, GPS, traits, rarity, thumbnail, and the content chunks. Readers need the chain password to unlock any of it. Only the public anchors (identifier, content_hash, hash_version) and the record\u2019s grid position stay visible — so the bar still verifies and the record still places in the Observatory.' },
+      body: 'Password-gated chain. The whole soul is encrypted — origin fields, dimensions, birth certificate, GPS, traits, rarity, thumbnail, and the content chunks. Readers need the chain password to unlock any of it. Only the public anchors (identifier, content_hash, hash_version) and the record\u2019s grid position stay visible — so the bar still verifies and the record still places in the Observatory.' },
     { id: 'access_layer', label: 'Access layer (chain password)',
       body: 'The third pillar of creator control, beside your signing key (identity) and the content hash (integrity): an optional password that encrypts what the world sees. On a <strong>Light chain</strong> it seals only the GPS (your private time capsule); on a <strong>Dark chain</strong> it seals the whole soul. Mememage never stores or learns it — you bring the key, we hold the lock: we encrypt, keep the ciphertext, and forget. Lose it and the sealed fields are unrecoverable.' },
     { id: 'gps_source', label: 'GPS source',
-      body: 'Chain-level setting for how location is captured at conception: <code>phone</code> (browser <code>watchPosition</code>, precise), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded — no time-lock puzzle). A <code>phone</code> chain automatically falls back to <code>machine</code> when no phone can reach this server (a loopback-only desktop with no Tailscale) — the conception handoff shows which source will actually be used, so the swap is never silent.' },
+      body: 'Chain-level setting for how location is captured at conception: <code>phone</code> (browser <code>watchPosition</code>, precise), <code>machine</code> (server-side IP geolocation, approximate), or <code>none</code> (no GPS recorded — no time-lock puzzle). A <code>phone</code> chain falls back to <code>machine</code> when no phone can reach this server (a loopback-only desktop with no Tailscale) — the conception handoff shows which source will be used, so the swap is never silent.' },
     { id: 'rotate_key', label: 'Rotate key',
       body: 'Generates a new Ed25519 keypair and signs a <strong>succession record</strong> with the OLD key, uploading it to the Internet Archive so verifiers can follow the keychain to your new key. Records signed by the old key still verify; everything minted afterward is signed by the new key. The old key is archived under the active profile’s keychain (<code>~/.mememage/profiles/&lt;profile&gt;/keychain/</code>).' },
     { id: 'revoke_key', label: 'Revoke key',
       body: 'Publishes the <strong>pre-signed revocation cert</strong> to the Internet Archive; every record ever signed by this key then shows a revocation warning once the cert propagates. Irreversible — use only if your private key is compromised. The cert was pre-signed at keygen, so an attacker who steals the key can’t forge a revocation, but neither can you un-revoke.' },
     { id: 'webhooks', label: 'Webhooks',
-      body: 'Outbound notifications fired on each mint — to Discord, Slack, Telegram, or a generic endpoint. Two events: <code>conceived</code> (image minted) and <code>ready</code> (the GPS-capture link is generated). Custom auth headers (e.g. a Discord bot token) aren’t editable in the dashboard — set them in <code>~/.mememage/server.json</code> directly; they’re preserved across saves.' },
+      body: 'Outbound notifications fired on each mint — to Discord, Slack, Telegram, or a generic endpoint. Two events: <code>conceived</code> (image minted) and <code>ready</code> (the GPS-capture link is generated). Custom auth headers (e.g. a Discord bot token) aren’t editable in the dashboard — set them in <code>~/.mememage/server.json</code>; they’re preserved across saves.' },
 
     // --- Misc tech ---
     { id: 'sigil', label: 'Sigil',
-      body: 'The name for a rare event: when the kernel\u2019s entropy at conception happens to contain the bar\u2019s magic bytes (<code>AD4E</code>) somewhere in the random hex. The image\u2019s identity radiating unbidden in pure noise. ~0.09% per conception; when it lands it adds to the rarity score and <strong>floors the tier to at least Rare</strong> \u2014 the rarest event in the system, guaranteed to change your tier.' },
+      body: 'A rare event: the kernel\u2019s entropy at conception happens to contain the bar\u2019s magic bytes (<code>AD4E</code>) somewhere in the random hex \u2014 the image\u2019s identity radiating unbidden in pure noise. ~0.09% per conception; when it lands it adds to the rarity score and <strong>floors the tier to at least Rare</strong>.' },
     { id: 'hash_version', label: 'Hash version',
-      body: 'Which inclusion set was used to compute this record\u2019s content_hash. Lets the system evolve which fields are tamper-evident without invalidating older records — verifiers dispatch on the field at hash time.' },
+      body: 'Which inclusion set was used to compute this record\u2019s content_hash. Lets the tamper-evident field set evolve without invalidating older records — verifiers dispatch on the field at hash time.' },
   ];
 
   // Build a lookup map for deep-linking.

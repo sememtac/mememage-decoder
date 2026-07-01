@@ -159,7 +159,7 @@ function sortKeysDeep(obj) {
 // Pure-JS SHA-256 fallback for environments where crypto.subtle is
 // unavailable. iOS Safari and most browsers gate crypto.subtle to
 // "secure contexts" — HTTPS with a publicly-trusted cert, or
-// http://localhost. The VPS at 160.153.182.117 with a self-signed
+// http://localhost. A VPS reached over a self-signed
 // cert doesn't qualify (Safari treats user-trusted self-signed
 // certs as insecure for API-gating purposes), so crypto.subtle is
 // undefined there. This fallback keeps the codec working in any
@@ -874,18 +874,6 @@ async function comparePortrait(droppedImageCanvas, thumbnailDataURI, lumaGridB64
     // defacement). gridScore is the worst exceedance, for the badge readout.
     gridOk = !(ev.markMax > LUMA_MARK || ev.highMax > LUMA_HIGH);
     gridScore = Math.round(Math.max(ev.markMax, ev.highMax));
-    // Diagnostic: confirm grid-32 ran and see why a mark did/didn't trip.
-    // console.log so it shows at the default level.
-    if (typeof console !== 'undefined') {
-      console.log('[embodied] luma grid', {
-        markMax: +ev.markMax.toFixed(1), mark: LUMA_MARK,
-        highMax: +ev.highMax.toFixed(1), high: LUMA_HIGH,
-        verdict: gridOk ? 'intact' : 'ALTERED',
-      });
-    }
-  } else if (lumaGridB64 && typeof console !== 'undefined') {
-    console.log('[embodied] luma grid present but not the current format — '
-      + 'skipping grid check (legacy/old-JS). Hard-refresh / re-mint if unexpected.');
   }
 
   var match = dHashOk && gridOk;
