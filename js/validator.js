@@ -842,7 +842,7 @@ var ROLE_META = {
   decoder:    { label: 'Decoder',    color: 'decoder', mime: 'text/html',  filename: 'index.html'             },
   validator:  { label: 'Validator',  color: 'validator', mime: 'text/html', filename: 'validator.html'         },
   truth:      { label: 'Truth',      color: 'truth',   mime: 'text/plain', filename: 'mememage-truth.txt'     },
-  schematic:  { label: 'Schematics', color: 'epag',    mime: 'image/svg+xml', filename: 'schematic.svg'      },
+  schematic:  { label: 'Schematics', color: 'epag',    mime: 'application/pdf', filename: 'schematic.pdf'     },
   claim:      { label: 'Claim',      color: 'epag',    mime: 'text/html',  filename: 'mememage-claim.html'    },
   easter_egg: { label: 'Easter Egg', color: 'egg',     mime: 'text/html',  filename: 'easter-egg.html'        },
 };
@@ -2617,16 +2617,21 @@ function buildOrbitInspector(records, collected) {
         var globalBucket = collected.indexed[role];
         if (!globalBucket) return;
         if (role === 'schematic') {
-          // Multiple files — one .svg per chunk.
+          // Multiple files — one per chunk. Sniff each so PDFs land as .pdf,
+          // SVGs as .svg, images as their own type — whatever figures the
+          // chain sealed, downloaded with the right extension.
           dlBtnColored(meta.label, meta.color, async function() {
             for (var i = 0; i < bucket.total; i++) {
               var c = globalBucket.chunks[i];
               if (!c) continue;
               var bytes = await gunzipBytes(c.data);
-              var b = new Blob([bytes], {type:'image/svg+xml'});
+              var sniffed = sniffBinaryType(bytes);
+              var mime = (sniffed && sniffed.mime) || meta.mime;
+              var ext = (sniffed && sniffed.ext) || 'bin';
+              var b = new Blob([bytes], {type: mime});
               var a = document.createElement('a');
               a.href = URL.createObjectURL(b);
-              a.download = 'schematic-' + (i + 1) + '.svg';
+              a.download = 'schematic-' + (i + 1) + '.' + ext;
               a.click();
             }
           });
