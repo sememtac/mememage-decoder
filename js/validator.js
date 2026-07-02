@@ -412,24 +412,65 @@ function analyze(file){
       // detail, JPEG to keep the data URL from ballooning.
       var fullUri = (w <= tw) ? thumbUri : res.canvas.toDataURL('image/jpeg', 0.95);
 
-      var barOk=!!decoded;
-      var cls=barOk?'both':'lost';
-      var label=barOk?'Bar Survived':'Bar Lost';
-
-      // file.name + file.type are user-controlled (drag-and-drop); decoded.*
-      // is bar-validated (format-checked by decodePayload) but escape on
-      // principle so a future codec change can't surprise us.
-      var safeName = escapeHtml(file.name);
-      var safeType = escapeHtml(file.type || file.name.split('.').pop());
-      var safeHash = escapeHtml(decoded ? decoded.content_hash : '');
-      var safeId   = escapeHtml(decoded ? (decoded.identifier || '') : '');
+      // === Whole-image header (once) ===
+      // Capture full-image buffers before the per-bar loop shadows px/w/h.
+      var _opx = px, _ow = w, _oh = h;
+      var _oname = escapeHtml(file.name);
+      var _otype = escapeHtml(file.type || file.name.split('.').pop());
+      // EVERY decodable bar, any placement (mirrors bar.py:extract_bars); each
+      // gets its OWN full diagnostic panel below. Fall back to the primary
+      // decode attempt when nothing decoded (bar detected but unreadable).
+      var allBars = (typeof decodeAllBars === 'function') ? decodeAllBars(_opx, _ow, _oh) : [];
+      var barList = allBars.length ? allBars : [{
+        identifier: decoded ? decoded.identifier : null,
+        content_hash: decoded ? decoded.content_hash : null,
+        barRow: barBottom, x0: 0, x1: _ow - 1, fullWidth: true, ppb: barPpb, frame: barFrame }];
 
       var o='<div class="ev">';
-      o+='<div class="ev-h '+cls+'"><span class="ev-t">'+safeName+'</span><span class="ev-b '+cls+'">'+label+'</span></div>';
+      o+='<div class="ev-h '+(decoded?'both':'lost')+'"><span class="ev-t">'+_oname+'</span><span class="ev-b '+(decoded?'both':'lost')+'">'+(barList.length>1?barList.length+' bars':(decoded?'Bar Survived':'Bar Lost'))+'</span></div>';
       o+='<div class="ev-body">';
+      o+='<div class="ev-sec">Image</div><div class="ev-g">';
+      o+='<div class="ev-m"><div class="ev-ml">Size</div><div class="ev-mv">'+(file.size/1024).toFixed(0)+' KB</div></div>';
+      o+='<div class="ev-m"><div class="ev-ml">Dimensions</div><div class="ev-mv">'+_ow+' × '+_oh+'</div></div>';
+      o+='<div class="ev-m"><div class="ev-ml">Format</div><div class="ev-mv">'+_otype+'</div></div>';
+      o+='<div class="ev-m"><div class="ev-ml">Bars detected</div><div class="ev-mv">'+barList.length+'</div></div>';
+      o+='</div>';
+
+      // === One full diagnostic panel per detected bar ===
+      barList.forEach(function(bar, idx){
+        // Crop the bar's region so an offset/pasted bar is analysed as if flush
+        // at the bottom; the section code below (unchanged) reads px/w/h etc.,
+        // which we SHADOW here to the crop. The watermark diff still uses the
+        // whole image (_opx/_ow/_oh), keyed by THIS bar's hash.
+        var _x0 = bar.fullWidth ? 0 : bar.x0, _x1 = bar.fullWidth ? _ow - 1 : bar.x1;
+        var _crop = _cropPixels(_opx, _ow, _x0, _x1, bar.barRow);
+        var px = _crop.px, w = _crop.w, h = _crop.h;
+        var res = { canvas: (function(){ var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').putImageData(new ImageData(px, w, h), 0, 0); return c; })() };
+        var decoded = bar.identifier ? { identifier: bar.identifier, content_hash: bar.content_hash } : null;
+        var barFrame = bar.frame, barPpb = bar.ppb || 3;
+        var barBottom = h - 1, barEffH = h;
+        var barBright = extractBitBrightness(px, w, barEffH, barPpb);
+        var barH = Math.min(16, h), barTop = Math.max(0, barBottom - barH + 1);
+        var _bc = document.createElement('canvas'); _bc.width=w; _bc.height=barH*4;
+        var _bctx=_bc.getContext('2d'); _bctx.imageSmoothingEnabled=false; _bctx.drawImage(res.canvas,0,barTop,w,barH,0,0,w,barH*4);
+        var barUri = _bc.toDataURL('image/png');
+        var bands={},bandRaw={},idealBands={M:[255,0,255],Y:[255,255,0],C:[0,255,255]};
+        if(h>=2&&w>=50){var _by=barBottom,_bmid=Math.floor(HEADER_BAND/2);
+          for(var _bbi=0;_bbi<3;_bbi++){var _bpos=_bbi*HEADER_BAND+_bmid;var _bidx=(_by*w+_bpos)*4;var _blbl=['M','Y','C'][_bbi];
+            bands[_blbl]='rgb('+px[_bidx]+','+px[_bidx+1]+','+px[_bidx+2]+')';bandRaw[_blbl]=[px[_bidx],px[_bidx+1],px[_bidx+2]];}}
+        var safeHash = escapeHtml(decoded ? decoded.content_hash : '');
+        var safeId   = escapeHtml(decoded ? (decoded.identifier || '') : '');
+        var _place = bar.fullWidth ? (bar.barRow >= _oh - 2 ? 'bottom edge (standard)' : 'row '+bar.barRow+', full width')
+                                   : 'row '+bar.barRow+', x'+bar.x0+'–'+bar.x1+' (offset)';
+        o+='<div style="border:1px solid #1a1a2a;border-radius:5px;margin:0.4rem 0;overflow:hidden;">';
+        o+='<div onclick="var d=document.getElementById(\'barpanel-'+idx+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';" style="padding:0.45rem 0.6rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;background:rgba(255,255,255,0.04);">';
+        o+='<span style="font-size:0.7rem;color:'+(decoded?'#4ade80':'#f87171')+';">'+(decoded?'●':'○')+'</span>';
+        o+='<span style="font-size:0.72rem;font-family:monospace;color:#d0d0d8;">'+(decoded?escapeHtml(decoded.identifier.slice(-16)):'unreadable')+'</span>';
+        o+='<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+_place+'</span></div>';
+        o+='<div id="barpanel-'+idx+'" style="display:'+(idx===0?'block':'none')+';padding:0.1rem 0.6rem 0.5rem;">';
 
       // Bar region
-      o+='<div class="ev-sec">Bar Region ('+(barBottom<h-1?'offset @ row '+barBottom:'bottom')+', '+barH+'px, 4x zoom)</div>';
+      o+='<div class="ev-sec">Bar Region ('+_place+', '+barH+'px, 4x zoom)</div>';
       o+='<img src="'+barUri+'" class="bar-img bar-zoom" alt="Bar region"/>';
 
       // Bar results
@@ -443,45 +484,8 @@ function analyze(file){
         o+='<div class="ev-m"><div class="ev-ml">Status</div><div class="ev-mv fail">LOST</div></div>';
         o+='<div class="ev-m w"><div class="ev-ml">Diagnosis</div><div class="ev-mv fail">'+(detected?'M/Y/C bands detected but data unreadable \u2014 compression destroyed brightness encoding':'No M/Y/C bands found \u2014 image cropped, resized, or not a Mememage image')+'</div></div>';
       }
-      // File info
-      o+='<div class="ev-m"><div class="ev-ml">Size</div><div class="ev-mv">'+(file.size/1024).toFixed(0)+' KB</div></div>';
-      o+='<div class="ev-m"><div class="ev-ml">Dimensions</div><div class="ev-mv">'+w+' \u00d7 '+h+'</div></div>';
-      o+='<div class="ev-m"><div class="ev-ml">Format</div><div class="ev-mv">'+safeType+'</div></div>';
       if(bands.M)o+='<div class="ev-m"><div class="ev-ml">M / Y / C</div><div class="ev-mv" style="font-size:0.68rem;">'+bands.M+' '+bands.Y+' '+bands.C+'</div></div>';
       o+='</div>';
-
-      // Bars detected — EVERY decodable bar in the image (all placements),
-      // filled async so the full-canvas multi-scan doesn't block the report.
-      // Reveals buried / off-position bars; each row expands to its identifier,
-      // content hash, and where on the canvas it sits.
-      o+='<div class="ev-sec">Bars detected</div>';
-      o+='<div id="barsDetected"><span style="font-size:0.65rem;color:#8a8a9a;">scanning for bars…</span></div>';
-      _runWhenMounted('barsDetected', function(){
-        var allBars = (typeof decodeAllBars === 'function') ? decodeAllBars(px, w, h) : [];
-        var host = document.getElementById('barsDetected');
-        if (!host) return;
-        if (!allBars.length) { host.innerHTML = '<div style="font-size:0.65rem;color:#8a8a9a;">none</div>'; return; }
-        var bh = '<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">'+allBars.length+' bar'+(allBars.length>1?'s':'')+' found'+(allBars.length>1?' — click a row to expand':'')+'.</div>';
-        allBars.forEach(function(bd, i){
-          var place = bd.fullWidth
-            ? (bd.barRow >= h - 2 ? 'bottom edge (standard)' : 'row '+bd.barRow+', full width')
-            : 'row '+bd.barRow+', x'+bd.x0+'–'+bd.x1+' (offset)';
-          var sid = escapeHtml(bd.identifier), did = 'bard-'+i;
-          var open = allBars.length === 1;
-          bh += '<div style="border:1px solid #1a1a2a;border-radius:4px;margin-bottom:0.3rem;overflow:hidden;">';
-          bh += '<div onclick="var d=document.getElementById(\''+did+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';" style="padding:0.4rem 0.5rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;background:rgba(255,255,255,0.03);">';
-          bh += '<span style="font-size:0.72rem;color:#8a8a9a;">▾</span>';
-          bh += '<span style="font-size:0.7rem;font-family:monospace;color:#d0d0d8;">'+escapeHtml(bd.identifier.slice(-16))+'</span>';
-          bh += '<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+place+'</span></div>';
-          bh += '<div id="'+did+'" style="display:'+(open?'block':'none')+';padding:0.4rem 0.5rem;background:rgba(24,24,28,0.6);"><div class="ev-g">';
-          bh += '<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv"><a href="#" class="audit-link" data-id="'+sid+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+sid+'</a></div></div>';
-          bh += '<div class="ev-m"><div class="ev-ml">Content Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+escapeHtml(bd.content_hash)+'</div></div>';
-          bh += '<div class="ev-m"><div class="ev-ml">Placement</div><div class="ev-mv">'+place+'</div></div>';
-          bh += '<div class="ev-m"><div class="ev-ml">Bit width</div><div class="ev-mv">'+bd.ppb+'px/bit</div></div>';
-          bh += '</div></div></div>';
-        });
-        host.innerHTML = bh;
-      });
 
       // Bar Bit Confidence
       if(barBright&&barBright.length>0){
@@ -506,8 +510,11 @@ function analyze(file){
       // findable. Runs client-side (docs/js/watermark.js) — no backend.
       try {
         if (typeof extractWatermark === 'function') {
+          // Whole-image extraction (the watermark spans the whole body, not the
+          // bar crop) diffed against THIS bar's hash — the watermark carries the
+          // content hash, so a match ties the pixels to this bar independently.
           var wmHash = decoded ? decoded.content_hash : null;
-          var wm = extractWatermark(px, w, h, wmHash);
+          var wm = extractWatermark(_opx, _ow, _oh, wmHash);
           o += '<div class="ev-sec">Watermark</div><div class="ev-g">';
           if (wm) {
             var wmMatch = decoded && wm.hash === decoded.content_hash;
@@ -646,15 +653,15 @@ function analyze(file){
           // deferring + yielding between scales keeps the UI alive and fills
           // each row progressively.
           scales.forEach(function(s, i){
-            o += '<div id="scaleRow-' + i + '" style="padding:0.4rem 0.5rem;background:rgba(40,40,60,0.05);border-left:3px solid rgba(120,120,140,0.3);border-radius:4px;margin-bottom:0.3rem;">';
+            o += '<div id="scaleRow-' + idx + '-' + i + '" style="padding:0.4rem 0.5rem;background:rgba(40,40,60,0.05);border-left:3px solid rgba(120,120,140,0.3);border-radius:4px;margin-bottom:0.3rem;">';
             o += '<div style="display:flex;align-items:center;gap:0.6rem;">';
             o += '<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">' + s.toFixed(2) + '×</span>';
             o += '<span style="font-size:0.65rem;color:#8a8a9a;">analyzing…</span>';
             o += '</div></div>';
           });
-          o += '<div id="scaleFloor" style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Measuring floor…</div>';
+          o += '<div id="scaleFloor-' + idx + '" style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">Measuring floor…</div>';
           // Defer the heavy re-reads until after the panel is in the DOM.
-          _runWhenMounted('scaleRow-0', async function(){
+          _runWhenMounted('scaleRow-' + idx + '-0', async function(){
             var lowestOk = null;
             for (var sIdx = 0; sIdx < scales.length; sIdx++) {
               var s = scales[sIdx];
@@ -677,7 +684,7 @@ function analyze(file){
                 sUri = sbc.toDataURL('image/png');
               } catch (e) { sok = false; }
               if (sok) lowestOk = s;
-              var row = document.getElementById('scaleRow-' + sIdx);
+              var row = document.getElementById('scaleRow-' + idx + '-' + sIdx);
               if (row) {
                 var sBg = sok ? 'rgba(74,158,74,0.08)' : 'rgba(180,60,60,0.06)';
                 var sBd = sok ? 'rgba(74,158,74,0.5)' : 'rgba(180,60,60,0.4)';
@@ -696,7 +703,7 @@ function analyze(file){
               // Yield so the UI can paint between heavy scales.
               await new Promise(function(r){ setTimeout(r, 0); });
             }
-            var floor = document.getElementById('scaleFloor');
+            var floor = document.getElementById('scaleFloor-' + idx);
             if (floor) {
               var floorTxt = lowestOk ? ('survives down to ~'+lowestOk.toFixed(2)+'×') : ('lost even at 0.90× — unusually fragile, check the source');
               floor.innerHTML = 'Measured floor: <span style="font-weight:600;">'+floorTxt+'</span>.';
@@ -769,7 +776,7 @@ function analyze(file){
       }
       // Render placeholder rows; fill them in async.
       jpegLevels.forEach(function(q){
-        o += '<div id="jpegRow-' + q + '" style="padding:0.4rem 0.5rem;background:rgba(40,40,60,0.05);border-left:3px solid rgba(120,120,140,0.3);border-radius:4px;margin-bottom:0.3rem;">';
+        o += '<div id="jpegRow-' + idx + '-' + q + '" style="padding:0.4rem 0.5rem;background:rgba(40,40,60,0.05);border-left:3px solid rgba(120,120,140,0.3);border-radius:4px;margin-bottom:0.3rem;">';
         o += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">';
         o += '<span style="font-size:0.85rem;color:#c0c0d0;font-weight:700;">q' + q + '</span>';
         o += '<span style="font-size:0.65rem;color:#8a8a9a;">analyzing\u2026</span>';
@@ -777,10 +784,10 @@ function analyze(file){
       });
       // Fill the rows once they're actually mounted (PanelSwap may defer the
       // insertion via a cross-fade — see _runWhenMounted).
-      _runWhenMounted('jpegRow-95', async function(){
+      _runWhenMounted('jpegRow-' + idx + '-95', async function(){
         for (var qi = 0; qi < jpegLevels.length; qi++) {
           var r = await jpegOneLevel(jpegLevels[qi]);
-          var row = document.getElementById('jpegRow-' + r.q);
+          var row = document.getElementById('jpegRow-' + idx + '-' + r.q);
           if (!row) continue;
           var rowBg = r.ok ? 'rgba(74,158,74,0.08)' : 'rgba(180,60,60,0.06)';
           var rowBdr = r.ok ? 'rgba(74,158,74,0.5)' : 'rgba(180,60,60,0.4)';
@@ -802,7 +809,11 @@ function analyze(file){
         }
       });
 
-      // Image thumbnail
+        o+='</div>';   // close #barpanel-idx (this bar's diagnostic body)
+        o+='</div>';   // close the bar panel wrapper
+      });               // close barList.forEach — one full panel per detected bar
+
+      // Image thumbnail (whole image, once)
       o+='<div class="ev-sec">Image</div>';
       o+='<img src="'+thumbUri+'" class="img-zoom" data-full="'+fullUri+'" style="width:100%;border-radius:6px;margin:0.3rem 0;"/>';
 

@@ -268,7 +268,8 @@ function decodeAllBars(px, W, H) {
     if (seen[key]) return;
     seen[key] = true;
     out.push({ identifier: d.identifier, content_hash: d.content_hash,
-               barRow: row, x0: x0, x1: x1, fullWidth: fullWidth, ppb: hit.ppb });
+               barRow: row, x0: x0, x1: x1, fullWidth: fullWidth, ppb: hit.ppb,
+               frame: hit.frame });
   }
   for (var b = H - 1; b >= SIG_ROWS; b--) {
     if (detectBar(px, W, b + 1)) add(_decodeFrameAtHeight(px, W, b + 1), b, 0, W - 1, true);
