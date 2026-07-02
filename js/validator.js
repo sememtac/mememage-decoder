@@ -450,6 +450,39 @@ function analyze(file){
       if(bands.M)o+='<div class="ev-m"><div class="ev-ml">M / Y / C</div><div class="ev-mv" style="font-size:0.68rem;">'+bands.M+' '+bands.Y+' '+bands.C+'</div></div>';
       o+='</div>';
 
+      // Bars detected — EVERY decodable bar in the image (all placements),
+      // filled async so the full-canvas multi-scan doesn't block the report.
+      // Reveals buried / off-position bars; each row expands to its identifier,
+      // content hash, and where on the canvas it sits.
+      o+='<div class="ev-sec">Bars detected</div>';
+      o+='<div id="barsDetected"><span style="font-size:0.65rem;color:#8a8a9a;">scanning for bars…</span></div>';
+      _runWhenMounted('barsDetected', function(){
+        var allBars = (typeof decodeAllBars === 'function') ? decodeAllBars(px, w, h) : [];
+        var host = document.getElementById('barsDetected');
+        if (!host) return;
+        if (!allBars.length) { host.innerHTML = '<div style="font-size:0.65rem;color:#8a8a9a;">none</div>'; return; }
+        var bh = '<div style="font-size:0.62rem;color:#8a8a9a;margin-bottom:0.3rem;">'+allBars.length+' bar'+(allBars.length>1?'s':'')+' found'+(allBars.length>1?' — click a row to expand':'')+'.</div>';
+        allBars.forEach(function(bd, i){
+          var place = bd.fullWidth
+            ? (bd.barRow >= h - 2 ? 'bottom edge (standard)' : 'row '+bd.barRow+', full width')
+            : 'row '+bd.barRow+', x'+bd.x0+'–'+bd.x1+' (offset)';
+          var sid = escapeHtml(bd.identifier), did = 'bard-'+i;
+          var open = allBars.length === 1;
+          bh += '<div style="border:1px solid #1a1a2a;border-radius:4px;margin-bottom:0.3rem;overflow:hidden;">';
+          bh += '<div onclick="var d=document.getElementById(\''+did+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\';" style="padding:0.4rem 0.5rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;background:rgba(255,255,255,0.03);">';
+          bh += '<span style="font-size:0.72rem;color:#8a8a9a;">▾</span>';
+          bh += '<span style="font-size:0.7rem;font-family:monospace;color:#d0d0d8;">'+escapeHtml(bd.identifier.slice(-16))+'</span>';
+          bh += '<span style="font-size:0.58rem;color:#8a8a9a;margin-left:auto;">'+place+'</span></div>';
+          bh += '<div id="'+did+'" style="display:'+(open?'block':'none')+';padding:0.4rem 0.5rem;background:rgba(24,24,28,0.6);"><div class="ev-g">';
+          bh += '<div class="ev-m"><div class="ev-ml">Identifier</div><div class="ev-mv"><a href="#" class="audit-link" data-id="'+sid+'" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,0.2);cursor:pointer;">'+sid+'</a></div></div>';
+          bh += '<div class="ev-m"><div class="ev-ml">Content Hash</div><div class="ev-mv" style="font-size:0.68rem;">'+escapeHtml(bd.content_hash)+'</div></div>';
+          bh += '<div class="ev-m"><div class="ev-ml">Placement</div><div class="ev-mv">'+place+'</div></div>';
+          bh += '<div class="ev-m"><div class="ev-ml">Bit width</div><div class="ev-mv">'+bd.ppb+'px/bit</div></div>';
+          bh += '</div></div></div>';
+        });
+        host.innerHTML = bh;
+      });
+
       // Bar Bit Confidence
       if(barBright&&barBright.length>0){
         o+='<div class="ev-sec">Bar Bit Confidence</div>';

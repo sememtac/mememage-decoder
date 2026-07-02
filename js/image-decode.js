@@ -249,3 +249,38 @@ function _decodeFrameAtHeight(px, w, h) {
   }
   return null;
 }
+
+// Find EVERY decodable bar in the image, each with its placement — the union
+// of the edge-anchored vertical scan (bottom / different-height, full width)
+// and the full-canvas band search (offset / pasted), de-duped by payload.
+// Mirrors bar.py:extract_bars. Each entry:
+//   { identifier, content_hash, barRow, x0, x1, fullWidth, ppb }
+// Heavier than a single decode (it scans every row and doesn't stop at the
+// first hit), so the validator runs it on a dropped image where the user is
+// already waiting for a forensic report; bounded to <=16M px.
+function decodeAllBars(px, W, H) {
+  var out = [], seen = {};
+  function add(hit, row, x0, x1, fullWidth) {
+    if (!hit) return;
+    var d = decodePayload(hit.frame.payload);
+    if (!d) return;
+    var key = d.identifier + '|' + d.content_hash;
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push({ identifier: d.identifier, content_hash: d.content_hash,
+               barRow: row, x0: x0, x1: x1, fullWidth: fullWidth, ppb: hit.ppb });
+  }
+  for (var b = H - 1; b >= SIG_ROWS; b--) {
+    if (detectBar(px, W, b + 1)) add(_decodeFrameAtHeight(px, W, b + 1), b, 0, W - 1, true);
+  }
+  if (W * H <= 16000000) {
+    for (var ay = H - 1; ay >= SIG_ROWS; ay--) {
+      var span = _barHspan(px, W, H, ay);
+      if (span) {
+        var cr = _cropPixels(px, W, span[0], span[1], ay);
+        add(_decodeFrameAtHeight(cr.px, cr.w, cr.h), ay, span[0], span[1], false);
+      }
+    }
+  }
+  return out;
+}
