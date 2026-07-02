@@ -31,6 +31,68 @@
 //     error: string | null         — error string on any failure
 //   }
 // =====================================================================
+// --- Full-canvas band search — locate a relocated/pasted bar anywhere ---
+// Mirrors bar.py's _bar_hspan / _scan_anywhere. The M/Y/C↔C/Y/M bands are a
+// "data begins/ends here" fiducial, so a bar whose canvas was extended
+// (side/top/bottom margins) or that was pasted into a larger image can still be
+// found: scan a row's colour runs for the header (M,Y,C) and footer (C,Y,M)
+// ANYWHERE, crop to that span, and decode it flush. CRC + RS reject false band
+// matches. Runs only after the fast + edge-anchored vertical scans fail.
+var _HSPAN_MIN_RUN = 3;
+
+function _rowColorRuns(px, w, y) {
+  var runs = [], x = 0, base = y * w * 4;
+  function cls(i) {
+    var r = px[base + i * 4], g = px[base + i * 4 + 1], b = px[base + i * 4 + 2];
+    if (r > 130 && g < 120 && b > 130) return 'M';
+    if (r > 130 && g > 130 && b < 120) return 'Y';
+    if (r < 120 && g > 130 && b > 130) return 'C';
+    return '.';
+  }
+  while (x < w) {
+    var c = cls(x);
+    if (c === '.') { x++; continue; }
+    var j = x + 1;
+    while (j < w && cls(j) === c) j++;
+    runs.push([c, x, j - x]);
+    x = j;
+  }
+  return runs;
+}
+
+function _barHspan(px, w, h, y) {
+  if (y < SIG_ROWS || y >= h || w < 2 * _HSPAN_MIN_RUN * 3) return null;
+  var all = _rowColorRuns(px, w, y), runs = [];
+  for (var i = 0; i < all.length; i++) if (all[i][2] >= _HSPAN_MIN_RUN) runs.push(all[i]);
+  if (runs.length < 6) return null;
+  function adjacent(k0, seq) {
+    for (var k = 0; k < 3; k++) if (runs[k0 + k][0] !== seq[k]) return false;
+    for (var g = 0; g < 2; g++) {
+      var gap = runs[k0 + g + 1][1] - (runs[k0 + g][1] + runs[k0 + g][2]);
+      if (gap < 0 || gap > 4) return false;
+    }
+    return true;
+  }
+  var x0 = null;
+  for (var a = 0; a <= runs.length - 3; a++) if (adjacent(a, ['M', 'Y', 'C'])) { x0 = runs[a][1]; break; }
+  if (x0 === null) return null;
+  var x1 = null;
+  for (var b = runs.length - 3; b >= 0; b--) if (adjacent(b, ['C', 'Y', 'M'])) { x1 = runs[b + 2][1] + runs[b + 2][2] - 1; break; }
+  if (x1 === null || x1 - x0 + 1 < 2 * _HSPAN_MIN_RUN * 3) return null;
+  return [x0, x1];
+}
+
+function _cropPixels(px, w, x0, x1, yBottom) {
+  var cw = x1 - x0 + 1, ch = yBottom + 1;
+  var out = new Uint8ClampedArray(cw * ch * 4);
+  var rowBytes = cw * 4;
+  for (var yy = 0; yy < ch; yy++) {
+    var src = (yy * w + x0) * 4, dst = yy * rowBytes;
+    for (var k = 0; k < rowBytes; k++) out[dst + k] = px[src + k];
+  }
+  return { px: out, w: cw, h: ch };
+}
+
 async function decodeImageBar(file) {
   var objUrl = URL.createObjectURL(file);
   var img = new Image();
@@ -93,6 +155,22 @@ async function decodeImageBar(file) {
   if (!hit) {
     for (var b = H - 1; b >= SIG_ROWS && !hit; b--) {
       if (detectBar(px, W, b + 1)) { hit = _decodeFrameAtHeight(px, W, b + 1); if (hit) barRow = b; }
+    }
+  }
+
+  // Last resort: the bar isn't bottom-anchored OR full-width — its canvas was
+  // extended (margins) or it was pasted into a larger image. Find it by its
+  // band signature anywhere, crop to that span, decode flush. Mirrors
+  // bar.py:_scan_anywhere. Bounded to keep the UI responsive (it's a rare
+  // fallback and a per-row full-width band scan is O(W·H)).
+  if (!hit && W * H <= 16000000) {
+    for (var ay = H - 1; ay >= SIG_ROWS && !hit; ay--) {
+      var span = _barHspan(px, W, H, ay);
+      if (span) {
+        var cr = _cropPixels(px, W, span[0], span[1], ay);
+        var chit = _decodeFrameAtHeight(cr.px, cr.w, cr.h);
+        if (chit) { hit = chit; barRow = ay; }
+      }
     }
   }
   if (hit) { frame = hit.frame; usedPpb = hit.ppb; detected = true; }
